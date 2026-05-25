@@ -3,8 +3,8 @@
 This directory contains Pi Agent extensions and PSM browser-plugin examples.
 
 For plugin authoring workflow, see [`agent-docs/06-plugins.md`](../agent-docs/06-plugins.md).
-For the PSM plugin SDK, see [`docs/PSM_PLUGIN_SDK.md`](../docs/PSM_PLUGIN_SDK.md).
-For the current SDK capability audit and contract gaps, see [`docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md`](../docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md).
+For the public PSM plugin contract, see [`docs/PSM_PLUGIN_SDK.md`](../docs/PSM_PLUGIN_SDK.md).
+For the current SDK capability audit and remaining gaps, see [`docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md`](../docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md).
 
 The Settings -> PSM Plugins page is a source-grouped list:
 
@@ -32,26 +32,14 @@ If the plugin renders React UI, follow the host React pattern used by
 `extensions/psm-cache-usage-path`: read `globalThis.__PSM_HOST_REACT__` through a
 small `hostReact()` helper instead of importing a separate React runtime.
 
----
-
-## PSM Plugins
-
-| Plugin | Purpose | Permissions |
-| --- | --- | --- |
-| [psm-kanban-board](./psm-kanban-board/) | Provides an app-level board view plus a sidebar bound with `appViewId` through `ctx.ui.registerAppView(...)` / `ctx.ui.registerAppSidebarView(...)` | `sessions:read`, `tags:read`, `tags:write`, `config:read`, `config:write` |
-| [psm-session-summary](./psm-session-summary/) | Generates session intelligence and writes `session.intelligence` plugin records | `sessions:read`, `records:read`, `records:write`, `model:invoke` |
-| [psm-sidechat](./psm-sidechat/) | Session Q&A command/tool and toolbar panel example | `sessions:read`, `model:invoke`, `records:read`, `records:write` |
-| [psm-trace](./psm-trace/) | Session trace analytics main view parsed in the plugin runtime | `sessions:read` |
-| [psm-word-cloud](./psm-word-cloud/) | Demonstrates Cmd+K plugin commands plus global/project user-message word cloud app views from session-list preview fields | `config:read`, `config:write` |
-
-### SDK Capability Notes
+## SDK Capability Notes
 
 The public SDK package is `@pi-session-manager/plugin-sdk`. It intentionally exposes only the stable browser-plugin contract:
 
 - manifest and package validation helpers
 - plugin host context and activation types
 - command/tool registration
-- app-view, app-sidebar, session toolbar, main-view, and right-panel UI contributions
+- app-view, app-sidebar, session toolbar, main-view, panel, tree-view, and tool-renderer UI contributions
 - plugin settings and i18n clients
 - the `ctx.psm` capability client for selected plugin-safe PSM operations
 
@@ -64,168 +52,56 @@ Current `ctx.psm` namespaces:
 | `records` | `search`, `listForScope`, `upsert`, `refreshSessionIntelligence` |
 | `sessions` | `scan`, `list`, `readEntries`, `readFileChunk`, `getLabels`, `open` |
 | `search` | `fulltext`, `pluginRecords` |
-| `sidechat` | `ask` |
+| `sidechat` | `ask`, `askStream` |
 | `models` | `listOptions` |
 | `tags` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` |
 | `config` | `read`, `write` |
 
+## PSM Plugins
+
+| Plugin | Purpose | Permissions |
+| --- | --- | --- |
+| [psm-kanban-board](./psm-kanban-board/) | Provides an app-level board view plus a sidebar bound with `appViewId` through `ctx.ui.registerAppView(...)` / `ctx.ui.registerAppSidebarView(...)` | `sessions:read`, `tags:read`, `tags:write`, `config:read`, `config:write` |
+| [psm-session-summary](./psm-session-summary/) | Generates session intelligence and writes `session.intelligence` plugin records | `sessions:read`, `records:read`, `records:write`, `model:invoke` |
+| [psm-sidechat](./psm-sidechat/) | Session Q&A command/tool and toolbar panel example | `sessions:read`, `model:invoke`, `records:read`, `records:write` |
+| [psm-trace](./psm-trace/) | Session trace analytics main view parsed in the plugin runtime | `sessions:read` |
+| [psm-word-cloud](./psm-word-cloud/) | Demonstrates Cmd+K plugin commands plus global/project user-message word cloud app views from session-list preview fields | `config:read`, `config:write` |
+
+## SDK Capability Notes
+
+The public SDK is a browser-plugin contract, not the whole app.
+A good plugin starts with the SDK docs and only uses host-owned surfaces through the permission-aware `ctx.psm` client.
+
+The most important current capabilities to remember are:
+
+- `records.upsert` accepts `indexValues`
+- `sessions.readEntries(..., { limit })` is supported
+- `sidechat` exposes both `ask` and `askStream`
+- `ctx.ui.registerSessionTreeView(...)` exists for tree-style session views
+- `ctx.events.subscribe(...)` is available for host-emitted events
+
 The SDK is not intended to expose every backend dispatch command. Commands such as database reset, API key management, raw terminal I/O, app settings, devtools, and plugin installation remain host-internal or privileged.
 
----
+## Built-In Plugins
 
-## Pi Agent Extensions Overview
+`extensions/psm-sidechat` is a full logic + UI plugin. It registers:
 
-The following extensions follow the Pi package convention and are loaded from `~/.pi/agent/extensions/`.
+- command `sidechat.ask`
+- tool `sidechat_ask`
+- session toolbar button
+- right-side session panel
+- configuration for provider/model, thinking level, snippet limit, panel width, option expansion, and quick prompts
 
-| Extension | Purpose | Dependency |
-| --- | --- | --- |
-| [pi-session-bridge](./pi-session-bridge/) | Session sync, search, tags, and context recall | `better-sqlite3` |
-| [resume-x](./resume-x/) | Enhanced session resume with a SQLite fast path | `better-sqlite3` |
-| [rename-nag](./rename-nag/) | Smart session naming reminders | none |
+`extensions/psm-session-summary` is also a full logic + UI plugin. It registers:
 
-`pi-session-bridge` and `resume-x` share the same SQLite database at `~/.pi/agent/sessions/sessions.db`. They load independently and do not depend on each other. `rename-nag` manages session names through the Pi API and does not access SQLite directly.
+- command `session-summary.refresh`
+- tool `session_summary_refresh`
+- session intelligence toolbar popover
+- configuration for provider/model, language, auto-open behavior, metadata, topics, next steps, and unresolved sections
 
-Package API note: `pi-session-bridge` uses the older `@mariozechner/pi-coding-agent` package, while `resume-x` and `rename-nag` use the newer `@earendil-works/pi-coding-agent` / `@earendil-works/pi-tui` APIs injected by the Pi runtime.
+The app shell renders these through runtime-host UI contributions; it no longer hard-codes sidechat or summary UI in `AppSessionViewerPane`.
 
----
-
-## pi-session-bridge
-
-**Core bridge between Pi Agent and Pi Session Manager.**
-
-Features:
-
-- **Live Mode** — streams session events to PSM over WebSocket
-- **Search** — searches historical sessions through the PSM HTTP API
-- **Tags** — manages session tags through the shared SQLite database
-- **Context Recall** — retrieves relevant context from previous sessions
-- **Config** — exposes `/psm-config` for bridge configuration
-
-```bash
-# Install
-pi install npm:Dwsy/psm-bridge
-
-# Live mode
-/psm-live on
-/psm-live off
-
-# Search
-/session_search query="rust async traits"
-
-# Tags
-/state           # show current tag
-/state-set wip   # set tag
-/flow start      # quick workflow transition
-
-# Context recall
-/session_recall query="how to fix the bug"
-```
-
-### Tools
-
-| Tool | Description |
-| --- | --- |
-| `session_search` | Full-text search over historical sessions |
-| `session_recall` | Search plus contextual recall |
-| `session_context` | Fetch messages around a target session hit |
-| `session_tag` | Manage tags (`list`, `set`, `remove`) |
-
-Note: `session_rename` has moved to [rename-nag](#rename-nag).
-
-### Commands
-
-| Command | Description |
-| --- | --- |
-| `/psm` | Show bridge status |
-| `/psm-live on/off` | Toggle live mode |
-| `/psm-connect` / `/psm-disconnect` | Manually connect or disconnect |
-| `/state` `/state-set` `/state-list` `/state-clear` | Manage session tags |
-| `/flow <action>` | Quick workflow transition |
-| `/open-in-pms` / `/open-in-psm` | Open the current session in PSM. Pass `web` to force the web UI. |
-| `/psm-config` | Manage bridge configuration |
-
-### Status Indicator
-
-```text
-[psm]         - connected
-[retry N]     - reconnecting, attempt N
-[timeout]     - disconnected after timeout
-[psm: off]    - live mode disabled
-```
-
----
-
-## resume-x
-
-**Enhanced session resume that bypasses disk scanning and reads SQLite directly.**
-
-Features:
-
-- SQLite fast path without rescanning session files
-- cwd filtering for the current project
-- details panel with model, token usage, and cost
-- message preview with left/right navigation
-- Session tag display
-
-```bash
-# Use
-/resume-x
-```
-
-### Features
-
-| Feature | Description |
-| --- | --- |
-| Fast load | Reads SQLite directly and skips disk scanning |
-| cwd filter | Shows sessions from the current project directory |
-| Details panel | Displays model, input/output tokens, and cost |
-| Message preview | Browse conversation preview with left/right keys |
-| Session tags | Shows session tags |
-
----
-
-## rename-nag
-
-**Smart session naming reminder that nudges agents to name sessions.**
-
-Features:
-
-- registers the `session_rename` tool, moved out of the bridge extension
-- tracks conversation entries and tool-call count
-- injects hidden reminders (`display: false`) when naming conditions are met
-- stops reminding after the agent renames the session
-
-### Trigger Conditions
-
-| Turn | Condition | Reminder |
-| --- | --- | --- |
-| First reminder | tool calls > 6 and session still unnamed | Full reminder with available tool and naming guidance |
-| Later reminders | every 40 tool calls (40, 80, 120...) after the session has a name | Ask the agent to check whether the name still matches the current topic |
-
-An unnamed session is one whose name is null or matches a default timestamp format such as `YYYY-MM-DDTHH:MM:SS` or `YYYY-MM-DDTHH-MM-SS`.
-
-### How It Works
-
-```text
-session_start (including resume)
-  -> scan existing entries and count tool calls
-  -> if already named or tool calls > 6, mark firstNagSent
-
-tool_call (any tool)
-  -> increment toolCallCount
-
-before_agent_start (each user message)
-  |- unnamed + toolCallCount > 6 + first reminder not sent -> full reminder
-  `- named + toolCallCount is a multiple of 40 -> topic-drift naming check
-```
-
-### Tools
-
-| Tool | Description |
-| --- | --- |
-| `session_rename` | Rename the current session |
-
----
+`extensions/psm-kanban-board` registers both the app-level `/kanban` view and its matching app sidebar view. Workspace state is plugin-owned JSON config via `ctx.psm.config`, while the app shell only provides generic app-surface data to registered app UI contributions.
 
 ## Development
 

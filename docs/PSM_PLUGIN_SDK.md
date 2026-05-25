@@ -1,431 +1,353 @@
 # PSM Plugin SDK
 
-Related: [PSM Plugin SDK Capability Audit](./PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md)
+Related:
+- [PSM Plugin SDK Capability Audit](./PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md)
+- [Extensions README](../extensions/README.md)
 
 PSM plugins are browser-compatible ESM modules activated by Pi Session Manager.
-They are separate from Pi runtime plugins, but follow the same philosophy:
-manifest first, convention-based discovery, host-owned permissions, and explicit
-command/tool registration.
+The SDK is the stable public contract for plugin authors. It intentionally hides the app transport, runtime host, Tauri APIs, npm plugin management, and other desktop-private implementation details.
 
-External plugins can be loaded from npm packages or explicit local `.js` / `.mjs`
-entry paths. `builtin` is reserved for repo-local first-party plugins under
-`extensions/`; it is not an external plugin source.
+## What the SDK gives you
 
-## Architecture
+- Manifest validation and typed manifest contracts
+- Permission-aware capability access through `ctx.psm`
+- Command and tool registration
+- App-level and session-level UI contribution APIs
+- Plugin settings and i18n clients
+- Event subscription hooks
 
-```text
-+----------------------------- Pi Session Manager -----------------------------+
-|                                                                              |
-|  React App                                                                   |
-|     |                                                                        |
-|     v                                                                        |
-|  runtime-host                                                                |
-|     |                                                                        |
-|     | discovers builtin plugins from extensions/psm-*                         |
-|     | discovers npm plugins from ~/.pi/pi-session-manager/extensions/npm       |
-|     | discovers path plugins from plugins.json customPaths                    |
-|     v                                                                        |
-|  PsmPluginHost                                                               |
-|     |                                                                        |
-|     | validates manifest                                                     |
-|     | merges i18n resources                                                   |
-|     | builds settings client                                                  |
-|     | injects PsmPluginHostContext                                            |
-|     v                                                                        |
-|  Plugin activate(ctx)                                                        |
-|     |                                                                        |
-|     | registerCommand / registerTool                                          |
-|     | ctx.ui.registerAppView / registerSessionToolbarItem / registerSessionPanel |
-|     | ctx.ui.registerToolRenderer                                             |
-|     | ctx.psm.sessions / records / search / sidechat / models / tags / config |
-|     v                                                                        |
-|  @pi-session-manager/plugin-sdk                                              |
-|     |                                                                        |
-|     | createPluginCapabilityClient                                            |
-|     | adds __psm permission context                                           |
-|     v                                                                        |
-|  appPsmTransport                                                             |
-|     |                                                                        |
-|     | Tauri GUI: plugin_dispatch_command                                      |
-|     | Web/server: normal app transport                                        |
-|     v                                                                        |
-|  dispatch.rs                                                                 |
-|     |                                                                        |
-|     | checks command permission when __psm exists                             |
-|     | routes to commands/domain/data                                          |
-|     v                                                                        |
-|  SQLite / Tantivy / session files / model providers / terminal adapters      |
-|                                                                              |
-+------------------------------------------------------------------------------+
-```
-
-Only the SDK layer is public to plugin authors. The runtime host, app transport,
-Tauri commands, and desktop-private adapters remain owned by the PSM host.
-
-## Module Contract
+## Quick Start
 
 ```ts
 import type { PsmPluginHostContext, PsmPluginManifest } from '@pi-session-manager/plugin-sdk'
 
 export const manifest: PsmPluginManifest = {
   manifestVersion: 1,
-  id: 'npm.example.sidechat',
-  name: 'Example Sidechat',
+  id: 'acme.sidechat',
+  name: 'Acme Sidechat',
   version: '1.0.0',
   runtime: {
     sdk: '^0.1.0',
-    host: '>=0.6.3'
+    host: '>=0.6.3',
   },
   package: {
-    name: '@example/psm-sidechat',
-    export: './dist/index.js'
+    name: '@acme/psm-sidechat',
+    export: './dist/index.js',
   },
-  permissions: ['sessions:read', 'model:invoke']
+  permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke'],
 }
 
 export function activate(ctx: PsmPluginHostContext) {
   ctx.registerCommand('sidechat.ask', async (args) => {
     return ctx.psm.sidechat.ask({
       sessionPath: String(args.sessionPath),
-      question: String(args.question)
+      question: String(args.question),
+      thinkingLevel: 'medium',
     })
+  })
+
+  ctx.ui.registerSessionToolbarItem({
+    id: 'acme.sidechat.toolbar',
+    title: 'Sidechat',
+    render: ({ session }) => {
+      return session.name ?? session.path
+    },
   })
 }
 ```
 
-The package entry must be a browser-compatible ESM bundle. PSM does not load
-TypeScript directly and does not support Node built-ins inside browser plugins.
+The package entry must be browser-compatible ESM. Do not import Node built-ins in published plugin code.
 
-## SDK Package
+## Package Shape
 
-The public SDK package is:
+The public package is:
 
 ```text
 @pi-session-manager/plugin-sdk
 ```
 
-It exports only `packages/runtime-sdk/src/index.ts`: manifest/types, validation helpers,
-UI contribution types, host event subscription types, and the capability client factory.
-It does not export app transport, the runtime host, Tauri APIs, or desktop-private implementation.
+It re-exports the public surface from `packages/runtime-sdk/src/index.ts`:
 
-## Source Policy
+- `types`
+- `manifest`
+- `client`
+
+That means the SDK package is a small, stable facade. It is not the runtime host.
+
+## Plugin Sources
 
 PSM recognizes three plugin sources:
 
-- `builtin`: repo-local first-party plugins checked into this repository under `extensions/`.
-- `npm`: external plugins installed into the managed npm workspace.
-- `path`: explicit local `.js` or `.mjs` browser-compatible ESM entry files listed in `plugins.json`.
+| Source | Meaning |
+| --- | --- |
+| `builtin` | Repo-local first-party plugins under `extensions/psm-*` |
+| `npm` | External plugins installed into the managed npm workspace |
+| `path` | Explicit local `.js` / `.mjs` browser-compatible ESM files |
 
-PSM does not load remote URLs, git checkouts, `file:` dependencies, or raw TypeScript files.
-Path plugins are for local development and private plugins; published plugins should use npm.
+Path plugins are for local development or private plugins. Published plugins should use npm.
 
-## NPM Package Shape
+## Manifest Contract
 
-Install packages into the PSM-managed npm workspace:
+### Top-level fields
 
-```bash
-npm install --prefix ~/.pi/pi-session-manager/extensions/npm <package>
-```
+| Field | Purpose |
+| --- | --- |
+| `manifestVersion` | Manifest schema version. Current supported value is `1` |
+| `id` | Stable plugin identifier |
+| `name` | Human-readable plugin name |
+| `version` | Plugin package version |
+| `runtime` | SDK and host compatibility requirements |
+| `package` | Optional npm package metadata and entry file |
+| `permissions` | Declared plugin permissions |
+| `records` | Plugin record declarations |
+| `configuration` | Settings UI schema |
+| `i18n` | Translation resources |
 
-Declare PSM entries in `package.json`:
+### Record declarations
 
-```json
-{
-  "name": "@example/psm-sidechat",
-  "type": "module",
-  "psm": {
-    "extensions": ["./dist/index.js"]
-  }
-}
-```
-
-PSM scans `~/.pi/pi-session-manager/extensions/npm/node_modules/**/package.json`
-for `psm.extensions`.
-
-The package should declare normal npm metadata and keep host-provided libraries as peer
-dependencies when they are used by UI contributions:
-
-```json
-{
-  "peerDependencies": {
-    "@pi-session-manager/plugin-sdk": "^0.1.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "lucide-react": "^0.468.0"
-  }
-}
-```
-
-Tailwind classes may be authored in TSX or plugin-owned `styles.ts` files. Published bundles
-must not depend on PSM app aliases such as `@/components`, `@/types`, or `@/plugins`.
-
-## Local Path Plugin Shape
-
-Path plugins point directly to a built browser-compatible ESM file:
-
-```text
-/absolute/path/to/my-psm-plugin/dist/index.mjs
-```
-
-The entry file must be `.js` or `.mjs`, stay under the host module size limit, and export the
-same `manifest` plus `activate` contract as npm plugins. Add or remove path plugins from
-Settings -> PSM Plugins, or edit `customPaths` in `plugins.json`.
-
-Path plugins are loaded from local disk only. They are not package-managed by PSM; rebuild the
-file yourself, then use Reload in Settings -> PSM Plugins.
-
-## Configuration
-
-Plugin enablement is stored in:
-
-```text
-~/.pi/pi-session-manager/plugins.json
-```
-
-Example:
-
-```json
-{
-  "version": 1,
-  "customPaths": [
-    "/absolute/path/to/my-psm-plugin/dist/index.mjs"
-  ],
-  "plugins": {
-    "builtin.session-summary": {
-      "enabled": true,
-      "source": "builtin"
-    },
-    "npm.example.sidechat": {
-      "enabled": false,
-      "source": "npm",
-      "packageName": "@example/psm-sidechat"
-    },
-    "path.example.local": {
-      "enabled": true,
-      "source": "path",
-      "entryPath": "/absolute/path/to/my-psm-plugin/dist/index.mjs"
-    }
-  }
-}
-```
-
-Repo-local built-ins under `extensions/psm-*` are discovered automatically and
-can be disabled through the same config/UI.
-
-## Capabilities
-
-Logic contributions:
-
-- `ctx.registerCommand(name, handler)`
-- `ctx.registerTool(name, { description, run })`
-- `ctx.psm.sessions`
-- `ctx.psm.records`
-- `ctx.psm.search`
-- `ctx.psm.sidechat`
-- `ctx.psm.models`
-- `ctx.psm.tags`
-- `ctx.psm.config`
-
-UI contributions:
-
-- `ctx.ui.registerAppView({ id, title, route?, icon?, shortcut?, render })`
-- `ctx.ui.registerAppSidebarView({ id, title, appViewId?, route?, render })`
-- `ctx.ui.registerSessionToolbarItem({ id, title, panelId?, mainViewId?, render })`
-- `ctx.ui.registerSessionMainView({ id, title, render })`
-- `ctx.ui.registerSessionPanel({ id, title, side: 'right', render })`
-- `ctx.ui.registerToolRenderer({ id, name, match, component, ... })`
-
-Tool renderers customize how session tool calls are displayed. `match` may be an exact tool
-name, a `RegExp`, or a predicate over the raw tool call. `component` receives resolved tool
-data, search query, and the host-owned render context for expansion, clipboard, theme, mobile,
-and i18n state.
-
-App views are first-class app surfaces. The host uses the registered `route`, `title`, `icon`,
-and `shortcut` to build navigation; when `route` is omitted, the host can still address the
-view through `/app/{viewId}`. An app sidebar view can bind directly to its main app view with
-`appViewId`, which avoids host-side feature-specific matching.
+`manifest.records` lets plugins declare the kinds of records they write.
+Each declaration may include searchable paths and index declarations.
 
 ```ts
-export function activate(ctx: PsmPluginHostContext) {
-  ctx.ui.registerToolRenderer({
-    id: 'acme-log-renderer',
-    name: 'Acme Log Renderer',
-    match: /^acme_/,
-    priority: 120,
-    component: ({ resolvedData, context }) => {
-      return context.isExpanded ? resolvedData.output : `${resolvedData.name} ready`
-    },
-    getSearchSegments: (_toolCall, data) => [data.name, data.output],
-  })
-}
-```
-
-Renderer IDs are global inside the host. First registration wins. A later duplicate keeps the
-plugin active but records a `warn` diagnostic. Registered renderers are removed when the host
-reloads plugins or when activation fails.
-
-Configuration contributions:
-
-- `manifest.configuration`
-- `ctx.settings.get(key, fallback)`
-- `ctx.settings.all()`
-- `ctx.psm.config.read(key, { defaultValue? })`
-- `ctx.psm.config.write(key, value)`
-
-`manifest.configuration` is for scalar settings rendered in Settings -> PSM Plugins.
-`ctx.psm.config` is for plugin-owned JSON documents stored under the host PSM config root
-and isolated by plugin id. Use the `config:read` and `config:write` permissions for this API.
-
-I18n contributions:
-
-- `manifest.i18n`
-- `ctx.i18n.t(key, fallback, options?)`
-- `ctx.i18n.language`
-
-Toolbar and panel `render(...)` receive the active session plus panel state helpers.
-First-party built-ins may return React nodes; npm bundles should stay browser-compatible ESM.
-Tool renderer components may also return React-compatible nodes, but published bundles must
-obtain React from their normal package/peer dependency boundary rather than importing PSM app internals.
-
-Every SDK call carries the plugin permission context when the plugin declares
-permissions. Backend permission checks are enforced through `plugin_dispatch_command`.
-
-## Per-Plugin Configuration
-
-Plugins declare VS Code-style independent settings in `manifest.configuration`. PSM renders
-those fields inside that plugin's Settings -> PSM Plugins card, persists values under the
-plugin's own `plugins.json` entry, reloads the host, and exposes merged defaults + saved
-values through `ctx.settings`.
-
-```ts
-export const manifest = {
-  manifestVersion: 1,
-  id: 'acme.sidechat',
-  name: 'Acme Sidechat',
-  version: '1.0.0',
-  configuration: {
-    title: 'Sidechat Settings',
-    properties: [
-      { key: 'provider', title: 'Default provider', type: 'model-provider', default: '', modelKey: 'model' },
-      { key: 'model', title: 'Default model', type: 'model-id', default: '', providerKey: 'provider' },
-      { key: 'thinkingLevel', title: 'Thinking level', type: 'select', default: 'medium', options: [
-        { label: 'Medium', value: 'medium' },
-        { label: 'High', value: 'high' },
-      ] },
-      { key: 'snippetLimit', title: 'Snippet limit', type: 'number', default: 8, min: 4, max: 12 },
-      { key: 'showQuickPrompts', title: 'Show quick prompts', type: 'boolean', default: true },
+records: [
+  {
+    type: 'session.intelligence',
+    scope: 'session',
+    schemaVersion: 1,
+    searchable: ['$.summary', '$.status'],
+    indexes: [
+      { name: 'topic', path: '$.topics[0]', type: 'text' },
+      { name: 'confidence', path: '$.confidence', type: 'number' },
     ],
   },
-}
+]
 ```
 
-Supported field types are `string`, `number`, `boolean`, `select`, `model-provider`, and
-`model-id`. Model fields are rendered from the host model configuration; use `modelKey` and
-`providerKey` to keep the provider/model pair in sync. Plugins should read settings through
-`ctx.settings.get(...)` during activation and pass normalized values into commands/UI
-components.
+`index` paths must be JSON paths. Use `indexValues` in `records.upsert(...)` to populate these secondary indexes.
 
-## Plugin I18n Resources
+### Configuration schema
 
-Plugins provide plain JSON translation resources through `manifest.i18n`; they should not create
-private `i18next` instances or depend on the app's React hooks. The runtime host merges those
-resources into the project i18n instance, then injects `ctx.i18n` into plugin activation context.
-Plugin UI receives that injected client and calls `i18n.t(...)`.
+`manifest.configuration` renders plugin settings in the host settings UI.
+Use `ctx.settings.get(...)` and `ctx.settings.all()` to read the persisted values after activation.
+
+Supported field types:
+
+- `string`
+- `number`
+- `boolean`
+- `select`
+- `model-provider`
+- `model-id`
+
+### I18n
+
+`manifest.i18n` provides plain JSON translation resources. The host merges them into the app i18n instance and exposes `ctx.i18n` to the plugin.
+
+## Permissions
+
+The host injects a plugin permission context into every SDK call.
+Plugin-safe permissions currently include:
+
+| Permission | Scope |
+| --- | --- |
+| `sessions:read` | Scan, list, and read session data |
+| `records:read` | Read and search plugin records |
+| `records:write` | Upsert plugin records |
+| `search:read` | Full-text search |
+| `tags:read` | Read tags and session-tag assignments |
+| `tags:write` | Create, assign, and remove tags |
+| `config:read` | Read plugin-owned JSON config |
+| `config:write` | Write plugin-owned JSON config |
+| `events:read` | Subscribe to host-emitted events |
+| `model:invoke` | Read model options and invoke model-backed plugin features |
+
+## Capability Client
+
+`ctx.psm` is the permission-aware client for plugin-safe PSM operations.
+
+### `records`
+
+| Method | Notes |
+| --- | --- |
+| `search(params)` | Search plugin records |
+| `listForScope(params)` | List records for a scope |
+| `upsert(params)` | Stores `payload`, `searchableText`, and optional `indexValues` |
+| `refreshSessionIntelligence(params)` | Refreshes plugin intelligence records for a session |
+
+### `sessions`
+
+| Method | Notes |
+| --- | --- |
+| `scan()` | Returns session entries from the host |
+| `list(params)` | Returns paginated sessions |
+| `readEntries(sessionPath, options?)` | Supports `limit` for slicing returned entries |
+| `readFileChunk(sessionPath, options?)` | Reads a chunk of the JSONL file |
+| `getLabels(sessionPath)` | Returns session labels |
+| `open(sessionPath, options?)` | Opens in browser or terminal based on `target` |
+
+### `search`
+
+| Method | Notes |
+| --- | --- |
+| `fulltext(params)` | Full-text search over sessions |
+| `pluginRecords(params)` | Convenience wrapper for plugin records search |
+
+### `sidechat`
+
+| Method | Notes |
+| --- | --- |
+| `ask(params)` | Runs the sidechat flow and returns a response |
+| `askStream(params, handlers?)` | Streams sidechat deltas and final response |
+
+### `models`
+
+| Method | Notes |
+| --- | --- |
+| `listOptions()` | Lists available model/provider combinations |
+
+### `tags`
+
+| Method | Notes |
+| --- | --- |
+| `listTags()` | Returns all tags |
+| `createTag(params)` | Creates a tag |
+| `assignTag(sessionId, tagId)` | Assigns a tag to a session |
+| `removeTag(sessionId, tagId)` | Removes a tag from a session |
+| `listSessionTags(sessionId?)` | Lists tags for a session or all session tags |
+
+### `config`
+
+| Method | Notes |
+| --- | --- |
+| `read(key, options?)` | Reads plugin-owned JSON config |
+| `write(key, value)` | Writes plugin-owned JSON config |
+
+## Logic Contributions
+
+Use command and tool registrations for plugin behavior that should appear in the host command palette or tool layer.
+
+- `ctx.registerCommand(name, handler)`
+- `ctx.registerCommand({ ... }, handler?)`
+- `ctx.registerTool(name, { description, run })`
+
+## UI Contributions
+
+| API | Purpose |
+| --- | --- |
+| `ctx.ui.registerAppView(...)` | Add a first-class app view |
+| `ctx.ui.registerAppSidebarView(...)` | Add a sidebar companion for an app view |
+| `ctx.ui.registerSessionToolbarItem(...)` | Add a session toolbar item |
+| `ctx.ui.registerSessionMainView(...)` | Add a main session view |
+| `ctx.ui.registerSessionPanel(...)` | Add a right-side session panel |
+| `ctx.ui.registerSessionTreeView(...)` | Add a tree-style session view |
+| `ctx.ui.registerToolRenderer(...)` | Customize tool-call rendering |
+
+App views can be bound to sidebars with `appViewId`. Tool renderers can match by exact name, regular expression, or predicate.
 
 ```ts
-// i18n.ts
-export const sidechatI18n = {
-  'en-US': { session: { sideChat: { title: 'Side chat' } } },
-  'zh-CN': { session: { sideChat: { title: '会话侧聊' } } },
-}
-
-// manifest.ts
-export const manifest = {
-  id: 'acme.sidechat',
-  i18n: sidechatI18n,
-}
+ctx.ui.registerToolRenderer({
+  id: 'acme-log-renderer',
+  name: 'Acme Log Renderer',
+  match: /^acme_/,
+  component: ({ resolvedData, context }) => {
+    return context.isExpanded ? resolvedData.output : `${resolvedData.name} ready`
+  },
+})
 ```
 
-First-party plugins should keep `manifest.ts`, `settings.ts`, `i18n.ts`, TSX components, and
-`styles.ts` separate so external plugin authors can copy a clean package structure.
+## Events
 
-## Runtime Diagnostics
+`ctx.events.subscribe(name, handler)` listens to host-emitted app events.
+This is useful for plugin-side state sync and long-lived UI surfaces.
 
-Plugin status diagnostics are structured as `{ level, message }`:
+## Runtime Notes
 
-- `info`: host metadata or non-actionable lifecycle notes.
-- `warn`: recoverable issues. Command/tool name conflicts are warnings; the plugin still stays `active`.
-- `error`: module load, manifest validation, or activation failures. These mark the plugin as `error`.
+- First registration wins for global command, tool, view, and renderer IDs.
+- Duplicate IDs are kept as host diagnostics rather than crashing the plugin.
+- NPM plugins must live inside the managed npm workspace.
+- Path plugins must be `.js` or `.mjs` and must point to a built browser-compatible module.
+- Do not depend on PSM app aliases such as `@/components`, `@/types`, or `@/plugins` in published plugins.
+- Keep React, Lucide, and other host-provided UI dependencies as peer dependencies where appropriate.
 
-The host also records `loadTimeMs` for loaded plugins. NPM plugins may include
-`moduleModifiedMs` and `sourceHash` from the discovered bundle, which helps detect
-whether a plugin source changed before reload.
+## Recommended Entry Docs
 
-## Command And Tool Conflicts
+If you are writing or debugging a plugin, read these in order:
 
-Command, tool, tool renderer, toolbar item, and panel IDs are global inside the PSM plugin host.
-First registration wins. If a later plugin registers the same ID, the host keeps the
-original registration, adds a `warn` diagnostic to the later plugin, and keeps that
-later plugin `active` unless activation itself throws.
+1. `docs/PSM_PLUGIN_SDK.md`
+2. `docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md`
+3. `extensions/README.md`
+4. `agent-docs/06-plugins.md`
 
-## NPM Bundle Constraints
+## Examples
 
-NPM plugin bundles are loaded only from the PSM-managed directory:
+### Plugin record with indexes
 
-```text
-~/.pi/pi-session-manager/extensions/npm
+```ts
+ctx.psm.records.upsert({
+  pluginId: 'acme.sidechat',
+  scopeType: 'session',
+  scopeId: session.path,
+  recordType: 'session.intelligence',
+  schemaVersion: 1,
+  payload: {
+    summary: 'Needs follow-up',
+    status: 'blocked',
+    topics: ['sdk', 'docs'],
+  },
+  searchableText: 'needs follow-up sdk docs',
+  indexValues: [
+    {
+      recordId: `acme.sidechat:session:${session.path}:session.intelligence`,
+      pluginId: 'acme.sidechat',
+      recordType: 'session.intelligence',
+      indexName: 'topic',
+      valueText: 'sdk',
+    },
+  ],
+})
 ```
 
-The module source reader rejects:
+### Session read with limit
 
-- paths outside the managed npm directory
-- files that are not `.js` or `.mjs`
-- bundles larger than 2 MiB
-
-The package entry must still be a browser-compatible ESM bundle declared through
-`package.json#psm.extensions`.
-
-NPM bundles must not:
-
-- import `@/components`, `@/types`, `@/plugins`, or other PSM app aliases
-- import runtime-host internals or `appPsmTransport`
-- import Tauri APIs directly
-- use Node built-ins in browser plugin code
-- execute install-time scripts for runtime behavior
-- load additional code from remote URLs at activation time
-
-## Built-In Plugins
-
-`extensions/psm-sidechat` is now a full logic + UI plugin. It registers:
-
-- command `sidechat.ask`
-- tool `sidechat_ask`
-- session toolbar button
-- right-side session panel
-- configuration for provider/model, thinking level, snippet limit, panel width, option expansion, and quick prompts
-
-`extensions/psm-session-summary` is also a full logic + UI plugin. It registers:
-
-- command `session-summary.refresh`
-- tool `session_summary_refresh`
-- session intelligence toolbar popover
-- configuration for provider/model, language, auto-open behavior, metadata, topics, next steps, and unresolved sections
-
-The app shell renders these through runtime-host UI contributions; it no longer hard-codes
-sidechat or summary UI in `AppSessionViewerPane`.
-
-`extensions/psm-kanban-board` registers both the app-level `/kanban` view and its
-matching app sidebar view. Workspace state is plugin-owned JSON config via
-`ctx.psm.config`, while the app shell only provides generic app-surface data to
-registered app UI contributions.
-
-## Local Debugging
-
-```bash
-npm run build
-npm install --prefix ~/.pi/pi-session-manager/extensions/npm .
+```ts
+const entries = await ctx.psm.sessions.readEntries(session.path, { limit: 20 })
 ```
 
-Then open Settings -> PSM Plugins and use Reload. If loading fails, inspect the plugin
-status diagnostics. For source changes, rebuild the package and reload; the host will
-surface updated mtime/hash metadata for npm entries.
+### Sidechat ask and stream
+
+```ts
+const response = await ctx.psm.sidechat.ask({
+  sessionPath: session.path,
+  question: 'What is the blocker?',
+  thinkingLevel: 'medium',
+})
+
+await ctx.psm.sidechat.askStream(
+  {
+    sessionPath: session.path,
+    question: 'Summarize the current state',
+  },
+  {
+    onDelta(delta) {
+      console.log(delta)
+    },
+    onDone(finalResponse) {
+      console.log(finalResponse.answer)
+    },
+  },
+)
+```
+
+## What is intentionally not public
+
+The SDK does not expose:
+
+- runtime host internals
+- Tauri APIs
+- plugin installation and management internals
+- raw terminal I/O
+- API key administration
+- database maintenance commands
+- desktop-private app transport details
+
+Those remain host-owned surfaces.

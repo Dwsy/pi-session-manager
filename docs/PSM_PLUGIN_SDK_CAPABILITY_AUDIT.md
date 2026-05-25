@@ -1,15 +1,15 @@
 # PSM Plugin SDK Capability Audit
 
-> Date: 2026-05-23
+> Date: 2026-05-25
 > Scope: `@pi-session-manager/plugin-sdk`, runtime host injection, backend dispatch permissions, and shared contract reuse.
 
 ## Summary
 
-The current PSM plugin SDK is a useful first public browser-plugin contract, but it is not yet a complete capability surface for PSM plugins. It exposes a narrow facade over selected backend commands and keeps desktop-private implementation out of the package. That boundary is good. The remaining work is to make the public capability surface complete, typed, and generated or reused from one source of truth.
+The public plugin SDK is now a real authoring surface, but the docs need to stay honest about what is stable, what is supported, and what remains host-owned.
 
-The SDK should not expose every backend dispatch command. The backend currently routes far more commands than a plugin should receive by default, including dangerous or host-private operations such as database reset, API key management, raw terminal I/O, app settings, devtools, and plugin installation. The right target is complete exposure of plugin-safe capabilities, not complete exposure of the whole app control plane.
+The SDK should expose plugin-safe capabilities, not the entire app control plane. That boundary is good. The main task for the docs is to describe the current public surface clearly, call out the intentionally hidden parts, and keep the remaining gaps visible so they do not get reintroduced as stale examples.
 
-## Current Public SDK Surface
+## Current Public Surface
 
 The package entry point is intentionally small:
 
@@ -19,15 +19,15 @@ export * from './manifest'
 export * from './client'
 ```
 
-It exposes these public groups:
+It exposes:
 
 | Group | Exposed API |
 | --- | --- |
 | Manifest contract | `PsmPluginManifest`, `PsmPackageManifest`, runtime/package/permission/record/config/i18n declarations |
 | Validation | `validatePsmPluginManifest`, `assertPsmPluginManifest`, `validatePsmPackageManifest`, `assertPsmPackageManifest` |
-| Host context | `manifest`, `psm`, `permissions`, `settings`, `i18n`, `ui`, `registerCommand`, `registerTool` |
+| Host context | `manifest`, `psm`, `permissions`, `settings`, `i18n`, `events`, `ui`, `registerCommand`, `registerTool` |
 | Capability client | `createPluginCapabilityClient(options)` |
-| UI contributions | app view, app sidebar view bound by `appViewId`, session toolbar item, session main view, session right panel |
+| UI contributions | app view, app sidebar view bound by `appViewId`, session toolbar item, session main view, session right panel, session tree view |
 | Settings/config | `manifest.configuration`, `ctx.settings.get(...)`, `ctx.settings.all()`, plugin-scoped JSON config |
 | I18n | `manifest.i18n`, `ctx.i18n.t(...)`, `ctx.i18n.language` |
 
@@ -38,137 +38,84 @@ The injected `ctx.psm` client currently has these namespaces:
 | `records` | `search`, `listForScope`, `upsert`, `refreshSessionIntelligence` |
 | `sessions` | `scan`, `list`, `readEntries`, `readFileChunk`, `getLabels`, `open` |
 | `search` | `fulltext`, `pluginRecords` |
-| `sidechat` | `ask` |
+| `sidechat` | `ask`, `askStream` |
 | `models` | `listOptions` |
 | `tags` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` |
 | `config` | `read`, `write` |
 
-The SDK does not export the app transport, runtime host, Tauri APIs, npm plugin management, or desktop-private implementation.
+## What the docs should emphasize
 
-## Backend Capability Gap
+1. `records.upsert` supports `indexValues` and record declarations can define secondary indexes.
+2. `sessions.readEntries(path, { limit })` is supported and should be documented as a real option.
+3. `sidechat` exposes both `ask` and `askStream`.
+4. The SDK does not expose raw dispatch or host-private commands.
+5. Plugin source loading is limited to `builtin`, `npm`, and `path` sources.
 
-Static inspection found that `dispatch.rs` routes 127 command names, while the SDK wraps only a small subset of those commands. This is expected for a public plugin SDK, but it means the SDK is not a complete capability layer yet.
+## Capability Boundaries
 
-The current exposed command set is centered on:
+The backend still contains many commands that are not meant to be part of the public SDK.
+Keep these grouped as host-owned or privileged surfaces in the docs:
 
-- session read/list/open
-- plugin record read/write/search
-- full-text search
-- sidechat ask
-- model option list
-- basic tag operations
-
-Large command families are not exposed:
-
-| Family | Examples | Default plugin exposure |
+| Family | Examples | Public SDK stance |
 | --- | --- | --- |
-| App/admin | `reset_database`, `backup_database`, `toggle_devtools` | no |
-| API keys | `list_api_keys`, `create_api_key`, `revoke_api_key` | no |
-| Raw terminal | `terminal_create`, `terminal_write`, `terminal_resize`, `terminal_close` | no |
-| Pi Live control | `pi_agent_prompt`, `pi_agent_steer`, `pi_agent_abort` | privileged only |
-| Settings/config | `save_app_settings`, `save_server_settings`, `restore_config_version`; plugin-scoped JSON config is exposed through `ctx.psm.config` | host-internal by default except plugin-scoped JSON |
-| File/session mutation | `delete_sessions`, `rename_session`, `fork_session`, `export_session` | privileged only |
-| Plugin management | `install_psm_plugin`, `uninstall_psm_plugin`, `read_npm_psm_plugin_module_source` | host-internal |
+| App/admin | `reset_database`, `backup_database`, `toggle_devtools` | host-internal |
+| API keys | `list_api_keys`, `create_api_key`, `revoke_api_key` | host-internal |
+| Raw terminal | `terminal_create`, `terminal_write`, `terminal_resize`, `terminal_close` | host-internal |
+| Pi Live control | `pi_agent_prompt`, `pi_agent_steer`, `pi_agent_abort` | privileged or host-internal |
+| Settings/config | app and server settings writes | host-internal except plugin-scoped JSON config |
+| File/session mutation | `delete_sessions`, `rename_session`, `fork_session`, `export_session` | privileged or host-internal |
+| Plugin management | `install_psm_plugin`, `uninstall_psm_plugin` | host-internal |
 
-## Contract Mismatches
+## Remaining Documentation Gaps
 
-These are concrete places where the current public types and actual behavior diverge.
+These are the places that still deserve explicit notes in the docs because they can confuse plugin authors if left implicit.
 
-| Area | Current mismatch | Impact |
+| Area | Current state | Doc note |
 | --- | --- | --- |
-| Record indexes | `manifest.records.indexes` can declare indexes, backend `upsert_plugin_record` accepts `indexValues`, but SDK `records.upsert` never sends them | plugins cannot fully use declared secondary indexes |
-| Record search scope | `PluginRecordSearchParams` includes `scopeType` and `scopeId`, but client/backend search do not use them | type promises scope filtering that does not exist |
-| Record list plugin filter | `PluginRecordListParams` includes `pluginId`, but client/backend list do not use it | callers may expect filtering that is ignored |
-| Session entries limit | `sessions.readEntries(path, { limit })` accepts an option, but client ignores it | API surface has a non-functional option |
-| Session/search result types | several SDK return types use `unknown[]` | plugin authors cannot rely on stable shape without local casts |
-| Sidechat response | Rust response includes extra fields such as `used_entry_ids` and `session_path`; SDK only models a subset | public contract is not lossless |
-| Tag casing | SDK tag types accept both camelCase and snake_case fields | boundary normalization is incomplete |
+| Record search | plugin record search is available, but filtering needs to be described in terms of the current client surface | document the accepted params and avoid promising extra filtering semantics |
+| Session payloads | several session methods still return host-shaped opaque values | note the shapes that are stable and point authors to the right render helpers |
+| Sidechat response | response is typed and streamable, but only the documented fields should be considered stable | list the stable fields and mark extra fields as host implementation details if needed |
+| Tag casing | camelCase and snake_case appear in some payloads | document the normalized field names that plugin authors should prefer |
 
-## Permission Model
+## Recommended Doc Structure
 
-The backend has an opt-in plugin permission context carried as `__psm` in the command payload. If no plugin context is present, normal app calls continue to work. If plugin context is present, selected commands require declared permissions.
+For the public SDK doc, keep these sections in this order:
 
-Current permissions:
+1. Overview
+2. Quick start
+3. Package shape
+4. Manifest contract
+5. Permissions
+6. Capability client
+7. Logic contributions
+8. UI contributions
+9. Events
+10. Runtime notes
+11. Examples
+12. Intentionally private surfaces
 
-| Permission | Intended scope |
-| --- | --- |
-| `sessions:read` | scan/list/read session data |
-| `records:read` | read/search plugin records |
-| `records:write` | upsert plugin records |
-| `search:read` | full-text search |
-| `tags:read` | read tags and session tags |
-| `tags:write` | create/assign/remove tags |
-| `config:read` | read plugin-owned JSON config |
-| `config:write` | write plugin-owned JSON config |
-| `model:invoke` | invoke model-backed operations or list model options |
+For the audit doc, keep it short and current:
 
-This is the right foundation, but it should be expanded into a declarative capability table that records command name, permission, exposure level, request type, and response type.
+- what is exposed now
+- what is intentionally hidden
+- what still needs cleanup in the docs
+- what to revisit when the SDK grows
 
-## Recommended Exposure Model
+## Authoring Checklist
 
-Do not expose raw dispatch wholesale. Classify each command first.
+Before publishing any SDK doc change, verify that:
 
-| Exposure level | Meaning | Examples |
-| --- | --- | --- |
-| `public` | safe for normal plugins with declared permission | session read, record read/write, search, sidechat, model list, tag read/write |
-| `privileged` | useful but mutating or high impact; requires explicit grant and UI confirmation | rename/fork/export sessions, Pi Live prompt/steer, workspace mutation |
-| `host-internal` | app maintenance or desktop-private operation | settings writes, npm plugin install, database backup/reset, devtools |
-| `unsafe` | should stay unavailable to third-party browser plugins | raw terminal write, arbitrary file open/write, API key management |
+- every method named in the docs exists in `packages/runtime-sdk/src/types.ts` or `client.ts`
+- examples use only exported names from `packages/runtime-sdk/src/index.ts`
+- no example relies on desktop-private runtime internals
+- `indexValues`, `readEntries({ limit })`, and `askStream` are documented correctly
+- the docs point plugin authors to `extensions/README.md` and the capability audit
 
-The SDK should expose complete public capabilities first. Privileged capabilities can come later behind explicit manifest permissions and Settings UI warnings.
+## Notes for Future Expansion
 
-## Definition Reuse Plan
+If new public plugin-safe capabilities are added later, document them in two places at once:
 
-Current definitions are hand-written in multiple places: Rust structs, app frontend types, SDK types, runtime provider types, and HTTP request structs. This is manageable while small, but it is already drifting.
+- the SDK docs in `docs/PSM_PLUGIN_SDK.md`
+- the capability audit in `docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md`
 
-Preferred direction:
-
-```text
-packages/
-  psm-contract/
-    src/public.ts      # stable plugin-facing contract
-    src/internal.ts    # app-only contract, not exported by plugin SDK
-    src/commands.ts    # command metadata: name, payload, response, permission, exposure
-
-  runtime-sdk/
-    src/index.ts       # re-export public contract + client factory
-    src/client.ts      # typed facade over public command metadata
-```
-
-Short-term work:
-
-1. Move stable public TS types into one package or SDK module.
-2. Make the app import those shared public types instead of duplicating them.
-3. Replace `unknown[]` in SDK public methods with concrete shared types.
-4. Add SDK tests that compare client payload keys with backend dispatch expectations.
-5. Add a small command exposure table and deny unclassified command exposure.
-
-Medium-term work:
-
-1. Generate TS types from Rust `Serialize`/`Deserialize` structs, or generate Rust/TS from a shared schema.
-2. Keep plugin public contracts separate from app-internal contracts.
-3. Generate SDK client wrappers from command metadata where practical.
-
-The repository does not currently use `specta`, `ts-rs`, or `typeshare`. Introducing one of them would be a deliberate build-system change. Until then, a `psm-contract` TypeScript package plus strict tests is the least disruptive path.
-
-## Acceptance Criteria For A Complete Public SDK
-
-The SDK should be considered complete when these checks pass:
-
-- Every public plugin-safe backend command has an SDK method or is explicitly marked unsupported.
-- Every SDK method maps to exactly one backend command or documented composed operation.
-- Every public method has typed payload and typed result, not `unknown[]`.
-- Every public command has a permission entry and exposure level.
-- Manifest record declarations and record upsert/search behavior agree, including index values.
-- App frontend and SDK import shared public types from the same source.
-- Tests verify command payload key casing, permission injection, and backend dispatch compatibility.
-
-## Proposed First Patch Set
-
-1. Add `PluginRecordIndexValue` to SDK types and support `indexValues` in `records.upsert`.
-2. Remove or implement unsupported params: `scopeType/scopeId` in record search, `pluginId` in record list, and `limit` in `readEntries`.
-3. Export concrete `PsmSessionInfo`, `PsmSessionEntry`, `PsmFullTextSearchHit`, and complete `PsmSideChatResponse` types.
-4. Add `capabilities.ts` with public command metadata and permissions.
-5. Add tests asserting SDK client command payloads match backend dispatch field names.
-
-This keeps the SDK honest without widening plugin power too quickly.
+That keeps the contract and the gap list from drifting apart again.
