@@ -1,14 +1,13 @@
 ---
 title: psm-bridge
-description: Bridge Pi agent sessions to Pi Session Manager.
+description: Bridge Pi agent sessions to Pi Session Manager with live sync, search, tags, and context recall.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
-import { Steps, Step } from 'fumadocs-ui/components/steps';
 
 # psm-bridge
 
-Bridge Pi agent sessions to Pi Session Manager — live sync, search, tags, and context recall.
+Bridge Pi agent sessions to Pi Session Manager for live sync, search, tags, and context recall.
 
 ## Installation
 
@@ -19,6 +18,8 @@ pi install npm:Dwsy/psm-bridge
 <Callout type="info">
 Requires Node.js >= 21.0.0 and Pi Session Manager running on port 52131.
 </Callout>
+
+For the public plugin contract behind this bridge, see [the PSM Plugin SDK](../../../docs/PSM_PLUGIN_SDK.md).
 
 ## Configuration
 
@@ -34,7 +35,7 @@ export PSM_TOKEN=your-token
 
 ### Live Mode
 
-Real-time session sync via WebSocket. Events (messages, tool calls, agent turns) are forwarded to PSM as they happen.
+Real-time session sync via WebSocket. Messages, tool calls, and agent turns are forwarded to Pi Session Manager as they happen, so the browser, search index, and live session views stay aligned.
 
 ```bash
 /psm-live on     # Enable live mode
@@ -53,7 +54,7 @@ Real-time session sync via WebSocket. Events (messages, tool calls, agent turns)
 
 ### Search
 
-Full-text search across indexed sessions via PSM's HTTP API.
+Full-text search across indexed sessions via Pi Session Manager's HTTP API.
 
 ```
 /session_search query="rust async traits"

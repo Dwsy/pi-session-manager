@@ -1,11 +1,20 @@
 ---
 title: API Reference
-description: HTTP and WebSocket API for programmatic access to Pi Session Manager.
+description: HTTP, WebSocket, and SSE APIs for programmatic access to Pi Session Manager.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-Pi Session Manager exposes its full functionality through HTTP and WebSocket APIs. Both protocols share the same command router (`dispatch()`), so every command works identically on both.
+Pi Session Manager exposes its full capability surface through HTTP, WebSocket, and SSE APIs. The same command router powers all three transports, so session management, search, tags, model config, Pi Live, and terminal workflows stay consistent across clients.
+
+## What This API Covers
+
+- Session lifecycle operations like scan, rename, delete, and export
+- Search, tags, and favorites
+- Configuration and model config management
+- Statistics and live Pi session access
+- Terminal session control
+- Authentication and token management
 
 ## HTTP API
 

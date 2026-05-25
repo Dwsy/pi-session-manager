@@ -14,16 +14,15 @@ Pi Session Manager 是一款跨平台应用，用于浏览、搜索和管理 [Pi
 
 无论你是在回顾过去的对话、在数百个会话中搜索特定代码片段，还是在看板上追踪 AI 辅助开发工作流，Pi Session Manager 都能满足你的需求。
 
-### 核心功能
+### 核心能力
 
-- **会话浏览器** — 列表、项目、目录和看板视图，支持收藏和批量导出
-- **全文搜索** — 基于 SQLite FTS5 与规范化索引，支持角色过滤、会话 ID 匹配和片段高亮
-- **会话查看器** — 树形视图、流程可视化（React Flow）、可折叠的工具调用和思考块
-- **数据仪表板** — 活动热力图、项目分布、模型使用、Token 消耗、成就系统
-- **内置终端** — 集成 xterm.js 与 PTY 后端，支持恢复会话
-- **层级标签** — 父子标签树与自动规则
-- **多平台** — 桌面端、移动端 Web 和无头 CLI 模式
-- **多协议 API** — Tauri IPC、WebSocket 和 HTTP 共享同一命令路由
+- **会话浏览器** — 列表、项目、目录和看板视图，支持收藏、批量导出和多路径扫描。查看 [会话浏览器](./session-browser)。
+- **搜索与回溯** — SQLite FTS5、角色过滤、会话 ID 匹配、片段高亮和命令面板搜索。查看 [搜索系统](./search)。
+- **仪表板与分析** — 活动热力图、项目分布、模型使用、Token 消耗和成就追踪。查看 [仪表板](./dashboard)。
+- **API 与自动化** — HTTP、WebSocket 和 SSE 共享同一命令路由，便于程序化访问。查看 [API 参考](./api)。
+- **扩展系统** — 内置、npm 和本地路径插件，配套浏览器插件 SDK，可扩展应用视图、命令、工具和设置。查看 [扩展 README](https://github.com/Dwsy/pi-session-manager/blob/main/extensions/README.md)。
+- **Pi Live 与桥接同步** — 实时会话同步、上下文回溯、标签和基于桥接的 Pi CLI 工作流。查看 [psm-bridge](./plugins/psm-bridge)。
+- **终端与工作区工具** — 内置 PTY 终端、会话恢复、层级标签和多平台支持。查看 [终端](./terminal) 与 [标签](./tags)。
 
 ## 界面预览
 
@@ -81,5 +80,7 @@ chmod +x pi-session-cli
   <Card title="安装指南" href="./installation" description="各平台的详细安装说明" />
   <Card title="会话浏览器" href="./session-browser" description="浏览和管理你的会话" />
   <Card title="搜索系统" href="./search" description="带过滤器的全文搜索" />
-  <Card title="架构概览" href="./architecture" description="了解整体架构设计" />
+  <Card title="仪表板" href="./dashboard" description="活动指标和使用趋势" />
+  <Card title="API 参考" href="./api" description="HTTP、WebSocket 和 SSE 命令" />
+  <Card title="psm-bridge" href="./plugins/psm-bridge" description="实时同步和桥接工作流" />
 </Cards>

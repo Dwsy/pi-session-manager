@@ -14,16 +14,15 @@ Pi Session Manager is a cross-platform application for browsing, searching, and 
 
 Whether you're reviewing past conversations, searching for a specific code snippet across hundreds of sessions, or tracking your AI-assisted development workflow on a Kanban board, Pi Session Manager has you covered.
 
-### Key Features
+### Key Capabilities
 
-- **Session Browser** — List, project, directory, and Kanban views with favorites and batch export
-- **Full-Text Search** — SQLite FTS5 with normalized indexing, role filters, session ID matching, and snippet highlighting
-- **Session Viewer** — Tree view, flow visualization (React Flow), collapsible tool calls and thinking blocks
-- **Dashboard** — Activity heatmap, project mix, model usage, token costs, achievements
-- **Built-in Terminal** — Integrated xterm.js with PTY backend for resuming sessions
-- **Hierarchical Tags** — Parent-child tag tree with auto-rules
-- **Multi-Platform** — Desktop, mobile web, and headless CLI mode
-- **Multi-Protocol API** — Tauri IPC, WebSocket, and HTTP all sharing one command router
+- **Session Browser** — List, project, directory, and Kanban views with favorites, batch export, and multi-path scanning. See [Session Browser](./session-browser).
+- **Search and Recall** — SQLite FTS5, role filters, session ID matching, snippet highlighting, and command palette search. See [Search](./search).
+- **Dashboard and Analytics** — Activity heatmap, project mix, model usage, token costs, and achievement tracking. See [Dashboard](./dashboard).
+- **API and Automation** — HTTP, WebSocket, and SSE APIs share one command router for programmatic access. See [API Reference](./api).
+- **Extension System** — Built-in, npm, and local path plugins with a browser-plugin SDK for app views, commands, tools, and settings. See [plugin SDK](../../docs/PSM_PLUGIN_SDK.md) and [Extensions README](../../extensions/README.md).
+- **Pi Live and Bridge Sync** — Live session sync, context recall, tags, and bridge-based workflows for Pi CLI users. See [psm-bridge](./plugins/psm-bridge).
+- **Terminal and Workspace Tools** — Integrated PTY terminal, session resume, hierarchical tags, and multi-platform support. See [Terminal](./terminal) and [Tags](./tags).
 
 ## UI Preview
 
@@ -81,5 +80,7 @@ Pi must be installed for session resume and terminal integration. Install it fro
   <Card title="Installation" href="./installation" description="Detailed setup for all platforms" />
   <Card title="Session Browser" href="./session-browser" description="Browse and organize your sessions" />
   <Card title="Search" href="./search" description="Full-text search with filters" />
-  <Card title="Architecture" href="./architecture" description="How it all fits together" />
+  <Card title="Dashboard" href="./dashboard" description="Activity metrics and usage trends" />
+  <Card title="API Reference" href="./api" description="HTTP, WebSocket, and SSE commands" />
+  <Card title="psm-bridge" href="./plugins/psm-bridge" description="Live sync and bridge workflows" />
 </Cards>
