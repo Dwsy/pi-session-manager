@@ -6,6 +6,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   root: __dirname,
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+  },
   esbuild: {
     jsx: 'transform',
     jsxFactory: 'React.createElement',

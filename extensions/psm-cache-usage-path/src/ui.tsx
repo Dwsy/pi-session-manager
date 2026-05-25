@@ -7,7 +7,10 @@ import type { PsmPluginI18nClient } from '../../../packages/runtime-sdk/src'
 import {
   formatInt,
   formatPercent,
+  type CacheUsageInsight,
   type CacheUsageMessageStat,
+  type CacheUsageModelStat,
+  type CacheUsageReason,
   type CacheUsageStats,
   collectCacheUsageStats,
 } from './cache-usage'
@@ -16,7 +19,7 @@ import { hostReact } from './host-react'
 const React = hostReact()
 const { useEffect, useMemo, useRef, useState } = React
 
-type CacheUsageTab = 'trend' | 'stats' | 'recent'
+type CacheUsageTab = 'insights' | 'trend' | 'stats' | 'recent'
 type CacheUsageTrendView = 'per-turn' | 'cumulative-percent' | 'cumulative-total'
 
 interface SessionsClientLike {
@@ -88,9 +91,72 @@ function formatTimestamp(value: string, language: string) {
   }).format(date)
 }
 
+function formatCost(value: number, locale = 'en-US'): string {
+  return new Intl.NumberFormat(locale || undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: value > 0 && value < 0.01 ? 6 : 4,
+    maximumFractionDigits: value > 0 && value < 0.01 ? 6 : 4,
+  }).format(value)
+}
+
+function formatSignedPercent(value: number, locale: string) {
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${formatPercent(value, locale)}`
+}
+
+function formatSignedCost(value: number, locale: string) {
+  const sign = value > 0 ? '+' : value < 0 ? '-' : ''
+  return `${sign}${formatCost(Math.abs(value), locale)}`
+}
+
 function providerModelLabel(message: CacheUsageMessageStat, fallback: string) {
   const label = [message.provider, message.model].filter(Boolean).join('/')
   return label || message.model || fallback
+}
+
+function reasonLabel(reason: CacheUsageReason, t: PsmPluginI18nClient['t']) {
+  switch (reason) {
+    case 'model-switch':
+      return t('session.cacheUsage.reasons.modelSwitch', 'Model switch')
+    case 'first-cache-write':
+      return t('session.cacheUsage.reasons.firstCacheWrite', 'First write')
+    case 'cache-write-spike':
+      return t('session.cacheUsage.reasons.cacheWriteSpike', 'Write spike')
+    case 'hit-rate-drop':
+      return t('session.cacheUsage.reasons.hitRateDrop', 'Hit drop')
+    case 'cost-unknown':
+      return t('session.cacheUsage.reasons.costUnknown', 'Cost unknown')
+    default:
+      return reason
+  }
+}
+
+function insightTitle(insight: CacheUsageInsight, t: PsmPluginI18nClient['t']) {
+  switch (insight.kind) {
+    case 'model-switch':
+      return t('session.cacheUsage.insights.modelSwitch', 'Model switch changed cache behavior')
+    case 'hit-rate-drop':
+      return t('session.cacheUsage.insights.hitRateDrop', 'Cache hit rate dropped')
+    case 'cache-write-spike':
+      return t('session.cacheUsage.insights.cacheWriteSpike', 'Cache write spike detected')
+    case 'first-cache-write':
+      return t('session.cacheUsage.insights.firstCacheWrite', 'Cache started being written')
+    case 'branch-gap':
+      return t('session.cacheUsage.insights.branchGap', 'Branch and tree diverge')
+    case 'cost-missing':
+      return t('session.cacheUsage.insights.costMissing', 'Cost data is incomplete')
+    case 'high-cost':
+      return t('session.cacheUsage.insights.highCost', 'Highest recorded cost turn')
+    default:
+      return insight.kind
+  }
+}
+
+function insightTone(severity: CacheUsageInsight['severity']) {
+  if (severity === 'warning') return 'border-amber-500/25 bg-amber-500/8'
+  if (severity === 'success') return 'border-emerald-500/20 bg-emerald-500/8'
+  return 'border-info/25 bg-info/8'
 }
 
 function deltaTotals(stats: CacheUsageStats) {
@@ -102,6 +168,15 @@ function deltaTotals(stats: CacheUsageStats) {
     promptTotal: stats.treeTotals.promptTotal - stats.activeBranchTotals.promptTotal,
     tokenTotal: stats.treeTotals.tokenTotal - stats.activeBranchTotals.tokenTotal,
     assistantMessages: stats.treeTotals.assistantMessages - stats.activeBranchTotals.assistantMessages,
+    cost: {
+      input: stats.treeTotals.cost.input - stats.activeBranchTotals.cost.input,
+      output: stats.treeTotals.cost.output - stats.activeBranchTotals.cost.output,
+      cacheRead: stats.treeTotals.cost.cacheRead - stats.activeBranchTotals.cost.cacheRead,
+      cacheWrite: stats.treeTotals.cost.cacheWrite - stats.activeBranchTotals.cost.cacheWrite,
+      total: stats.treeTotals.cost.total - stats.activeBranchTotals.cost.total,
+      knownMessages: stats.treeTotals.cost.knownMessages - stats.activeBranchTotals.cost.knownMessages,
+      unknownMessages: stats.treeTotals.cost.unknownMessages - stats.activeBranchTotals.cost.unknownMessages,
+    },
   }
 }
 
@@ -254,6 +329,35 @@ function DeltaValue({ value, locale }: { value: number; locale: string }) {
   return <span className={`font-mono ${tone}`}>{sign}{formatInt(value, locale)}</span>
 }
 
+function CostValue({
+  value,
+  knownMessages,
+  unknownMessages,
+  locale,
+  t,
+  delta = false,
+}: {
+  value: number
+  knownMessages: number
+  unknownMessages: number
+  locale: string
+  t: PsmPluginI18nClient['t']
+  delta?: boolean
+}) {
+  const text = knownMessages > 0
+    ? delta ? formatSignedCost(value, locale) : formatCost(value, locale)
+    : t('session.cacheUsage.cost.unknown', 'Unknown')
+  const tone = unknownMessages > 0 && knownMessages === 0
+    ? 'text-amber-300'
+    : delta && value < 0
+      ? 'text-amber-300'
+      : delta && value > 0
+        ? 'text-emerald-300'
+        : 'text-foreground'
+
+  return <span className={`font-mono ${tone}`}>{text}</span>
+}
+
 function StatSection({
   title,
   totals,
@@ -270,6 +374,7 @@ function StatSection({
     promptTotal: number
     tokenTotal: number
     assistantMessages: number
+    cost: CacheUsageStats['treeTotals']['cost']
   }
   locale: string
   t: PsmPluginI18nClient['t']
@@ -290,8 +395,132 @@ function StatSection({
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3"><span className="text-muted-foreground">{t('session.cacheUsage.stats.promptTotal', 'Prompt total')}</span>{renderValue(totals.promptTotal)}</div>
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3"><span className="text-muted-foreground">{t('session.cacheUsage.stats.output', 'Output')}</span>{renderValue(totals.output)}</div>
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3"><span className="text-muted-foreground">{t('session.cacheUsage.stats.tokenTotal', 'Token total')}</span>{renderValue(totals.tokenTotal)}</div>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+          <span className="text-muted-foreground">{t('session.cacheUsage.cost.recorded', 'Recorded cost')}</span>
+          <CostValue
+            value={totals.cost.total}
+            knownMessages={totals.cost.knownMessages}
+            unknownMessages={totals.cost.unknownMessages}
+            locale={locale}
+            t={t}
+            delta={delta}
+          />
+        </div>
+        {totals.cost.unknownMessages > 0 && (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+            <span className="text-muted-foreground">{t('session.cacheUsage.cost.unknownTurns', 'Unknown cost turns')}</span>
+            {renderValue(totals.cost.unknownMessages)}
+          </div>
+        )}
       </div>
     </section>
+  )
+}
+
+function CostSummary({ stats, locale, t }: { stats: CacheUsageStats; locale: string; t: PsmPluginI18nClient['t'] }) {
+  const known = stats.treeTotals.cost.knownMessages
+  const total = stats.treeTotals.assistantMessages
+  const coverage = total > 0 ? (known / total) * 100 : 0
+
+  return (
+    <section className="border border-border/60 bg-background/35 p-3">
+      <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{t('session.cacheUsage.cost.title', 'Cost analysis')}</div>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="border border-border/50 bg-background/25 px-2.5 py-2">
+          <div className="text-muted-foreground">{t('session.cacheUsage.cost.activeBranch', 'Branch cost')}</div>
+          <div className="mt-1">
+            <CostValue value={stats.activeBranchTotals.cost.total} knownMessages={stats.activeBranchTotals.cost.knownMessages} unknownMessages={stats.activeBranchTotals.cost.unknownMessages} locale={locale} t={t} />
+          </div>
+        </div>
+        <div className="border border-border/50 bg-background/25 px-2.5 py-2">
+          <div className="text-muted-foreground">{t('session.cacheUsage.cost.wholeTree', 'Tree cost')}</div>
+          <div className="mt-1">
+            <CostValue value={stats.treeTotals.cost.total} knownMessages={stats.treeTotals.cost.knownMessages} unknownMessages={stats.treeTotals.cost.unknownMessages} locale={locale} t={t} />
+          </div>
+        </div>
+        <div className="border border-border/50 bg-background/25 px-2.5 py-2">
+          <div className="text-muted-foreground">{t('session.cacheUsage.cost.coverage', 'Cost coverage')}</div>
+          <div className="mt-1 font-mono text-foreground">{formatPercent(coverage, locale)}</div>
+        </div>
+        <div className="border border-border/50 bg-background/25 px-2.5 py-2">
+          <div className="text-muted-foreground">{t('session.cacheUsage.cost.unknownTurns', 'Unknown cost turns')}</div>
+          <div className="mt-1 font-mono text-amber-300">{formatInt(stats.treeTotals.cost.unknownMessages, locale)}</div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ModelStatsTable({ models, locale, t }: { models: CacheUsageModelStat[]; locale: string; t: PsmPluginI18nClient['t'] }) {
+  if (models.length === 0) return null
+
+  return (
+    <section className="border border-border/60 bg-background/35 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{t('session.cacheUsage.models.title', 'Model breakdown')}</div>
+        <div className="text-[11px] text-muted-foreground">{t('session.cacheUsage.models.count', '{{count}} models', { count: models.length })}</div>
+      </div>
+      <div className="space-y-2">
+        {models.slice(0, 6).map((model) => (
+          <div key={model.key} className="border border-border/50 bg-background/25 px-2.5 py-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium text-foreground">{model.label}</div>
+                <div className="mt-1 text-[11px] text-muted-foreground">
+                  {t('session.cacheUsage.models.turnRange', '#{{first}}-#{{last}}', { first: model.firstSequence, last: model.lastSequence })}
+                  {model.switchesIn > 0 ? ` - ${t('session.cacheUsage.models.switchesIn', '{{count}} switch-in', { count: model.switchesIn })}` : ''}
+                </div>
+              </div>
+              <div className="shrink-0 text-right">
+                <div className="font-mono text-sm text-emerald-300">{formatPercent(model.hitRate, locale)}</div>
+                <div className="mt-1 text-[11px] text-muted-foreground">{formatInt(model.assistantMessages, locale)} {t('session.cacheUsage.summary.turns', 'Turns')}</div>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
+              <span>{t('session.cacheUsage.stats.promptTotal', 'Prompt total')}: <span className="font-mono text-foreground">{formatInt(model.promptTotal, locale)}</span></span>
+              <span>{t('session.cacheUsage.stats.cacheRead', 'Cache hit')}: <span className="font-mono text-emerald-300">{formatInt(model.cacheRead, locale)}</span></span>
+              <span>{t('session.cacheUsage.cost.recorded', 'Recorded cost')}: <CostValue value={model.cost.total} knownMessages={model.cost.knownMessages} unknownMessages={model.cost.unknownMessages} locale={locale} t={t} /></span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function InsightCard({ insight, locale, t }: { insight: CacheUsageInsight; locale: string; t: PsmPluginI18nClient['t'] }) {
+  return (
+    <div className={`border px-3 py-2.5 ${insightTone(insight.severity)}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-foreground">{insightTitle(insight, t)}</div>
+          <div className="mt-1 text-[11px] text-muted-foreground">
+            {insight.sequence ? t('session.cacheUsage.sequence', '#{{value}}', { value: insight.sequence }) : t('session.cacheUsage.insights.sessionScope', 'Session scope')}
+            {insight.model ? ` - ${insight.previousModel ? `${insight.previousModel} -> ` : ''}${insight.model}` : ''}
+          </div>
+        </div>
+        {typeof insight.hitRateDelta === 'number' && (
+          <div className="shrink-0 font-mono text-sm text-foreground">{formatSignedPercent(insight.hitRateDelta, locale)}</div>
+        )}
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+        {typeof insight.hitRate === 'number' && (
+          <span>{t('session.cacheUsage.insights.hitRate', 'Hit rate')}: <span className="font-mono text-foreground">{formatPercent(insight.hitRate, locale)}</span></span>
+        )}
+        {typeof insight.cacheWrite === 'number' && (
+          <span>{t('session.cacheUsage.stats.cacheWrite', 'Cache write')}: <span className="font-mono text-foreground">{formatInt(insight.cacheWrite, locale)}</span></span>
+        )}
+        {typeof insight.cost === 'number' && (
+          <span>{t('session.cacheUsage.cost.recorded', 'Recorded cost')}: <span className="font-mono text-foreground">{insight.costKnown ? formatCost(insight.cost, locale) : t('session.cacheUsage.cost.unknown', 'Unknown')}</span></span>
+        )}
+        {typeof insight.count === 'number' && (
+          <span>{t('session.cacheUsage.insights.count', 'Count')}: <span className="font-mono text-foreground">{formatInt(insight.count, locale)}</span></span>
+        )}
+        {typeof insight.unknownCount === 'number' && (
+          <span>{t('session.cacheUsage.cost.unknownTurns', 'Unknown cost turns')}: <span className="font-mono text-amber-300">{formatInt(insight.unknownCount, locale)}</span></span>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -326,7 +555,7 @@ export function CacheUsagePanel({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<CacheUsageStats | null>(null)
-  const [activeTab, setActiveTab] = useState<CacheUsageTab>('trend')
+  const [activeTab, setActiveTab] = useState<CacheUsageTab>('insights')
   const [trendView, setTrendView] = useState<CacheUsageTrendView>('per-turn')
   const [isResizing, setIsResizing] = useState(false)
   const resizeStartRef = useRef<{ x: number; width: number } | null>(null)
@@ -510,6 +739,7 @@ export function CacheUsagePanel({
 
       <div className="border-b border-border/60 bg-background/15 px-2 py-2">
         <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setActiveTab('insights')} className={tabButtonClass(activeTab === 'insights')}>{t('session.cacheUsage.tabs.insights', 'Insights')}</button>
           <button type="button" onClick={() => setActiveTab('trend')} className={tabButtonClass(activeTab === 'trend')}>{t('session.cacheUsage.tabs.trend', 'Trend')}</button>
           <button type="button" onClick={() => setActiveTab('stats')} className={tabButtonClass(activeTab === 'stats')}>{t('session.cacheUsage.tabs.stats', 'Stats')}</button>
           <button type="button" onClick={() => setActiveTab('recent')} className={tabButtonClass(activeTab === 'recent')}>{t('session.cacheUsage.tabs.recent', 'Recent')}</button>
@@ -525,6 +755,37 @@ export function CacheUsagePanel({
           <div className="m-3 border border-border/60 bg-background/45 px-3 py-3 text-sm text-muted-foreground">
             <p>{t('session.cacheUsage.empty', 'No assistant usage metrics found in this session.')}</p>
             <p className="mt-2 text-xs text-muted-foreground/80">{branchHint}</p>
+          </div>
+        ) : activeTab === 'insights' ? (
+          <div className="space-y-3 px-3 py-3">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="border border-border/60 bg-background/35 px-2.5 py-2">
+                <div className="text-muted-foreground">{t('session.cacheUsage.insights.switches', 'Model switches')}</div>
+                <div className="mt-1 font-mono text-foreground">{formatInt(stats.modelSwitches.length, language)}</div>
+              </div>
+              <div className="border border-border/60 bg-background/35 px-2.5 py-2">
+                <div className="text-muted-foreground">{t('session.cacheUsage.cost.recorded', 'Recorded cost')}</div>
+                <div className="mt-1">
+                  <CostValue value={stats.treeTotals.cost.total} knownMessages={stats.treeTotals.cost.knownMessages} unknownMessages={stats.treeTotals.cost.unknownMessages} locale={language} t={t} />
+                </div>
+              </div>
+            </div>
+
+            {stats.insights.length > 0 ? (
+              <div className="space-y-2">
+                {stats.insights.map((insight) => (
+                  <InsightCard key={insight.id} insight={insight} locale={language} t={t} />
+                ))}
+              </div>
+            ) : (
+              <div className="border border-border/60 bg-background/45 px-3 py-3 text-sm text-muted-foreground">
+                {t('session.cacheUsage.insights.empty', 'No cache anomalies detected in this session.')}
+              </div>
+            )}
+
+            <ModelStatsTable models={stats.modelStats} locale={language} t={t} />
+            <CostSummary stats={stats} locale={language} t={t} />
+            <div className="text-[11px] text-muted-foreground">{branchHint}</div>
           </div>
         ) : activeTab === 'trend' ? (
           <div className="px-3 py-3">
@@ -571,6 +832,8 @@ export function CacheUsagePanel({
             <StatSection title={branchTitle} totals={stats.activeBranchTotals} locale={language} t={t} />
             <StatSection title={t('session.cacheUsage.stats.wholeTree', 'Whole tree')} totals={stats.treeTotals} locale={language} t={t} />
             <StatSection title={t('session.cacheUsage.stats.delta', 'Delta')} totals={deltaTotals(stats)} locale={language} t={t} delta />
+            <ModelStatsTable models={stats.modelStats} locale={language} t={t} />
+            <CostSummary stats={stats} locale={language} t={t} />
           </div>
         ) : (
           <div className="px-3 py-3">
@@ -586,14 +849,28 @@ export function CacheUsagePanel({
                           {message.isOnActiveBranch && (
                             <span className="border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-foreground">{t('session.cacheUsage.branchBadge', 'Latest branch')}</span>
                           )}
+                          {message.modelChanged && (
+                            <span className="border border-info/25 bg-info/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-foreground">{t('session.cacheUsage.reasons.modelSwitch', 'Model switch')}</span>
+                          )}
                           <span className="truncate text-sm font-medium text-foreground">{providerModelLabel(message, t('session.cacheUsage.modelFallback', 'assistant'))}</span>
                         </div>
                         <div className="mt-1 text-[11px] text-muted-foreground">{formatTimestamp(message.timestamp, language)}</div>
+                        {message.reasons.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {message.reasons.map((reason) => (
+                              <span key={reason} className="border border-border/50 bg-background/25 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                {reasonLabel(reason, t)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
                           <span>{t('session.cacheUsage.stats.input', 'Input (uncached)')}: <span className="font-mono text-foreground">{formatInt(message.input, language)}</span></span>
                           <span>{t('session.cacheUsage.stats.output', 'Output')}: <span className="font-mono text-foreground">{formatInt(message.output, language)}</span></span>
                           <span>{t('session.cacheUsage.stats.cacheRead', 'Cache hit')}: <span className="font-mono text-emerald-300">{formatInt(message.cacheRead, language)}</span></span>
                           <span>{t('session.cacheUsage.stats.cacheWrite', 'Cache write')}: <span className="font-mono text-foreground">{formatInt(message.cacheWrite, language)}</span></span>
+                          <span>{t('session.cacheUsage.insights.hitRateDelta', 'Hit delta')}: <span className="font-mono text-foreground">{formatSignedPercent(message.hitRateDelta, language)}</span></span>
+                          <span>{t('session.cacheUsage.cost.recorded', 'Recorded cost')}: <span className="font-mono text-foreground">{message.costKnown ? formatCost(message.cost.total, language) : t('session.cacheUsage.cost.unknown', 'Unknown')}</span></span>
                         </div>
                       </div>
                       <div className="shrink-0 text-right">

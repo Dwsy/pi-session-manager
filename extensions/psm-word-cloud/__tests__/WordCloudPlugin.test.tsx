@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../host-react', () => ({
   hostReact: () => React,
@@ -10,6 +10,8 @@ vi.mock('../host-react', () => ({
 
 import activate, { layoutWordCloudWords } from '../index'
 import type { SessionInfo } from '@/types'
+
+const canvasContexts: Array<Record<string, any>> = []
 
 const session: SessionInfo = {
   id: 'session-1',
@@ -59,7 +61,33 @@ function overlaps(a: { x: number; y: number; width: number; height: number }, b:
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
 }
 
-afterEach(() => cleanup())
+beforeEach(() => {
+  canvasContexts.length = 0
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => {
+    const context = {
+      setTransform: vi.fn(),
+      clearRect: vi.fn(),
+      measureText: vi.fn((text: string) => ({ width: text.length * 9 })),
+      save: vi.fn(),
+      restore: vi.fn(),
+      fillText: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      quadraticCurveTo: vi.fn(),
+      closePath: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+    }
+    canvasContexts.push(context)
+    return context as unknown as CanvasRenderingContext2D
+  })
+})
+
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('word cloud plugin', () => {
   it('scales canvas word sizes by frequency', () => {
@@ -96,6 +124,22 @@ describe('word cloud plugin', () => {
     }
   })
 
+  it('fits the default 50-word cloud density on one screen', () => {
+    const words = Array.from({ length: 50 }, (_item, index) => ({
+      word: `word${index}`,
+      count: 100 - index,
+    }))
+    const layout = layoutWordCloudWords(words, 720, 420, (text, fontSize) => text.length * fontSize * 0.58)
+
+    expect(layout.length).toBeGreaterThanOrEqual(45)
+    expect(layout[0].fontSize).toBeGreaterThan(layout[layout.length - 1].fontSize)
+    for (let i = 0; i < layout.length; i += 1) {
+      for (let j = i + 1; j < layout.length; j += 1) {
+        expect(overlaps(layout[i], layout[j])).toBe(false)
+      }
+    }
+  })
+
   it('opens the app view from its command registration', () => {
     const { commands } = createPluginContext()
     const openAppView = vi.fn()
@@ -105,6 +149,26 @@ describe('word cloud plugin', () => {
     })
 
     expect(openAppView).toHaveBeenCalledWith('builtin.word-cloud.view')
+  })
+
+  it('filters projects in the plugin sidebar', async () => {
+    const { appSidebarViews } = createPluginContext()
+    const alphaSession = { ...session, cwd: '/tmp/alpha-project' }
+    const betaSession = { ...session, id: 'session-2', cwd: '/tmp/beta-project' }
+
+    render(appSidebarViews[0].render({
+      viewId: appSidebarViews[0].id,
+      active: true,
+      data: { sessions: [alphaSession, betaSession] },
+    }))
+
+    expect(screen.getByText('alpha-project')).not.toBeNull()
+    expect(screen.getByText('beta-project')).not.toBeNull()
+
+    fireEvent.change(screen.getByPlaceholderText('Search projects'), { target: { value: 'beta' } })
+
+    await waitFor(() => expect(screen.queryByText('alpha-project')).toBeNull())
+    expect(screen.getByText('beta-project')).not.toBeNull()
   })
 
   it('builds words from DB preview fields without reading JSONL entries', async () => {
@@ -121,6 +185,93 @@ describe('word cloud plugin', () => {
     expect(readEntries).not.toHaveBeenCalled()
     expect(screen.getByText('2')).not.toBeNull()
     expect(screen.queryByText('ignored')).toBeNull()
+  })
+
+  it('keeps the word snapshot stable until refresh when session data changes', async () => {
+    const { appViews } = createPluginContext()
+    const { rerender } = render(appViews[0].render({
+      viewId: appViews[0].id,
+      active: true,
+      data: { sessions: [session] },
+    }))
+
+    await waitFor(() => expect(screen.getAllByText('alpha').length).toBeGreaterThan(0))
+
+    rerender(appViews[0].render({
+      viewId: appViews[0].id,
+      active: true,
+      data: { sessions: [{ ...session, first_message: 'delta delta epsilon', last_message: '' }] },
+    }))
+
+    expect(screen.queryByText('delta')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+
+    await waitFor(() => expect(screen.getAllByText('delta').length).toBeGreaterThan(0))
+    expect(screen.queryByText('alpha')).toBeNull()
+  })
+
+  it('refreshes automatically when maxWords changes', async () => {
+    const { appViews } = createPluginContext()
+    const element = appViews[0].render({
+      viewId: appViews[0].id,
+      active: true,
+      data: { sessions: [{ ...session, first_message: 'alpha beta gamma delta', last_message: '' }] },
+    })
+    const { rerender } = render(React.cloneElement(element, { maxWords: 2 }))
+
+    await waitFor(() => expect(screen.getAllByText('alpha').length).toBeGreaterThan(0))
+    expect(screen.queryByText('gamma')).toBeNull()
+
+    rerender(React.cloneElement(element, { maxWords: 4 }))
+
+    await waitFor(() => expect(screen.getAllByText('gamma').length).toBeGreaterThan(0))
+  })
+
+  it('draws computed words directly on the canvas', async () => {
+    const { appViews } = createPluginContext()
+
+    render(appViews[0].render({
+      viewId: appViews[0].id,
+      active: true,
+      data: { sessions: [session] },
+    }))
+
+    await waitFor(() => {
+      expect(canvasContexts.some((context) => context.fillText.mock.calls.some((call: unknown[]) => call[0] === 'alpha'))).toBe(true)
+    })
+  })
+
+  it('uses full user message text and exposes word search', async () => {
+    const { appViews } = createPluginContext()
+    const richSession = {
+      ...session,
+      user_messages_text: 'omega omega searchableword searchableword searchableword',
+    }
+
+    render(appViews[0].render({
+      viewId: appViews[0].id,
+      active: true,
+      data: { sessions: [richSession] },
+    }))
+
+    await waitFor(() => expect(screen.getAllByText('searchableword').length).toBeGreaterThan(0))
+    fireEvent.change(screen.getByPlaceholderText('Search words'), { target: { value: 'omega' } })
+
+    await waitFor(() => expect(screen.getAllByText('omega').length).toBeGreaterThan(0))
+    expect(screen.queryByText('searchableword')).toBeNull()
+  })
+
+  it('shows more than the old fixed top-word limit', async () => {
+    const { appViews } = createPluginContext()
+    const manyWords = Array.from({ length: 35 }, (_item, index) => `word${index}`).join(' ')
+
+    render(appViews[0].render({
+      viewId: appViews[0].id,
+      active: true,
+      data: { sessions: [{ ...session, first_message: manyWords, last_message: '' }] },
+    }))
+
+    await waitFor(() => expect(screen.getByText('word34')).not.toBeNull())
   })
 
   it('stores clicked words as globally hidden words', async () => {

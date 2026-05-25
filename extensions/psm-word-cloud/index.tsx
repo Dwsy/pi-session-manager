@@ -1,5 +1,5 @@
 import { hostReact } from './host-react'
-import type { WordCloudOptions } from 'wordcloud'
+import type { MouseEvent as ReactMouseEvent } from 'react'
 import type {
   PsmAppSidebarViewRenderProps,
   PsmAppViewRenderProps,
@@ -35,7 +35,7 @@ export const manifest: PsmPluginManifest = {
     title: 'Word Cloud Settings',
     properties: [
       { key: 'minWordLength', title: 'Minimum word length', type: 'number', default: 3, min: 1, max: 12 },
-      { key: 'maxWords', title: 'Maximum words', type: 'number', default: 80, min: 10, max: 200 },
+      { key: 'maxWords', title: 'Maximum words', type: 'number', default: 50, min: 10, max: 200 },
     ],
   },
 }
@@ -81,7 +81,7 @@ function sessionMatchesScope(session: SessionInfo, scope: WordCloudScope) {
 }
 
 function userPreviewTextFromSession(session: SessionInfo) {
-  const texts = [session.first_message]
+  const texts = [session.user_messages_text, session.first_message]
   if (session.last_message_role?.toLowerCase() === 'user' && session.last_message !== session.first_message) {
     texts.push(session.last_message)
   }
@@ -149,10 +149,12 @@ export interface WordCloudLayoutItem extends WordStat {
 
 interface WordCloudStats {
   words: WordStat[]
-  sampledSessions: number
+  scopedSessions: number
 }
 
-const MAX_SAMPLED_SESSIONS = 120
+type WordSortMode = 'count' | 'alpha'
+
+type ProjectSortMode = 'recent' | 'sessions' | 'messages' | 'name'
 
 function rectsOverlap(a: WordCloudLayoutItem, b: WordCloudLayoutItem) {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
@@ -170,8 +172,13 @@ export function layoutWordCloudWords(
   const minCount = words[words.length - 1]?.count ?? maxCount
   const countRange = Math.max(1, maxCount - minCount)
   const minDimension = Math.min(width, height)
-  const maxFontSize = Math.max(96, Math.min(168, minDimension / 2.7))
-  const minFontSize = Math.max(15, Math.min(22, minDimension / 20))
+  const density = Math.max(0, Math.min(1, (words.length - 12) / 38))
+  const sparseMaxFontSize = Math.max(96, Math.min(168, minDimension / 2.7))
+  const denseMaxFontSize = Math.max(32, Math.min(48, minDimension / 10))
+  const sparseMinFontSize = Math.max(15, Math.min(22, minDimension / 20))
+  const denseMinFontSize = Math.max(9, Math.min(12, minDimension / 38))
+  const maxFontSize = Math.round(sparseMaxFontSize * (1 - density) + denseMaxFontSize * density)
+  const minFontSize = Math.round(sparseMinFontSize * (1 - density) + denseMinFontSize * density)
   const centerX = width / 2
   const centerY = height / 2
   const placed: WordCloudLayoutItem[] = []
@@ -182,21 +189,21 @@ export function layoutWordCloudWords(
     const weight = Math.max(0, Math.min(1, frequencyWeight * 0.64 + rankWeight * 0.36))
     const baseFontSize = Math.round(minFontSize + (maxFontSize - minFontSize) * weight)
 
-    for (const scale of [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.52]) {
-      const fontSize = Math.round(baseFontSize * scale)
+    for (const scale of [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44, 0.36]) {
+      const fontSize = Math.max(10, Math.round(baseFontSize * scale))
       const textWidth = measureText(item.word, fontSize)
       const box: Omit<WordCloudLayoutItem, 'x' | 'y'> = {
         ...item,
-        width: textWidth + 18,
-        height: Math.ceil(fontSize * 1.22) + 10,
+        width: textWidth + Math.max(8, Math.round(fontSize * 0.32)),
+        height: Math.ceil(fontSize * 1.12) + 6,
         fontSize,
         colorIndex: index,
       }
 
       let didPlace = false
-      for (let step = 0; step < 5200; step += 1) {
+      for (let step = 0; step < 7200; step += 1) {
         const angle = step * 0.36
-        const radius = 7.4 * Math.sqrt(step)
+        const radius = 5.8 * Math.sqrt(step)
         const x = centerX + Math.cos(angle) * radius - box.width / 2
         const y = centerY + Math.sin(angle) * radius * 0.76 - box.height / 2
         const candidate = { ...box, x, y }
@@ -222,7 +229,7 @@ function computeWordStats(
   hiddenWords = new Set<string>(),
 ): WordCloudStats {
   const counts = new Map<string, number>()
-  const scopedSessions = sessions.filter((session) => sessionMatchesScope(session, scope)).slice(0, MAX_SAMPLED_SESSIONS)
+  const scopedSessions = sessions.filter((session) => sessionMatchesScope(session, scope))
 
   for (const session of scopedSessions) {
     for (const word of tokenize(userPreviewTextFromSession(session), minWordLength, hiddenWords)) {
@@ -237,7 +244,7 @@ function computeWordStats(
 
   return {
     words,
-    sampledSessions: scopedSessions.length,
+    scopedSessions: scopedSessions.length,
   }
 }
 
@@ -268,13 +275,27 @@ interface WordCloudCanvasProps {
 
 type WordCloudDimension = { x: number; y: number; w: number; h: number }
 
-class WordCloudCanvas extends Component<WordCloudCanvasProps, { width: number; height: number; hoveredWord: string | null; hoveredDimension: WordCloudDimension | null }> {
+interface WordCloudCanvasState {
+  width: number
+  height: number
+  layout: WordCloudLayoutItem[]
+  hoveredWord: string | null
+  hoveredDimension: WordCloudDimension | null
+}
+
+class WordCloudCanvas extends Component<WordCloudCanvasProps, WordCloudCanvasState> {
   private containerRef = createRef<HTMLDivElement>()
   private baseCanvasRef = createRef<HTMLCanvasElement>()
   private overlayCanvasRef = createRef<HTMLCanvasElement>()
   private resizeObserver: ResizeObserver | null = null
 
-  state = { width: 0, height: 0, hoveredWord: null as string | null, hoveredDimension: null as WordCloudDimension | null }
+  state: WordCloudCanvasState = {
+    width: 0,
+    height: 0,
+    layout: [],
+    hoveredWord: null,
+    hoveredDimension: null,
+  }
 
   componentDidMount() {
     this.updateSize()
@@ -289,7 +310,7 @@ class WordCloudCanvas extends Component<WordCloudCanvasProps, { width: number; h
     this.resizeObserver.observe(container)
   }
 
-  componentDidUpdate(prevProps: WordCloudCanvasProps, prevState: { width: number; height: number; hoveredWord: string | null; hoveredDimension: WordCloudDimension | null }) {
+  componentDidUpdate(prevProps: WordCloudCanvasProps, prevState: WordCloudCanvasState) {
     if (prevState.width !== this.state.width || prevState.height !== this.state.height || prevProps.words !== this.props.words) {
       void this.drawWordCloud()
     }
@@ -313,7 +334,7 @@ class WordCloudCanvas extends Component<WordCloudCanvasProps, { width: number; h
     if (!container) return
     const next = {
       width: Math.max(320, Math.round(container.clientWidth)),
-      height: Math.max(280, Math.round(container.clientHeight)),
+      height: Math.max(320, Math.round(container.clientHeight)),
     }
     if (next.width !== this.state.width || next.height !== this.state.height) {
       this.setState(next)
@@ -329,57 +350,56 @@ class WordCloudCanvas extends Component<WordCloudCanvasProps, { width: number; h
     canvas.height = Math.floor(height * ratio)
     canvas.style.width = `${width}px`
     canvas.style.height = `${height}px`
-    const context = canvas.getContext('2d')
+    let context: CanvasRenderingContext2D | null = null
+    try {
+      context = canvas.getContext('2d')
+    } catch {
+      return null
+    }
     if (context) context.setTransform(ratio, 0, 0, ratio, 0, 0)
     return context
   }
 
-  private async drawWordCloud() {
+  private canvasFont(fontSize: number) {
+    const container = this.containerRef.current
+    const styles = container ? getComputedStyle(container) : null
+    const fontFamily = styles?.fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif'
+    return `600 ${fontSize}px ${fontFamily}`
+  }
+
+  private wordColor(styles: CSSStyleDeclaration, item: WordCloudLayoutItem) {
+    if (item.colorIndex === 0) return cssRgb(styles, '--color-info', '#3b82f6')
+    if (item.colorIndex < 5) return cssRgb(styles, '--color-foreground', '#111827')
+    if (item.colorIndex < 14) return cssRgb(styles, '--color-purple', '#8b5cf6')
+    return cssRgb(styles, '--color-muted-foreground', '#6b7280')
+  }
+
+  private drawWordCloud() {
     const canvas = this.baseCanvasRef.current
     const { width, height } = this.state
     if (!canvas || width <= 0 || height <= 0) return
-    this.syncCanvasSize(canvas, width, height)
+    const context = this.syncCanvasSize(canvas, width, height)
+    if (!context) return
 
-    const { default: wordCloud } = (await import('wordcloud')) as { default: (canvas: HTMLCanvasElement, options: WordCloudOptions) => void }
-    const maxCount = this.props.words[0]?.count ?? 1
-    const minCount = this.props.words[this.props.words.length - 1]?.count ?? maxCount
-    const list = this.props.words.map((item, index) => {
-      const frequency = maxCount === minCount ? 0.5 : (item.count - minCount) / Math.max(1, maxCount - minCount)
-      const rank = this.props.words.length > 1 ? 1 - index / (this.props.words.length - 1) : 1
-      return [item.word, Math.round(20 + frequency * 120 + rank * 60)] as [string, number]
-    })
+    context.clearRect(0, 0, width, height)
 
-    wordCloud(canvas, {
-      list,
-      weightFactor: (weight) => weight,
-      fontFamily: 'var(--font-family, system-ui)',
-      backgroundColor: 'transparent',
-      clearCanvas: true,
-      drawOutOfBound: false,
-      ellipticity: 0.74,
-      gridSize: Math.max(8, Math.round(Math.min(width, height) / 24)),
-      minSize: 14,
-      rotateRatio: 0,
-      shuffle: false,
-      color: (_word, weight) => {
-        if (weight >= 150) return 'rgb(var(--color-info))'
-        if (weight >= 110) return 'rgb(var(--color-foreground))'
-        if (weight >= 70) return 'rgb(var(--color-purple))'
-        return 'rgb(var(--color-muted-foreground))'
-      },
-      hover: (item, dimension) => {
-        if (!item || !dimension) {
-          this.setState({ hoveredWord: null, hoveredDimension: null })
-          return
-        }
-        this.setState({ hoveredWord: item[0], hoveredDimension: dimension })
-      },
-      click: (item) => {
-        if (!item) return
-        const clicked = this.props.words.find((entry) => entry.word === item[0])
-        if (clicked) this.props.onWordClick?.(clicked)
-      },
+    const layout = layoutWordCloudWords(this.props.words, width, height, (text, fontSize) => {
+      context.font = this.canvasFont(fontSize)
+      return context.measureText(text).width
     })
+    const styles = getComputedStyle(canvas)
+
+    for (const item of layout) {
+      context.save()
+      context.font = this.canvasFont(item.fontSize)
+      context.textBaseline = 'top'
+      context.fillStyle = this.wordColor(styles, item)
+      context.globalAlpha = item.colorIndex === 0 ? 1 : Math.max(0.72, 1 - item.colorIndex * 0.006)
+      context.fillText(item.word, item.x + 9, item.y + 5)
+      context.restore()
+    }
+
+    this.setState({ layout }, () => this.drawOverlay())
   }
 
   private drawOverlay() {
@@ -408,10 +428,54 @@ class WordCloudCanvas extends Component<WordCloudCanvasProps, { width: number; h
     context.restore()
   }
 
+  private getWordAt(event: ReactMouseEvent<HTMLCanvasElement>) {
+    const canvas = this.baseCanvasRef.current
+    if (!canvas) return null
+    const rect = canvas.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    const y = event.clientY - rect.top
+    for (let index = this.state.layout.length - 1; index >= 0; index -= 1) {
+      const item = this.state.layout[index]
+      if (x >= item.x && x <= item.x + item.width && y >= item.y && y <= item.y + item.height) {
+        return item
+      }
+    }
+    return null
+  }
+
+  private handleMouseMove = (event: ReactMouseEvent<HTMLCanvasElement>) => {
+    const item = this.getWordAt(event)
+    if (!item) {
+      if (this.state.hoveredWord) this.setState({ hoveredWord: null, hoveredDimension: null })
+      return
+    }
+    if (item.word === this.state.hoveredWord) return
+    this.setState({
+      hoveredWord: item.word,
+      hoveredDimension: { x: item.x, y: item.y, w: item.width, h: item.height },
+    })
+  }
+
+  private handleMouseLeave = () => {
+    this.setState({ hoveredWord: null, hoveredDimension: null })
+  }
+
+  private handleClick = (event: ReactMouseEvent<HTMLCanvasElement>) => {
+    const item = this.getWordAt(event)
+    if (item) this.props.onWordClick?.({ word: item.word, count: item.count })
+  }
+
   render() {
     return (
-      <div ref={this.containerRef} className="relative h-full min-h-[280px] overflow-hidden rounded-xl border border-border/70 bg-surface/20">
-        <canvas ref={this.baseCanvasRef} className="block h-full w-full" aria-label="Word cloud canvas" />
+      <div ref={this.containerRef} className="relative h-full min-h-[320px] select-none overflow-hidden rounded-lg border border-border/70 bg-surface/20">
+        <canvas
+          ref={this.baseCanvasRef}
+          className="block h-full w-full"
+          aria-label="Word cloud canvas"
+          onMouseMove={this.handleMouseMove}
+          onMouseLeave={this.handleMouseLeave}
+          onClick={this.handleClick}
+        />
         <canvas ref={this.overlayCanvasRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true" />
       </div>
     )
@@ -432,10 +496,15 @@ interface WordCloudAppViewState {
   selectedWord: WordStat | null
   savingHiddenWords: boolean
   configError: string | null
+  wordSearch: string
+  wordSort: WordSortMode
+  stats: WordCloudStats | null
+  refreshedAt: number
 }
 
 class WordCloudAppView extends Component<WordCloudAppViewProps, WordCloudAppViewState> {
   private unsubscribeScope: (() => void) | null = null
+  private visibleWordsCache: { source: WordStat[]; search: string; sort: WordSortMode; words: WordStat[] } | null = null
 
   state: WordCloudAppViewState = {
     scope: activeScope,
@@ -443,15 +512,59 @@ class WordCloudAppView extends Component<WordCloudAppViewProps, WordCloudAppView
     selectedWord: null,
     savingHiddenWords: false,
     configError: null,
+    wordSearch: '',
+    wordSort: 'count',
+    stats: null,
+    refreshedAt: 0,
   }
 
   componentDidMount() {
-    this.unsubscribeScope = subscribeScope(() => this.setState({ scope: activeScope }))
+    this.unsubscribeScope = subscribeScope(() => this.setState({ scope: activeScope }, () => this.refreshStats()))
+    this.refreshStats()
     void this.loadHiddenWords()
+  }
+
+  componentDidUpdate(prevProps: WordCloudAppViewProps, prevState: WordCloudAppViewState) {
+    const prevSessionCount = getSessions(prevProps.data).length
+    const nextSessionCount = getSessions(this.props.data).length
+    const shouldRefresh =
+      prevProps.minWordLength !== this.props.minWordLength ||
+      prevProps.maxWords !== this.props.maxWords ||
+      !scopesEqual(prevState.scope, this.state.scope) ||
+      prevState.hiddenWords !== this.state.hiddenWords ||
+      (prevSessionCount === 0 && nextSessionCount > 0 && (prevState.stats?.scopedSessions ?? 0) === 0)
+
+    if (shouldRefresh) this.refreshStats()
   }
 
   componentWillUnmount() {
     this.unsubscribeScope?.()
+  }
+
+  private refreshStats = () => {
+    const { data, minWordLength, maxWords } = this.props
+    const { scope, hiddenWords } = this.state
+    const sessions = getSessions(data)
+    const stats = computeWordStats(sessions, scope, minWordLength, maxWords, new Set(hiddenWords))
+    this.visibleWordsCache = null
+    this.setState({ stats, refreshedAt: Date.now() })
+  }
+
+  private getVisibleWords(words: WordStat[], search: string, sort: WordSortMode) {
+    const normalizedSearch = search.trim().toLowerCase()
+    const cached = this.visibleWordsCache
+    if (cached && cached.source === words && cached.search === normalizedSearch && cached.sort === sort) return cached.words
+
+    const visibleWords = (normalizedSearch
+      ? words.filter((item) => item.word.includes(normalizedSearch))
+      : words
+    ).slice().sort((a, b) => {
+      if (sort === 'alpha') return a.word.localeCompare(b.word) || b.count - a.count
+      return b.count - a.count || a.word.localeCompare(b.word)
+    })
+
+    this.visibleWordsCache = { source: words, search: normalizedSearch, sort, words: visibleWords }
+    return visibleWords
   }
 
   private async loadHiddenWords() {
@@ -495,23 +608,18 @@ class WordCloudAppView extends Component<WordCloudAppViewProps, WordCloudAppView
   }
 
   render() {
-    const { data, minWordLength, maxWords } = this.props
-    const { scope, hiddenWords, selectedWord, savingHiddenWords, configError } = this.state
-    const sessions = getSessions(data)
-    const scopedSessionCount = sessions.filter((session) => sessionMatchesScope(session, scope)).length
+    const { scope, hiddenWords, selectedWord, savingHiddenWords, configError, wordSearch, wordSort, stats } = this.state
     const hiddenWordSet = new Set(hiddenWords)
-    const stats = computeWordStats(sessions, scope, minWordLength, maxWords, hiddenWordSet)
-    const words = stats.words
-    const maxCount = words[0]?.count ?? 1
+    const words = stats?.words ?? []
+    const visibleWords = this.getVisibleWords(words, wordSearch, wordSort)
+    const maxCount = visibleWords[0]?.count ?? 1
     const title = scope.type === 'global' ? 'Global Word Cloud' : 'Project Word Cloud'
     const subtitle = scope.type === 'global' ? 'All projects' : scope.projectPath
-    const sampledLabel = scopedSessionCount > MAX_SAMPLED_SESSIONS
-      ? `${stats.sampledSessions}/${scopedSessionCount} sampled`
-      : `${scopedSessionCount} sessions`
+    const sampledLabel = `${stats?.scopedSessions ?? 0} sessions`
 
     return (
-      <div className="flex h-full min-h-0 flex-col bg-background p-5">
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-border/70 pb-4">
+      <div className="flex h-full min-h-0 flex-col bg-background px-4 py-3">
+        <div className="mb-3 flex min-h-[52px] items-start justify-between gap-3 border-b border-border/70 pb-3 select-none">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <CloudIcon />
@@ -520,18 +628,26 @@ class WordCloudAppView extends Component<WordCloudAppViewProps, WordCloudAppView
             <h2 className="mt-1 truncate text-xl font-semibold text-foreground">{title}</h2>
             <div className="mt-1 truncate text-sm text-muted-foreground">{subtitle}</div>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-right text-xs">
-            <div className="rounded-xl border border-border/70 bg-surface/30 px-3 py-2">
+          <div className="flex shrink-0 items-center gap-3 text-right text-[11px] text-muted-foreground">
+            <button
+              type="button"
+              onClick={this.refreshStats}
+              className="rounded-md border border-border/70 bg-surface/40 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-surface/70"
+              title="Refresh word snapshot"
+            >
+              Refresh
+            </button>
+            <div>
               <div className="font-mono text-sm text-foreground">{sampledLabel}</div>
-              <div className="text-muted-foreground">scope</div>
+              <div>scope</div>
             </div>
-            <div className="rounded-xl border border-border/70 bg-surface/30 px-3 py-2">
-              <div className="font-mono text-sm text-foreground">{words.length}</div>
-              <div className="text-muted-foreground">words</div>
+            <div>
+              <div className="font-mono text-sm text-foreground">{visibleWords.length}/{words.length}</div>
+              <div>words</div>
             </div>
-            <div className="rounded-xl border border-border/70 bg-surface/30 px-3 py-2">
+            <div>
               <div className="font-mono text-sm text-foreground">{hiddenWords.length}</div>
-              <div className="text-muted-foreground">hidden</div>
+              <div>hidden</div>
             </div>
           </div>
         </div>
@@ -544,20 +660,36 @@ class WordCloudAppView extends Component<WordCloudAppViewProps, WordCloudAppView
         )}
 
         {words.length > 0 && (
-          <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <WordCloudCanvas words={words} onWordClick={this.openWordManager} />
-            <div className="min-h-0 overflow-auto rounded-xl border border-border/70 bg-surface/20 p-3">
-              <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <WordCloudCanvas words={visibleWords} onWordClick={this.openWordManager} />
+            <div className="flex min-h-0 flex-col rounded-lg border border-border/70 bg-surface/20 p-2.5">
+              <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground select-none">
                 <BarChartIcon />
-                Top Words
+                Words
               </div>
-              <div className="space-y-1.5">
-                {words.slice(0, 28).map((item) => (
+              <div className="mb-2 grid grid-cols-[minmax(0,1fr)_112px] gap-2">
+                <input
+                  value={wordSearch}
+                  onChange={(event) => this.setState({ wordSearch: event.currentTarget.value })}
+                  placeholder="Search words"
+                  className="h-8 min-w-0 rounded-md border border-border/70 bg-background/60 px-2 text-xs text-foreground outline-none focus:border-info/50"
+                />
+                <select
+                  value={wordSort}
+                  onChange={(event) => this.setState({ wordSort: event.currentTarget.value as WordSortMode })}
+                  className="h-8 rounded-md border border-border/70 bg-background/60 px-2 text-xs text-foreground outline-none focus:border-info/50"
+                >
+                  <option value="count">Count</option>
+                  <option value="alpha">A-Z</option>
+                </select>
+              </div>
+              <div className="min-h-0 flex-1 overflow-auto space-y-1.5">
+                {visibleWords.map((item) => (
                   <button
                     key={item.word}
                     type="button"
                     onClick={() => this.openWordManager(item)}
-                    className="grid w-full grid-cols-[minmax(0,1fr)_42px] items-center gap-3 rounded-lg border border-transparent px-2 py-1.5 text-left text-sm hover:border-info/35 hover:bg-info/8 hover:text-foreground"
+                    className="grid w-full grid-cols-[minmax(0,1fr)_42px] items-center gap-3 rounded-md border border-transparent px-2 py-1.5 text-left text-sm hover:border-info/35 hover:bg-info/8 hover:text-foreground"
                   >
                     <div className="min-w-0">
                       <div className="truncate text-foreground">{item.word}</div>
@@ -578,7 +710,7 @@ class WordCloudAppView extends Component<WordCloudAppViewProps, WordCloudAppView
 
         {selectedWord && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6 backdrop-blur-sm" role="dialog" aria-modal="true">
-            <div className="w-full max-w-[520px] rounded-xl border border-border/70 bg-background/95 shadow-xl">
+            <div className="w-full max-w-[520px] rounded-lg border border-border/70 bg-background/95 shadow-xl">
               <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3">
                 <div className="min-w-0">
                   <div className="text-xs font-medium uppercase text-muted-foreground">Word</div>
@@ -588,11 +720,11 @@ class WordCloudAppView extends Component<WordCloudAppViewProps, WordCloudAppView
               </div>
               <div className="space-y-4 px-4 py-4">
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-xl border border-border/70 bg-surface/25 px-3 py-2">
+                  <div className="rounded-lg border border-border/70 bg-surface/25 px-3 py-2">
                     <div className="font-mono text-sm text-foreground">{selectedWord.count}</div>
                     <div className="text-muted-foreground">count</div>
                   </div>
-                  <div className="rounded-xl border border-border/70 bg-surface/25 px-3 py-2">
+                  <div className="rounded-lg border border-border/70 bg-surface/25 px-3 py-2">
                     <div className="font-mono text-sm text-foreground">{hiddenWords.length}</div>
                     <div className="text-muted-foreground">hidden</div>
                   </div>
@@ -607,7 +739,7 @@ class WordCloudAppView extends Component<WordCloudAppViewProps, WordCloudAppView
                   {hiddenWordSet.has(selectedWord.word) ? 'Hidden globally' : savingHiddenWords ? 'Saving...' : 'Hide globally'}
                 </button>
                 {hiddenWords.length > 0 && (
-                  <div className="max-h-[180px] overflow-auto rounded-xl border border-border/70 bg-surface/20 p-2">
+                  <div className="max-h-[180px] overflow-auto rounded-lg border border-border/70 bg-surface/20 p-2">
                     {hiddenWords.map((word) => (
                       <div key={word} className="mb-1 flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-sm last:mb-0 hover:bg-surface/70">
                         <span className="min-w-0 truncate text-foreground">{word}</span>
@@ -625,14 +757,79 @@ class WordCloudAppView extends Component<WordCloudAppViewProps, WordCloudAppView
   }
 }
 
-function pathLabel(path: string) {
-  return path.split(/[\\/]/).filter(Boolean).pop() ?? path
+interface ProjectSummary {
+  dir: string
+  name: string
+  sessionCount: number
+  messageCount: number
+  lastModified: number
 }
 
-class WordCloudSidebar extends Component<PsmAppSidebarViewRenderProps<AppPluginSurfaceData>, { scope: WordCloudScope }> {
+function projectName(path: string) {
+  const parts = path.split(/[\\/]/).filter(Boolean)
+  return parts[parts.length - 1] ?? path
+}
+
+function compactPath(path: string) {
+  const parts = path.split(/[\\/]/).filter(Boolean)
+  if (parts.length <= 2) return path
+  return `.../${parts.slice(-2).join('/')}`
+}
+
+function relativeTime(timestamp: number) {
+  if (!Number.isFinite(timestamp)) return ''
+  const diffMs = Date.now() - timestamp
+  const minutes = Math.floor(diffMs / 60000)
+  const hours = Math.floor(diffMs / 3600000)
+  const days = Math.floor(diffMs / 86400000)
+  if (minutes < 1) return 'now'
+  if (minutes < 60) return `${minutes}m`
+  if (hours < 24) return `${hours}h`
+  if (days < 30) return `${days}d`
+  return `${Math.floor(days / 30)}mo`
+}
+
+function projectSummaries(sessions: SessionInfo[], query: string, sortMode: ProjectSortMode) {
+  const projects = new Map<string, ProjectSummary>()
+  for (const session of sessions) {
+    const dir = session.cwd || 'Unknown'
+    const modified = new Date(session.modified).getTime()
+    const existing = projects.get(dir)
+    if (existing) {
+      existing.sessionCount += 1
+      existing.messageCount += session.message_count || 0
+      existing.lastModified = Math.max(existing.lastModified, Number.isFinite(modified) ? modified : 0)
+    } else {
+      projects.set(dir, {
+        dir,
+        name: projectName(dir),
+        sessionCount: 1,
+        messageCount: session.message_count || 0,
+        lastModified: Number.isFinite(modified) ? modified : 0,
+      })
+    }
+  }
+
+  const needle = query.trim().toLowerCase()
+  const list = Array.from(projects.values()).filter((project) => {
+    if (!needle) return true
+    return `${project.name}\n${project.dir}`.toLowerCase().includes(needle)
+  })
+
+  list.sort((a, b) => {
+    if (sortMode === 'sessions') return b.sessionCount - a.sessionCount || b.lastModified - a.lastModified
+    if (sortMode === 'messages') return b.messageCount - a.messageCount || b.lastModified - a.lastModified
+    if (sortMode === 'name') return a.name.localeCompare(b.name) || a.dir.localeCompare(b.dir)
+    return b.lastModified - a.lastModified
+  })
+
+  return list
+}
+
+class WordCloudSidebar extends Component<PsmAppSidebarViewRenderProps<AppPluginSurfaceData>, { scope: WordCloudScope; projectSearch: string; projectSort: ProjectSortMode }> {
   private unsubscribeScope: (() => void) | null = null
 
-  state = { scope: activeScope }
+  state = { scope: activeScope, projectSearch: '', projectSort: 'recent' as ProjectSortMode }
 
   componentDidMount() {
     this.unsubscribeScope = subscribeScope(() => this.setState({ scope: activeScope }))
@@ -644,24 +841,17 @@ class WordCloudSidebar extends Component<PsmAppSidebarViewRenderProps<AppPluginS
 
   render() {
     const { data } = this.props
-    const { scope } = this.state
+    const { scope, projectSearch, projectSort } = this.state
     const sessions = getSessions(data)
-    const counts = new Map<string, number>()
-    for (const session of sessions) {
-      if (!session.cwd) continue
-      counts.set(session.cwd, (counts.get(session.cwd) ?? 0) + 1)
-    }
-    const projects = Array.from(counts.entries())
-      .map(([path, count]) => ({ path, count, label: pathLabel(path) }))
-      .sort((a, b) => a.label.localeCompare(b.label) || a.path.localeCompare(b.path))
+    const projects = projectSummaries(sessions, projectSearch, projectSort)
 
     return (
-      <div className="flex h-full min-h-0 flex-col gap-3 p-3">
-        <div className="text-xs font-medium text-muted-foreground">Scope</div>
+      <div className="flex h-full min-h-0 flex-col gap-2 p-2.5 select-none">
+        <div className="px-1 text-xs font-medium text-muted-foreground">Scope</div>
         <button
           type="button"
           onClick={() => setActiveScope({ type: 'global' })}
-          className={`rounded-xl border px-3 py-2 text-left text-sm ${scope.type === 'global' ? 'border-info/40 bg-info/8 text-foreground' : 'border-border/70 text-muted-foreground hover:text-foreground'}`}
+          className={`rounded-md border px-2.5 py-1.5 text-left text-sm ${scope.type === 'global' ? 'border-info/40 bg-info/8 text-foreground' : 'border-border/70 text-muted-foreground hover:bg-surface/50 hover:text-foreground'}`}
         >
           <div className="flex items-center justify-between gap-2">
             <span>Global</span>
@@ -669,24 +859,48 @@ class WordCloudSidebar extends Component<PsmAppSidebarViewRenderProps<AppPluginS
           </div>
         </button>
 
-        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border/70 bg-surface/20 p-1">
+        <div className="grid grid-cols-[minmax(0,1fr)_112px] gap-2">
+          <input
+            value={projectSearch}
+            onChange={(event) => this.setState({ projectSearch: event.currentTarget.value })}
+            placeholder="Search projects"
+            className="h-8 min-w-0 rounded-md border border-border/70 bg-background/60 px-2 text-xs text-foreground outline-none focus:border-info/50"
+          />
+          <select
+            value={projectSort}
+            onChange={(event) => this.setState({ projectSort: event.currentTarget.value as ProjectSortMode })}
+            className="h-8 rounded-md border border-border/70 bg-background/60 px-2 text-xs text-foreground outline-none focus:border-info/50"
+          >
+            <option value="recent">Recent</option>
+            <option value="sessions">Sessions</option>
+            <option value="messages">Messages</option>
+            <option value="name">A-Z</option>
+          </select>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border/70 bg-surface/20">
           {projects.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-muted-foreground">No projects</div>
+            <div className="p-4 text-center text-xs text-muted-foreground">No projects</div>
           ) : projects.map((project) => {
-            const active = scope.type === 'project' && scope.projectPath === project.path
+            const selected = scope.type === 'project' && scope.projectPath === project.dir
             return (
               <button
-                key={project.path}
+                key={project.dir}
                 type="button"
-                onClick={() => setActiveScope({ type: 'project', projectPath: project.path })}
-                className={`mb-1 w-full rounded-lg px-2.5 py-2 text-left text-sm last:mb-0 ${active ? 'bg-info/10 text-foreground' : 'text-muted-foreground hover:bg-surface/70 hover:text-foreground'}`}
-                title={project.path}
+                onClick={() => setActiveScope({ type: 'project', projectPath: project.dir })}
+                className={`block w-full border-b border-border/10 px-3 py-2 text-left ${selected ? 'bg-info/10 text-foreground' : 'text-muted-foreground hover:bg-background hover:text-foreground'}`}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate">{project.label}</span>
-                  <span className="font-mono text-xs text-muted-foreground">{project.count}</span>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{project.name}</div>
+                    <div className="mt-1 truncate font-mono text-xs opacity-80">{compactPath(project.dir)}</div>
+                  </div>
+                  <div className="shrink-0 text-right font-mono text-[11px] opacity-70">{relativeTime(project.lastModified)}</div>
                 </div>
-                <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{project.path}</div>
+                <div className="mt-2 flex gap-2 text-[11px] opacity-80">
+                  <span className="rounded bg-muted/40 px-1.5 py-0.5">{project.sessionCount} sessions</span>
+                  <span className="rounded bg-muted/40 px-1.5 py-0.5">{project.messageCount} messages</span>
+                </div>
               </button>
             )
           })}
@@ -698,7 +912,7 @@ class WordCloudSidebar extends Component<PsmAppSidebarViewRenderProps<AppPluginS
 
 export default function activate(ctx: PsmPluginHostContext) {
   const minWordLength = Number(ctx.settings.get('minWordLength', 3))
-  const maxWords = Number(ctx.settings.get('maxWords', 80))
+  const maxWords = Number(ctx.settings.get('maxWords', 50))
 
   ctx.ui.registerAppView({
     id: WORD_CLOUD_VIEW_ID,
