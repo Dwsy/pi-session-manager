@@ -1,7 +1,13 @@
+import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/transport', () => ({
-  invoke: vi.fn().mockResolvedValue([]),
+  invoke: vi.fn(async (command: string) => {
+    if (command === 'load_pi_settings_full') return { defaultProvider: 'openai', defaultModel: 'gpt-5.5' }
+    if (command === 'list_model_options_fast') return [{ provider: 'openai', model: 'gpt-5.5' }]
+    if (command === 'invoke_model_text') return { text: 'ok', provider: 'openai', model: 'gpt-5.5' }
+    return []
+  }),
   isTauri: () => false,
 }))
 
@@ -80,6 +86,97 @@ describe('PsmPluginHost', () => {
     })
     expect(await host.executeCommand('builtin.test.command')).toEqual({ ok: true, id: 'builtin.test' })
     expect(await host.runTool('builtin.test_tool')).toEqual({ ok: true, id: 'builtin.test' })
+  })
+
+  it('injects host agent bridge into plugin capabilities', async () => {
+    const createSession = vi.fn(async () => ({ sessionId: 'agent-1', storageScope: 'plugin' }))
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/agent-plugin',
+          async load() {
+            return {
+              manifest: {
+                manifestVersion: 1,
+                id: 'builtin.agent-plugin',
+                name: 'Agent Plugin',
+                version: '1.0.0',
+                permissions: ['agent:invoke', 'model:invoke'],
+              },
+              activate: (ctx: any) => {
+                ctx.registerCommand('agent.create', async () => ctx.psm.agent.createSession({
+                  purpose: 'semantic-search',
+                  tools: [],
+                  storage: { scope: 'plugin' },
+                }))
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+        createAgentBridge: () => ({
+          createSession,
+          run: async () => ({ sessionId: 'agent-1', text: 'ok' }),
+          runStream: async () => ({ sessionId: 'agent-1', text: 'ok' }),
+          abort: async () => {},
+          dispose: async () => {},
+        }),
+      },
+    })
+
+    await host.reload()
+
+    await expect(host.executeCommand('agent.create')).resolves.toEqual({ sessionId: 'agent-1', storageScope: 'plugin' })
+    expect(createSession).toHaveBeenCalledWith({
+      purpose: 'semantic-search',
+      tools: [],
+      storage: { scope: 'plugin' },
+    })
+  })
+
+  it('injects the default Pi Agent bridge when no service override is provided', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/default-agent-plugin',
+          async load() {
+            return {
+              manifest: {
+                manifestVersion: 1,
+                id: 'builtin.default-agent-plugin',
+                name: 'Default Agent Plugin',
+                version: '1.0.0',
+                permissions: ['agent:invoke', 'model:invoke'],
+              },
+              activate: (ctx: any) => {
+                ctx.registerCommand('agent.default.create', async () => ctx.psm.agent.createSession({
+                  purpose: 'semantic-search',
+                  model: { provider: 'openai', id: 'gpt-5.5' },
+                  tools: [],
+                  storage: { scope: 'plugin' },
+                }))
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    await host.reload()
+
+    await expect(host.executeCommand('agent.default.create')).resolves.toMatchObject({
+      storageScope: 'plugin',
+      model: { provider: 'openai', id: 'gpt-5.5' },
+    })
   })
 
   it('returns a cached command snapshot between reload notifications', async () => {
@@ -810,6 +907,126 @@ describe('PsmPluginHost', () => {
       commands: ['path.test.command'],
     })
     expect(await host.executeCommand('path.test.command')).toBe('ok')
+  })
+
+  it('loads dev entries through module source bundles', async () => {
+    const source = `
+      export const manifest = {
+        manifestVersion: 1,
+        id: 'dev.test',
+        name: 'Dev Test',
+        version: '1.0.0',
+        permissions: ['records:read']
+      };
+      export function activate(ctx) {
+        ctx.registerCommand('dev.test.command', async () => 'ok');
+      }
+    `
+    const host = new PsmPluginHost({
+      builtinEntries: [],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+        listPathEntries: async () => [],
+        listDevEntries: async () => [
+          {
+            projectPath: '/tmp/dev-plugin',
+            packageName: '@acme/dev-plugin',
+            packageVersion: '0.1.0',
+            entryPath: '/tmp/dev-plugin/dist/index.js',
+            exportPath: './dist/index.js',
+          },
+        ],
+        readDevModuleSource: async () => source,
+      },
+    })
+
+    const plugins = await host.reload()
+
+    expect(plugins[0]).toMatchObject({
+      id: 'dev.test',
+      source: 'dev',
+      sourceId: '/tmp/dev-plugin/dist/index.js',
+      packageName: '@acme/dev-plugin',
+      projectPath: '/tmp/dev-plugin',
+      commands: ['dev.test.command'],
+    })
+    expect(await host.executeCommand('dev.test.command')).toBe('ok')
+  })
+
+  it('loads built word-cloud dev plugin module source', async () => {
+    ;(globalThis as Record<string, unknown>).__PSM_HOST_REACT__ = await import('react')
+    const source = readFileSync(new URL('../../../../extensions/psm-word-cloud/dist/index.mjs', import.meta.url), 'utf8')
+    const host = new PsmPluginHost({
+      builtinEntries: [],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+        listPathEntries: async () => [],
+        listDevEntries: async () => [
+          {
+            projectPath: '/Users/dengwenyu/Dev/AI/pi-session-manager/extensions/psm-word-cloud',
+            packageName: '@local/psm-word-cloud',
+            packageVersion: '0.1.0',
+            entryPath: '/Users/dengwenyu/Dev/AI/pi-session-manager/extensions/psm-word-cloud/dist/index.mjs',
+            exportPath: './dist/index.mjs',
+          },
+        ],
+        readDevModuleSource: async () => source,
+      },
+    })
+
+    const plugins = await host.reload()
+
+    expect(plugins[0]).toMatchObject({
+      id: 'builtin.word-cloud',
+      source: 'dev',
+      packageName: '@local/psm-word-cloud',
+      state: 'active',
+      appViews: ['builtin.word-cloud.view'],
+    })
+  })
+
+  it('reports duplicate plugin ids without replacing the first loaded plugin', async () => {
+    const duplicateSource = `
+      export const manifest = {
+        manifestVersion: 1,
+        id: 'builtin.test',
+        name: 'Duplicate Dev Test',
+        version: '1.0.0'
+      };
+      export function activate(ctx) {
+        ctx.registerCommand('duplicate.command', async () => 'bad');
+      }
+    `
+    const host = new PsmPluginHost({
+      builtinEntries: [entry('builtin.test')],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+        listPathEntries: async () => [],
+        listDevEntries: async () => [
+          {
+            projectPath: '/tmp/dev-plugin',
+            entryPath: '/tmp/dev-plugin/dist/index.js',
+            exportPath: './dist/index.js',
+          },
+        ],
+        readDevModuleSource: async () => duplicateSource,
+      },
+    })
+
+    const plugins = await host.reload()
+
+    expect(plugins.find((plugin) => plugin.id === 'builtin.test')).toMatchObject({
+      state: 'active',
+      commands: ['builtin.test.command'],
+    })
+    expect(plugins.find((plugin) => plugin.id === '/tmp/dev-plugin/dist/index.js')).toMatchObject({
+      state: 'error',
+      diagnostics: [{ level: 'error', message: expect.stringContaining('Duplicate plugin id builtin.test') }],
+    })
+    expect(host.getCommandNames()).toEqual(['builtin.test.command'])
   })
 
   it('loads npm entries through module source bundles', async () => {

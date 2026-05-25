@@ -7,7 +7,10 @@ import SessionSideChatPanel from './SessionSideChatPanel'
 
 const mocks = {
   listOptions: vi.fn(),
-  askStream: vi.fn(),
+  readEntries: vi.fn(),
+  createSession: vi.fn(),
+  runStream: vi.fn(),
+  dispose: vi.fn(),
   listForScope: vi.fn(),
   upsert: vi.fn(),
 }
@@ -16,8 +19,13 @@ const client = {
   models: {
     listOptions: mocks.listOptions,
   },
-  sidechat: {
-    askStream: mocks.askStream,
+  sessions: {
+    readEntries: mocks.readEntries,
+  },
+  agent: {
+    createSession: mocks.createSession,
+    runStream: mocks.runStream,
+    dispose: mocks.dispose,
   },
   records: {
     listForScope: mocks.listForScope,
@@ -66,15 +74,29 @@ describe('SessionSideChatPanel', () => {
     vi.useRealTimers()
     vi.clearAllMocks()
     mocks.listOptions.mockResolvedValue([{ provider: 'anthropic', model: 'claude-4-sonnet' }])
+    mocks.readEntries.mockResolvedValue([
+      {
+        id: 'entry-1',
+        timestamp: '2026-05-24T00:00:00Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'This session is focused on sidechat context.' }],
+        },
+      },
+    ])
+    mocks.createSession.mockResolvedValue({
+      sessionId: 'agent-1',
+      model: { provider: 'anthropic', id: 'claude-4-sonnet' },
+    })
     mocks.listForScope.mockResolvedValue([])
     mocks.upsert.mockResolvedValue(undefined)
-    mocks.askStream.mockImplementation(async (_params, handlers) => {
+    mocks.dispose.mockResolvedValue(undefined)
+    mocks.runStream.mockImplementation(async (_params, handlers) => {
       handlers?.onDelta?.('The session is focused on sidechat.')
       return {
-      answer: 'The session is focused on sidechat.',
-      citations: [{ role: 'assistant', snippet: 'sidechat context', score: 0.9 }],
-      provider: 'anthropic',
-      model: 'claude-4-sonnet',
+        sessionId: 'agent-1',
+        text: 'The session is focused on sidechat.',
+        toolResults: [],
       }
     })
   })
@@ -120,6 +142,14 @@ describe('SessionSideChatPanel', () => {
     expect(await screen.findByText('What changed?')).toBeTruthy()
     expect(await screen.findByText('The session is focused on sidechat.')).toBeTruthy()
     expect(screen.getByText('1 snippets')).toBeTruthy()
+    expect(mocks.createSession).toHaveBeenCalledWith(expect.objectContaining({
+      purpose: 'sidechat',
+      model: 'host-default',
+    }))
+    expect(mocks.runStream).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: 'agent-1',
+      prompt: expect.stringContaining('sidechat context'),
+    }), expect.any(Object))
     await waitFor(() => expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({
       pluginId: 'builtin.sidechat',
       recordType: 'sidechat.thread',

@@ -9,3 +9,4 @@ npm install --prefix ~/.pi/pi-session-manager/extensions/npm .
 ```
 
 The plugin declares record metadata in its manifest and builds a browser-compatible ESM bundle exposed by `psm.extensions`.
+During local development, add this template directory through Settings -> PSM Plugins -> Dev Preview and use Rebuild after source edits.

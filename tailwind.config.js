@@ -4,6 +4,10 @@ export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
+    "./extensions/psm-*/*.{js,ts,jsx,tsx}",
+    "./extensions/psm-*/src/**/*.{js,ts,jsx,tsx}",
+    "./extensions/psm-*/tool-review/**/*.{js,ts,jsx,tsx}",
+    "./extensions/psm-*/LoopStrip/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {

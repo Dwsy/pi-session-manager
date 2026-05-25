@@ -75,11 +75,10 @@ The TypeScript runtime SDK exposes first-stage PSM capabilities:
 | Capability | Methods | Permission |
 |---|---|---|
 | `sessions` | `scan`, `list`, `readEntries`, `readFileChunk`, `getLabels`, `open` | `sessions:read` |
-| `records` | `get`, `list`, `search`, `upsert`, `refreshSessionIntelligence` | `records:read`, `records:write` |
+| `records` | `search`, `listForScope`, `upsert` | `records:read`, `records:write` |
 | `search` | `fulltext`, `pluginRecords` | `search:read` |
 | `tags` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` | `tags:read`, `tags:write` |
-| `events` | `subscribe` | `events:read` |
-| `sidechat` | `ask` | `sessions:read`, `model:invoke` |
+| `agent` | `createSession`, `run`, `runStream`, `abort`, `dispose` | `agent:invoke` |
 | `models` | `listOptions` | `model:invoke` |
 
 The SDK maps TypeScript camelCase inputs to backend-compatible snake_case payloads where needed.
@@ -156,11 +155,12 @@ Current command-to-permission mapping:
 | `scan_sessions`, `scan_sessions_paginated`, `get_session_entries`, `read_session_file_chunk`, `get_session_labels` | `sessions:read` |
 | `get_plugin_record`, `list_plugin_records_for_scope`, `search_plugin_records` | `records:read` |
 | `upsert_plugin_record` | `records:write` |
-| `refresh_session_intelligence_record` | `records:write`, `model:invoke` |
+| `refresh_session_intelligence_record` | `records:write`, `model:invoke` compatibility path |
 | `full_text_search` | `search:read` |
 | `get_all_tags`, `get_all_session_tags` | `tags:read` |
 | `create_tag`, `assign_tag`, `remove_tag_from_session` | `tags:write` |
 | `list_model_options_fast` | `model:invoke` |
+| `plugin_agent_create_session`, `plugin_agent_run`, `plugin_agent_abort`, `plugin_agent_dispose` | `agent:invoke` |
 
 Permission denial shape:
 
@@ -186,7 +186,7 @@ export const manifest: PsmPluginManifest = {
     sdk: '^0.1.0',
     host: '>=0.6.3',
   },
-  permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke'],
+  permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke', 'agent:invoke'],
   records: [
     {
       type: 'session.intelligence',
@@ -198,11 +198,33 @@ export const manifest: PsmPluginManifest = {
 
 export default function activate(ctx: PsmPluginHostContext) {
   ctx.registerCommand('session-summary.refresh', async (args) => {
-    return ctx.psm.records.refreshSessionIntelligence({
-      path: String(args.path),
-      provider: typeof args.provider === 'string' ? args.provider : undefined,
-      model: typeof args.model === 'string' ? args.model : undefined,
+    const path = String(args.path)
+    const entries = await ctx.psm.sessions.readEntries(path, { limit: 60 })
+    const agent = await ctx.psm.agent.createSession({
+      purpose: 'session-summary',
+      model: 'host-default',
+      tools: [],
+      storage: { scope: 'memory' },
     })
+
+    try {
+      const result = await ctx.psm.agent.run({
+        sessionId: agent.sessionId,
+        prompt: `Summarize this session as JSON:\n\n${JSON.stringify(entries)}`,
+      })
+
+      return ctx.psm.records.upsert({
+        pluginId: 'builtin.session-summary',
+        scopeType: 'session',
+        scopeId: path,
+        recordType: 'session.intelligence',
+        schemaVersion: 1,
+        payload: JSON.parse(result.text),
+        searchableText: result.text,
+      })
+    } finally {
+      await ctx.psm.agent.dispose(agent.sessionId)
+    }
   })
 }
 ```
@@ -310,7 +332,7 @@ The first install model should be deterministic and local:
 - Load runtime plugins only from that managed registry.
 - Do not fetch arbitrary package code during normal startup.
 
-## Backend Flow: Refresh Session Intelligence
+## Compatibility Backend Flow: Refresh Session Intelligence
 
 `refresh_session_intelligence_record` performs:
 
@@ -323,6 +345,10 @@ The first install model should be deterministic and local:
 7. Update `plugin_records_fts` for search.
 
 The model caller supports OpenAI-compatible reasoning models by trying `max_completion_tokens` first and falling back to `max_tokens` on compatible 400/404/422 failures.
+
+New plugin code should use `ctx.psm.agent` for model work and write records
+with `ctx.psm.records.upsert(...)`. The backend command remains only as a
+compatibility path for older callers.
 
 ## HTTP API
 
@@ -580,4 +606,4 @@ Remaining natural follow-ups:
 
 - Decide and document which internal app paths should remain direct `invoke(...)` and which should converge on plugin-style capability boundaries.
 - Add plugin loader lifecycle if/when PSM needs dynamic external plugin loading.
-- Add broader capability tests if new plugin-facing commands are added beyond records/search/sidechat/models.
+- Add broader capability tests if new plugin-facing commands are added beyond records/search/agent/models.

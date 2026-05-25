@@ -66,6 +66,17 @@ describe('runtime-sdk manifest contract', () => {
     expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
   })
 
+  it('accepts agent invocation permissions', () => {
+    const manifest: PsmPluginManifest = {
+      id: 'builtin.agent-search',
+      name: 'Agent Search',
+      version: '0.1.0',
+      permissions: ['agent:invoke', 'model:invoke', 'search:read', 'sessions:read'],
+    }
+
+    expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
+  })
+
   it('rejects plugin-host style manifests without stable identity or record schema', () => {
     const manifest = {
       manifestVersion: 2,
@@ -132,6 +143,11 @@ describe('plugin capability client', () => {
   const pluginPermissions: PsmPermissionContext = {
     pluginId: 'builtin.session-summary',
     permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
+  }
+
+  const agentPermissions: PsmPermissionContext = {
+    pluginId: 'builtin.session-summary',
+    permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke', 'agent:invoke'],
   }
 
   it('sends typed record RPC through the provided PSM transport', async () => {
@@ -233,6 +249,72 @@ describe('plugin capability client', () => {
     expect(result[0].payload).toEqual({ summary: 'Existing summary', status: 'active' })
   })
 
+  it('upserts plugin records through the provided PSM transport', async () => {
+    const calls: Array<{ command: string; payload?: unknown }> = []
+    const transport: PsmTransport = {
+      invoke: async (command, payload) => {
+        calls.push({ command, payload })
+        return null
+      },
+    }
+
+    const client = createPluginCapabilityClient({ transport, permissions: pluginPermissions })
+    await client.records.upsert({
+      id: 'custom-record',
+      pluginId: 'builtin.session-summary',
+      scopeType: 'session',
+      scopeId: '/repo/session.jsonl',
+      recordType: 'session.intelligence',
+      schemaVersion: 1,
+      payload: { summary: 'Updated summary', status: 'active' },
+      searchableText: 'Updated summary',
+      indexValues: [
+        {
+          recordId: '',
+          pluginId: 'builtin.session-summary',
+          recordType: 'session.intelligence',
+          indexName: 'status',
+          valueText: 'active',
+        },
+      ],
+    })
+
+    expect(calls).toEqual([
+      {
+        command: 'upsert_plugin_record',
+        payload: {
+          record: {
+            id: 'custom-record',
+            plugin_id: 'builtin.session-summary',
+            scope_type: 'session',
+            scope_id: '/repo/session.jsonl',
+            record_type: 'session.intelligence',
+            schema_version: 1,
+            payload_json: '{"summary":"Updated summary","status":"active"}',
+            searchable_text: 'Updated summary',
+            created_at: expect.any(String),
+            updated_at: expect.any(String),
+          },
+          indexValues: [
+            {
+              recordId: 'custom-record',
+              pluginId: 'builtin.session-summary',
+              recordType: 'session.intelligence',
+              indexName: 'status',
+              valueText: 'active',
+              valueNumber: null,
+              valueDatetime: null,
+            },
+          ],
+          __psm: {
+            pluginId: 'builtin.session-summary',
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
+          },
+        },
+      },
+    ])
+  })
+
   it('sends session, search, and tag commands with backend-compatible payloads', async () => {
     const calls: Array<{ command: string; payload?: unknown }> = []
     const transport: PsmTransport = {
@@ -243,21 +325,6 @@ describe('plugin capability client', () => {
         }
         if (command === 'read_session_file_chunk') {
           return { content: 'chunk', next_offset: 5, file_size: 5, has_more: false }
-        }
-        if (command === 'get_session_entries') {
-          return [
-            {
-              id: 'entry-1',
-              timestamp: '2026-05-24T00:00:00Z',
-              message: {
-                role: 'assistant',
-                content: [{ type: 'text', text: 'The current blocker is model routing.' }],
-              },
-            },
-          ]
-        }
-        if (command === 'invoke_model_text') {
-          return { text: 'The current blocker is model routing.', provider: 'openai', model: 'gpt-5.5' }
         }
         if (command === 'full_text_search') {
           return { hits: [], total_hits: 0, has_more: false }
@@ -284,7 +351,6 @@ describe('plugin capability client', () => {
     await client.sessions.getLabels('/repo/session.jsonl')
     await client.sessions.open('/repo/session.jsonl', { cwd: '/repo', target: 'browser' })
     await client.search.fulltext({ query: 'summary', roleFilter: 'all', page: 0, pageSize: 20, matchMode: 'smart', sortOrder: 'newest' })
-    await client.sidechat.ask({ sessionPath: '/repo/session.jsonl', question: 'What is blocked?', language: 'zh-CN', provider: 'openai', model: 'gpt-5.5', thinkingLevel: 'high', limit: 8 })
     await client.models.listOptions()
     await client.tags.listTags()
     await client.tags.createTag({ name: 'Active', color: '#22c55e' })
@@ -332,30 +398,6 @@ describe('plugin capability client', () => {
           },
         },
       },
-      {
-        command: 'get_session_entries',
-        payload: {
-          path: '/repo/session.jsonl',
-          __psm: {
-            pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
-          },
-        },
-      },
-      {
-        command: 'invoke_model_text',
-        payload: {
-          systemPrompt: expect.stringContaining('zh-CN'),
-          prompt: expect.stringContaining('model routing'),
-          provider: 'openai',
-          model: 'gpt-5.5',
-          reasoning: 'high',
-          __psm: {
-            pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
-          },
-        },
-      },
       { command: 'list_model_options_fast', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
       { command: 'get_all_tags', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
       { command: 'create_tag', payload: { name: 'Active', color: '#22c55e', icon: undefined, parentId: undefined, __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
@@ -365,166 +407,128 @@ describe('plugin capability client', () => {
     ])
   })
 
-  it('refreshes session intelligence records through the PSM transport', async () => {
+  it('supports plugin-scoped agent bridge commands through the PSM transport', async () => {
     const calls: Array<{ command: string; payload?: unknown }> = []
     const transport: PsmTransport = {
       invoke: async (command, payload) => {
         calls.push({ command, payload })
-        return {
-          id: 'builtin.session-summary:/repo/session.jsonl',
-          plugin_id: 'builtin.session-summary',
-          scope_type: 'session',
-          scope_id: '/repo/session.jsonl',
-          record_type: 'session.intelligence',
-          schema_version: 1,
-          payload_json: '{"summary":"AI generated summary","status":"active"}',
-          searchable_text: 'AI generated summary',
-          created_at: '2026-05-23T00:00:00Z',
-          updated_at: '2026-05-23T00:00:00Z',
+        if (command === 'plugin_agent_create_session') {
+          return {
+            sessionId: 'agent-session-1',
+            storageScope: 'plugin',
+            storageKey: 'builtin.session-summary:semantic-search',
+            model: { provider: 'openai', id: 'gpt-5.5' },
+          }
         }
+        if (command === 'plugin_agent_run') {
+          return { sessionId: 'agent-session-1', text: 'found sessions', toolResults: [] }
+        }
+        if (command === 'plugin_agent_abort' || command === 'plugin_agent_dispose') {
+          return null
+        }
+        throw new Error(`unexpected command: ${command}`)
       },
     }
 
-    const client = createPluginCapabilityClient({ transport, permissions: pluginPermissions })
-    const result = await client.records.refreshSessionIntelligence({
-      path: '/repo/session.jsonl',
-      provider: 'local',
-      model: 'test-model',
-      language: 'zh-CN',
+    const client = createPluginCapabilityClient({ transport, permissions: agentPermissions })
+    const created = await client.agent.createSession({
+      purpose: 'semantic-search',
+      cwd: '/repo',
+      model: 'host-default',
+      thinkingLevel: 'medium',
+      tools: [
+        { name: 'psm.search.fulltext', permission: 'search:read' },
+        { name: 'psm.sessions.readEntries', permission: 'sessions:read' },
+      ],
+      storage: { scope: 'plugin', key: 'semantic-search' },
     })
+    const run = await client.agent.run({ sessionId: created.sessionId, prompt: 'find auth sessions' })
+    await client.agent.abort(created.sessionId)
+    await client.agent.dispose(created.sessionId)
 
+    expect(created).toMatchObject({
+      sessionId: 'agent-session-1',
+      storageScope: 'plugin',
+      storageKey: 'builtin.session-summary:semantic-search',
+    })
+    expect(run.text).toBe('found sessions')
     expect(calls).toEqual([
       {
-        command: 'refresh_session_intelligence_record',
+        command: 'plugin_agent_create_session',
         payload: {
-          path: '/repo/session.jsonl',
-          provider: 'local',
-          model: 'test-model',
-          language: 'zh-CN',
+          purpose: 'semantic-search',
+          cwd: '/repo',
+          model: 'host-default',
+          thinkingLevel: 'medium',
+          tools: [
+            { name: 'psm.search.fulltext', permission: 'search:read' },
+            { name: 'psm.sessions.readEntries', permission: 'sessions:read' },
+          ],
+          storage: { scope: 'plugin', key: 'semantic-search' },
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke', 'agent:invoke'],
           },
         },
       },
-    ])
-    expect(result.payload).toEqual({ summary: 'AI generated summary', status: 'active' })
-  })
-
-  it('composes sidechat streaming from session reads and generic AI stream', async () => {
-    const calls: Array<{ command: string; payload?: unknown }> = []
-    const streamCalls: Array<{ command: string; payload?: unknown }> = []
-    const transport: PsmTransport = {
-      invoke: async (command, payload) => {
-        calls.push({ command, payload })
-        if (command === 'get_session_entries') {
-          return [
-            {
-              id: 'entry-1',
-              timestamp: '2026-05-24T00:00:00Z',
-              message: {
-                role: 'assistant',
-                content: [{ type: 'text', text: 'This session is about sidechat streaming.' }],
-              },
-            },
-          ]
-        }
-        throw new Error(`unexpected invoke: ${command}`)
-      },
-      stream: async (command, payload, handlers) => {
-        streamCalls.push({ command, payload })
-        handlers.onEvent?.({ type: 'delta', delta: 'hello' })
-        handlers.onEvent?.({ type: 'done', response: { text: 'hello', provider: 'local', model: 'test' } })
-        return { text: 'hello', provider: 'local', model: 'test' }
-      },
-    }
-
-    const deltas: string[] = []
-    const client = createPluginCapabilityClient({ transport, permissions: pluginPermissions })
-    const response = await client.sidechat.askStream(
-      { sessionPath: '/repo/session.jsonl', question: 'Summarize', language: 'zh-CN', thinkingLevel: 'high' },
-      { onDelta: (delta) => deltas.push(delta) },
-    )
-
-    expect(deltas).toEqual(['hello'])
-    expect(response.answer).toBe('hello')
-    expect(response.citations).toHaveLength(1)
-    expect(calls).toEqual([
       {
-        command: 'get_session_entries',
+        command: 'plugin_agent_run',
         payload: {
-          path: '/repo/session.jsonl',
+          sessionId: 'agent-session-1',
+          prompt: 'find auth sessions',
+          streamingBehavior: undefined,
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke', 'agent:invoke'],
           },
         },
       },
-    ])
-    expect(streamCalls).toEqual([
       {
-        command: 'invoke_model_text_stream',
+        command: 'plugin_agent_abort',
         payload: {
-          systemPrompt: expect.stringContaining('zh-CN'),
-          prompt: expect.stringContaining('sidechat streaming'),
-          provider: undefined,
-          model: undefined,
-          reasoning: 'high',
+          sessionId: 'agent-session-1',
           __psm: {
             pluginId: 'builtin.session-summary',
-            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'],
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke', 'agent:invoke'],
+          },
+        },
+      },
+      {
+        command: 'plugin_agent_dispose',
+        payload: {
+          sessionId: 'agent-session-1',
+          __psm: {
+            pluginId: 'builtin.session-summary',
+            permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke', 'agent:invoke'],
           },
         },
       },
     ])
   })
 
-  it('falls back to generic non-stream AI when the host lacks generic AI stream dispatch', async () => {
-    const calls: Array<{ command: string; payload?: unknown }> = []
-    const streamCalls: Array<{ command: string; payload?: unknown }> = []
+  it('simulates agent run streaming when only transport RPC is available', async () => {
     const transport: PsmTransport = {
-      invoke: async (command, payload) => {
-        calls.push({ command, payload })
-        if (command === 'get_session_entries') {
-          return [
-            {
-              id: 'entry-1',
-              timestamp: '2026-05-24T00:00:00Z',
-              message: {
-                role: 'assistant',
-                content: [{ type: 'text', text: 'This session is about stream fallback.' }],
-              },
-            },
-          ]
+      invoke: async (command) => {
+        if (command === 'plugin_agent_run') {
+          return { sessionId: 'agent-session-1', text: 'streamed by fallback', toolResults: [] }
         }
-        if (command === 'invoke_model_text') {
-          return { text: 'fallback answer', provider: 'local', model: 'test' }
-        }
-        throw new Error(`unexpected invoke: ${command}`)
-      },
-      stream: async (command, payload) => {
-        streamCalls.push({ command, payload })
-        throw new Error('Unknown command: invoke_model_text_stream')
+        throw new Error(`unexpected command: ${command}`)
       },
     }
 
     const deltas: string[] = []
-    const client = createPluginCapabilityClient({ transport, permissions: pluginPermissions })
-    const response = await client.sidechat.askStream(
-      { sessionPath: '/repo/session.jsonl', question: 'Summarize', language: 'zh-CN' },
-      { onDelta: (delta) => deltas.push(delta) },
+    const done: string[] = []
+    const client = createPluginCapabilityClient({ transport, permissions: agentPermissions })
+    const result = await client.agent.runStream(
+      { sessionId: 'agent-session-1', prompt: 'hello' },
+      {
+        onDelta: (delta) => deltas.push(delta),
+        onDone: (run) => done.push(run.text),
+      },
     )
 
-    expect(response.answer).toBe('fallback answer')
-    expect(deltas).toEqual(['fallback answer'])
-    expect(streamCalls).toEqual([
-      {
-        command: 'invoke_model_text_stream',
-        payload: expect.objectContaining({
-          prompt: expect.stringContaining('stream fallback'),
-        }),
-      },
-    ])
-    expect(calls.map((call) => call.command)).toEqual(['get_session_entries', 'invoke_model_text'])
+    expect(result.text).toBe('streamed by fallback')
+    expect(deltas).toEqual(['streamed by fallback'])
+    expect(done).toEqual(['streamed by fallback'])
   })
 })

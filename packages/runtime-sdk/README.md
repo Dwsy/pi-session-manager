@@ -64,15 +64,16 @@ That means the SDK package is a small, stable facade. It is not the runtime host
 
 ## Plugin Sources
 
-PSM recognizes three plugin sources:
+PSM recognizes four plugin sources:
 
 | Source | Meaning |
 | --- | --- |
 | `builtin` | Repo-local first-party plugins under `extensions/psm-*` |
 | `npm` | External plugins installed into the managed npm workspace |
 | `path` | Explicit local `.js` / `.mjs` browser-compatible ESM files |
+| `dev` | Local plugin project directories built by Dev Preview |
 
-Path plugins are for local development or private plugins. Published plugins should use npm.
+Dev Preview is the local development path: add a plugin project directory, build with `npm run build`, and load the bundle declared by `package.json#psm.extensions`. Path plugins are for already-built private bundles. Published plugins should use npm.
 
 ## What Plugin Authors Can Rely On
 
@@ -80,7 +81,7 @@ Path plugins are for local development or private plugins. Published plugins sho
 - `ctx.psm` is permission aware.
 - `records.upsert` supports `indexValues`.
 - `sessions.readEntries(path, { limit })` is supported.
-- `sidechat` exposes both `ask` and `askStream`.
+- `agent` exposes host-managed Pi Agent sessions through `createSession`, `run`, `runStream`, `abort`, and `dispose`.
 - UI contributions are first-class and host-rendered.
 
 ## What Is Intentionally Not Public
@@ -96,13 +97,22 @@ Path plugins are for local development or private plugins. Published plugins sho
 ## Example Capability Use
 
 ```ts
-const response = await ctx.psm.sidechat.ask({
-  sessionPath: session.path,
-  question: 'What is the blocker?',
-  thinkingLevel: 'medium',
+const entries = await ctx.psm.sessions.readEntries(session.path, { limit: 20 })
+const agent = await ctx.psm.agent.createSession({
+  purpose: 'session-question',
+  model: 'host-default',
+  tools: [],
+  storage: { scope: 'memory' },
 })
 
-const entries = await ctx.psm.sessions.readEntries(session.path, { limit: 20 })
+try {
+  const response = await ctx.psm.agent.run({
+    sessionId: agent.sessionId,
+    prompt: `What is the blocker?\n\n${JSON.stringify(entries.slice(-20))}`,
+  })
+} finally {
+  await ctx.psm.agent.dispose(agent.sessionId)
+}
 ```
 
 ## Link Back From Product Docs

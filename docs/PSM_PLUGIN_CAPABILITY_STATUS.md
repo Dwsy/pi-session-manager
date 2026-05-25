@@ -9,7 +9,7 @@ This note is a short architecture snapshot for the current PSM plugin capability
 - generic `plugin_records`
 - `@pi-session-manager/plugin-sdk`
 - `session.intelligence`
-- `sidechat`
+- host-managed Pi Agent plugin sessions
 - opt-in permission enforcement
 - npm-installable plugins with logic + UI contributions
 
@@ -41,9 +41,8 @@ The current plugin-facing record substrate is:
 - `sessions`
 - `records`
 - `search`
+- `agent`
 - `tags`
-- `events`
-- `sidechat`
 - `models`
 
 Plugins can register logic (`commands`, `tools`) and session UI (`toolbar items`, `right panels`). The client can also attach an optional permission envelope:
@@ -230,14 +229,38 @@ export const manifest: PsmPluginManifest = {
     name: '@example/psm-session-summary',
     export: '.',
   },
-  permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke'],
+  permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke', 'agent:invoke'],
 }
 
 export default function activate(ctx: PsmPluginHostContext) {
   ctx.registerCommand('session-summary.refresh', async (args) => {
-    return ctx.psm.records.refreshSessionIntelligence({
-      path: String(args.path),
+    const path = String(args.path)
+    const entries = await ctx.psm.sessions.readEntries(path, { limit: 60 })
+    const agent = await ctx.psm.agent.createSession({
+      purpose: 'session-summary',
+      model: 'host-default',
+      tools: [],
+      storage: { scope: 'memory' },
     })
+
+    try {
+      const result = await ctx.psm.agent.run({
+        sessionId: agent.sessionId,
+        prompt: `Summarize this session as JSON:\n\n${JSON.stringify(entries)}`,
+      })
+
+      return ctx.psm.records.upsert({
+        pluginId: 'npm.example.session-summary',
+        scopeType: 'session',
+        scopeId: path,
+        recordType: 'session.intelligence',
+        schemaVersion: 1,
+        payload: JSON.parse(result.text),
+        searchableText: result.text,
+      })
+    } finally {
+      await ctx.psm.agent.dispose(agent.sessionId)
+    }
   })
 }
 ```

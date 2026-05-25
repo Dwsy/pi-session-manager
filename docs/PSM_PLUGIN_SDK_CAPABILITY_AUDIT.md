@@ -35,10 +35,10 @@ The injected `ctx.psm` client currently has these namespaces:
 
 | Namespace | Methods |
 | --- | --- |
-| `records` | `search`, `listForScope`, `upsert`, `refreshSessionIntelligence` |
+| `records` | `search`, `listForScope`, `upsert` |
 | `sessions` | `scan`, `list`, `readEntries`, `readFileChunk`, `getLabels`, `open` |
 | `search` | `fulltext`, `pluginRecords` |
-| `sidechat` | `ask`, `askStream` |
+| `agent` | `createSession`, `run`, `runStream`, `abort`, `dispose` |
 | `models` | `listOptions` |
 | `tags` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` |
 | `config` | `read`, `write` |
@@ -47,9 +47,10 @@ The injected `ctx.psm` client currently has these namespaces:
 
 1. `records.upsert` supports `indexValues` and record declarations can define secondary indexes.
 2. `sessions.readEntries(path, { limit })` is supported and should be documented as a real option.
-3. `sidechat` exposes both `ask` and `askStream`.
-4. The SDK does not expose raw dispatch or host-private commands.
-5. Plugin source loading is limited to `builtin`, `npm`, and `path` sources.
+3. AI plugins should use host-managed Pi Agent sessions through `ctx.psm.agent`.
+4. Plugins that call `ctx.psm.agent` must declare `agent:invoke` plus the permissions for any PSM tools exposed to that agent.
+5. The SDK does not expose raw dispatch or host-private commands.
+6. Plugin source loading is limited to `builtin`, `npm`, and `path` sources.
 
 ## Capability Boundaries
 
@@ -74,7 +75,8 @@ These are the places that still deserve explicit notes in the docs because they 
 | --- | --- | --- |
 | Record search | plugin record search is available, but filtering needs to be described in terms of the current client surface | document the accepted params and avoid promising extra filtering semantics |
 | Session payloads | several session methods still return host-shaped opaque values | note the shapes that are stable and point authors to the right render helpers |
-| Sidechat response | response is typed and streamable, but only the documented fields should be considered stable | list the stable fields and mark extra fields as host implementation details if needed |
+| Agent lifecycle | `ctx.psm.agent` is now the recommended AI path, but examples must show session disposal and plugin-scoped storage choices | document `createSession`, `run`, `runStream`, `abort`, and `dispose` together |
+| Legacy AI helpers | older `ctx.psm.ai`, `ctx.psm.sidechat`, and `records.refreshSessionIntelligence` paths may appear in existing code or backend compatibility routes | mark them compatibility-only and do not use them in new recommended examples |
 | Tag casing | camelCase and snake_case appear in some payloads | document the normalized field names that plugin authors should prefer |
 
 ## Recommended Doc Structure
@@ -108,7 +110,8 @@ Before publishing any SDK doc change, verify that:
 - every method named in the docs exists in `packages/runtime-sdk/src/types.ts` or `client.ts`
 - examples use only exported names from `packages/runtime-sdk/src/index.ts`
 - no example relies on desktop-private runtime internals
-- `indexValues`, `readEntries({ limit })`, and `askStream` are documented correctly
+- `agent:invoke`, `indexValues`, `readEntries({ limit })`, and `ctx.psm.agent.runStream` are documented correctly
+- legacy AI helper paths are marked compatibility-only, not recommended plugin APIs
 - the docs point plugin authors to `extensions/README.md` and the capability audit
 
 ## Notes for Future Expansion

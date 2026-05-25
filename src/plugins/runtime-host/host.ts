@@ -1,6 +1,7 @@
 import {
   assertPsmPluginManifest,
   createPluginCapabilityClient,
+  type PsmAgentClient,
   type PsmPluginDisposable,
   type PsmPluginEventEnvelope,
   type PsmPluginEventsClient,
@@ -21,13 +22,20 @@ import { toolRenderRegistry } from '@/plugins/tools-render/registry'
 import type { ToolRenderPlugin } from '@/plugins/tools-render/types'
 
 import { appPsmTransport } from './appTransport'
+import {
+  createPsmAgentBridge,
+  createPsmAgentBridgeCapabilities,
+  createPsmAgentHostModelResolver,
+} from './agentBridge'
 import { psmRuntimeEventBus } from './eventBus'
 
 import { builtinPsmPluginEntries } from './builtins'
 import {
   listNpmPsmPluginEntries,
+  listDevPsmPluginEntries,
   listPathPsmPluginEntries,
   loadPsmPluginConfig,
+  readDevPsmPluginModuleSource,
   readNpmPsmPluginModuleSource,
   readPathPsmPluginModuleSource,
 } from './service'
@@ -36,6 +44,7 @@ import type {
   PsmPluginCommandContext,
   PsmPluginCommandRuntimeRegistration,
   PsmPluginDiagnostic,
+  PsmDevPluginEntry,
   PsmPathPluginEntry,
   PsmAppSidebarViewRuntimeRegistration,
   PsmAppViewRuntimeRegistration,
@@ -57,6 +66,7 @@ interface ActivePlugin {
   source: PsmPluginSource
   sourceId: string
   packageName?: string
+  projectPath?: string
   disposable?: PsmPluginDisposable
   deactivate?: () => void | Promise<void>
   cleanup: Array<() => void | Promise<void>>
@@ -64,6 +74,7 @@ interface ActivePlugin {
 
 interface PsmPluginHostServices {
   loadConfig(): Promise<PsmPluginsConfig>
+  createAgentBridge?(params: { pluginId: string; permissions: PsmPermissionContext['permissions'] }): PsmAgentClient
   listNpmEntries(): Promise<Array<{
     packageName: string
     packageVersion?: string | null
@@ -73,8 +84,10 @@ interface PsmPluginHostServices {
     sourceHash?: string | null
   }>>
   listPathEntries(): Promise<PsmPathPluginEntry[]>
+  listDevEntries(): Promise<PsmDevPluginEntry[]>
   readNpmModuleSource(entryPath: string): Promise<string>
   readPathModuleSource(entryPath: string): Promise<string>
+  readDevModuleSource(entryPath: string, projectPath: string): Promise<string>
 }
 
 interface PsmPluginHostOptions {
@@ -84,10 +97,19 @@ interface PsmPluginHostOptions {
 
 const defaultServices: PsmPluginHostServices = {
   loadConfig: loadPsmPluginConfig,
+  createAgentBridge: ({ pluginId, permissions }) => createPsmAgentBridge({
+    pluginId,
+    permissions: permissions ?? [],
+    transport: appPsmTransport,
+    resolveHostModel: createPsmAgentHostModelResolver(appPsmTransport),
+    capabilities: createPsmAgentBridgeCapabilities(appPsmTransport),
+  }),
   listNpmEntries: listNpmPsmPluginEntries,
   listPathEntries: listPathPsmPluginEntries,
+  listDevEntries: listDevPsmPluginEntries,
   readNpmModuleSource: readNpmPsmPluginModuleSource,
   readPathModuleSource: readPathPsmPluginModuleSource,
+  readDevModuleSource: readDevPsmPluginModuleSource,
 }
 
 function moduleFromUnknown(input: unknown): PsmPluginModule {
@@ -107,12 +129,14 @@ function configEntryFor(
   source: PsmPluginSource,
   packageName?: string,
   entryPath?: string,
+  projectPath?: string,
 ): PsmPluginConfigEntry {
   return {
     enabled: pluginEnabled(config, manifest),
     source: config.plugins[manifest.id]?.source ?? source,
     packageName: config.plugins[manifest.id]?.packageName ?? packageName ?? manifest.package?.name ?? null,
     entryPath: config.plugins[manifest.id]?.entryPath ?? entryPath ?? null,
+    projectPath: config.plugins[manifest.id]?.projectPath ?? projectPath ?? null,
     settings: config.plugins[manifest.id]?.settings ?? {},
   }
 }
@@ -247,9 +271,10 @@ function sourceModuleLoadEntry(options: {
   packageName?: string
   packageVersion?: string | null
   entryPath: string
+  projectPath?: string
   moduleModifiedMs?: number | null
   sourceHash?: string | null
-  readModuleSource(entryPath: string): Promise<string>
+  readModuleSource(entryPath: string, projectPath?: string): Promise<string>
 }): PsmPluginLoadEntry {
   return {
     source: options.source,
@@ -257,10 +282,22 @@ function sourceModuleLoadEntry(options: {
     packageName: options.packageName,
     packageVersion: options.packageVersion,
     entryPath: options.entryPath,
+    projectPath: options.projectPath,
     moduleModifiedMs: options.moduleModifiedMs,
     sourceHash: options.sourceHash,
     async load() {
-      const source = await options.readModuleSource(options.entryPath)
+      const source = await options.readModuleSource(options.entryPath, options.projectPath)
+      if (typeof Blob !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        const blob = new Blob([source], { type: 'text/javascript;charset=utf-8' })
+        const moduleUrl = URL.createObjectURL(blob)
+        try {
+          return await import(/* @vite-ignore */ moduleUrl)
+        } catch {
+          // Node/Vitest cannot import blob: modules, but WebView can. Fall back for tests and older runtimes.
+        } finally {
+          URL.revokeObjectURL(moduleUrl)
+        }
+      }
       const moduleUrl = `data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`
       return import(/* @vite-ignore */ moduleUrl)
     },
@@ -295,6 +332,23 @@ function pathEntryToLoadEntry(entry: PsmPathPluginEntry, readModuleSource: (entr
     moduleModifiedMs: entry.moduleModifiedMs,
     sourceHash: entry.sourceHash,
     readModuleSource,
+  })
+}
+
+function devEntryToLoadEntry(entry: PsmDevPluginEntry, readModuleSource: (entryPath: string, projectPath: string) => Promise<string>): PsmPluginLoadEntry {
+  return sourceModuleLoadEntry({
+    source: 'dev',
+    sourceId: entry.entryPath,
+    packageName: entry.packageName ?? undefined,
+    packageVersion: entry.packageVersion,
+    entryPath: entry.entryPath,
+    projectPath: entry.projectPath,
+    moduleModifiedMs: entry.moduleModifiedMs,
+    sourceHash: entry.sourceHash,
+    readModuleSource: (entryPath, projectPath) => {
+      if (!projectPath) throw new Error(`Missing dev plugin project path for ${entryPath}`)
+      return readModuleSource(entryPath, projectPath)
+    },
   })
 }
 
@@ -491,10 +545,25 @@ export class PsmPluginHost {
       })
       return []
     })
+    const devEntries = await this.services.listDevEntries().catch((error) => {
+      this.statuses.set('dev-discovery', {
+        id: 'dev-discovery',
+        name: 'Dev plugin discovery',
+        source: 'dev',
+        sourceId: 'plugins.json devProjects',
+        enabled: false,
+        state: 'error',
+        commands: [],
+        tools: [],
+        diagnostics: [diagnostic('error', normalizeError(error))],
+      })
+      return []
+    })
     const entries = [
       ...this.builtinEntries,
       ...npmEntries.map((entry) => npmEntryToLoadEntry(entry, this.services.readNpmModuleSource)),
       ...pathEntries.map((entry) => pathEntryToLoadEntry(entry, this.services.readPathModuleSource)),
+      ...devEntries.map((entry) => devEntryToLoadEntry(entry, this.services.readDevModuleSource)),
     ]
 
     for (const entry of entries) {
@@ -517,6 +586,8 @@ export class PsmPluginHost {
         source: entry.source,
         sourceId: entry.sourceId,
         packageName: entry.packageName,
+        entryPath: entry.entryPath,
+        projectPath: entry.projectPath,
         enabled: false,
         state: 'error',
         commands: [],
@@ -532,6 +603,7 @@ export class PsmPluginHost {
     try {
       manifest = assertPsmPluginManifest(module.manifest)
     } catch (error) {
+      const moduleKeys = Object.keys(module).sort().join(', ') || '(none)'
       this.statuses.set(entry.sourceId, {
         id: entry.sourceId,
         name: entry.packageName ?? entry.sourceId,
@@ -539,11 +611,13 @@ export class PsmPluginHost {
         source: entry.source,
         sourceId: entry.sourceId,
         packageName: entry.packageName,
+        entryPath: entry.entryPath,
+        projectPath: entry.projectPath,
         enabled: false,
         state: 'error',
         commands: [],
         tools: [],
-        diagnostics: [diagnostic('error', normalizeError(error))],
+        diagnostics: [diagnostic('error', `${normalizeError(error)}; module exports: ${moduleKeys}`)],
         loadTimeMs: Date.now() - startedAt,
         ...metadataFor(entry),
       })
@@ -551,7 +625,30 @@ export class PsmPluginHost {
     }
 
     mergePluginI18n(manifest)
-    const configEntry = configEntryFor(config, manifest, entry.source, entry.packageName, entry.entryPath)
+    const existingStatus = this.statuses.get(manifest.id)
+    if (existingStatus) {
+      this.statuses.set(entry.sourceId, {
+        id: entry.sourceId,
+        name: manifest.name,
+        version: manifest.version,
+        source: entry.source,
+        sourceId: entry.sourceId,
+        packageName: entry.packageName,
+        entryPath: entry.entryPath,
+        projectPath: entry.projectPath,
+        enabled: false,
+        state: 'error',
+        manifest,
+        commands: [],
+        tools: [],
+        diagnostics: [diagnostic('error', `Duplicate plugin id ${manifest.id} already loaded from ${existingStatus.source}:${existingStatus.sourceId}`)],
+        loadTimeMs: Date.now() - startedAt,
+        ...metadataFor(entry),
+      })
+      return
+    }
+
+    const configEntry = configEntryFor(config, manifest, entry.source, entry.packageName, entry.entryPath, entry.projectPath)
     const settings = settingsFor(manifest, configEntry)
     if (!configEntry.enabled) {
       this.statuses.set(manifest.id, {
@@ -562,6 +659,7 @@ export class PsmPluginHost {
         sourceId: entry.sourceId,
         packageName: configEntry.packageName ?? undefined,
         entryPath: configEntry.entryPath ?? undefined,
+        projectPath: configEntry.projectPath ?? undefined,
         enabled: false,
         state: 'disabled',
         manifest,
@@ -595,7 +693,11 @@ export class PsmPluginHost {
       manifest,
       permissions,
       events: createPluginEventsClient(manifest.id, permissions, cleanup),
-      psm: createPluginCapabilityClient({ transport: appPsmTransport, permissions }),
+      psm: createPluginCapabilityClient({
+        transport: appPsmTransport,
+        permissions,
+        agent: this.services.createAgentBridge?.({ pluginId: manifest.id, permissions: manifest.permissions ?? [] }),
+      }),
       settings: settingsClient(settings),
       i18n: i18nClient(),
       log: loggerClient(manifest.id),
@@ -698,6 +800,7 @@ export class PsmPluginHost {
         source: entry.source,
         sourceId: entry.sourceId,
         packageName: configEntry.packageName ?? undefined,
+        projectPath: configEntry.projectPath ?? undefined,
         disposable: disposable && typeof disposable === 'object' ? disposable : undefined,
         deactivate: module.deactivate,
         cleanup,
@@ -710,6 +813,7 @@ export class PsmPluginHost {
         sourceId: entry.sourceId,
         packageName: configEntry.packageName ?? undefined,
         entryPath: configEntry.entryPath ?? undefined,
+        projectPath: configEntry.projectPath ?? undefined,
         enabled: true,
         state: 'active',
         manifest,
@@ -742,6 +846,7 @@ export class PsmPluginHost {
         sourceId: entry.sourceId,
         packageName: configEntry.packageName ?? undefined,
         entryPath: configEntry.entryPath ?? undefined,
+        projectPath: configEntry.projectPath ?? undefined,
         enabled: true,
         state: 'error',
         manifest,

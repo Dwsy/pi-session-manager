@@ -17,6 +17,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@18.3.1)
+      '@earendil-works/pi-agent-core':
+        specifier: ^0.75.5
+        version: 0.75.5(ws@8.20.0)(zod@4.4.3)
       '@earendil-works/pi-ai':
         specifier: ^0.75.5
         version: 0.75.5(ws@8.20.0)(zod@4.4.3)
@@ -107,6 +110,9 @@ importers:
       recharts:
         specifier: ^3.7.0
         version: 3.7.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-is@19.2.4)(react@18.3.1)(redux@5.0.1)
+      typebox:
+        specifier: 1.1.38
+        version: 1.1.38
       ws:
         specifier: ^8.20.0
         version: 8.20.0

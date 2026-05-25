@@ -7,7 +7,9 @@ import {
   Download,
   ExternalLink,
   FilePlus2,
+  FolderPlus,
   Package,
+  Play,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -19,10 +21,14 @@ import SettingsCard from "@/components/settings/SettingsCard";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
 import ModelSelector, { type RPCModel } from "@/components/ModelSelector";
 import {
+  addDevPsmPlugin,
   addPathPsmPlugin,
+  buildDevPsmPlugin,
   getPsmPluginPaths,
+  initializePsmPluginHost,
   installPsmPlugin,
   psmPluginHost,
+  removeDevPsmPlugin,
   removePathPsmPlugin,
   searchPsmPluginMarket,
   setPsmPluginEnabled,
@@ -40,6 +46,7 @@ import { usePiSettingsFull } from "./pi-config/usePiSettingsFull";
 
 interface PsmPluginsSettingsProps {
   pluginId?: string;
+  mode?: "manage" | "market" | "sources" | "developer" | "diagnostics";
 }
 
 function statusIcon(plugin: PsmPluginStatus) {
@@ -51,6 +58,7 @@ function statusIcon(plugin: PsmPluginStatus) {
 function sourceLabel(plugin: PsmPluginStatus) {
   if (plugin.source === "builtin") return "Built-in";
   if (plugin.source === "path") return "Path";
+  if (plugin.source === "dev") return "Dev";
   return plugin.packageName || "NPM";
 }
 
@@ -104,7 +112,7 @@ function formatPublishedDate(value: string | null | undefined) {
   }).format(date);
 }
 
-export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps) {
+export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPluginsSettingsProps) {
   const { t } = useTranslation();
   const [plugins, setPlugins] = useState<PsmPluginStatus[]>([]);
   const [draftSettingsByPluginId, setDraftSettingsByPluginId] = useState<Record<string, Record<string, PsmPluginSettingValue>>>({});
@@ -113,8 +121,10 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [npmAction, setNpmAction] = useState<string | null>(null);
   const [pathAction, setPathAction] = useState<string | null>(null);
+  const [devAction, setDevAction] = useState<string | null>(null);
   const [packageNameInput, setPackageNameInput] = useState("");
   const [pathInput, setPathInput] = useState("");
+  const [devProjectInput, setDevProjectInput] = useState("");
   const [marketQueryInput, setMarketQueryInput] = useState("psm plugin");
   const [marketResults, setMarketResults] = useState<PsmPluginMarketEntry[]>([]);
   const [marketTotal, setMarketTotal] = useState(0);
@@ -125,14 +135,46 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
   const installPrefix = paths?.npmDir ?? "~/.pi/pi-session-manager/extensions/npm";
   const trimmedPackageName = packageNameInput.trim();
   const trimmedPath = pathInput.trim();
+  const trimmedDevProject = devProjectInput.trim();
   const trimmedMarketQuery = marketQueryInput.trim();
   const npmBusy = loading || npmAction !== null;
   const pathBusy = loading || pathAction !== null;
+  const devBusy = loading || devAction !== null;
   const visiblePlugins = useMemo(
     () => plugins.filter((plugin) => plugin.id !== "npm-discovery"),
     [plugins],
   );
+  const activePluginCount = useMemo(
+    () => visiblePlugins.filter((plugin) => plugin.enabled && plugin.state === "active").length,
+    [visiblePlugins],
+  );
+  const issuePluginCount = useMemo(
+    () => visiblePlugins.filter((plugin) => plugin.state === "error" || plugin.diagnostics.length > 0).length,
+    [visiblePlugins],
+  );
+  const configurablePluginCount = useMemo(
+    () => visiblePlugins.filter((plugin) => (plugin.manifest?.configuration?.properties?.length ?? 0) > 0).length,
+    [visiblePlugins],
+  );
+  const capabilityCount = useMemo(
+    () => visiblePlugins.reduce((total, plugin) => total + plugin.commands.length + plugin.tools.length, 0),
+    [visiblePlugins],
+  );
   const selectedPlugin = pluginId ? visiblePlugins.find((plugin) => plugin.id === pluginId) : null;
+  const visibleDevPlugins = useMemo(
+    () => visiblePlugins.filter((plugin) => plugin.source === "dev"),
+    [visiblePlugins],
+  );
+  const visiblePathPlugins = useMemo(
+    () => visiblePlugins.filter((plugin) => plugin.source === "path"),
+    [visiblePlugins],
+  );
+  const visibleDiagnosticPlugins = useMemo(
+    () => visiblePlugins.filter((plugin) => plugin.state === "error" || plugin.diagnostics.length > 0),
+    [visiblePlugins],
+  );
+  const shouldLoadPaths = !pluginId && (mode === "market" || mode === "sources" || mode === "developer");
+  const shouldLoadMarket = !pluginId && mode === "market";
   const needsModelOptions = selectedPlugin?.manifest?.configuration?.properties?.some((definition) => definition.type === "model-provider" || definition.type === "model-id") ?? false;
   const modelData = useModelOptions(needsModelOptions);
   const piSettings = usePiSettingsFull(needsModelOptions);
@@ -174,6 +216,23 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
     syncMarketInstalledFlag(nextPlugins);
   };
 
+  const loadPlugins = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const currentPlugins = psmPluginHost.listPlugins();
+      if (currentPlugins.length > 0) {
+        applyPluginsSnapshot(currentPlugins);
+        return;
+      }
+      applyPluginsSnapshot(await initializePsmPluginHost());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const reload = async () => {
     setLoading(true);
     setError(null);
@@ -188,6 +247,14 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshPaths = async () => {
+    try {
+      setPaths(await getPsmPluginPaths());
+    } catch {
+      // The plugin list reload path will surface transport errors; keep this count refresh best-effort.
     }
   };
 
@@ -209,11 +276,21 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
   };
 
   useEffect(() => {
-    void Promise.all([
-      reload(),
-      searchMarket("psm plugin"),
-    ]);
+    void loadPlugins();
+    return psmPluginHost.subscribe(() => {
+      applyPluginsSnapshot(psmPluginHost.listPlugins());
+    });
   }, []);
+
+  useEffect(() => {
+    if (shouldLoadPaths) void refreshPaths();
+  }, [shouldLoadPaths]);
+
+  useEffect(() => {
+    if (shouldLoadMarket && marketResults.length === 0 && !marketLoading) {
+      void searchMarket("psm plugin");
+    }
+  }, [shouldLoadMarket, marketResults.length, marketLoading]);
 
   const togglePlugin = async (plugin: PsmPluginStatus, enabled: boolean) => {
     setUpdatingId(plugin.id);
@@ -224,7 +301,8 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
         enabled,
         source: plugin.source,
         packageName: plugin.packageName ?? null,
-        entryPath: plugin.source === "path" ? (plugin.entryPath ?? plugin.sourceId) : null,
+        entryPath: plugin.source === "path" || plugin.source === "dev" ? (plugin.entryPath ?? plugin.sourceId) : null,
+        projectPath: plugin.source === "dev" ? (plugin.projectPath ?? plugin.sourceId) : null,
       });
       applyPluginsSnapshot(await psmPluginHost.reload());
     } catch (err) {
@@ -265,6 +343,39 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
     }
   };
 
+  const addDevPlugin = async () => {
+    if (!trimmedDevProject) return;
+    setDevAction("preview");
+    setError(null);
+    try {
+      await addDevPsmPlugin(trimmedDevProject);
+      await buildDevPsmPlugin(trimmedDevProject);
+      applyPluginsSnapshot(await psmPluginHost.reload());
+      await refreshPaths();
+      setDevProjectInput("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDevAction(null);
+    }
+  };
+
+  const rebuildDevPlugin = async (plugin: PsmPluginStatus) => {
+    const projectPath = plugin.projectPath ?? plugin.sourceId;
+    if (!projectPath) return;
+    setDevAction(`build:${plugin.id}`);
+    setError(null);
+    try {
+      await buildDevPsmPlugin(projectPath);
+      applyPluginsSnapshot(await psmPluginHost.reload());
+      await refreshPaths();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDevAction(null);
+    }
+  };
+
   const updatePlugins = async () => {
     setNpmAction("update");
     setError(null);
@@ -291,7 +402,8 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
         settings: nextSettings,
         source: plugin.source,
         packageName: plugin.packageName ?? null,
-        entryPath: plugin.source === "path" ? (plugin.entryPath ?? plugin.sourceId) : null,
+        entryPath: plugin.source === "path" || plugin.source === "dev" ? (plugin.entryPath ?? plugin.sourceId) : null,
+        projectPath: plugin.source === "dev" ? (plugin.projectPath ?? plugin.sourceId) : null,
       });
       applyPluginsSnapshot(await psmPluginHost.reload());
     } catch (err) {
@@ -352,8 +464,10 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
   const removePlugin = async (plugin: PsmPluginStatus) => {
     if (plugin.source === "npm" && !plugin.packageName) return;
     if (plugin.source === "path" && !(plugin.entryPath || plugin.sourceId)) return;
+    if (plugin.source === "dev" && !(plugin.projectPath || plugin.sourceId)) return;
     const action = `remove:${plugin.id}`;
     if (plugin.source === "path") setPathAction(action);
+    else if (plugin.source === "dev") setDevAction(action);
     else setNpmAction(action);
     setError(null);
     setMarketError(null);
@@ -362,13 +476,17 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
         await uninstallPsmPlugin(plugin.packageName);
       } else if (plugin.source === "path") {
         await removePathPsmPlugin(plugin.entryPath ?? plugin.sourceId);
+      } else if (plugin.source === "dev") {
+        await removeDevPsmPlugin(plugin.projectPath ?? plugin.sourceId);
       }
       applyPluginsSnapshot(await psmPluginHost.reload());
+      await refreshPaths();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setNpmAction(null);
       setPathAction(null);
+      setDevAction(null);
     }
   };
 
@@ -434,12 +552,23 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
           ))}
         </div>
       )}
-      {((plugin.source === "npm" && plugin.packageName) || plugin.source === "path") && (
-        <div className="mt-2 flex justify-end">
+      {((plugin.source === "npm" && plugin.packageName) || plugin.source === "path" || plugin.source === "dev") && (
+        <div className="mt-2 flex justify-end gap-2">
+          {plugin.source === "dev" && (
+            <button
+              type="button"
+              onClick={() => void rebuildDevPlugin(plugin)}
+              disabled={devBusy}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-info/30 bg-info/10 px-2.5 text-xs font-medium text-foreground hover:bg-info/15 disabled:opacity-60"
+            >
+              <Play className={`h-3.5 w-3.5 ${devAction === `build:${plugin.id}` ? "animate-pulse" : ""}`} />
+              {t("settings.psmPlugins.rebuildDev", "Rebuild")}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => void removePlugin(plugin)}
-            disabled={npmBusy || pathBusy}
+            disabled={npmBusy || pathBusy || devBusy}
             className="inline-flex h-7 items-center gap-1.5 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 text-xs font-medium text-destructive hover:bg-destructive/15 disabled:opacity-60"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -595,6 +724,373 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
     );
   };
 
+  const renderStatsCards = () => (
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3" data-settings-search="psm-plugins-overview">
+      <div className="rounded-lg border border-border/60 bg-background/45 px-3 py-2.5">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <Package className="h-3.5 w-3.5 text-info" />
+          {t("settings.psmPlugins.discovered", "Discovered")}
+        </div>
+        <div className="mt-1 text-xl font-semibold text-foreground">{visiblePlugins.length}</div>
+        <div className="text-[11px] text-muted-foreground">
+          {t("settings.psmPlugins.description", "{{count}} plugins discovered", { count: visiblePlugins.length })}
+        </div>
+      </div>
+      <div className="rounded-lg border border-border/60 bg-background/45 px-3 py-2.5">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+          {t("settings.psmPlugins.active", "Active")}
+        </div>
+        <div className="mt-1 text-xl font-semibold text-foreground">{activePluginCount}</div>
+        <div className="text-[11px] text-muted-foreground">
+          {t("settings.psmPlugins.enabledPlugins", "Enabled and loaded")}
+        </div>
+      </div>
+      <div className="rounded-lg border border-border/60 bg-background/45 px-3 py-2.5">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <SlidersHorizontal className="h-3.5 w-3.5 text-info" />
+          {t("settings.psmPlugins.configurable", "Configurable")}
+        </div>
+        <div className="mt-1 text-xl font-semibold text-foreground">{configurablePluginCount}</div>
+        <div className="text-[11px] text-muted-foreground">
+          {t("settings.psmPlugins.capabilities", "{{count}} capabilities", { count: capabilityCount })}
+        </div>
+      </div>
+      <div className="rounded-lg border border-border/60 bg-background/45 px-3 py-2.5">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+          {t("settings.psmPlugins.issues", "Issues")}
+        </div>
+        <div className="mt-1 text-xl font-semibold text-foreground">{issuePluginCount}</div>
+        <div className="text-[11px] text-muted-foreground">
+          {t("settings.psmPlugins.diagnostics", "Diagnostics requiring attention")}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderPathsBar = () => (
+    <div className="grid gap-1 rounded-lg border border-border/60 bg-background/45 px-3 py-2.5 text-xs text-muted-foreground md:grid-cols-2">
+      <div className="truncate">
+        {t("settings.psmPlugins.config", "Config")} <span className="font-mono text-foreground">{paths?.configPath ?? "~/.pi/pi-session-manager/plugins.json"}</span>
+      </div>
+      <div className="truncate">
+        {t("settings.psmPlugins.npm", "NPM")} <span className="font-mono text-foreground">{installPrefix}</span>
+      </div>
+      <div className="truncate">
+        {t("settings.psmPlugins.pathPlugins", "Path plugins")} <span className="font-mono text-foreground">{paths?.customPaths?.length ?? visiblePathPlugins.length}</span>
+      </div>
+      <div className="truncate">
+        {t("settings.psmPlugins.devProjects", "Dev projects")} <span className="font-mono text-foreground">{paths?.devProjects?.length ?? visibleDevPlugins.length}</span>
+      </div>
+    </div>
+  );
+
+  const renderPluginList = (
+    title: string,
+    description: string,
+    pluginsToRender: PsmPluginStatus[],
+    emptyText: string,
+  ) => (
+    <section className="min-w-0 rounded-lg border border-border/60 bg-background/45">
+      <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2.5">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-foreground">{title}</div>
+          <div className="text-xs text-muted-foreground">{description}</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => void reload()}
+          disabled={loading}
+          className="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+          {t("settings.psmPlugins.reload", "Reload")}
+        </button>
+      </div>
+      <div className="max-h-[420px] space-y-2 overflow-y-auto p-3">
+        {pluginsToRender.length === 0 && !loading ? (
+          <div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+            {emptyText}
+          </div>
+        ) : (
+          pluginsToRender.map(renderPluginSummary)
+        )}
+      </div>
+    </section>
+  );
+
+  const renderNpmInstallSection = () => (
+    <section data-settings-search="psm-plugin-marketplace" className="rounded-lg border border-border/60 bg-background/45 p-3">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+        <Download className="h-4 w-4 text-info" />
+        {t("settings.psmPlugins.npmInstallTitle", "NPM package")}
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          type="text"
+          value={packageNameInput}
+          onChange={(event) => setPackageNameInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void installPlugin();
+          }}
+          placeholder={t("settings.psmPlugins.packagePlaceholder", "npm package name")}
+          disabled={npmBusy}
+          className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-info disabled:opacity-60"
+        />
+        <button
+          type="button"
+          onClick={() => void installPlugin()}
+          disabled={npmBusy || !trimmedPackageName}
+          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
+        >
+          <Download className="h-3.5 w-3.5" />
+          {t("settings.psmPlugins.install", "Install")}
+        </button>
+        <button
+          type="button"
+          onClick={() => void updatePlugins()}
+          disabled={npmBusy}
+          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${npmAction === "update" ? "animate-spin" : ""}`} />
+          {t("settings.psmPlugins.update", "Update")}
+        </button>
+      </div>
+      <div className="mt-2 truncate text-xs text-muted-foreground">
+        <span className="font-mono text-foreground">npm install --prefix {installPrefix} &lt;package&gt;</span>
+      </div>
+    </section>
+  );
+
+  const renderPathPluginSection = () => (
+    <section data-settings-search="psm-plugin-sources" className="rounded-lg border border-border/60 bg-background/45 p-3">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+        <FilePlus2 className="h-4 w-4 text-info" />
+        {t("settings.psmPlugins.pathPluginTitle", "Path plugin")}
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          type="text"
+          value={pathInput}
+          onChange={(event) => setPathInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void addPathPlugin();
+          }}
+          placeholder={t("settings.psmPlugins.pathPlaceholder", "local plugin entry path")}
+          disabled={pathBusy}
+          className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-info disabled:opacity-60"
+        />
+        <button
+          type="button"
+          onClick={() => void addPathPlugin()}
+          disabled={pathBusy || !trimmedPath}
+          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
+        >
+          <FilePlus2 className="h-3.5 w-3.5" />
+          {t("settings.psmPlugins.addPath", "Add path")}
+        </button>
+      </div>
+      <div className="mt-2 truncate text-xs text-muted-foreground">
+        <span className="font-mono text-foreground">/absolute/path/to/plugin.mjs</span>
+      </div>
+    </section>
+  );
+
+  const renderDevPreviewSection = () => (
+    <section data-settings-search="psm-plugin-dev" className="rounded-lg border border-border/60 bg-background/45 p-3">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+        <FolderPlus className="h-4 w-4 text-info" />
+        {t("settings.psmPlugins.devPreview", "Dev Preview")}
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          type="text"
+          value={devProjectInput}
+          onChange={(event) => setDevProjectInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void addDevPlugin();
+          }}
+          placeholder={t("settings.psmPlugins.devPlaceholder", "local plugin project directory")}
+          disabled={devBusy}
+          className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-info disabled:opacity-60"
+        />
+        <button
+          type="button"
+          onClick={() => void addDevPlugin()}
+          disabled={devBusy || !trimmedDevProject}
+          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
+        >
+          <Play className={`h-3.5 w-3.5 ${devAction === "preview" ? "animate-pulse" : ""}`} />
+          {t("settings.psmPlugins.addDev", "Add & Preview")}
+        </button>
+      </div>
+      <div className="mt-2 truncate text-xs text-muted-foreground">
+        <span className="font-mono text-foreground">package.json#psm.extensions</span>
+        <span className="px-1.5">·</span>
+        <span className="font-mono text-foreground">npm run build</span>
+      </div>
+    </section>
+  );
+
+  const renderMarketSection = () => (
+    <section className="rounded-lg border border-border/60 bg-background/45 p-3">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+        <Search className="h-4 w-4 text-info" />
+        {t("settings.psmPlugins.marketTitle", "Marketplace")}
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          type="text"
+          value={marketQueryInput}
+          onChange={(event) => setMarketQueryInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void searchMarket();
+          }}
+          placeholder={t("settings.psmPlugins.marketQueryPlaceholder", "search npm plugins")}
+          disabled={marketLoading}
+          className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-info disabled:opacity-60"
+        />
+        <button
+          type="button"
+          onClick={() => void searchMarket()}
+          disabled={marketLoading}
+          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
+        >
+          <Search className="h-3.5 w-3.5" />
+          {t("settings.psmPlugins.marketSearch", "Search")}
+        </button>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <span>
+          {t("settings.psmPlugins.marketResultCount", "Matched {{count}} PSM plugins", {
+            count: marketTotal,
+          })}
+        </span>
+        <span>
+          {t("settings.psmPlugins.marketQuery", "Query")} <span className="font-mono text-foreground">{trimmedMarketQuery || "psm plugin"}</span>
+        </span>
+      </div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        {t("settings.psmPlugins.marketFilterHint", "Only packages declaring psm.extensions are shown.")}
+      </div>
+
+      {marketError ? (
+        <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {marketError}
+        </div>
+      ) : null}
+
+      <div className="mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1">
+        {marketResults.length === 0 && !marketLoading ? (
+          <div className="rounded-md border border-dashed border-border px-3 py-5 text-center text-xs text-muted-foreground">
+            {t("settings.psmPlugins.marketEmpty", "No marketplace results.")}
+          </div>
+        ) : (
+          marketResults.map((entry) => {
+            const publishedAt = formatPublishedDate(entry.publishedAt);
+            const busy = npmBusy || npmAction === `market-install:${entry.packageName}`;
+            return (
+              <div key={entry.packageName} className="flex gap-3 rounded-md border border-border/60 bg-surface/35 p-2.5">
+                <img
+                  src={entry.imageUrl ?? `https://api.dicebear.com/9.x/shapes/svg?seed=${encodeURIComponent(entry.packageName)}`}
+                  alt={entry.packageName}
+                  className="h-10 w-10 shrink-0 rounded-md border border-border/60 bg-background object-cover"
+                  loading="lazy"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="truncate text-sm font-medium text-foreground">{entry.packageName}</span>
+                    {entry.packageVersion ? (
+                      <span className="text-[11px] text-muted-foreground">v{entry.packageVersion}</span>
+                    ) : null}
+                    {entry.installed ? (
+                      <span className="rounded border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-300">
+                        {t("settings.psmPlugins.marketInstalled", "Installed")}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                    {entry.description || t("settings.psmPlugins.marketNoDescription", "No description")}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    <span>
+                      {t("settings.psmPlugins.marketDownloads", "Weekly")} {formatWeeklyDownloads(entry.weeklyDownloads)}
+                    </span>
+                    {publishedAt ? (
+                      <span>{t("settings.psmPlugins.marketPublished", "Published")} {publishedAt}</span>
+                    ) : null}
+                    {entry.psmExtensionExports.length > 0 ? (
+                      <span>{t("settings.psmPlugins.marketExports", "{{count}} exports", { count: entry.psmExtensionExports.length })}</span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-start gap-1">
+                  {entry.npmUrl ? (
+                    <a
+                      href={entry.npmUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/50 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                      title={t("settings.psmPlugins.marketOpenNpm", "Open npm page")}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void installMarketPlugin(entry)}
+                    disabled={busy || entry.installed}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background/50 px-2.5 text-[11px] font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    {entry.installed
+                      ? t("settings.psmPlugins.marketInstalled", "Installed")
+                      : t("settings.psmPlugins.install", "Install")}
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </section>
+  );
+
+  const renderDiagnosticsSection = () => (
+    <section data-settings-search="psm-plugin-diagnostics" className="rounded-lg border border-border/60 bg-background/45">
+      <div className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2.5">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-foreground">
+            {t("settings.psmPlugins.diagnosticsTitle", "Plugin diagnostics")}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {t("settings.psmPlugins.diagnosticsHint", "Plugins with load errors, warnings, or runtime diagnostics.")}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => void reload()}
+          disabled={loading}
+          className="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+          {t("settings.psmPlugins.reload", "Reload")}
+        </button>
+      </div>
+      <div className="space-y-2 p-3">
+        {visibleDiagnosticPlugins.length === 0 && !loading ? (
+          <div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+            {t("settings.psmPlugins.noDiagnostics", "No plugin diagnostics right now.")}
+          </div>
+        ) : (
+          visibleDiagnosticPlugins.map(renderPluginSummary)
+        )}
+      </div>
+    </section>
+  );
+
   if (pluginId) {
     return (
       <div className="space-y-4">
@@ -632,236 +1128,73 @@ export default function PsmPluginsSettings({ pluginId }: PsmPluginsSettingsProps
     );
   }
 
-  return (
-    <div className="space-y-4">
-      <SettingsCard
-        title={t("settings.psmPlugins.title", "PSM Plugins")}
-        description={t("settings.psmPlugins.description", "{{count}} plugins discovered", { count: visiblePlugins.length })}
-        icon={<Package className="h-4 w-4" />}
-      >
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/60 bg-background/40 px-3 py-2">
-            <div className="min-w-0 text-xs text-muted-foreground">
-              <div className="truncate">
-                {t("settings.psmPlugins.config", "Config")} <span className="font-mono text-foreground">{paths?.configPath ?? "~/.pi/pi-session-manager/plugins.json"}</span>
-              </div>
-              <div className="truncate">
-                {t("settings.psmPlugins.npm", "NPM")} <span className="font-mono text-foreground">{installPrefix}</span>
-              </div>
-              <div className="truncate">
-                {t("settings.psmPlugins.pathPlugins", "Path plugins")} <span className="font-mono text-foreground">{paths?.customPaths?.length ?? 0}</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => void reload()}
-              disabled={loading}
-              className="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-              {t("settings.psmPlugins.reload", "Reload")}
-            </button>
-          </div>
+  if (mode === "market") {
+    return (
+      <div className="space-y-4">
+        {renderError()}
+        {renderPathsBar()}
+        {renderNpmInstallSection()}
+        {renderMarketSection()}
+      </div>
+    );
+  }
 
-          <div className="rounded-md border border-border/60 bg-background/40 p-3">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                type="text"
-                value={packageNameInput}
-                onChange={(event) => setPackageNameInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void installPlugin();
-                }}
-                placeholder={t("settings.psmPlugins.packagePlaceholder", "npm package name")}
-                disabled={npmBusy}
-                className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-info disabled:opacity-60"
-              />
-              <div className="flex shrink-0 gap-2">
-                <button
-                  type="button"
-                  onClick={() => void installPlugin()}
-                  disabled={npmBusy || !trimmedPackageName}
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {t("settings.psmPlugins.install", "Install")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void updatePlugins()}
-                  disabled={npmBusy}
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${npmAction === "update" ? "animate-spin" : ""}`} />
-                  {t("settings.psmPlugins.update", "Update")}
-                </button>
-              </div>
-            </div>
-            <div className="mt-2 truncate text-xs text-muted-foreground">
-              <span className="font-mono text-foreground">npm install --prefix {installPrefix} &lt;package&gt;</span>
-            </div>
-          </div>
+  if (mode === "sources") {
+    return (
+      <div className="space-y-4">
+        {renderError()}
+        {renderPathsBar()}
+        {renderPathPluginSection()}
+        {renderPluginList(
+          t("settings.psmPlugins.pathPlugins", "Path plugins"),
+          t("settings.psmPlugins.pathPluginsHint", "Local entry files loaded directly from disk."),
+          visiblePathPlugins,
+          t("settings.psmPlugins.noPathPlugins", "No path plugins configured."),
+        )}
+      </div>
+    );
+  }
 
-          <div className="rounded-md border border-border/60 bg-background/40 p-3">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                type="text"
-                value={marketQueryInput}
-                onChange={(event) => setMarketQueryInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void searchMarket();
-                }}
-                placeholder={t("settings.psmPlugins.marketQueryPlaceholder", "search npm plugins")}
-                disabled={marketLoading}
-                className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-info disabled:opacity-60"
-              />
-              <button
-                type="button"
-                onClick={() => void searchMarket()}
-                disabled={marketLoading}
-                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
-              >
-                <Search className="h-3.5 w-3.5" />
-                {t("settings.psmPlugins.marketSearch", "Search")}
-              </button>
-            </div>
+  if (mode === "developer") {
+    return (
+      <div className="space-y-4">
+        {renderError()}
+        {renderPathsBar()}
+        {renderDevPreviewSection()}
+        {renderPluginList(
+          t("settings.psmPlugins.devProjects", "Dev projects"),
+          t("settings.psmPlugins.devProjectsHint", "Local plugin projects that can be rebuilt and previewed."),
+          visibleDevPlugins,
+          t("settings.psmPlugins.noDevProjects", "No dev projects configured."),
+        )}
+      </div>
+    );
+  }
 
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              <span>
-                {t("settings.psmPlugins.marketResultCount", "Matched {{count}} PSM plugins", {
-                  count: marketTotal,
-                })}
-              </span>
-              <span>
-                {t("settings.psmPlugins.marketQuery", "Query")} <span className="font-mono text-foreground">{trimmedMarketQuery || "psm plugin"}</span>
-              </span>
-            </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {t("settings.psmPlugins.marketFilterHint", "Only packages declaring psm.extensions are shown.")}
-            </div>
+  if (mode === "diagnostics") {
+    return (
+      <div className="space-y-4">
+        {renderError()}
+        {renderStatsCards()}
+        {renderDiagnosticsSection()}
+      </div>
+    );
+  }
 
-            {marketError ? (
-              <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {marketError}
-              </div>
-            ) : null}
+  if (mode === "manage") {
+    return (
+      <div className="space-y-4">
+        {renderError()}
+        {renderStatsCards()}
+        {renderPluginList(
+          t("settings.psmPlugins.installedTitle", "Installed plugins"),
+          t("settings.psmPlugins.installedHint", "Enable, inspect diagnostics, rebuild or remove from one compact list."),
+          visiblePlugins,
+          t("settings.psmPlugins.empty", "No PSM plugins discovered."),
+        )}
+      </div>
+    );
+  }
 
-            <div className="mt-3 space-y-2">
-              {marketResults.length === 0 && !marketLoading ? (
-                <div className="rounded-md border border-dashed border-border px-3 py-5 text-center text-xs text-muted-foreground">
-                  {t("settings.psmPlugins.marketEmpty", "No marketplace results.")}
-                </div>
-              ) : (
-                marketResults.map((entry) => {
-                  const publishedAt = formatPublishedDate(entry.publishedAt);
-                  const busy = npmBusy || npmAction === `market-install:${entry.packageName}`;
-                  return (
-                    <div key={entry.packageName} className="flex gap-3 rounded-md border border-border/60 bg-surface/35 p-2.5">
-                      <img
-                        src={entry.imageUrl ?? `https://api.dicebear.com/9.x/shapes/svg?seed=${encodeURIComponent(entry.packageName)}`}
-                        alt={entry.packageName}
-                        className="h-10 w-10 shrink-0 rounded-md border border-border/60 bg-background object-cover"
-                        loading="lazy"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="truncate text-sm font-medium text-foreground">{entry.packageName}</span>
-                          {entry.packageVersion ? (
-                            <span className="text-[11px] text-muted-foreground">v{entry.packageVersion}</span>
-                          ) : null}
-                          {entry.installed ? (
-                            <span className="rounded border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-300">
-                              {t("settings.psmPlugins.marketInstalled", "Installed")}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                          {entry.description || t("settings.psmPlugins.marketNoDescription", "No description")}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                          <span>
-                            {t("settings.psmPlugins.marketDownloads", "Weekly")} {formatWeeklyDownloads(entry.weeklyDownloads)}
-                          </span>
-                          {publishedAt ? (
-                            <span>{t("settings.psmPlugins.marketPublished", "Published")} {publishedAt}</span>
-                          ) : null}
-                          {entry.psmExtensionExports.length > 0 ? (
-                            <span>{t("settings.psmPlugins.marketExports", "{{count}} exports", { count: entry.psmExtensionExports.length })}</span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 items-start gap-1">
-                        {entry.npmUrl ? (
-                          <a
-                            href={entry.npmUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/50 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-                            title={t("settings.psmPlugins.marketOpenNpm", "Open npm page")}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => void installMarketPlugin(entry)}
-                          disabled={busy || entry.installed}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background/50 px-2.5 text-[11px] font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          {entry.installed
-                            ? t("settings.psmPlugins.marketInstalled", "Installed")
-                            : t("settings.psmPlugins.install", "Install")}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-md border border-border/60 bg-background/40 p-3">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                type="text"
-                value={pathInput}
-                onChange={(event) => setPathInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void addPathPlugin();
-                }}
-                placeholder={t("settings.psmPlugins.pathPlaceholder", "local plugin entry path")}
-                disabled={pathBusy}
-                className="min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-info disabled:opacity-60"
-              />
-              <button
-                type="button"
-                onClick={() => void addPathPlugin()}
-                disabled={pathBusy || !trimmedPath}
-                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
-              >
-                <FilePlus2 className="h-3.5 w-3.5" />
-                {t("settings.psmPlugins.addPath", "Add path")}
-              </button>
-            </div>
-            <div className="mt-2 truncate text-xs text-muted-foreground">
-              <span className="font-mono text-foreground">/absolute/path/to/plugin.mjs</span>
-            </div>
-          </div>
-
-          {renderError()}
-
-          <div className="space-y-2">
-            {visiblePlugins.length === 0 && !loading ? (
-              <div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-                {t("settings.psmPlugins.empty", "No PSM plugins discovered.")}
-              </div>
-            ) : (
-              visiblePlugins.map(renderPluginSummary)
-            )}
-          </div>
-        </div>
-      </SettingsCard>
-    </div>
-  );
+  return null;
 }

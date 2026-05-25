@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import type { PsmPluginHostContext } from '@pi-session-manager/plugin-sdk'
 
 import { manifest } from './manifest'
+import { refreshSessionSummaryWithAgent } from './agentSummary'
 import SessionIntelligenceToolbarPanel from './SessionIntelligenceToolbarPanel'
 
 export { manifest }
@@ -23,7 +24,7 @@ export default function sessionSummaryPlugin(ctx: PsmPluginHostContext) {
     const provider = readStringArg(args, 'provider') ?? readStringArg(ctx.settings.all(), 'provider')
     const model = readStringArg(args, 'model') ?? readStringArg(ctx.settings.all(), 'model')
     ctx.log.info('session summary refresh requested', { path, provider: provider ?? 'auto', model: model ?? 'auto', language })
-    return ctx.psm.records.refreshSessionIntelligence({
+    return refreshSessionSummaryWithAgent(ctx.psm, {
       path,
       provider,
       model,

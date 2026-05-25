@@ -87,6 +87,13 @@ export const SETTINGS_AREAS: SettingsAreaMeta[] = [
     descriptionKey: "settings.areaDescriptions.configCenter",
     fallbackDescription: "Agent, server, data source and maintenance tools",
   },
+  {
+    id: "plugins",
+    labelKey: "settings.areas.plugins",
+    fallbackLabel: "Plugins",
+    descriptionKey: "settings.areaDescriptions.plugins",
+    fallbackDescription: "PSM plugin management, install and development tools",
+  },
 ];
 
 export const PSM_PLUGIN_SECTION_PREFIX = "psm-plugin:";
@@ -104,8 +111,8 @@ export function psmPluginIdFromSettingsSection(section: SettingsSection): string
 function pluginSettingsSectionMeta(plugin: PsmPluginStatus): SettingsSectionMeta {
   return {
     id: psmPluginSectionId(plugin.id),
-    area: "config-center",
-    group: "agent",
+    area: "plugins",
+    group: "management",
     icon: plugin.id.includes("sidechat")
       ? <MessageCircleQuestion className="h-4 w-4" />
       : <Brain className="h-4 w-4" />,
@@ -285,13 +292,57 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   },
   {
     id: "psm-plugins",
-    area: "config-center",
-    group: "agent",
+    area: "plugins",
+    group: "management",
     icon: <Puzzle className="h-4 w-4" />,
     labelKey: "settings.sections.psmPlugins",
     fallbackLabel: "PSM Plugins",
     descriptionKey: "settings.sectionDescriptions.psmPlugins",
-    fallbackDescription: "Built-in and npm-installed PSM plugins",
+    fallbackDescription: "Enable, disable and inspect installed plugins",
+    saveMode: "inline",
+  },
+  {
+    id: "psm-plugin-marketplace",
+    area: "plugins",
+    group: "distribution",
+    icon: <Download className="h-4 w-4" />,
+    labelKey: "settings.sections.psmPluginMarketplace",
+    fallbackLabel: "Marketplace",
+    descriptionKey: "settings.sectionDescriptions.psmPluginMarketplace",
+    fallbackDescription: "Search, install and update npm plugin packages",
+    saveMode: "inline",
+  },
+  {
+    id: "psm-plugin-sources",
+    area: "plugins",
+    group: "distribution",
+    icon: <FolderOpen className="h-4 w-4" />,
+    labelKey: "settings.sections.psmPluginSources",
+    fallbackLabel: "Local Sources",
+    descriptionKey: "settings.sectionDescriptions.psmPluginSources",
+    fallbackDescription: "Register local plugin entry files",
+    saveMode: "inline",
+  },
+  {
+    id: "psm-plugin-dev",
+    area: "plugins",
+    group: "development",
+    icon: <Terminal className="h-4 w-4" />,
+    labelKey: "settings.sections.psmPluginDev",
+    fallbackLabel: "Dev Mode",
+    descriptionKey: "settings.sectionDescriptions.psmPluginDev",
+    fallbackDescription: "Add, build and preview plugin projects",
+    saveMode: "inline",
+  },
+  {
+    id: "psm-plugin-diagnostics",
+    area: "plugins",
+    group: "health",
+    icon: <Activity className="h-4 w-4" />,
+    labelKey: "settings.sections.psmPluginDiagnostics",
+    fallbackLabel: "Diagnostics",
+    descriptionKey: "settings.sectionDescriptions.psmPluginDiagnostics",
+    fallbackDescription: "Plugin load and runtime diagnostics",
     saveMode: "inline",
   },
   {
@@ -370,7 +421,35 @@ export const SETTINGS_GROUPS: SettingsGroupMeta[] = [
     area: "config-center",
     labelKey: "settings.groups.agent",
     fallbackLabel: "Agent",
-    sections: ["pi-agent", "models", "psm-plugins"],
+    sections: ["pi-agent", "models"],
+  },
+  {
+    id: "management",
+    area: "plugins",
+    labelKey: "settings.groups.pluginManagement",
+    fallbackLabel: "Management",
+    sections: ["psm-plugins"],
+  },
+  {
+    id: "distribution",
+    area: "plugins",
+    labelKey: "settings.groups.pluginDistribution",
+    fallbackLabel: "Distribution",
+    sections: ["psm-plugin-marketplace", "psm-plugin-sources"],
+  },
+  {
+    id: "development",
+    area: "plugins",
+    labelKey: "settings.groups.pluginDevelopment",
+    fallbackLabel: "Development",
+    sections: ["psm-plugin-dev"],
+  },
+  {
+    id: "health",
+    area: "plugins",
+    labelKey: "settings.groups.pluginHealth",
+    fallbackLabel: "Health",
+    sections: ["psm-plugin-diagnostics"],
   },
   {
     id: "access",
@@ -529,7 +608,15 @@ export function renderSettingsSection(
     case "models":
       return <ModelSettings />;
     case "psm-plugins":
-      return <PsmPluginsSettings />;
+      return <PsmPluginsSettings mode="manage" />;
+    case "psm-plugin-marketplace":
+      return <PsmPluginsSettings mode="market" />;
+    case "psm-plugin-sources":
+      return <PsmPluginsSettings mode="sources" />;
+    case "psm-plugin-dev":
+      return <PsmPluginsSettings mode="developer" />;
+    case "psm-plugin-diagnostics":
+      return <PsmPluginsSettings mode="diagnostics" />;
     case "server-access":
       return (
         <AdvancedSettings

@@ -17,6 +17,7 @@ const SUPPORTED_PERMISSIONS = new Set<PsmPermission>([
   'config:write',
   'events:read',
   'model:invoke',
+  'agent:invoke',
 ])
 
 const SUPPORTED_SCOPES = new Set<PsmRecordScope>([

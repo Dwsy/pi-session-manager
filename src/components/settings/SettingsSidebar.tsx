@@ -143,12 +143,17 @@ export default function SettingsSidebar({
       </div>
 
       <div className="px-3 pt-2.5 pb-1 flex-shrink-0">
-        <div className="mb-2 grid grid-cols-2 gap-1 rounded-lg bg-surface p-1">
+        <div
+          className="mb-2 grid gap-1 rounded-lg bg-surface p-1"
+          style={{
+            gridTemplateColumns: `repeat(${Math.max(settingsAreas.length, 1)}, minmax(0, 1fr))`,
+          }}
+        >
           {settingsAreas.map((area) => (
             <button
               key={area.id}
               onClick={() => onAreaChange(area.id)}
-              className={`min-h-[32px] rounded-md px-2.5 text-xs font-medium motion-color motion-press focus-ring ${
+              className={`min-h-[32px] truncate rounded-md px-2 text-xs font-medium motion-color motion-press focus-ring ${
                 activeArea === area.id
                   ? "bg-info text-white shadow-sm"
                   : "text-muted-foreground hover:text-foreground"

@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import type { PsmPluginHostContext } from '@pi-session-manager/plugin-sdk'
 
 import { manifest } from './manifest'
+import { askSideChatWithAgent } from './agentSidechat'
 import SessionSideChatPanel from './SessionSideChatPanel'
 import SessionSideChatToolbarButton from './SessionSideChatToolbarButton'
 
@@ -30,7 +31,7 @@ export default function activate(ctx: PsmPluginHostContext) {
     if (!sessionPath) throw new Error('sessionPath is required')
     if (!question) throw new Error('question is required')
 
-    return ctx.psm.sidechat.ask({
+    return askSideChatWithAgent(ctx.psm, {
       sessionPath,
       question,
       language: optionalString(args.language),

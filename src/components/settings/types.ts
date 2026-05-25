@@ -214,7 +214,7 @@ export const defaultSettings: AppSettings = {
   },
 };
 
-export type SettingsArea = "preferences" | "config-center";
+export type SettingsArea = "preferences" | "config-center" | "plugins";
 
 export type SettingsSaveMode = "app-settings" | "inline" | "read-only";
 
@@ -228,6 +228,10 @@ export type SettingsSection =
   | "resume-targets"
   | "pi-agent"
   | "psm-plugins"
+  | "psm-plugin-marketplace"
+  | "psm-plugin-sources"
+  | "psm-plugin-dev"
+  | "psm-plugin-diagnostics"
   | `psm-plugin:${string}`
   | "server-access"
   | "backup-restore"

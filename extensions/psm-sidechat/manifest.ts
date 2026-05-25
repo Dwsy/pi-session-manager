@@ -12,7 +12,7 @@ export const manifest: PsmPluginManifest = {
     sdk: '^0.1.0',
     host: '>=0.6.3',
   },
-  permissions: ['sessions:read', 'model:invoke', 'records:read', 'records:write'],
+  permissions: ['sessions:read', 'model:invoke', 'agent:invoke', 'records:read', 'records:write'],
   records: [
     {
       type: 'sidechat.thread',

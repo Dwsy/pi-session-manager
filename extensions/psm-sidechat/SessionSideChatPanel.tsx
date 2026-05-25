@@ -19,6 +19,7 @@ import {
   type PsmSessionReference,
   type PsmSideChatCitation,
 } from "@pi-session-manager/plugin-sdk";
+import { askSideChatWithAgent } from "./agentSidechat";
 import { sideChatStyles } from "./styles";
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
@@ -449,7 +450,7 @@ export default function SessionSideChatPanel({
 
     try {
       let streamedAnswer = "";
-      const response = await client.sidechat.askStream({
+      const response = await askSideChatWithAgent(client, {
           sessionPath: session.path,
           question,
           language,

@@ -13,11 +13,17 @@ import {
 import {
   type PluginRecord,
   type PsmCapabilityClient,
+  type PsmModelOption,
   type PsmPluginI18nClient,
   type PsmSessionReference,
 } from "@pi-session-manager/plugin-sdk";
+import { refreshSessionSummaryWithAgent } from "./agentSummary";
 
 const SESSION_INTELLIGENCE_RECORD = "session.intelligence";
+const MODEL_OPTIONS_TIMEOUT_MS = 5000;
+
+let cachedModelOptions: PsmModelOption[] | null = null;
+let cachedModelOptionsPromise: Promise<PsmModelOption[]> | null = null;
 
 interface SessionIntelligencePayload {
   summary?: string;
@@ -94,6 +100,35 @@ function languageLabel(language: string, t: PsmPluginI18nClient["t"]) {
   return t("session.intelligence.languageAuto", "Auto");
 }
 
+function providerModelLabel(option: PsmModelOption) {
+  return `${option.provider}/${option.model}`;
+}
+
+function loadModelOptions(client: PsmCapabilityClient) {
+  if (cachedModelOptions) {
+    return Promise.resolve(cachedModelOptions);
+  }
+
+  if (cachedModelOptionsPromise) {
+    return cachedModelOptionsPromise;
+  }
+
+  const timeoutPromise = new Promise<PsmModelOption[]>((_, reject) => {
+    window.setTimeout(() => reject(new Error("model options request timed out")), MODEL_OPTIONS_TIMEOUT_MS);
+  });
+
+  cachedModelOptionsPromise = Promise.race([client.models.listOptions(), timeoutPromise])
+    .then((items) => {
+      cachedModelOptions = items;
+      return items;
+    })
+    .finally(() => {
+      cachedModelOptionsPromise = null;
+    });
+
+  return cachedModelOptionsPromise;
+}
+
 export default function SessionIntelligenceToolbarPanel({
   client,
   i18n,
@@ -107,6 +142,13 @@ export default function SessionIntelligenceToolbarPanel({
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draftText, setDraftText] = useState("");
+  const [models, setModels] = useState<PsmModelOption[]>(cachedModelOptions ?? []);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelLoadFailed, setModelLoadFailed] = useState(false);
+  const [requestedModels, setRequestedModels] = useState(Boolean(cachedModelOptions));
+  const [selectedProvider, setSelectedProvider] = useState(settings.provider);
+  const [selectedModel, setSelectedModel] = useState(settings.model);
 
   const payload = asPayload(record);
   const updatedAt = formatUpdatedAt(record, language);
@@ -117,6 +159,39 @@ export default function SessionIntelligenceToolbarPanel({
   const provider = firstString(payload?.provider, payload?.providerUsed, payload?.provider_used);
   const messageCount = payload?.messageCount ?? payload?.message_count;
   const status = payload?.status || t("session.intelligence.noSummary", "No summary");
+
+  useEffect(() => {
+    if (!open) return;
+    setSelectedProvider(settings.provider);
+    setSelectedModel(settings.model);
+  }, [open, session.path, settings.model, settings.provider]);
+
+  useEffect(() => {
+    if (!open || models.length > 0 || modelsLoading || requestedModels) return;
+
+    let cancelled = false;
+    setRequestedModels(true);
+    setModelsLoading(true);
+    setModelLoadFailed(false);
+
+    loadModelOptions(client)
+      .then((items) => {
+        if (cancelled) return;
+        setModels(items);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setModelLoadFailed(true);
+        console.error("[SessionIntelligenceToolbarPanel] Failed to load model options:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setModelsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client, models.length, modelsLoading, open, requestedModels]);
 
   useEffect(() => {
     if (!open) return;
@@ -150,14 +225,24 @@ export default function SessionIntelligenceToolbarPanel({
   const handleRefresh = async () => {
     setRefreshing(true);
     setError(null);
+    setDraftText("");
     try {
-      const refreshed = await client.records.refreshSessionIntelligence({
-        path: session.path,
-        language: settings.language === "auto" ? language : settings.language,
-        provider: settings.provider || undefined,
-        model: settings.model || undefined,
-      });
+      const refreshed = await refreshSessionSummaryWithAgent(
+        client,
+        {
+          path: session.path,
+          language: settings.language === "auto" ? language : settings.language,
+          provider: selectedProvider || undefined,
+          model: selectedModel || undefined,
+        },
+        {
+          onDelta(delta) {
+            setDraftText((current) => current + delta);
+          },
+        },
+      );
       setRecord(refreshed);
+      setDraftText("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -165,19 +250,50 @@ export default function SessionIntelligenceToolbarPanel({
     }
   };
 
+  const selectedModelValue = selectedProvider && selectedModel ? `${selectedProvider}::${selectedModel}` : "";
   const defaultChips = useMemo(() => {
     const chips = [
       `${t("session.intelligence.language", "Language")}: ${languageLabel(settings.language, t)}`,
     ];
-    if (settings.provider || settings.model) {
-      chips.push(`${t("session.intelligence.model", "Model")}: ${[settings.provider, settings.model].filter(Boolean).join("/")}`);
+    if (selectedProvider || selectedModel) {
+      chips.push(`${t("session.intelligence.model", "Model")}: ${[selectedProvider, selectedModel].filter(Boolean).join("/")}`);
     }
     return chips;
-  }, [settings.language, settings.model, settings.provider, t]);
+  }, [selectedModel, selectedProvider, settings.language, t]);
+
+  const modelOptions = useMemo(
+    () => [
+      { value: "", label: t("session.intelligence.modelAuto", "Auto") },
+      ...models.map((option) => ({
+        value: `${option.provider}::${option.model}`,
+        label: providerModelLabel(option),
+      })),
+    ],
+    [models, t],
+  );
+
+  const modelStatus = modelsLoading ? (
+    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+      <Loader2 className="h-3 w-3 animate-spin" />
+      {t("session.intelligence.loadingModelsShort", "Loading")}
+    </span>
+  ) : modelLoadFailed ? (
+    <button
+      type="button"
+      onClick={() => {
+        setRequestedModels(false);
+        setModelLoadFailed(false);
+      }}
+      className="text-[11px] text-warning hover:text-foreground"
+    >
+      {t("session.intelligence.retryLoadModels", "Retry")}
+    </button>
+  ) : null;
 
   if (!open) return null;
 
   const hasPayload = Boolean(payload);
+  const hasDraft = draftText.trim().length > 0;
   const actionLabel = hasPayload
     ? t("session.intelligence.refresh", "Refresh")
     : t("session.intelligence.generate", "Generate");
@@ -186,7 +302,7 @@ export default function SessionIntelligenceToolbarPanel({
     <div className="flex h-full min-h-0 flex-col bg-surface-dark/75">
       <div className="border-b border-border/70 bg-background/30 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.12em] text-foreground/92">
               <Brain className="h-4 w-4 text-primary" />
               <span>{t("session.intelligence.title", "Session intelligence")}</span>
@@ -207,6 +323,34 @@ export default function SessionIntelligenceToolbarPanel({
                   {chip}
                 </span>
               ))}
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <label className="min-w-0 flex-1">
+                <span className="sr-only">{t("session.intelligence.model", "Model")}</span>
+                <select
+                  aria-label={t("session.intelligence.model", "Model")}
+                  value={selectedModelValue}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (!value) {
+                      setSelectedProvider("");
+                      setSelectedModel("");
+                      return;
+                    }
+                    const [nextProvider, nextModel] = value.split("::");
+                    setSelectedProvider(nextProvider);
+                    setSelectedModel(nextModel);
+                  }}
+                  className="h-8 w-full rounded-md border border-border/70 bg-background/75 px-2.5 text-xs text-foreground outline-none focus:border-primary/50"
+                >
+                  {modelOptions.map((option) => (
+                    <option key={`session-summary-model-${option.value || "auto"}`} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {modelStatus}
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -238,106 +382,135 @@ export default function SessionIntelligenceToolbarPanel({
             <span>{t("session.intelligence.loading", "Loading intelligence...")}</span>
           </div>
         ) : error ? (
-          <div className="rounded-xl border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {error}
-          </div>
-        ) : payload ? (
           <div className="space-y-4">
-            <section className="rounded-2xl border border-border/60 bg-background/65 p-4">
-              <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                {t("session.intelligence.summary", "Summary")}
-              </div>
-              <p className="text-[15px] leading-7 text-foreground">
-                {payload.summary || t("session.intelligence.noSummaryText", "No summary text.")}
-              </p>
-            </section>
-
-            {settings.showMetadata && (
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-xl border border-border/60 bg-background/45 p-3">
-                  <div className="text-muted-foreground">{t("session.intelligence.status", "Status")}</div>
-                  <div className="mt-1 truncate text-foreground">{payload.status || "unknown"}</div>
+            <div className="rounded-xl border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </div>
+            {hasDraft && (
+              <section className="rounded-2xl border border-primary/20 bg-primary/8 p-4">
+                <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {t("session.intelligence.streamingPreview", "Streaming preview")}
                 </div>
-                {typeof payload.confidence === "number" && (
-                  <div className="rounded-xl border border-border/60 bg-background/45 p-3">
-                    <div className="text-muted-foreground">{t("session.intelligence.confidence", "Confidence")}</div>
-                    <div className="mt-1 text-foreground">{Math.round(payload.confidence * 100)}%</div>
+                <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-foreground/90">
+                  {draftText}
+                </pre>
+              </section>
+            )}
+          </div>
+        ) : payload || refreshing || hasDraft ? (
+          <div className="space-y-4">
+            {(refreshing || hasDraft) && (
+              <section className="rounded-2xl border border-primary/20 bg-primary/8 p-4">
+                <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {t("session.intelligence.streamingPreview", "Streaming preview")}
+                </div>
+                <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-foreground/90">
+                  {draftText || t("session.intelligence.waitingStream", "Waiting for first tokens...")}
+                </pre>
+              </section>
+            )}
+
+            {payload && (
+              <>
+                <section className="rounded-2xl border border-border/60 bg-background/65 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {t("session.intelligence.summary", "Summary")}
                   </div>
-                )}
-                {messageCount !== undefined && (
-                  <div className="rounded-xl border border-border/60 bg-background/45 p-3">
-                    <div className="text-muted-foreground">{t("session.intelligence.messages", "Messages")}</div>
-                    <div className="mt-1 text-foreground">{messageCount}</div>
-                  </div>
-                )}
-                {(provider || model) && (
-                  <div className="rounded-xl border border-border/60 bg-background/45 p-3">
-                    <div className="text-muted-foreground">{t("session.intelligence.model", "Model")}</div>
-                    <div className="mt-1 break-words text-foreground" title={[provider, model].filter(Boolean).join(" / ")}>
-                      {[provider, model].filter(Boolean).join(" / ")}
+                  <p className="text-[15px] leading-7 text-foreground">
+                    {payload.summary || t("session.intelligence.noSummaryText", "No summary text.")}
+                  </p>
+                </section>
+
+                {settings.showMetadata && (
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                      <div className="text-muted-foreground">{t("session.intelligence.status", "Status")}</div>
+                      <div className="mt-1 truncate text-foreground">{payload.status || "unknown"}</div>
                     </div>
+                    {typeof payload.confidence === "number" && (
+                      <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                        <div className="text-muted-foreground">{t("session.intelligence.confidence", "Confidence")}</div>
+                        <div className="mt-1 text-foreground">{Math.round(payload.confidence * 100)}%</div>
+                      </div>
+                    )}
+                    {messageCount !== undefined && (
+                      <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                        <div className="text-muted-foreground">{t("session.intelligence.messages", "Messages")}</div>
+                        <div className="mt-1 text-foreground">{messageCount}</div>
+                      </div>
+                    )}
+                    {(provider || model) && (
+                      <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                        <div className="text-muted-foreground">{t("session.intelligence.model", "Model")}</div>
+                        <div className="mt-1 break-words text-foreground" title={[provider, model].filter(Boolean).join(" / ")}>
+                          {[provider, model].filter(Boolean).join(" / ")}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {payload.objective && (
-              <section className="rounded-2xl border border-border/60 bg-background/50 p-4">
-                <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                  <Target className="h-3.5 w-3.5" />
-                  {t("session.intelligence.objective", "Objective")}
-                </div>
-                <p className="text-sm leading-6 text-foreground/90">{payload.objective}</p>
-              </section>
-            )}
+                {payload.objective && (
+                  <section className="rounded-2xl border border-border/60 bg-background/50 p-4">
+                    <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      <Target className="h-3.5 w-3.5" />
+                      {t("session.intelligence.objective", "Objective")}
+                    </div>
+                    <p className="text-sm leading-6 text-foreground/90">{payload.objective}</p>
+                  </section>
+                )}
 
-            {settings.showTopics && topics.length > 0 && (
-              <section className="rounded-2xl border border-border/60 bg-background/50 p-4">
-                <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                  {t("session.intelligence.topics", "Topics")}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {topics.map((topic) => (
-                    <span key={topic} className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs text-foreground">
-                      {topic}
-                    </span>
-                  ))}
-                </div>
-              </section>
-            )}
+                {settings.showTopics && topics.length > 0 && (
+                  <section className="rounded-2xl border border-border/60 bg-background/50 p-4">
+                    <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      {t("session.intelligence.topics", "Topics")}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {topics.map((topic) => (
+                        <span key={topic} className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs text-foreground">
+                          {topic}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
-            {settings.showNextSteps && nextSteps.length > 0 && (
-              <section className="rounded-2xl border border-border/60 bg-background/50 p-4">
-                <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                  <ListChecks className="h-3.5 w-3.5" />
-                  {t("session.intelligence.nextSteps", "Next steps")}
-                </div>
-                <ul className="space-y-2 text-sm leading-6 text-foreground/90">
-                  {nextSteps.map((item) => (
-                    <li key={item} className="flex gap-2">
-                      <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-primary" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+                {settings.showNextSteps && nextSteps.length > 0 && (
+                  <section className="rounded-2xl border border-border/60 bg-background/50 p-4">
+                    <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      <ListChecks className="h-3.5 w-3.5" />
+                      {t("session.intelligence.nextSteps", "Next steps")}
+                    </div>
+                    <ul className="space-y-2 text-sm leading-6 text-foreground/90">
+                      {nextSteps.map((item) => (
+                        <li key={item} className="flex gap-2">
+                          <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-primary" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
 
-            {settings.showUnresolved && unresolvedTasks.length > 0 && (
-              <section className="rounded-2xl border border-warning/30 bg-warning/10 p-4">
-                <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                  {t("session.intelligence.unresolved", "Unresolved")}
-                </div>
-                <ul className="space-y-2 text-sm leading-6 text-foreground/90">
-                  {unresolvedTasks.map((item) => (
-                    <li key={item} className="flex gap-2">
-                      <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-warning" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+                {settings.showUnresolved && unresolvedTasks.length > 0 && (
+                  <section className="rounded-2xl border border-warning/30 bg-warning/10 p-4">
+                    <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      {t("session.intelligence.unresolved", "Unresolved")}
+                    </div>
+                    <ul className="space-y-2 text-sm leading-6 text-foreground/90">
+                      {unresolvedTasks.map((item) => (
+                        <li key={item} className="flex gap-2">
+                          <span className="mt-[8px] h-1.5 w-1.5 rounded-full bg-warning" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </>
             )}
           </div>
         ) : (

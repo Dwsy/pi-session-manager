@@ -12,7 +12,7 @@ export const manifest: PsmPluginManifest = {
     sdk: '^0.1.0',
     host: '>=0.6.3',
   },
-  permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke'],
+  permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke', 'agent:invoke'],
   records: [
     {
       type: 'session.intelligence',

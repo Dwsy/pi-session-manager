@@ -25,6 +25,7 @@ enum PluginPermission {
     ConfigRead,
     ConfigWrite,
     ModelInvoke,
+    AgentInvoke,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -61,6 +62,7 @@ fn parse_plugin_permission(value: &str) -> Option<PluginPermission> {
         "config:read" => Some(PluginPermission::ConfigRead),
         "config:write" => Some(PluginPermission::ConfigWrite),
         "model:invoke" => Some(PluginPermission::ModelInvoke),
+        "agent:invoke" => Some(PluginPermission::AgentInvoke),
         _ => None,
     }
 }
@@ -78,7 +80,7 @@ fn extract_plugin_permission_context(payload: &Value) -> PluginPermissionContext
 
 fn required_permissions_for_command(command: &str) -> &'static [PluginPermission] {
     match command {
-        "scan_sessions" | "scan_sessions_paginated" | "get_session_entries" | "read_session_file_chunk" | "get_session_labels" => &[PluginPermission::SessionsRead],
+        "scan_sessions" | "scan_sessions_paginated" | "get_session_entries" | "read_session_file_chunk" | "get_session_labels" | "open_session_in_browser" | "open_session_in_terminal" => &[PluginPermission::SessionsRead],
         "get_plugin_record" | "list_plugin_records_for_scope" | "search_plugin_records" => &[PluginPermission::RecordsRead],
         "upsert_plugin_record" => &[PluginPermission::RecordsWrite],
         "refresh_session_intelligence_record" => &[PluginPermission::RecordsWrite, PluginPermission::ModelInvoke],
@@ -89,6 +91,7 @@ fn required_permissions_for_command(command: &str) -> &'static [PluginPermission
         "write_psm_plugin_json_config" => &[PluginPermission::ConfigWrite],
         "invoke_model_text" | "invoke_model_text_stream" => &[PluginPermission::ModelInvoke],
         "list_model_options_fast" => &[PluginPermission::ModelInvoke],
+        "plugin_agent_create_session" | "plugin_agent_run" | "plugin_agent_abort" | "plugin_agent_dispose" => &[PluginPermission::AgentInvoke],
         _ => &[],
     }
 }
@@ -550,7 +553,8 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let source = extract_optional_string(payload, "source");
             let package_name = extract_optional_string(payload, "packageName");
             let entry_path = extract_optional_string(payload, "entryPath");
-            let result = crate::set_psm_plugin_enabled(plugin_id, enabled, source, package_name, entry_path).await?;
+            let project_path = extract_optional_string(payload, "projectPath");
+            let result = crate::set_psm_plugin_enabled(plugin_id, enabled, source, package_name, entry_path, project_path).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "set_psm_plugin_settings" => {
@@ -559,7 +563,8 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let source = extract_optional_string(payload, "source");
             let package_name = extract_optional_string(payload, "packageName");
             let entry_path = extract_optional_string(payload, "entryPath");
-            let result = crate::set_psm_plugin_settings(plugin_id, settings, source, package_name, entry_path).await?;
+            let project_path = extract_optional_string(payload, "projectPath");
+            let result = crate::set_psm_plugin_settings(plugin_id, settings, source, package_name, entry_path, project_path).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "list_npm_psm_plugin_entries" => {
@@ -568,6 +573,10 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
         }
         "list_path_psm_plugin_entries" => {
             let result = crate::list_path_psm_plugin_entries().await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "list_dev_psm_plugin_entries" => {
+            let result = crate::list_dev_psm_plugin_entries().await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
         "search_psm_plugin_market" => {
@@ -587,6 +596,16 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::remove_path_psm_plugin(entry_path).await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
+        "add_dev_psm_plugin" => {
+            let project_path = extract(payload, "projectPath")?;
+            let result = crate::add_dev_psm_plugin(project_path).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
+        "remove_dev_psm_plugin" => {
+            let project_path = extract(payload, "projectPath")?;
+            let result = crate::remove_dev_psm_plugin(project_path).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
         "install_psm_plugin" => {
             let package_name = extract(payload, "packageName")?;
             let result = crate::install_psm_plugin(package_name).await?;
@@ -601,6 +620,11 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::update_psm_plugins().await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
         }
+        "build_dev_psm_plugin" => {
+            let project_path = extract(payload, "projectPath")?;
+            let result = crate::build_dev_psm_plugin(project_path).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }
         "reload_psm_plugins" => {
             let result = crate::reload_psm_plugins().await?;
             serde_json::to_value(result).map_err(|e| e.to_string())
@@ -613,6 +637,12 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
         "read_path_psm_plugin_module_source" => {
             let entry_path = extract(payload, "entryPath")?;
             let result = crate::read_path_psm_plugin_module_source(entry_path).await?;
+            Ok(Value::String(result))
+        }
+        "read_dev_psm_plugin_module_source" => {
+            let entry_path = extract(payload, "entryPath")?;
+            let project_path = extract(payload, "projectPath")?;
+            let result = crate::read_dev_psm_plugin_module_source(entry_path, project_path).await?;
             Ok(Value::String(result))
         }
         "get_psm_plugin_paths" => {
@@ -755,6 +785,10 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             {
                 let state = app_state.as_ref().ok_or_else(|| "Streaming model text requires GUI app state".to_string())?.clone();
                 let request_id = extract_optional_string(payload, "requestId").or_else(|| extract_optional_string(payload, "request_id")).ok_or_else(|| "Missing field: requestId".to_string())?;
+                if payload.get("protocol").and_then(Value::as_str) == Some("pi-agent") {
+                    let result = crate::invoke_model_agent_stream(state, request_id, payload.clone()).await?;
+                    return Ok(result);
+                }
                 let system_prompt = extract_optional_string(payload, "systemPrompt").or_else(|| extract_optional_string(payload, "system_prompt")).ok_or_else(|| "Missing field: systemPrompt".to_string())?;
                 let prompt = extract(payload, "prompt")?;
                 let provider = extract_optional_string(payload, "provider");
@@ -1102,8 +1136,34 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
                 Err(format!("Command '{command}' requires GUI mode (terminal not available in CLI)"))
             }
         }
-        "open_session_in_browser" => Err("open_session_in_browser is desktop-only".to_string()),
-        "open_session_in_terminal" => Err("open_session_in_terminal is desktop-only".to_string()),
+        "open_session_in_browser" => {
+            #[cfg(feature = "gui")]
+            {
+                let path = extract(payload, "path")?;
+                crate::open_session_in_browser(path).await?;
+                Ok(Value::Null)
+            }
+            #[cfg(not(feature = "gui"))]
+            {
+                Err("open_session_in_browser is desktop-only".to_string())
+            }
+        }
+        "open_session_in_terminal" => {
+            #[cfg(feature = "gui")]
+            {
+                let path = extract(payload, "path")?;
+                let cwd = extract_optional_string(payload, "cwd").unwrap_or_default();
+                let terminal = extract_optional_string(payload, "terminal");
+                let pi_path = extract_optional_string(payload, "piPath").or_else(|| extract_optional_string(payload, "pi_path"));
+                let resume_command = extract_optional_string(payload, "resumeCommand").or_else(|| extract_optional_string(payload, "resume_command"));
+                crate::open_session_in_terminal(path, cwd, terminal, pi_path, resume_command).await?;
+                Ok(Value::Null)
+            }
+            #[cfg(not(feature = "gui"))]
+            {
+                Err("open_session_in_terminal is desktop-only".to_string())
+            }
+        }
         "list_available_terminals" => {
             let terminals = crate::domain::terminal::utils::scan_available_terminals();
             Ok(serde_json::json!(terminals))
@@ -1196,6 +1256,35 @@ mod tests {
         let result = enforce_plugin_permission("read_psm_plugin_json_config", &payload);
 
         assert!(result.is_ok(), "expected plugin config read to pass permission checks, got {result:?}");
+    }
+
+    #[tokio::test]
+    async fn dispatch_allows_plugin_agent_commands_with_declared_permission() {
+        let payload = serde_json::json!({
+            "__psm": {
+                "pluginId": "builtin.agent-search",
+                "permissions": ["agent:invoke"]
+            }
+        });
+        let result = enforce_plugin_permission("plugin_agent_create_session", &payload);
+
+        assert!(result.is_ok(), "expected plugin agent command to pass permission checks, got {result:?}");
+    }
+
+    #[tokio::test]
+    async fn dispatch_rejects_plugin_agent_commands_without_required_permission() {
+        let payload = serde_json::json!({
+            "__psm": {
+                "pluginId": "builtin.agent-search",
+                "permissions": ["model:invoke"]
+            }
+        });
+        let result = enforce_plugin_permission("plugin_agent_create_session", &payload);
+
+        assert!(result.is_err(), "expected agent permission denial");
+        let error = result.unwrap_err();
+        assert!(error.contains("Plugin permission denied"), "error should mention permission denial, got: {error}");
+        assert!(error.contains("plugin_agent_create_session"), "error should mention denied command, got: {error}");
     }
 
     #[tokio::test]

@@ -4,12 +4,18 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
+  addDevPsmPlugin: vi.fn(),
   addPathPsmPlugin: vi.fn(),
+  buildDevPsmPlugin: vi.fn(),
   getPsmPluginPaths: vi.fn(),
+  initializePsmPluginHost: vi.fn(),
   installPsmPlugin: vi.fn(),
+  listPlugins: vi.fn(),
   reload: vi.fn(),
+  subscribe: vi.fn(),
   setPsmPluginEnabled: vi.fn(),
   setPsmPluginSettings: vi.fn(),
+  removeDevPsmPlugin: vi.fn(),
   removePathPsmPlugin: vi.fn(),
   searchPsmPluginMarket: vi.fn(),
   uninstallPsmPlugin: vi.fn(),
@@ -18,13 +24,21 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/plugins/runtime-host', () => ({
+  addDevPsmPlugin: mocks.addDevPsmPlugin,
   addPathPsmPlugin: mocks.addPathPsmPlugin,
+  buildDevPsmPlugin: mocks.buildDevPsmPlugin,
   getPsmPluginPaths: mocks.getPsmPluginPaths,
+  initializePsmPluginHost: mocks.initializePsmPluginHost,
   installPsmPlugin: mocks.installPsmPlugin,
-  psmPluginHost: { reload: mocks.reload },
+  psmPluginHost: {
+    listPlugins: mocks.listPlugins,
+    reload: mocks.reload,
+    subscribe: mocks.subscribe,
+  },
   setPsmPluginEnabled: mocks.setPsmPluginEnabled,
   setPsmPluginSettings: mocks.setPsmPluginSettings,
   searchPsmPluginMarket: mocks.searchPsmPluginMarket,
+  removeDevPsmPlugin: mocks.removeDevPsmPlugin,
   removePathPsmPlugin: mocks.removePathPsmPlugin,
   uninstallPsmPlugin: mocks.uninstallPsmPlugin,
   updatePsmPlugins: mocks.updatePsmPlugins,
@@ -126,15 +140,37 @@ const pathPlugin = {
   diagnostics: [],
 }
 
+const devPlugin = {
+  id: 'dev.local',
+  name: 'Dev Local',
+  version: '0.1.0',
+  source: 'dev' as const,
+  sourceId: '/Users/test/plugins/dev-plugin/dist/index.js',
+  packageName: '@acme/dev-plugin',
+  entryPath: '/Users/test/plugins/dev-plugin/dist/index.js',
+  projectPath: '/Users/test/plugins/dev-plugin',
+  enabled: true,
+  state: 'active' as const,
+  commands: ['dev.local.command'],
+  tools: [],
+  diagnostics: [],
+}
+
 describe('PsmPluginsSettings npm lifecycle controls', () => {
   beforeEach(() => {
+    mocks.addDevPsmPlugin.mockReset()
     mocks.addPathPsmPlugin.mockReset()
+    mocks.buildDevPsmPlugin.mockReset()
     mocks.getPsmPluginPaths.mockReset()
+    mocks.initializePsmPluginHost.mockReset()
     mocks.installPsmPlugin.mockReset()
+    mocks.listPlugins.mockReset()
     mocks.reload.mockReset()
+    mocks.subscribe.mockReset()
     mocks.setPsmPluginEnabled.mockReset()
     mocks.setPsmPluginSettings.mockReset()
     mocks.searchPsmPluginMarket.mockReset()
+    mocks.removeDevPsmPlugin.mockReset()
     mocks.removePathPsmPlugin.mockReset()
     mocks.uninstallPsmPlugin.mockReset()
     mocks.updatePsmPlugins.mockReset()
@@ -144,8 +180,15 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
       configPath: '/Users/test/.pi/pi-session-manager/plugins.json',
       npmDir: '/Users/test/.pi/pi-session-manager/extensions/npm',
       customPaths: [],
+      devProjects: [],
     })
+    mocks.addDevPsmPlugin.mockResolvedValue({ version: 1, plugins: {}, devProjects: ['/Users/test/plugins/dev-plugin'] })
+    mocks.buildDevPsmPlugin.mockResolvedValue({ entries: [], stdout: '', stderr: '' })
+    mocks.initializePsmPluginHost.mockImplementation(() => mocks.reload())
+    mocks.listPlugins.mockReturnValue([])
+    mocks.subscribe.mockReturnValue(() => {})
     mocks.addPathPsmPlugin.mockResolvedValue({ version: 1, plugins: {}, customPaths: ['/Users/test/plugins/local-plugin.mjs'] })
+    mocks.removeDevPsmPlugin.mockResolvedValue({ version: 1, plugins: {}, devProjects: [] })
     mocks.removePathPsmPlugin.mockResolvedValue({ version: 1, plugins: {}, customPaths: [] })
     mocks.installPsmPlugin.mockResolvedValue({ entries: [], stdout: '', stderr: '' })
     mocks.searchPsmPluginMarket.mockResolvedValue({ query: 'psm plugin', total: 0, results: [] })
@@ -167,28 +210,36 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
     cleanup()
   })
 
-  it('installs npm package and refreshes host state', async () => {
-    mocks.reload.mockResolvedValueOnce([builtinPlugin, npmPlugin]).mockResolvedValueOnce([builtinPlugin, npmPlugin, installedPlugin])
+  it('keeps marketplace search lazy outside the marketplace menu', async () => {
+    mocks.reload.mockResolvedValueOnce([builtinPlugin, npmPlugin])
 
     render(<PsmPluginsSettings />)
 
-    await screen.findByText('NPM Sidechat')
+    await screen.findByText('Installed plugins')
+    expect(mocks.searchPsmPluginMarket).not.toHaveBeenCalled()
+  })
+
+  it('installs npm package and refreshes host state', async () => {
+    mocks.reload.mockResolvedValueOnce([builtinPlugin, npmPlugin]).mockResolvedValueOnce([builtinPlugin, npmPlugin, installedPlugin])
+
+    render(<PsmPluginsSettings mode="market" />)
+
+    await screen.findByText('NPM package')
     fireEvent.change(screen.getByPlaceholderText('npm package name'), {
       target: { value: '@acme/new-plugin' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Install' }))
 
     await waitFor(() => expect(mocks.installPsmPlugin).toHaveBeenCalledWith('@acme/new-plugin'))
-    await screen.findByText('New Plugin')
     expect(mocks.reload).toHaveBeenCalledTimes(2)
   })
 
   it('adds path plugin entry and refreshes host state', async () => {
     mocks.reload.mockResolvedValueOnce([builtinPlugin, npmPlugin]).mockResolvedValueOnce([builtinPlugin, npmPlugin, pathPlugin])
 
-    render(<PsmPluginsSettings />)
+    render(<PsmPluginsSettings mode="sources" />)
 
-    await screen.findByText('NPM Sidechat')
+    await screen.findByText('Path plugin')
     fireEvent.change(screen.getByPlaceholderText('local plugin entry path'), {
       target: { value: '/Users/test/plugins/local-plugin.mjs' },
     })
@@ -196,6 +247,35 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
 
     await waitFor(() => expect(mocks.addPathPsmPlugin).toHaveBeenCalledWith('/Users/test/plugins/local-plugin.mjs'))
     await screen.findByText('Path Local')
+    expect(mocks.reload).toHaveBeenCalledTimes(2)
+  })
+
+  it('adds dev plugin project, builds it, and refreshes host state', async () => {
+    mocks.reload.mockResolvedValueOnce([builtinPlugin, npmPlugin]).mockResolvedValueOnce([builtinPlugin, npmPlugin, devPlugin])
+
+    render(<PsmPluginsSettings mode="developer" />)
+
+    await screen.findByText('Dev Preview')
+    fireEvent.change(screen.getByPlaceholderText('local plugin project directory'), {
+      target: { value: '/Users/test/plugins/dev-plugin' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Add & Preview' }))
+
+    await waitFor(() => expect(mocks.addDevPsmPlugin).toHaveBeenCalledWith('/Users/test/plugins/dev-plugin'))
+    await waitFor(() => expect(mocks.buildDevPsmPlugin).toHaveBeenCalledWith('/Users/test/plugins/dev-plugin'))
+    await screen.findByText('Dev Local')
+    expect(mocks.reload).toHaveBeenCalledTimes(2)
+  })
+
+  it('rebuilds an installed dev plugin from its project path', async () => {
+    mocks.reload.mockResolvedValueOnce([builtinPlugin, devPlugin]).mockResolvedValueOnce([builtinPlugin, devPlugin])
+
+    render(<PsmPluginsSettings />)
+
+    await screen.findByText('Dev Local')
+    fireEvent.click(screen.getByRole('button', { name: 'Rebuild' }))
+
+    await waitFor(() => expect(mocks.buildDevPsmPlugin).toHaveBeenCalledWith('/Users/test/plugins/dev-plugin'))
     expect(mocks.reload).toHaveBeenCalledTimes(2)
   })
 
@@ -216,6 +296,7 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
       source: 'builtin',
       packageName: null,
       entryPath: null,
+      projectPath: null,
     }))
   })
 
@@ -243,6 +324,7 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
       source: 'builtin',
       packageName: null,
       entryPath: null,
+      projectPath: null,
     }))
   })
 
@@ -266,6 +348,7 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
       source: 'builtin',
       packageName: null,
       entryPath: null,
+      projectPath: null,
     }))
   })
 
@@ -291,6 +374,7 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
       source: 'builtin',
       packageName: null,
       entryPath: null,
+      projectPath: null,
     }))
 
     expect(screen.getByLabelText('Default model').textContent).toContain('anthropic/claude-sonnet-4-5')
@@ -303,20 +387,28 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
     await waitFor(() => expect(screen.getByLabelText('Default model').textContent).toContain('anthropic/claude-sonnet-4-5'))
   })
 
-  it('shows remove controls for npm and path plugins and refreshes after removal', async () => {
-    mocks.reload.mockResolvedValueOnce([builtinPlugin, npmPlugin, pathPlugin]).mockResolvedValueOnce([builtinPlugin, pathPlugin]).mockResolvedValueOnce([builtinPlugin])
+  it('shows remove controls for npm, path, and dev plugins and refreshes after removal', async () => {
+    mocks.reload
+      .mockResolvedValueOnce([builtinPlugin, npmPlugin, pathPlugin, devPlugin])
+      .mockResolvedValueOnce([builtinPlugin, pathPlugin, devPlugin])
+      .mockResolvedValueOnce([builtinPlugin, devPlugin])
+      .mockResolvedValueOnce([builtinPlugin])
 
     render(<PsmPluginsSettings />)
 
     await screen.findByText('Built-in Sidechat')
-    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(3)
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0])
     await waitFor(() => expect(mocks.uninstallPsmPlugin).toHaveBeenCalledWith('@acme/psm-sidechat'))
     await waitFor(() => expect(screen.queryByText('NPM Sidechat')).toBeNull())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0])
     await waitFor(() => expect(mocks.removePathPsmPlugin).toHaveBeenCalledWith('/Users/test/plugins/local-plugin.mjs'))
     await waitFor(() => expect(screen.queryByText('Path Local')).toBeNull())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(mocks.removeDevPsmPlugin).toHaveBeenCalledWith('/Users/test/plugins/dev-plugin'))
+    await waitFor(() => expect(screen.queryByText('Dev Local')).toBeNull())
   })
 })

@@ -25,6 +25,19 @@ function assistantText(message) {
     .join('')
 }
 
+function requestMessages(request) {
+  if (Array.isArray(request.messages)) {
+    return request.messages
+  }
+  return [
+    {
+      role: 'user',
+      content: String(request.prompt || ''),
+      timestamp: Date.now(),
+    },
+  ]
+}
+
 function resolveModel(registry, provider, modelId) {
   if (provider && modelId) {
     const model = registry.find(provider, modelId)
@@ -50,13 +63,8 @@ async function main() {
 
   const context = {
     systemPrompt: request.systemPrompt,
-    messages: [
-      {
-        role: 'user',
-        content: String(request.prompt || ''),
-        timestamp: Date.now(),
-      },
-    ],
+    messages: requestMessages(request),
+    tools: Array.isArray(request.tools) ? request.tools : undefined,
   }
 
   const options = {
@@ -70,6 +78,12 @@ async function main() {
     const eventStream = streamSimple(model, context, options)
     let finalMessage = null
     for await (const event of eventStream) {
+      if (request.protocol === 'pi-agent') {
+        writeEvent(event)
+        if (event.type === 'done') finalMessage = event.message
+        if (event.type === 'error') finalMessage = event.error
+        continue
+      }
       if (event.type === 'text_delta') {
         writeEvent({ type: 'delta', delta: event.delta })
       } else if (event.type === 'done') {
@@ -78,6 +92,10 @@ async function main() {
         finalMessage = event.error
         writeEvent({ type: 'error', error: event.error.errorMessage || 'Pi AI stream failed' })
       }
+    }
+    if (request.protocol === 'pi-agent') {
+      finalMessage ||= await eventStream.result()
+      return
     }
     finalMessage ||= await eventStream.result()
     writeEvent({

@@ -13,7 +13,7 @@ import type {
   PsmToolRendererRegistration,
 } from '@pi-session-manager/plugin-sdk'
 
-export type PsmPluginSource = 'builtin' | 'npm' | 'path'
+export type PsmPluginSource = 'builtin' | 'npm' | 'path' | 'dev'
 export type PsmPluginStatusState = 'active' | 'disabled' | 'error'
 export type PsmPluginDiagnosticLevel = 'info' | 'warn' | 'error'
 
@@ -22,6 +22,7 @@ export interface PsmPluginConfigEntry {
   source?: PsmPluginSource | string
   packageName?: string | null
   entryPath?: string | null
+  projectPath?: string | null
   settings?: Record<string, PsmPluginSettingValue>
 }
 
@@ -29,6 +30,7 @@ export interface PsmPluginsConfig {
   version: number
   plugins: Record<string, PsmPluginConfigEntry>
   customPaths?: string[]
+  devProjects?: string[]
 }
 
 export interface PsmNpmPluginEntry {
@@ -46,14 +48,31 @@ export interface PsmPathPluginEntry {
   sourceHash?: string | null
 }
 
+export interface PsmDevPluginEntry {
+  projectPath: string
+  packageName?: string | null
+  packageVersion?: string | null
+  entryPath: string
+  exportPath: string
+  moduleModifiedMs?: number | null
+  sourceHash?: string | null
+}
+
 export interface PsmPluginPaths {
   configPath: string
   npmDir: string
   customPaths: string[]
+  devProjects: string[]
 }
 
 export interface PsmPluginNpmOperationResult {
   entries: PsmNpmPluginEntry[]
+  stdout: string
+  stderr: string
+}
+
+export interface PsmPluginDevBuildResult {
+  entries: PsmDevPluginEntry[]
   stdout: string
   stderr: string
 }
@@ -86,6 +105,7 @@ export interface PsmPluginLoadEntry {
   packageName?: string
   packageVersion?: string | null
   entryPath?: string
+  projectPath?: string
   moduleModifiedMs?: number | null
   sourceHash?: string | null
   load(): Promise<unknown>
@@ -104,6 +124,7 @@ export interface PsmPluginStatus {
   sourceId: string
   packageName?: string
   entryPath?: string
+  projectPath?: string
   enabled: boolean
   state: PsmPluginStatusState
   manifest?: PsmPluginManifest

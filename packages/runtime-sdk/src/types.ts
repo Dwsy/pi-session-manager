@@ -9,6 +9,7 @@ export type PsmPermission =
   | 'config:write'
   | 'events:read'
   | 'model:invoke'
+  | 'agent:invoke'
 
 export interface PsmPermissionContext {
   pluginId?: string
@@ -442,6 +443,7 @@ export interface PluginRecordIndexValue {
 }
 
 export interface PluginRecordUpsertParams {
+  id?: string
   pluginId: string
   scopeType: PsmRecordScope
   scopeId: string
@@ -456,12 +458,6 @@ export interface PsmRecordsClient {
   search(params: PluginRecordSearchParams): Promise<PluginRecord[]>
   listForScope(params: PluginRecordListParams): Promise<PluginRecord[]>
   upsert(params: PluginRecordUpsertParams): Promise<void>
-  refreshSessionIntelligence(params: {
-    path: string
-    provider?: string
-    model?: string
-    language?: string
-  }): Promise<PluginRecord>
 }
 
 export interface PsmSessionListParams {
@@ -607,50 +603,74 @@ export interface PsmSideChatAskParams {
   limit?: number
 }
 
-export interface PsmAiTextParams {
-  systemPrompt: string
-  prompt: string
-  provider?: string
-  model?: string
-  reasoning?: string
-}
-
 export interface PsmAiTextResponse {
   text: string
   provider?: string
   model?: string
 }
 
-export type PsmAiTextStreamEvent =
-  | { type: 'delta'; delta: string }
-  | { type: 'done'; response: PsmAiTextResponse }
-  | { type: 'error'; error: string }
+export type PsmAgentThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+export type PsmAgentStorageScope = 'memory' | 'plugin'
+export type PsmAgentStreamingBehavior = 'steer' | 'followUp'
 
-export interface PsmAiTextStreamHandlers {
+export interface PsmAgentToolRef {
+  name: string
+  permission: PsmPermission
+}
+
+export interface PsmAgentCreateSessionParams {
+  purpose: string
+  cwd?: string
+  systemPrompt?: string
+  model?: 'host-default' | { provider?: string; id?: string }
+  thinkingLevel?: PsmAgentThinkingLevel
+  tools: PsmAgentToolRef[]
+  storage?: {
+    scope: PsmAgentStorageScope
+    key?: string
+  }
+}
+
+export interface PsmAgentSessionHandle {
+  sessionId: string
+  storageScope: PsmAgentStorageScope
+  storageKey?: string
+  model?: {
+    provider?: string
+    id?: string
+  }
+}
+
+export interface PsmAgentRunParams {
+  sessionId: string
+  prompt: string
+  streamingBehavior?: PsmAgentStreamingBehavior
+}
+
+export interface PsmAgentRunResult {
+  sessionId: string
+  text: string
+  toolResults?: unknown[]
+}
+
+export interface PsmAgentRunStreamHandlers {
   onDelta?: (delta: string) => void
-  onDone?: (response: PsmAiTextResponse) => void
+  onDone?: (result: PsmAgentRunResult) => void
   onError?: (error: string) => void
 }
 
-export interface PsmAiClient {
-  generateText(params: PsmAiTextParams): Promise<PsmAiTextResponse>
-  streamText(params: PsmAiTextParams, handlers?: PsmAiTextStreamHandlers): Promise<PsmAiTextResponse>
+export interface PsmAgentClient {
+  createSession(params: PsmAgentCreateSessionParams): Promise<PsmAgentSessionHandle>
+  run(params: PsmAgentRunParams): Promise<PsmAgentRunResult>
+  runStream(params: PsmAgentRunParams, handlers?: PsmAgentRunStreamHandlers): Promise<PsmAgentRunResult>
+  abort(sessionId: string): Promise<void>
+  dispose(sessionId: string): Promise<void>
 }
-
-export type PsmSideChatStreamEvent =
-  | { type: 'delta'; delta: string }
-  | { type: 'done'; response: PsmSideChatResponse }
-  | { type: 'error'; error: string }
 
 export interface PsmSideChatStreamHandlers {
   onDelta?: (delta: string) => void
   onDone?: (response: PsmSideChatResponse) => void
   onError?: (error: string) => void
-}
-
-export interface PsmSideChatClient {
-  ask(params: PsmSideChatAskParams): Promise<PsmSideChatResponse>
-  askStream(params: PsmSideChatAskParams, handlers?: PsmSideChatStreamHandlers): Promise<PsmSideChatResponse>
 }
 
 export interface PsmModelsClient {
@@ -670,8 +690,7 @@ export interface PsmCapabilityClient {
   records: PsmRecordsClient
   sessions: PsmSessionsClient
   search: PsmSearchClient
-  ai: PsmAiClient
-  sidechat: PsmSideChatClient
+  agent: PsmAgentClient
   models: PsmModelsClient
   tags: PsmTagsClient
   config: PsmJsonConfigClient
@@ -680,4 +699,5 @@ export interface PsmCapabilityClient {
 export interface CreatePsmClientOptions {
   transport: PsmTransport
   permissions?: PsmPermissionContext
+  agent?: PsmAgentClient
 }

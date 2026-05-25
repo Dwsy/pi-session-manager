@@ -25,7 +25,14 @@ The payload is stored in SQLite `plugin_records.payload_json` and indexed throug
 
 ## Model Configuration
 
-The backend command uses normal PSM model configuration (`models.json`). Do not hard-code API keys in this plugin. Pass provider/model by name at runtime or let PSM choose defaults.
+The plugin uses the host-managed Pi Agent bridge and normal PSM model configuration (`models.json`). Do not hard-code API keys in this plugin. Pass provider/model by name at runtime or let PSM choose defaults.
+
+## Permissions
+
+The manifest declares `sessions:read`, `records:read`, `records:write`,
+`model:invoke`, and `agent:invoke`. `agent:invoke` is required for the
+host-managed Pi Agent session; `records:write` is required for the final
+`session.intelligence` record.
 
 ## Command
 
@@ -40,12 +47,37 @@ toolbar item  = builtin.session-summary.toolbar
 The sample command calls:
 
 ```ts
-await psm.records.refreshSessionIntelligence({
-  path: sessionPath,
-  provider,
-  model,
+const session = await ctx.psm.agent.createSession({
+  purpose: 'session-summary',
+  model: 'host-default',
+  tools: [],
+  storage: { scope: 'memory' },
+})
+
+const result = await ctx.psm.agent.run({
+  sessionId: session.sessionId,
+  prompt: summaryPrompt,
 })
 ```
+
+Then it writes the generated payload through:
+
+```ts
+await ctx.psm.records.upsert({
+  id: `builtin.session-summary:${sessionPath}`,
+  pluginId: 'builtin.session-summary',
+  scopeType: 'session',
+  scopeId: sessionPath,
+  recordType: 'session.intelligence',
+  schemaVersion: 1,
+  payload,
+  searchableText,
+})
+```
+
+The plugin disposes the agent session after the run. Do not call
+`ctx.psm.records.refreshSessionIntelligence(...)` from new plugin code; that
+name belongs to the older backend-generated summary path.
 
 The toolbar UI is registered through `ctx.ui.registerSessionToolbarItem(...)` and rendered by the PSM runtime host.
 
@@ -60,7 +92,8 @@ The toolbar UI is registered through `ctx.ui.registerSessionToolbarItem(...)` an
 - Host contract: `ctx.ui.registerSessionToolbarItem(...)`
 - Capability access: injected `ctx.psm`; the UI does not import app transport directly
 
-Backend command:
+Legacy backend command kept for compatibility, not as the recommended plugin
+path:
 
 ```text
 refresh_session_intelligence_record

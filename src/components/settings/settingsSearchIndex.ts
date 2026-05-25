@@ -483,6 +483,43 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     keywords: ["invoke", "transport", "ipc", "http", "websocket", "debug"],
   },
 
+  // ── PSM Plugins ──
+  {
+    id: "psm-plugins-overview",
+    section: "psm-plugins",
+    labelKey: "settings.sections.psmPlugins",
+    fallbackLabel: "PSM Plugins",
+    keywords: ["psm", "plugin", "plugins", "enable", "disable", "installed"],
+  },
+  {
+    id: "psm-plugin-marketplace",
+    section: "psm-plugin-marketplace",
+    labelKey: "settings.sections.psmPluginMarketplace",
+    fallbackLabel: "Marketplace",
+    keywords: ["psm", "plugin", "market", "marketplace", "npm", "install", "update"],
+  },
+  {
+    id: "psm-plugin-sources",
+    section: "psm-plugin-sources",
+    labelKey: "settings.sections.psmPluginSources",
+    fallbackLabel: "Local Sources",
+    keywords: ["psm", "plugin", "path", "source", "local", "entry"],
+  },
+  {
+    id: "psm-plugin-dev",
+    section: "psm-plugin-dev",
+    labelKey: "settings.sections.psmPluginDev",
+    fallbackLabel: "Dev Mode",
+    keywords: ["psm", "plugin", "dev", "developer", "preview", "build"],
+  },
+  {
+    id: "psm-plugin-diagnostics",
+    section: "psm-plugin-diagnostics",
+    labelKey: "settings.sections.psmPluginDiagnostics",
+    fallbackLabel: "Diagnostics",
+    keywords: ["psm", "plugin", "diagnostics", "errors", "warnings", "health"],
+  },
+
   // ── Import/Export (Config Bundle) ──
   {
     id: "import-export",

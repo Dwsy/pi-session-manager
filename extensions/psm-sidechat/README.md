@@ -1,6 +1,9 @@
 # PSM Sidechat Plugin
 
 Built-in PSM plugin example for session Q&A.
+The command and tool names keep the existing sidechat integration points, but
+the AI work is performed by host-managed Pi Agent sessions through
+`ctx.psm.agent`.
 
 This plugin registers:
 
@@ -8,7 +11,7 @@ This plugin registers:
 - tool: `sidechat_ask`
 - session toolbar button: `builtin.sidechat.toolbar`
 - session right panel: `builtin.sidechat.panel`
-- permissions: `sessions:read`, `model:invoke`, `records:read`, `records:write`
+- permissions: `sessions:read`, `model:invoke`, `agent:invoke`, `records:read`, `records:write`
 
 ## UI Stack
 
@@ -20,6 +23,11 @@ This plugin registers:
 - Manifest boundary: `manifest.ts`; `index.ts` only activates/registers contributions
 - Host contract: `ctx.ui.registerSessionToolbarItem(...)` + `ctx.ui.registerSessionPanel(...)`
 - Capability access: injected `ctx.psm`; the UI does not import app transport directly
+- Generation path: `ctx.psm.agent.createSession(...)` + `ctx.psm.agent.runStream(...)`
+
+Do not use the legacy `ctx.psm.sidechat` helper for new sidechat plugin code.
+Keep `sidechat.ask` / `sidechat_ask` as contribution IDs for compatibility, and
+use `ctx.psm.agent` plus `agent:invoke` for generation.
 
 The npm package shape is the same as other PSM plugins:
 

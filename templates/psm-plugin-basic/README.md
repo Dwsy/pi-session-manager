@@ -9,3 +9,4 @@ npm install --prefix ~/.pi/pi-session-manager/extensions/npm .
 ```
 
 The package declares `psm.extensions` as `./dist/index.js` and uses `@pi-session-manager/plugin-sdk` for types.
+During local development, add this template directory through Settings -> PSM Plugins -> Dev Preview and use Rebuild after source edits.

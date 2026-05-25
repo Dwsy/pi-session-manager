@@ -75,6 +75,28 @@ pub async fn invoke_model_text_stream(app_state: crate::app_state::SharedAppStat
     }
 }
 
+#[cfg(feature = "gui")]
+pub async fn invoke_model_agent_stream(app_state: crate::app_state::SharedAppState, request_id: String, mut request: serde_json::Value) -> Result<serde_json::Value, String> {
+    let event_name = format!("psm-ai-stream:{request_id}");
+    request["stream"] = serde_json::Value::Bool(true);
+    request["protocol"] = serde_json::Value::String("pi-agent".to_string());
+
+    let delta_app = app_state.app_handle.clone();
+    let delta_event_name = event_name.clone();
+    let result = run_pi_model_agent_stream(request, move |event| {
+        let _ = delta_app.emit(&delta_event_name, event.clone());
+    })
+    .await;
+
+    match result {
+        Ok(response) => Ok(response),
+        Err(error) => {
+            let _ = app_state.app_handle.emit(&event_name, ModelTextStreamEvent { r#type: "error".to_string(), delta: None, response: None, error: Some(error.clone()) });
+            Err(error)
+        }
+    }
+}
+
 async fn run_pi_model_text<F>(system_prompt: String, prompt: String, provider: Option<String>, model: Option<String>, reasoning: Option<String>, stream: bool, mut on_delta: F) -> Result<ModelTextResponse, String>
 where
     F: FnMut(&str) + Send,
@@ -128,6 +150,50 @@ where
     }
 
     final_response.ok_or_else(|| helper_error.unwrap_or_else(|| "Pi AI helper did not return a final response".to_string()))
+}
+
+#[cfg(feature = "gui")]
+async fn run_pi_model_agent_stream<F>(request: serde_json::Value, mut on_event: F) -> Result<serde_json::Value, String>
+where
+    F: FnMut(&serde_json::Value) + Send,
+{
+    let script = pi_model_text_script_path()?;
+    let mut child = TokioCommand::new("node").arg(script).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().map_err(|error| format!("Failed to start Pi AI SDK helper: {error}"))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(request.to_string().as_bytes()).await.map_err(|error| format!("Failed to write Pi AI request: {error}"))?;
+    }
+
+    let stdout = child.stdout.take().ok_or_else(|| "Pi AI helper did not expose stdout".to_string())?;
+    let mut lines = BufReader::new(stdout).lines();
+    let mut final_response: Option<serde_json::Value> = None;
+    let mut helper_error: Option<String> = None;
+
+    while let Some(line) = lines.next_line().await.map_err(|error| format!("Failed to read Pi AI helper output: {error}"))? {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let event: serde_json::Value = serde_json::from_str(&line).map_err(|error| format!("Invalid Pi AI helper event: {error}. Raw: {line}"))?;
+        match event.get("type").and_then(|value| value.as_str()) {
+            Some("done") => {
+                final_response = event.get("message").cloned().or_else(|| event.get("response").cloned());
+            }
+            Some("error") => {
+                final_response = event.get("error").cloned();
+                helper_error = event.get("error").and_then(|value| value.as_str().map(str::to_string).or_else(|| value.get("errorMessage").and_then(|message| message.as_str()).map(str::to_string)));
+            }
+            _ => {}
+        }
+        on_event(&event);
+    }
+
+    let output = child.wait_with_output().await.map_err(|error| format!("Failed to wait for Pi AI helper: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(helper_error.or(if stderr.is_empty() { None } else { Some(stderr) }).unwrap_or_else(|| format!("Pi AI helper exited with {}", output.status)));
+    }
+
+    Ok(final_response.unwrap_or(serde_json::Value::Null))
 }
 
 fn pi_model_text_script_path() -> Result<std::path::PathBuf, String> {

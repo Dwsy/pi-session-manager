@@ -23,32 +23,57 @@ import type { PsmPluginHostContext, PsmPluginManifest } from '@pi-session-manage
 
 export const manifest: PsmPluginManifest = {
   manifestVersion: 1,
-  id: 'acme.sidechat',
-  name: 'Acme Sidechat',
+  id: 'acme.session-summary',
+  name: 'Acme Session Summary',
   version: '1.0.0',
   runtime: {
     sdk: '^0.1.0',
     host: '>=0.6.3',
   },
   package: {
-    name: '@acme/psm-sidechat',
+    name: '@acme/psm-session-summary',
     export: './dist/index.js',
   },
-  permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke'],
+  permissions: ['sessions:read', 'records:read', 'records:write', 'model:invoke', 'agent:invoke'],
 }
 
 export function activate(ctx: PsmPluginHostContext) {
-  ctx.registerCommand('sidechat.ask', async (args) => {
-    return ctx.psm.sidechat.ask({
-      sessionPath: String(args.sessionPath),
-      question: String(args.question),
+  ctx.registerCommand('session-summary.refresh', async (args) => {
+    const sessionPath = String(args.sessionPath)
+    const agent = await ctx.psm.agent.createSession({
+      purpose: 'session-summary',
+      model: 'host-default',
       thinkingLevel: 'medium',
+      tools: [],
+      storage: { scope: 'memory' },
     })
+
+    try {
+      const entries = await ctx.psm.sessions.readEntries(sessionPath, { limit: 80 })
+      const result = await ctx.psm.agent.run({
+        sessionId: agent.sessionId,
+        prompt: `Summarize this session:\n${JSON.stringify(entries)}`,
+      })
+
+      await ctx.psm.records.upsert({
+        pluginId: 'acme.session-summary',
+        scopeType: 'session',
+        scopeId: sessionPath,
+        recordType: 'session.summary',
+        schemaVersion: 1,
+        payload: { text: result.text, model: agent.model },
+        searchableText: result.text,
+      })
+
+      return result
+    } finally {
+      await ctx.psm.agent.dispose(agent.sessionId)
+    }
   })
 
   ctx.ui.registerSessionToolbarItem({
-    id: 'acme.sidechat.toolbar',
-    title: 'Sidechat',
+    id: 'acme.session-summary.toolbar',
+    title: 'Refresh Summary',
     render: ({ session }) => {
       return session.name ?? session.path
     },
@@ -76,15 +101,16 @@ That means the SDK package is a small, stable facade. It is not the runtime host
 
 ## Plugin Sources
 
-PSM recognizes three plugin sources:
+PSM recognizes four plugin sources:
 
 | Source | Meaning |
 | --- | --- |
 | `builtin` | Repo-local first-party plugins under `extensions/psm-*` |
 | `npm` | External plugins installed into the managed npm workspace |
 | `path` | Explicit local `.js` / `.mjs` browser-compatible ESM files |
+| `dev` | Local plugin project directories built by Dev Preview |
 
-Path plugins are for local development or private plugins. Published plugins should use npm.
+Use Dev Preview for active local development: add the plugin project directory in Settings -> PSM Plugins, and PSM runs `npm run build` before loading the bundle declared by `package.json#psm.extensions`. Path plugins are for already-built private bundles. Published plugins should use npm.
 
 ## Manifest Contract
 
@@ -160,6 +186,36 @@ Plugin-safe permissions currently include:
 | `config:write` | Write plugin-owned JSON config |
 | `events:read` | Subscribe to host-emitted events |
 | `model:invoke` | Read model options and invoke model-backed plugin features |
+| `agent:invoke` | Create and run host-managed Pi Agent sessions through `ctx.psm.agent` |
+
+## AI Plugin Guidance
+
+New AI plugins should use the host-managed Pi Agent bridge:
+
+```ts
+const agent = await ctx.psm.agent.createSession({
+  purpose: 'my-plugin',
+  model: 'host-default',
+  tools: [
+    { name: 'psm.search.fulltext', permission: 'search:read' },
+    { name: 'psm.sessions.readEntries', permission: 'sessions:read' },
+  ],
+  storage: { scope: 'plugin', key: 'my-plugin' },
+})
+
+const result = await ctx.psm.agent.run({
+  sessionId: agent.sessionId,
+  prompt: 'Find the most relevant sessions for auth failures',
+})
+```
+
+Declare `agent:invoke` plus the permissions for any PSM tools the agent may call.
+The host owns model credentials, model resolution, Pi Agent session lifecycle, and plugin-scoped persistence.
+
+Older helpers such as `ctx.psm.ai`, `ctx.psm.sidechat`, and
+`ctx.psm.records.refreshSessionIntelligence(...)` are compatibility surfaces or
+legacy backend bridges. They are not the recommended path for new plugin AI
+features.
 
 ## Capability Client
 
@@ -172,7 +228,6 @@ Plugin-safe permissions currently include:
 | `search(params)` | Search plugin records |
 | `listForScope(params)` | List records for a scope |
 | `upsert(params)` | Stores `payload`, `searchableText`, and optional `indexValues` |
-| `refreshSessionIntelligence(params)` | Refreshes plugin intelligence records for a session |
 
 ### `sessions`
 
@@ -192,12 +247,15 @@ Plugin-safe permissions currently include:
 | `fulltext(params)` | Full-text search over sessions |
 | `pluginRecords(params)` | Convenience wrapper for plugin records search |
 
-### `sidechat`
+### `agent`
 
 | Method | Notes |
 | --- | --- |
-| `ask(params)` | Runs the sidechat flow and returns a response |
-| `askStream(params, handlers?)` | Streams sidechat deltas and final response |
+| `createSession(params)` | Creates a host-managed Pi Agent session for the plugin |
+| `run(params)` | Runs a prompt through an existing agent session |
+| `runStream(params, handlers?)` | Runs a prompt and forwards streamed text deltas when the host bridge supports them |
+| `abort(sessionId)` | Aborts a running agent session |
+| `dispose(sessionId)` | Releases a plugin agent session |
 
 ### `models`
 
@@ -266,6 +324,7 @@ This is useful for plugin-side state sync and long-lived UI surfaces.
 - Duplicate IDs are kept as host diagnostics rather than crashing the plugin.
 - NPM plugins must live inside the managed npm workspace.
 - Path plugins must be `.js` or `.mjs` and must point to a built browser-compatible module.
+- Dev plugins must be local project directories with `package.json#psm.extensions` and an `npm run build` script.
 - Do not depend on PSM app aliases such as `@/components`, `@/types`, or `@/plugins` in published plugins.
 - Keep React, Lucide, and other host-provided UI dependencies as peer dependencies where appropriate.
 
@@ -284,7 +343,7 @@ If you are writing or debugging a plugin, read these in order:
 
 ```ts
 ctx.psm.records.upsert({
-  pluginId: 'acme.sidechat',
+  pluginId: 'acme.session-summary',
   scopeType: 'session',
   scopeId: session.path,
   recordType: 'session.intelligence',
@@ -297,8 +356,8 @@ ctx.psm.records.upsert({
   searchableText: 'needs follow-up sdk docs',
   indexValues: [
     {
-      recordId: `acme.sidechat:session:${session.path}:session.intelligence`,
-      pluginId: 'acme.sidechat',
+      recordId: `acme.session-summary:session:${session.path}:session.intelligence`,
+      pluginId: 'acme.session-summary',
       recordType: 'session.intelligence',
       indexName: 'topic',
       valueText: 'sdk',
@@ -313,30 +372,55 @@ ctx.psm.records.upsert({
 const entries = await ctx.psm.sessions.readEntries(session.path, { limit: 20 })
 ```
 
-### Sidechat ask and stream
+### Host-managed agent run
 
 ```ts
-const response = await ctx.psm.sidechat.ask({
-  sessionPath: session.path,
-  question: 'What is the blocker?',
+const agent = await ctx.psm.agent.createSession({
+  purpose: 'session-question',
+  model: 'host-default',
   thinkingLevel: 'medium',
+  tools: [{ name: 'psm.sessions.readEntries', permission: 'sessions:read' }],
+  storage: { scope: 'memory' },
 })
 
-await ctx.psm.sidechat.askStream(
-  {
-    sessionPath: session.path,
-    question: 'Summarize the current state',
-  },
-  {
-    onDelta(delta) {
-      console.log(delta)
+try {
+  const response = await ctx.psm.agent.runStream(
+    {
+      sessionId: agent.sessionId,
+      prompt: 'What is the blocker in this session?',
     },
-    onDone(finalResponse) {
-      console.log(finalResponse.answer)
+    {
+      onDelta(delta) {
+        console.log(delta)
+      },
+      onDone(finalResponse) {
+        console.log(finalResponse.text)
+      },
     },
-  },
-)
+  )
+  console.log(response.text)
+} finally {
+  await ctx.psm.agent.dispose(agent.sessionId)
+}
 ```
+
+## Legacy Compatibility
+
+Some older host builds and backend routes still expose AI convenience calls:
+
+- `ctx.psm.sidechat.ask(...)` / `ctx.psm.sidechat.askStream(...)`
+- `ctx.psm.ai.generateText(...)` / `ctx.psm.ai.streamText(...)`
+- `ctx.psm.records.refreshSessionIntelligence(...)`
+- backend command `refresh_session_intelligence_record`
+- HTTP endpoint `POST /v1/plugin-records/session-intelligence/refresh`
+
+Keep these only for compatibility with existing plugins or external test
+harnesses. New plugin code should use `ctx.psm.agent.createSession(...)`,
+`ctx.psm.agent.run(...)` or `ctx.psm.agent.runStream(...)`, and persist plugin
+output through `ctx.psm.records.upsert(...)`.
+
+If you must call the compatibility backend route directly, treat it as a
+host-owned command rather than a stable plugin SDK path.
 
 ## What is intentionally not public
 
