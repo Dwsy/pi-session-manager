@@ -10,6 +10,13 @@ vi.mock("@/hooks/useAppearance", () => ({
 
 beforeEach(() => {
   window.matchMedia = vi.fn().mockReturnValue({ matches: true });
+  class MockResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  window.ResizeObserver = MockResizeObserver;
+  globalThis.ResizeObserver = MockResizeObserver;
   Object.assign(navigator, {
     clipboard: {
       writeText: vi.fn().mockResolvedValue(undefined),
@@ -475,6 +482,43 @@ describe("ToolCallReviewModal UI behavior", () => {
     expect(inspector?.textContent).toContain("Size");
     expect(inspector?.textContent).toContain("Additions");
     expect(inspector?.textContent).toContain("Deletions");
+  });
+
+  it("lets the detail content enter fullscreen without the side panels", async () => {
+    const { onClose } = renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-write-preview",
+            name: "write",
+            arguments: {
+              file_path: "src/views/review/PreviewPane.tsx",
+              content: "export const PreviewPane = () => null;\n",
+            },
+          },
+        ]),
+      ],
+    });
+
+    await getFileTreeShadowRoot();
+    expect(screen.getByText("Inspector")).toBeTruthy();
+    expect(screen.queryByText("Target")).toBeNull();
+    expect(document.querySelector("[data-tool-review-content-expanded='false']")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Fullscreen content" }));
+
+    expect(document.querySelector("[data-tool-review-content-expanded='true']")).toBeTruthy();
+    expect(screen.queryByText("Inspector")).toBeNull();
+    expect(document.querySelector("file-tree-container")).toBeNull();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(onClose).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(document.querySelector("[data-tool-review-content-expanded='false']")).toBeTruthy();
+    });
+    expect(await screen.findByText("Inspector")).toBeTruthy();
   });
 
   it("moves selection with ArrowDown and ArrowUp", async () => {

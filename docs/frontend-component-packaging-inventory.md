@@ -99,7 +99,9 @@
 
 ### `session-viewer/`
 
-`AgentIcon.tsx`, `ConversationPreviewMessages.tsx`, `NewMessagesButton.tsx`, `SessionBadge.tsx`, `SessionContextMenu.tsx`, `SessionEntryRenderer.tsx`, `SessionFlowView.tsx`, `SessionHeader.tsx`, `SessionInfoEntry.tsx`, `SessionMessagesStates.tsx`, `SessionScrollMarkers.tsx`, `SessionSortSelect.tsx`, `SessionTimelineNav.tsx`, `SessionViewerBody.tsx`, `SessionViewerMessages.tsx`, `SessionViewerModelControls.tsx`, `SessionViewerOnlineStatusBar.tsx`, `SessionViewerSearchBar.tsx`, `SessionViewerSidebar.tsx`, `SessionViewerToolbar.tsx`, `SessionViewerToolbarTypes.ts`, `ToolCallReviewModal.tsx`, `previewTypes.ts`, `index.ts`
+`AgentIcon.tsx`, `ConversationPreviewMessages.tsx`, `NewMessagesButton.tsx`, `SessionBadge.tsx`, `SessionContextMenu.tsx`, `SessionEntryRenderer.tsx`, `SessionFlowView.tsx`, `SessionHeader.tsx`, `SessionInfoEntry.tsx`, `SessionMessagesStates.tsx`, `SessionScrollMarkers.tsx`, `SessionSortSelect.tsx`, `SessionTimelineNav.tsx`, `SessionViewerBody.tsx`, `SessionViewerMessages.tsx`, `SessionViewerModelControls.tsx`, `SessionViewerOnlineStatusBar.tsx`, `SessionViewerSearchBar.tsx`, `SessionViewerSidebar.tsx`, `SessionViewerToolbar.tsx`, `SessionViewerToolbarTypes.ts`, `previewTypes.ts`, `index.ts`
+
+Code-review UI moved to the built-in plugin under `extensions/psm-code-review/`.
 
 已有 barrel：`index.ts`，但公开面是渐进式的，不等同于“导出所有内部件”。测试文件：`SessionViewerSidebar.test.tsx`。
 

@@ -68,6 +68,19 @@ const REVIEW_TREE_UNSAFE_CSS = `
     opacity: 0.78;
     padding-right: 3px;
   }
+
+  [data-file-tree-virtualized-scroll='true'] {
+    overscroll-behavior: contain;
+    scrollbar-color: rgb(var(--color-muted-foreground) / 0.34) transparent;
+  }
+
+  [data-file-tree-virtualized-scroll='true']::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--color-muted-foreground) / 0.26);
+  }
+
+  [data-file-tree-virtualized-scroll='true']:hover::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--color-muted-foreground) / 0.42);
+  }
 `;
 
 const reviewTreeStyle = {
@@ -80,6 +93,7 @@ const reviewTreeStyle = {
   "--trees-selected-bg-override": "rgb(var(--color-background) / 0.88)",
   "--trees-selected-fg-override": "rgb(var(--color-foreground))",
   "--trees-focus-ring-color-override": "rgb(var(--color-ring) / 0.62)",
+  "--trees-scrollbar-thumb-override": "rgb(var(--color-muted-foreground) / 0.34)",
   "--trees-status-added-override": "rgb(var(--color-success))",
   "--trees-status-modified-override": "rgb(var(--color-info))",
   "--trees-status-deleted-override": "rgb(var(--color-destructive))",
@@ -88,6 +102,7 @@ const reviewTreeStyle = {
   "--trees-item-margin-x-override": "0px",
   "--trees-item-padding-x-override": "7px",
   "--trees-padding-inline-override": "4px",
+  "--trees-scrollbar-gutter-override": "6px",
   "--trees-border-radius-override": "5px",
   "--trees-git-lane-width-override": "16px",
 } as CSSProperties;
@@ -191,11 +206,11 @@ export default function ReviewFileTree({
   if (tree.paths.length === 0) return null;
 
   return (
-    <div className="h-full bg-transparent py-1.5">
+    <div className="h-full min-h-0 bg-transparent py-1.5">
       <FileTree
         model={model}
         aria-label={ariaLabel}
-        className="h-full w-full"
+        className="h-full min-h-0 w-full"
         style={reviewTreeStyle}
       />
     </div>
