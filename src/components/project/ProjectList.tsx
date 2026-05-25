@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { FolderOpen, Star } from "lucide-react";
 
+export type ProjectListSortMode = "recent" | "sessions" | "messages" | "name";
+
 import { ProjectListSkeleton } from "@/components/ui/Skeleton";
 import type { SessionInfo, FavoriteItem } from "@/types";
 import {
@@ -20,6 +22,9 @@ interface ProjectListProps {
   favorites?: FavoriteItem[];
   onToggleFavorite?: (item: Omit<FavoriteItem, "addedAt">) => void;
   liveSessionIds?: Set<string>;
+  selectedProject?: string | null;
+  searchQuery?: string;
+  sortMode?: ProjectListSortMode;
 }
 
 interface Project {
@@ -39,6 +44,9 @@ export default function ProjectList({
   favorites = [],
   onToggleFavorite,
   liveSessionIds,
+  selectedProject = null,
+  searchQuery = "",
+  sortMode = "recent",
 }: ProjectListProps) {
   const { t } = useTranslation();
 
@@ -55,6 +63,7 @@ export default function ProjectList({
       {} as Record<string, SessionInfo[]>,
     );
 
+    const normalizedQuery = searchQuery.trim().toLowerCase();
     const list = Object.entries(projectMap).map(([dir, dirSessions]) => {
       const liveCount = dirSessions.filter(
         (s) => s.isLive || (liveSessionIds?.has(s.id) ?? false),
@@ -70,9 +79,21 @@ export default function ProjectList({
         liveCount,
       };
     });
-    list.sort((a, b) => b.lastModified - a.lastModified);
-    return list;
-  }, [sessions, t, liveSessionIds]);
+    const filteredList = normalizedQuery
+      ? list.filter((project) => {
+          const haystack = `${project.dirName}\n${project.dir}`.toLowerCase();
+          return haystack.includes(normalizedQuery);
+        })
+      : list;
+
+    filteredList.sort((a, b) => {
+      if (sortMode === "sessions") return b.sessionCount - a.sessionCount || b.lastModified - a.lastModified;
+      if (sortMode === "messages") return b.messageCount - a.messageCount || b.lastModified - a.lastModified;
+      if (sortMode === "name") return a.dirName.localeCompare(b.dirName) || a.dir.localeCompare(b.dir);
+      return b.lastModified - a.lastModified;
+    });
+    return filteredList;
+  }, [sessions, t, liveSessionIds, searchQuery, sortMode]);
 
   const projectsVirtualizer = useVirtualizer({
     count: projects.length,
@@ -111,12 +132,13 @@ export default function ProjectList({
           const isFavorite = favorites.some(
             (f) => f.type === "project" && f.id === project.dir,
           );
+          const isSelected = selectedProject === project.dir;
           return (
             <div
               key={project.dir}
               data-index={virtualRow.index}
               ref={projectsVirtualizer.measureElement}
-              className="px-3 py-2 hover:bg-background motion-surface motion-color border-b border-border/10 group"
+              className={`px-3 py-2 motion-surface motion-color border-b border-border/10 group ${isSelected ? "bg-info/10" : "hover:bg-background"}`}
               style={{
                 position: "absolute",
                 top: 0,

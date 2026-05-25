@@ -21,6 +21,20 @@ export const manifest: PsmPluginManifest = {
           dropSessionsHere: 'Drop sessions here',
           newSession: 'New Session',
           newSessionShort: 'New',
+          dragColumn: 'Drag column',
+          columnSearch: 'Search',
+          noColumnMatches: 'No matches',
+          density: {
+            comfortable: 'Comfortable',
+            compact: 'Compact',
+          },
+          bulk: {
+            selected: '{{count}} selected',
+            moveSelected: 'Move selected',
+            moveTo: 'Move to...',
+            deleteSelected: 'Delete selected',
+            clearSelection: 'Clear selection',
+          },
           workspace: {
             create: 'New Workspace',
             edit: 'Edit Workspace',
@@ -52,6 +66,20 @@ export const manifest: PsmPluginManifest = {
           dropSessionsHere: '拖放会话到这里',
           newSession: '新建会话',
           newSessionShort: '新建',
+          dragColumn: '拖拽列',
+          columnSearch: '搜索',
+          noColumnMatches: '无匹配',
+          density: {
+            comfortable: '舒适',
+            compact: '紧凑',
+          },
+          bulk: {
+            selected: '已选择 {{count}} 项',
+            moveSelected: '移动已选',
+            moveTo: '移动到...',
+            deleteSelected: '删除已选',
+            clearSelection: '清除选择',
+          },
           workspace: {
             create: '新建工作区',
             edit: '编辑工作区',

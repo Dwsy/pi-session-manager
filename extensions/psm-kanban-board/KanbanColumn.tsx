@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState, useLayoutEffect } from 'react'
+import { useRef, useMemo, useState, useLayoutEffect, type HTMLAttributes } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -8,12 +8,14 @@ import KanbanCard from './KanbanCard'
 import KanbanContextMenu from './KanbanContextMenu'
 import type { DeleteSessionRequestOptions } from '@/components/dialogs/deleteSessionTypes'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
+import { GripVertical, Search } from 'lucide-react'
 import { invoke, isTauri } from '@/transport'
 import { useClipboard } from '@/hooks/useClipboard'
 import {
   buildCopyResumeCommand,
   openSessionInTerminalDirect,
 } from '@/utils/sessionResume'
+import type { KanbanCardDensity } from './kanbanBoardModel'
 
 interface KanbanColumnProps {
   id: string
@@ -40,11 +42,21 @@ interface KanbanColumnProps {
   liveSessionIds?: Set<string>
   hideProjectInfo?: boolean
   isDropTarget?: boolean
+  columnDragHandleProps?: HTMLAttributes<HTMLButtonElement>
+  isColumnDragging?: boolean
+  selectedSessionIds?: Set<string>
+  selectionMode?: boolean
+  onToggleBulkSelect?: (sessionId: string) => void
+  density?: KanbanCardDensity
+  columnSearchQuery?: string
+  onColumnSearchChange?: (query: string) => void
+  totalSessionCount?: number
 }
 
 // Threshold for enabling virtualization
 const VIRTUALIZATION_THRESHOLD = 50
 const ESTIMATED_CARD_HEIGHT = 88
+const COMPACT_CARD_HEIGHT = 64
 
 export default function KanbanColumn({
   id,
@@ -68,6 +80,15 @@ export default function KanbanColumn({
   liveSessionIds,
   hideProjectInfo = false,
   isDropTarget = false,
+  columnDragHandleProps,
+  isColumnDragging = false,
+  selectedSessionIds,
+  selectionMode = false,
+  onToggleBulkSelect,
+  density = 'comfortable',
+  columnSearchQuery = '',
+  onColumnSearchChange,
+  totalSessionCount = sessions.length,
 }: KanbanColumnProps) {
   const { t } = useTranslation()
   const { copyText } = useClipboard()
@@ -106,7 +127,7 @@ export default function KanbanColumn({
   const virtualizer = useVirtualizer({
     count: sessions.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ESTIMATED_CARD_HEIGHT,
+    estimateSize: () => density === 'compact' ? COMPACT_CARD_HEIGHT : ESTIMATED_CARD_HEIGHT,
     getItemKey: (index) => sessions[index]?.id ?? index,
     overscan: 5,
     enabled: useVirtual,
@@ -119,7 +140,7 @@ export default function KanbanColumn({
     if (useVirtual) {
       virtualizer.measure()
     }
-  }, [sessions.length, useVirtual, virtualizer])
+  }, [density, sessions.length, useVirtual, virtualizer])
 
   // Memoize session IDs for SortableContext
   const sessionIds = useMemo(() => sessions.map(s => s.id), [sessions])
@@ -159,6 +180,10 @@ export default function KanbanColumn({
                     onSelect={(rect, clickPoint) => onSelectSession(session, rect, clickPoint)}
                     onContextMenu={(e) => handleContextMenu(session, e)}
                     hideProjectInfo={hideProjectInfo}
+                    isBulkSelected={selectedSessionIds?.has(session.id) ?? false}
+                    selectionMode={selectionMode}
+                    onToggleBulkSelect={() => onToggleBulkSelect?.(session.id)}
+                    density={density}
                   />
                 </div>
               </div>
@@ -180,6 +205,10 @@ export default function KanbanColumn({
             onSelect={(rect, clickPoint) => onSelectSession(session, rect, clickPoint)}
             onContextMenu={(e) => handleContextMenu(session, e)}
             hideProjectInfo={hideProjectInfo}
+            isBulkSelected={selectedSessionIds?.has(session.id) ?? false}
+            selectionMode={selectionMode}
+            onToggleBulkSelect={() => onToggleBulkSelect?.(session.id)}
+            density={density}
           />
         ))}
       </div>
@@ -187,10 +216,21 @@ export default function KanbanColumn({
   }
 
   return (
-    <div className={`flex flex-col flex-shrink-0 h-full min-h-0 overflow-hidden ${isMobile ? 'w-full' : 'w-64 min-w-[256px]'}`}>
+    <div className={`flex flex-col flex-shrink-0 h-full min-h-0 overflow-hidden ${isMobile ? 'w-full' : 'w-64 min-w-[256px]'} ${isColumnDragging ? 'opacity-80' : ''}`}>
       {/* Column Header - hidden on mobile (tabs handle this) */}
       {!isMobile && (
       <div className="flex items-center gap-2 px-3 py-2.5 mb-1">
+        {columnDragHandleProps && tag && (
+          <button
+            type="button"
+            className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-secondary hover:text-foreground focus-ring"
+            title={t('plugins.kanbanBoard.dragColumn', 'Drag column')}
+            aria-label={t('plugins.kanbanBoard.dragColumn', 'Drag column')}
+            {...columnDragHandleProps}
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </button>
+        )}
         {tag ? (
           <span
             className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isHex ? '' : getColorClass(tag.color)}`}
@@ -202,8 +242,18 @@ export default function KanbanColumn({
         <span className="text-xs font-medium text-foreground flex-1 truncate">
           {tag?.name || t('plugins.kanbanBoard.untagged', 'Unlabeled')}
         </span>
+        <div className="relative w-20 flex-shrink-0">
+          <Search className="pointer-events-none absolute left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/45" />
+          <input
+            value={columnSearchQuery}
+            onChange={(event) => onColumnSearchChange?.(event.currentTarget.value)}
+            placeholder={t('plugins.kanbanBoard.columnSearch', 'Search')}
+            aria-label={t('plugins.kanbanBoard.columnSearch', 'Search')}
+            className="h-6 w-full rounded-md border border-border/25 bg-background/40 pl-5 pr-1.5 text-[10px] text-foreground outline-none placeholder:text-muted-foreground/45 focus:border-primary/50"
+          />
+        </div>
         <span className="text-[10px] text-muted-foreground tabular-nums px-1.5 py-0.5 rounded bg-muted/50">
-          {sessions.length}
+          {sessions.length}{sessions.length !== totalSessionCount ? `/${totalSessionCount}` : ''}
         </span>
         {liveCount > 0 && (
           <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-green-500/10 text-green-500">
@@ -234,7 +284,9 @@ export default function KanbanColumn({
             {renderCards()}
             {sessions.length === 0 && (
               <div className="text-[10px] text-muted-foreground/50 text-center py-6">
-                {t('plugins.kanbanBoard.dropSessionsHere', 'Drop sessions here')}
+                {columnSearchQuery.trim()
+                  ? t('plugins.kanbanBoard.noColumnMatches', 'No matches')
+                  : t('plugins.kanbanBoard.dropSessionsHere', 'Drop sessions here')}
               </div>
             )}
           </SortableContext>

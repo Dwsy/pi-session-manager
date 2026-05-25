@@ -1,10 +1,13 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import type { PsmPluginHostContext } from '@pi-session-manager/plugin-sdk'
+import type { KanbanCardDensity } from './kanbanBoardModel'
 
 export interface KanbanWorkspaceConfig {
   projectFilter: string | null
   filterTagIds: string[]
   sourceFilterSlugs: string[]
+  columnOrder: string[]
+  cardDensity: KanbanCardDensity
 }
 
 export interface KanbanWorkspace {
@@ -46,6 +49,8 @@ const EMPTY_CONFIG: KanbanWorkspaceConfig = {
   projectFilter: null,
   filterTagIds: [],
   sourceFilterSlugs: [],
+  columnOrder: [],
+  cardDensity: 'comfortable',
 }
 
 interface StoreState {
@@ -69,6 +74,8 @@ function cloneConfig(config: KanbanWorkspaceConfig): KanbanWorkspaceConfig {
     projectFilter: config.projectFilter,
     filterTagIds: [...config.filterTagIds],
     sourceFilterSlugs: [...config.sourceFilterSlugs],
+    columnOrder: [...config.columnOrder],
+    cardDensity: config.cardDensity,
   }
 }
 
@@ -92,10 +99,13 @@ function stringArray(value: unknown): string[] {
 
 function sanitizeConfig(value: unknown): KanbanWorkspaceConfig {
   if (!isRecord(value)) return cloneConfig(EMPTY_CONFIG)
+  const cardDensity = value.cardDensity === 'compact' ? 'compact' : 'comfortable'
   return {
     projectFilter: typeof value.projectFilter === 'string' && value.projectFilter ? value.projectFilter : null,
     filterTagIds: stringArray(value.filterTagIds),
     sourceFilterSlugs: stringArray(value.sourceFilterSlugs),
+    columnOrder: stringArray(value.columnOrder),
+    cardDensity,
   }
 }
 

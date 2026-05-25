@@ -15,6 +15,7 @@ export interface AppPluginSurfaceData {
   getTagsForSession: (sessionId: string) => Tag[];
   onToggleTag: (sessionId: string, tagId: string, assigned: boolean) => void;
   onDeleteSession?: (session: SessionInfo, options?: DeleteSessionRequestOptions) => void;
+  onDeleteSessions?: (sessions: SessionInfo[], options?: DeleteSessionRequestOptions) => void;
   onConvertSession?: (session: SessionInfo) => void;
   onResumeSession?: (session: SessionInfo) => void | Promise<void>;
   onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>;

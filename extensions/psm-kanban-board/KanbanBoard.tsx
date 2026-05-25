@@ -1,7 +1,7 @@
-import { useMemo, useState, useCallback, useRef } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect, type HTMLAttributes, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { Plus, Loader2 } from 'lucide-react'
+import { AlignJustify, Loader2, Plus, Rows3 } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
@@ -17,17 +17,27 @@ import {
   type DragEndEvent,
   type DragOverEvent,
 } from '@dnd-kit/core'
-// arrayMove available if needed for reordering within column
+import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { SessionInfo, Tag, SessionTag, FavoriteItem } from '@/types'
 import type { TerminalType } from '@/components/settings/types'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
+import KanbanBulkToolbar from './KanbanBulkToolbar'
 import SearchFilterBar from '@/components/search/SearchFilterBar'
 import SessionPreviewModal from '@/components/session-preview/SessionPreviewModal'
 import TimeRangeSelector from './TimeRangeSelector'
 import type { TimeRange } from '@/utils/sessionFilters'
 import { filterSessions } from '@/utils/sessionFilters'
 import { getPathBasename } from '@/utils/path'
+import {
+  buildKanbanColumns,
+  filterColumnSessions,
+  reorderTagColumnIds,
+  UNTAGGED_COLUMN_ID,
+  type KanbanCardDensity,
+  type KanbanColumnData,
+} from './kanbanBoardModel'
 
 interface KanbanBoardProps {
   sessions: SessionInfo[]
@@ -42,6 +52,10 @@ interface KanbanBoardProps {
     session: SessionInfo,
     options?: import('@/components/dialogs/deleteSessionTypes').DeleteSessionRequestOptions,
   ) => void
+  onDeleteSessions?: (
+    sessions: SessionInfo[],
+    options?: import('@/components/dialogs/deleteSessionTypes').DeleteSessionRequestOptions,
+  ) => void
   onConvertSession?: (session: SessionInfo) => void
   onResumeSession?: (session: SessionInfo) => void | Promise<void>
   onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>
@@ -53,6 +67,10 @@ interface KanbanBoardProps {
   customCommand?: string
   resumeCommand?: string
   onCreateTag?: (name: string, color: string) => void
+  columnOrder?: string[]
+  onColumnOrderChange?: (tagIds: string[]) => void | Promise<void>
+  cardDensity?: KanbanCardDensity
+  onCardDensityChange?: (density: KanbanCardDensity) => void | Promise<void>
   projectFilter?: string | null // null = all projects
   filterTagIds?: string[]
   sourceFilterSlugs?: string[]
@@ -62,17 +80,69 @@ interface KanbanBoardProps {
   loading?: boolean
 }
 
-interface ColumnData {
-  id: string
-  tag: Tag | null
-  sessions: SessionInfo[]
-}
-
 const PREVIEW_CLICK_THROUGH_GUARD_MS = 120
+const COLUMN_SORTABLE_PREFIX = 'column:'
 const DND_MEASURING = {
   droppable: {
     strategy: MeasuringStrategy.Always,
   },
+}
+
+function columnSortableId(columnId: string) {
+  return `${COLUMN_SORTABLE_PREFIX}${columnId}`
+}
+
+function isColumnSortableId(id: string) {
+  return id.startsWith(COLUMN_SORTABLE_PREFIX)
+}
+
+function columnIdFromDndId(id: string) {
+  return isColumnSortableId(id) ? id.slice(COLUMN_SORTABLE_PREFIX.length) : id
+}
+
+interface SortableColumnFrameProps {
+  column: KanbanColumnData
+  disabled?: boolean
+  children: (props: {
+    dragHandleProps?: HTMLAttributes<HTMLButtonElement>
+    isDragging: boolean
+  }) => ReactNode
+}
+
+function SortableColumnFrame({ column, disabled, children }: SortableColumnFrameProps) {
+  const sortableId = columnSortableId(column.id)
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: sortableId,
+    disabled,
+    data: { type: 'column', columnId: column.id },
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="h-full min-h-0 min-w-[280px]"
+      style={{
+        scrollSnapAlign: 'start',
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.55 : undefined,
+      }}
+    >
+      {children({
+        dragHandleProps: disabled
+          ? undefined
+          : ({ ...attributes, ...listeners } as HTMLAttributes<HTMLButtonElement>),
+        isDragging,
+      })}
+    </div>
+  )
 }
 
 export default function KanbanBoard({
@@ -85,6 +155,7 @@ export default function KanbanBoard({
   getTagsForSession,
   onToggleTag,
   onDeleteSession,
+  onDeleteSessions,
   onConvertSession,
   onResumeSession,
   onCopyResumeSession,
@@ -95,6 +166,10 @@ export default function KanbanBoard({
   piPath,
   customCommand,
   resumeCommand,
+  columnOrder = [],
+  onColumnOrderChange,
+  cardDensity = 'comfortable',
+  onCardDensityChange,
   projectFilter,
   filterTagIds = [],
   sourceFilterSlugs = [],
@@ -106,12 +181,15 @@ export default function KanbanBoard({
   const { t } = useTranslation()
   const isMobile = useIsMobile()
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeColumnId, setActiveColumnId] = useState<string | null>(null)
   const [activeOverColumnId, setActiveOverColumnId] = useState<string | null>(null)
   const [mobileColIndex, setMobileColIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null)
   const [initialClickPoint, setInitialClickPoint] = useState<{ x: number; y: number } | null>(null)
   const [timeRange, setTimeRange] = useState<TimeRange>('any')
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(() => new Set())
+  const [columnQueries, setColumnQueries] = useState<Record<string, string>>({})
   const suppressPreviewOpenUntilRef = useRef(0)
 
   // Filter sessions by project + search query + time range
@@ -146,71 +224,90 @@ export default function KanbanBoard({
     [filteredSessions]
   )
 
-  // Build columns data (using filtered sessions)
-  // Order: Untagged first, then tagged columns
-  const columns = useMemo<ColumnData[]>(() => {
-    const taggedSessionIds = new Set<string>()
-    const cols: ColumnData[] = []
+  useEffect(() => {
+    setSelectedSessionIds((prev) => {
+      const next = new Set([...prev].filter((id) => sessionMap.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [sessionMap])
 
-    // First, collect all tagged sessions
-    for (const tag of sortedTags) {
-      const tagSessions = sessionTags
-        .filter(st => st.tagId === tag.id)
-        .sort((a, b) => {
-          const sessionA = sessionMap.get(a.sessionId)
-          const sessionB = sessionMap.get(b.sessionId)
-          if (!sessionA || !sessionB) return 0
-          return new Date(sessionB.modified).getTime() - new Date(sessionA.modified).getTime()
-        })
-        .map(st => sessionMap.get(st.sessionId))
-        .filter((s): s is SessionInfo => s !== undefined)
+  const selectedSessions = useMemo(
+    () => [...selectedSessionIds]
+      .map((id) => sessionMap.get(id))
+      .filter((session): session is SessionInfo => session !== undefined),
+    [selectedSessionIds, sessionMap],
+  )
 
-      tagSessions.forEach(s => taggedSessionIds.add(s.id))
-    }
+  const toggleBulkSelect = useCallback((sessionId: string) => {
+    setSelectedSessionIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(sessionId)) next.delete(sessionId)
+      else next.add(sessionId)
+      return next
+    })
+  }, [])
 
-    // Untagged column FIRST (before tagged columns)
-    const untaggedSessions = filteredSessions
-      .filter(s => !taggedSessionIds.has(s.id))
-      .sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime())
-    cols.push({ id: '__untagged__', tag: null, sessions: untaggedSessions })
+  const clearBulkSelection = useCallback(() => {
+    setSelectedSessionIds(new Set())
+  }, [])
 
-    // Then add tagged columns
-    for (const tag of sortedTags) {
-      const tagSessions = sessionTags
-        .filter(st => st.tagId === tag.id)
-        .sort((a, b) => {
-          const sessionA = sessionMap.get(a.sessionId)
-          const sessionB = sessionMap.get(b.sessionId)
-          if (!sessionA || !sessionB) return 0
-          return new Date(sessionB.modified).getTime() - new Date(sessionA.modified).getTime()
-        })
-        .map(st => sessionMap.get(st.sessionId))
-        .filter((s): s is SessionInfo => s !== undefined)
+  const columns = useMemo(
+    () => buildKanbanColumns({
+      sessions: filteredSessions,
+      tags: sortedTags,
+      sessionTags,
+      columnOrder,
+    }),
+    [columnOrder, filteredSessions, sortedTags, sessionTags],
+  )
 
-      cols.push({ id: tag.id, tag, sessions: tagSessions })
-    }
-
-    return cols
-  }, [sortedTags, filteredSessions, sessionTags, sessionMap, filterTagIds])
+  const displayColumns = useMemo(
+    () => columns.map((column) => ({
+      ...column,
+      sessions: filterColumnSessions(column.sessions, columnQueries[column.id] ?? ''),
+      totalSessionCount: column.sessions.length,
+    })),
+    [columnQueries, columns],
+  )
 
   const columnIds = useMemo(() => new Set(columns.map(col => col.id)), [columns])
+  const sortableColumnIds = useMemo(
+    () => columns.filter((col) => col.id !== UNTAGGED_COLUMN_ID).map((col) => columnSortableId(col.id)),
+    [columns],
+  )
 
   const collisionDetection = useCallback<CollisionDetection>((args) => {
     const withoutActive = (collisions: ReturnType<CollisionDetection>) =>
       collisions.filter(collision => collision.id !== args.active.id)
 
-    const pointerCollisions = withoutActive(pointerWithin(args))
+    if (args.active.data.current?.type === 'column') {
+      const onlyColumns = (collisions: ReturnType<CollisionDetection>) =>
+        withoutActive(collisions).filter((collision) => isColumnSortableId(String(collision.id)))
+
+      const pointerColumns = onlyColumns(pointerWithin(args))
+      if (pointerColumns.length > 0) return pointerColumns
+
+      const rectColumns = onlyColumns(rectIntersection(args))
+      if (rectColumns.length > 0) return rectColumns
+
+      return onlyColumns(closestCorners(args))
+    }
+
+    const withoutColumnSortables = (collisions: ReturnType<CollisionDetection>) =>
+      withoutActive(collisions).filter((collision) => !isColumnSortableId(String(collision.id)))
+
+    const pointerCollisions = withoutColumnSortables(pointerWithin(args))
     if (pointerCollisions.length > 0) {
       return pointerCollisions
     }
 
-    const rectCollisions = withoutActive(rectIntersection(args))
+    const rectCollisions = withoutColumnSortables(rectIntersection(args))
     if (rectCollisions.length > 0) {
       const cardCollisions = rectCollisions.filter(collision => !columnIds.has(String(collision.id)))
       return cardCollisions.length > 0 ? cardCollisions : rectCollisions
     }
 
-    return withoutActive(closestCorners(args))
+    return withoutColumnSortables(closestCorners(args))
   }, [columnIds])
 
   // Get active session for drag overlay
@@ -233,11 +330,19 @@ export default function KanbanBoard({
   }, [columns, findColumnForSession])
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
+    if (event.active.data.current?.type === 'column') {
+      setActiveColumnId(String(event.active.data.current.columnId ?? columnIdFromDndId(String(event.active.id))))
+      setActiveId(null)
+      setActiveOverColumnId(null)
+      return
+    }
+
     setActiveId(event.active.id as string)
     setActiveOverColumnId(findColumnForSession(event.active.id as string))
   }, [findColumnForSession])
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
+    if (event.active.data.current?.type === 'column') return
     const overId = event.over?.id
     setActiveOverColumnId(overId ? resolveOverColumnId(overId as string) : null)
   }, [resolveOverColumnId])
@@ -245,9 +350,23 @@ export default function KanbanBoard({
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
     setActiveId(null)
+    setActiveColumnId(null)
     setActiveOverColumnId(null)
 
     if (!over) return
+
+    if (active.data.current?.type === 'column') {
+      const activeColumn = String(active.data.current.columnId ?? columnIdFromDndId(String(active.id)))
+      const overColumn = String(over.data.current?.columnId ?? columnIdFromDndId(String(over.id)))
+      const currentOrder = columns
+        .filter((column) => column.id !== UNTAGGED_COLUMN_ID)
+        .map((column) => column.id)
+      const nextOrder = reorderTagColumnIds(currentOrder, activeColumn, overColumn)
+      if (nextOrder.some((id, index) => id !== currentOrder[index])) {
+        void onColumnOrderChange?.(nextOrder)
+      }
+      return
+    }
 
     const sessionId = active.id as string
     const overId = over.id as string
@@ -283,18 +402,44 @@ export default function KanbanBoard({
     if (fromColId === toColId) return
 
     // Handle move to untagged
-    if (toColId === '__untagged__') {
-      if (fromColId !== '__untagged__') {
+    if (toColId === UNTAGGED_COLUMN_ID) {
+      if (fromColId !== UNTAGGED_COLUMN_ID) {
         onToggleTag(sessionId, fromColId, true) // Remove tag
       }
       return
     }
 
     // Handle move to tagged column
-    const fromTagId = fromColId === '__untagged__' ? null : fromColId
+    const fromTagId = fromColId === UNTAGGED_COLUMN_ID ? null : fromColId
     onMoveSession(sessionId, fromTagId, toColId, position)
-  }, [columns, findColumnForSession, onMoveSession, onToggleTag])
+  }, [columns, findColumnForSession, onColumnOrderChange, onMoveSession, onToggleTag])
 
+  const handleBulkMoveToTag = useCallback((tagId: string) => {
+    const targetColumn = columns.find((column) => column.id === tagId)
+    let position = targetColumn?.sessions.length ?? 0
+
+    for (const session of selectedSessions) {
+      const fromColId = findColumnForSession(session.id)
+      if (!fromColId || fromColId === tagId) continue
+      const fromTagId = fromColId === UNTAGGED_COLUMN_ID ? null : fromColId
+      onMoveSession(session.id, fromTagId, tagId, position)
+      position += 1
+    }
+
+    clearBulkSelection()
+  }, [clearBulkSelection, columns, findColumnForSession, onMoveSession, selectedSessions])
+
+  const handleBulkDelete = useCallback(() => {
+    if (selectedSessions.length === 0) return
+    if (onDeleteSessions) {
+      onDeleteSessions(selectedSessions)
+    } else {
+      for (const session of selectedSessions) {
+        onDeleteSession?.(session)
+      }
+    }
+    clearBulkSelection()
+  }, [clearBulkSelection, onDeleteSession, onDeleteSessions, selectedSessions])
 
   const blockPreviewOpen = useCallback(() => {
     suppressPreviewOpenUntilRef.current = Date.now() + PREVIEW_CLICK_THROUGH_GUARD_MS
@@ -375,6 +520,33 @@ export default function KanbanBoard({
         <span className="text-[10px] text-muted-foreground shrink-0">
           {filteredSessions.length} {t('project.list.sessions')}
         </span>
+        <KanbanBulkToolbar
+          selectedCount={selectedSessions.length}
+          tags={sortedTags}
+          onMoveToTag={handleBulkMoveToTag}
+          onDeleteSelected={handleBulkDelete}
+          onClearSelection={clearBulkSelection}
+        />
+        <div className="flex items-center rounded-md border border-border/35 bg-background/40 p-0.5">
+          <button
+            type="button"
+            className={`flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-foreground focus-ring ${cardDensity === 'comfortable' ? 'bg-secondary text-foreground' : ''}`}
+            title={t('plugins.kanbanBoard.density.comfortable', 'Comfortable')}
+            aria-label={t('plugins.kanbanBoard.density.comfortable', 'Comfortable')}
+            onClick={() => onCardDensityChange?.('comfortable')}
+          >
+            <Rows3 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            className={`flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-foreground focus-ring ${cardDensity === 'compact' ? 'bg-secondary text-foreground' : ''}`}
+            title={t('plugins.kanbanBoard.density.compact', 'Compact')}
+            aria-label={t('plugins.kanbanBoard.density.compact', 'Compact')}
+            onClick={() => onCardDensityChange?.('compact')}
+          >
+            <AlignJustify className="h-3.5 w-3.5" />
+          </button>
+        </div>
         <TimeRangeSelector
           value={timeRange}
           onChange={setTimeRange}
@@ -406,7 +578,7 @@ export default function KanbanBoard({
           <div className="flex-1 min-h-0 flex flex-col">
             {/* Column tabs */}
             <div className="flex items-center gap-1 px-3 py-1.5 border-b border-border/30 overflow-x-auto flex-shrink-0">
-              {columns.map((col, i) => (
+              {displayColumns.map((col, i) => (
                 <button
                   key={col.id}
                   onClick={() => setMobileColIndex(i)}
@@ -423,11 +595,11 @@ export default function KanbanBoard({
             </div>
             {/* Active column */}
             <div className="flex-1 min-h-0 p-3">
-              {columns[mobileColIndex] && (
+              {displayColumns[mobileColIndex] && (
                 <KanbanColumn
-                  id={columns[mobileColIndex].id}
-                  tag={columns[mobileColIndex].tag}
-                  sessions={columns[mobileColIndex].sessions}
+                  id={displayColumns[mobileColIndex].id}
+                  tag={displayColumns[mobileColIndex].tag}
+                  sessions={displayColumns[mobileColIndex].sessions}
                   selectedSession={selectedSession}
                   onSelectSession={handleCardClick}
                   getTagsForSession={getTagsForSession}
@@ -441,7 +613,14 @@ export default function KanbanBoard({
                     isMobile
                     liveSessionIds={liveSessionIds}
                     hideProjectInfo={!!projectFilter}
-                    isDropTarget={activeOverColumnId === columns[mobileColIndex].id && activeId !== null}
+                    isDropTarget={activeOverColumnId === displayColumns[mobileColIndex].id && activeId !== null}
+                    selectedSessionIds={selectedSessionIds}
+                    selectionMode={selectedSessionIds.size > 0}
+                    onToggleBulkSelect={toggleBulkSelect}
+                    density={cardDensity}
+                    columnSearchQuery={columnQueries[displayColumns[mobileColIndex].id] ?? ''}
+                    onColumnSearchChange={(query) => setColumnQueries((prev) => ({ ...prev, [displayColumns[mobileColIndex].id]: query }))}
+                    totalSessionCount={displayColumns[mobileColIndex].totalSessionCount}
                 />
               )}
             </div>
@@ -453,28 +632,45 @@ export default function KanbanBoard({
               className="flex items-stretch gap-3 h-full min-h-0 overflow-x-auto"
               style={{ WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory' }}
             >
-              {columns.map(col => (
-                <div key={col.id} className="h-full min-h-0 min-w-[280px]" style={{ scrollSnapAlign: 'start' }}>
-                  <KanbanColumn
-                    id={col.id}
-                    tag={col.tag}
-                    sessions={col.sessions}
-                    selectedSession={selectedSession}
-                    onSelectSession={handleCardClick}
-                    getTagsForSession={getTagsForSession}
-                    allTags={tags}
-                    favorites={favorites || []}
-                    onToggleFavorite={onToggleFavorite || (() => {})}
-                    onToggleTag={onToggleTag}
-                    onDeleteSession={onDeleteSession}
-                    onResumeSession={onResumeSession}
-                    onCopyResumeSession={onCopyResumeSession}
-                    liveSessionIds={liveSessionIds}
-                    hideProjectInfo={!!projectFilter}
-                    isDropTarget={activeOverColumnId === col.id && activeId !== null}
-                  />
-                </div>
-              ))}
+              <SortableContext items={sortableColumnIds} strategy={horizontalListSortingStrategy}>
+                {displayColumns.map(col => (
+                  <SortableColumnFrame
+                    key={col.id}
+                    column={col}
+                    disabled={col.id === UNTAGGED_COLUMN_ID || !onColumnOrderChange}
+                  >
+                    {({ dragHandleProps, isDragging }) => (
+                      <KanbanColumn
+                        id={col.id}
+                        tag={col.tag}
+                        sessions={col.sessions}
+                        selectedSession={selectedSession}
+                        onSelectSession={handleCardClick}
+                        getTagsForSession={getTagsForSession}
+                        allTags={tags}
+                        favorites={favorites || []}
+                        onToggleFavorite={onToggleFavorite || (() => {})}
+                        onToggleTag={onToggleTag}
+                        onDeleteSession={onDeleteSession}
+                        onResumeSession={onResumeSession}
+                        onCopyResumeSession={onCopyResumeSession}
+                        liveSessionIds={liveSessionIds}
+                        hideProjectInfo={!!projectFilter}
+                        isDropTarget={activeOverColumnId === col.id && activeId !== null}
+                        columnDragHandleProps={dragHandleProps}
+                        isColumnDragging={activeColumnId === col.id || isDragging}
+                        selectedSessionIds={selectedSessionIds}
+                        selectionMode={selectedSessionIds.size > 0}
+                        onToggleBulkSelect={toggleBulkSelect}
+                        density={cardDensity}
+                        columnSearchQuery={columnQueries[col.id] ?? ''}
+                        onColumnSearchChange={(query) => setColumnQueries((prev) => ({ ...prev, [col.id]: query }))}
+                        totalSessionCount={col.totalSessionCount}
+                      />
+                    )}
+                  </SortableColumnFrame>
+                ))}
+              </SortableContext>
             </div>
           </div>
         )}
@@ -488,6 +684,7 @@ export default function KanbanBoard({
               isSelected={false}
               isOverlay
               onSelect={() => {}}
+              density={cardDensity}
             />
           )}
         </DragOverlay>

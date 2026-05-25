@@ -1,8 +1,9 @@
 import { memo, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Clock, MessageSquare } from 'lucide-react'
+import { CheckSquare, Clock, MessageSquare, Square } from 'lucide-react'
 import type { SessionInfo, Tag } from '@/types'
+import type { KanbanCardDensity } from './kanbanBoardModel'
 import TagBadge from '@/components/tags/TagBadge'
 import { SessionBadge } from '@/components/session-viewer/SessionBadge'
 import { useSettings } from '@/hooks/useSettings'
@@ -18,6 +19,10 @@ interface KanbanCardProps {
   onSelect: (rect: DOMRect, clickPoint?: { x: number; y: number }) => void
   onContextMenu?: (e: React.MouseEvent) => void
   hideProjectInfo?: boolean
+  isBulkSelected?: boolean
+  selectionMode?: boolean
+  onToggleBulkSelect?: () => void
+  density?: KanbanCardDensity
 }
 
 function KanbanCardInner({
@@ -29,6 +34,10 @@ function KanbanCardInner({
   onSelect,
   onContextMenu,
   hideProjectInfo = false,
+  isBulkSelected = false,
+  selectionMode = false,
+  onToggleBulkSelect,
+  density = 'comfortable',
 }: KanbanCardProps) {
   const { getSessionSetting } = useSettings()
   const cardRef = useRef<HTMLDivElement>(null)
@@ -48,6 +57,11 @@ function KanbanCardInner({
   const dragging = isDragging || sortableIsDragging
 
   const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (selectionMode && onToggleBulkSelect) {
+      onToggleBulkSelect()
+      return
+    }
+
     if (cardRef.current) {
       const rect = cardRef.current.getBoundingClientRect()
       onSelect(rect, { x: event.clientX, y: event.clientY })
@@ -71,10 +85,12 @@ function KanbanCardInner({
   const showAgentIconInBadge =
     getSessionSetting('showAgentIconInSessionBadge') !== false
 
+  const isCompact = density === 'compact'
   const cardClasses = [
-    'group relative rounded-md border p-2.5 motion-surface motion-color',
+    'group relative rounded-md border motion-surface motion-color',
+    isCompact ? 'p-2' : 'p-2.5',
     'bg-card hover:border-border',
-    isSelected ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20' : 'border-border/40',
+    isSelected || isBulkSelected ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20' : 'border-border/40',
     dragging ? 'opacity-40 border-primary/40 shadow-lg ring-1 ring-primary/20' : '',
     isOverlay ? 'shadow-xl rotate-2 scale-105 mb-0 cursor-grabbing' : '',
   ].filter(Boolean).join(' ')
@@ -92,13 +108,30 @@ function KanbanCardInner({
       className={cardClasses}
       onClick={isOverlay ? undefined : handleClick}
       onContextMenu={onContextMenu}
+      data-testid="kanban-card"
       data-session-id={session.id}
+      data-density={density}
       data-dragging={dragging ? 'true' : undefined}
       {...(isOverlay ? {} : { ...attributes, ...listeners })}
     >
+      <button
+        type="button"
+        className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground/55 opacity-0 hover:bg-secondary hover:text-foreground group-hover:opacity-100 focus-ring focus:opacity-100 data-[selected=true]:opacity-100 data-[selected=true]:text-primary"
+        aria-label={isBulkSelected ? 'Deselect session' : 'Select session'}
+        data-selected={isBulkSelected ? 'true' : 'false'}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onToggleBulkSelect?.()
+        }}
+      >
+        {isBulkSelected ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
+      </button>
+
       {/* Header: Title + Tags */}
-      <div className="flex items-start gap-1.5 mb-1.5">
-        <span className="flex-1 text-[11px] font-medium text-foreground leading-tight line-clamp-2 min-w-0">
+      <div className={`flex items-start gap-1.5 pr-5 ${isCompact ? 'mb-1' : 'mb-1.5'}`}>
+        <span className={`flex-1 font-medium text-foreground leading-tight min-w-0 ${isCompact ? 'text-[10px] line-clamp-1' : 'text-[11px] line-clamp-2'}`}>
           {session.name || session.first_message || 'Untitled'}
         </span>
         {tags.length > 0 && (
@@ -114,14 +147,14 @@ function KanbanCardInner({
       </div>
 
       {/* Last message preview */}
-      {session.last_message && (
+      {!isCompact && session.last_message && (
         <p className="text-[9px] text-muted-foreground truncate mb-1.5">
           {session.last_message}
         </p>
       )}
 
       {/* Meta info */}
-      <div className="flex items-center gap-2 text-[9px] text-muted-foreground/60">
+      <div className={`flex items-center text-[9px] text-muted-foreground/60 ${isCompact ? 'gap-1.5' : 'gap-2'}`}>
         {sourceTag && (
           <SessionBadge
             label={sourceTag}
@@ -155,6 +188,9 @@ const KanbanCard = memo(KanbanCardInner, (prev, next) => {
     prev.isSelected === next.isSelected &&
     prev.isDragging === next.isDragging &&
     prev.isOverlay === next.isOverlay &&
+    prev.isBulkSelected === next.isBulkSelected &&
+    prev.selectionMode === next.selectionMode &&
+    prev.density === next.density &&
     prev.tags.length === next.tags.length
   )
 })
