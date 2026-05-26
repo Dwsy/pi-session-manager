@@ -552,11 +552,13 @@ mod tests {
 
         let entries = parse_pi_session_entries(&path).expect("parse entries");
         let message = entries[0].message.as_ref().expect("message entry");
-        assert_eq!(message.content.len(), 2);
+        assert_eq!(message.content.len(), 3);
         assert_eq!(message.content[0].content_type, "text");
         assert_eq!(message.content[0].text.as_deref(), Some("visible"));
         assert_eq!(message.content[1].content_type, "thinking");
         assert_eq!(message.content[1].text.as_deref(), Some("hidden"));
+        assert_eq!(message.content[2].content_type, "toolCall");
+        assert_eq!(message.content[2].name.as_deref(), Some("ignored"));
     }
 
     #[test]
