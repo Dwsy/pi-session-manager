@@ -357,6 +357,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
 
   // ── Update ──
   {
+    id: "update-auto-check",
+    section: "app-behavior",
+    labelKey: "settings.update.autoCheck",
+    fallbackLabel: "Auto Check Updates",
+    extraKeys: ["settings.update.autoCheckHelp"],
+    keywords: ["update", "auto", "check", "daily"],
+  },
+  {
     id: "update-channel",
     section: "app-behavior",
     labelKey: "settings.update.channel.title",
@@ -539,7 +547,7 @@ export function pluginSearchId(pluginId: string, key: string) {
 export function getSettingsSearchIndex(): SettingsSearchItem[] {
   const pluginItems = psmPluginHost.listPlugins().flatMap((plugin) => {
     const properties = plugin.manifest?.configuration?.properties ?? [];
-    return properties.map((property) => ({
+    const propertyItems = properties.map((property) => ({
       id: pluginSearchId(plugin.id, property.key),
       section: psmPluginSectionId(plugin.id),
       labelKey: `plugins.${plugin.id}.settings.${property.key}.title`,
@@ -549,6 +557,14 @@ export function getSettingsSearchIndex(): SettingsSearchItem[] {
         : undefined,
       keywords: ["psm", "plugin", plugin.name, plugin.id, property.key],
     }));
+    const permissionItems = (plugin.permissions ?? []).map((permission) => ({
+      id: pluginSearchId(plugin.id, `permission-${permission.permission}`),
+      section: psmPluginSectionId(plugin.id),
+      labelKey: "settings.psmPlugins.authorization",
+      fallbackLabel: "Authorization",
+      keywords: ["psm", "plugin", "permission", "authorization", plugin.name, plugin.id, permission.permission],
+    }));
+    return [...propertyItems, ...permissionItems];
   });
   return [...SETTINGS_SEARCH_INDEX, ...pluginItems];
 }

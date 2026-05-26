@@ -8,6 +8,7 @@ import ResumeSessionDialog from "@/components/dialogs/ResumeSessionDialog";
 import RenameDialog from "@/components/dialogs/RenameDialog";
 import ForkDialog from "@/components/dialogs/ForkDialog";
 import Onboarding from "@/components/Onboarding";
+import PsmPluginPermissionRequestDialog from "@/components/plugins/PsmPluginPermissionRequestDialog";
 import type { SearchContext } from "@/plugins/types";
 import type {
   SessionConvertResult,
@@ -149,6 +150,7 @@ function AppOverlays({
         <CommandPalette context={commandContext} />
       </Suspense>
       {showOnboarding && <Onboarding onComplete={onCompleteOnboarding} />}
+      <PsmPluginPermissionRequestDialog />
     </>
   );
 }

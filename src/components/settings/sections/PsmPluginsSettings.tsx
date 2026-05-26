@@ -12,6 +12,8 @@ import {
   Play,
   RefreshCw,
   Search,
+  ShieldCheck,
+  ShieldOff,
   SlidersHorizontal,
   Trash2,
   X,
@@ -32,6 +34,7 @@ import {
   removePathPsmPlugin,
   searchPsmPluginMarket,
   setPsmPluginEnabled,
+  setPsmPluginPermissions,
   setPsmPluginSettings,
   uninstallPsmPlugin,
   updatePsmPlugins,
@@ -39,7 +42,7 @@ import {
   type PsmPluginPaths,
   type PsmPluginStatus,
 } from "@/plugins/runtime-host";
-import type { PsmPluginSettingDefinition, PsmPluginSettingValue } from "@pi-session-manager/plugin-sdk";
+import type { PsmPermission, PsmPluginSettingDefinition, PsmPluginSettingValue } from "@pi-session-manager/plugin-sdk";
 import { SETTINGS_NAVIGATE_EVENT } from "../navigation";
 import { useModelOptions } from "./pi-config/useModelOptions";
 import { usePiSettingsFull } from "./pi-config/usePiSettingsFull";
@@ -72,6 +75,44 @@ function pluginSearchPrefix(plugin: PsmPluginStatus) {
 
 function pluginI18nBase(plugin: PsmPluginStatus) {
   return `plugins.${plugin.id}`;
+}
+
+function permissionLabel(permission: PsmPermission) {
+  const labels: Record<PsmPermission, string> = {
+    "sessions:read": "Sessions",
+    "records:read": "Read records",
+    "records:write": "Write records",
+    "search:read": "Search",
+    "tags:read": "Read tags",
+    "tags:write": "Write tags",
+    "config:read": "Read config",
+    "config:write": "Write config",
+    "events:read": "Events",
+    "model:invoke": "Models",
+    "agent:invoke": "Agent",
+    "fs:read": "Files",
+    "windows:open": "Windows",
+  };
+  return labels[permission] ?? permission;
+}
+
+function permissionDescription(permission: PsmPermission) {
+  const descriptions: Record<PsmPermission, string> = {
+    "sessions:read": "Read session metadata and entries",
+    "records:read": "Read plugin-owned records",
+    "records:write": "Create or update plugin records",
+    "search:read": "Run full-text search through PSM",
+    "tags:read": "Read tags and session tag links",
+    "tags:write": "Create tags and assign them to sessions",
+    "config:read": "Read plugin-scoped JSON config",
+    "config:write": "Write plugin-scoped JSON config",
+    "events:read": "Subscribe to host runtime events",
+    "model:invoke": "Invoke host-managed model calls",
+    "agent:invoke": "Create and run host-managed agent sessions",
+    "fs:read": "Read files through declared restricted roots, including saved widget HTML",
+    "windows:open": "Open host-managed popup windows",
+  };
+  return descriptions[permission] ?? permission;
 }
 
 function settingValue(plugin: PsmPluginStatus, definition: PsmPluginSettingDefinition): PsmPluginSettingValue {
@@ -158,6 +199,10 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
   );
   const capabilityCount = useMemo(
     () => visiblePlugins.reduce((total, plugin) => total + plugin.commands.length + plugin.tools.length, 0),
+    [visiblePlugins],
+  );
+  const grantedPermissionCount = useMemo(
+    () => visiblePlugins.reduce((total, plugin) => total + (plugin.permissions?.filter((permission) => permission.granted).length ?? 0), 0),
     [visiblePlugins],
   );
   const selectedPlugin = pluginId ? visiblePlugins.find((plugin) => plugin.id === pluginId) : null;
@@ -426,6 +471,31 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
     });
   };
 
+  const updatePluginPermission = async (plugin: PsmPluginStatus, permission: PsmPermission, granted: boolean) => {
+    setUpdatingId(`permissions:${plugin.id}`);
+    setError(null);
+    const permissionOverrides = Object.fromEntries(
+      (plugin.permissions ?? [])
+        .map((item) => [item.permission, item.permission === permission ? granted : item.granted] as const)
+        .filter(([itemPermission, enabled]) => !enabled || (itemPermission === "fs:read" && enabled)),
+    ) as Partial<Record<PsmPermission, boolean>>;
+    try {
+      await setPsmPluginPermissions({
+        pluginId: plugin.id,
+        permissionOverrides,
+        source: plugin.source,
+        packageName: plugin.packageName ?? null,
+        entryPath: plugin.source === "path" || plugin.source === "dev" ? (plugin.entryPath ?? plugin.sourceId) : null,
+        projectPath: plugin.source === "dev" ? (plugin.projectPath ?? plugin.sourceId) : null,
+      });
+      applyPluginsSnapshot(await psmPluginHost.reload());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const updateModelIdSetting = async (plugin: PsmPluginStatus, definition: PsmPluginSettingDefinition, model: RPCModel | null) => {
     const resolvedPlugin = withDraftSettings(plugin);
     const providerKey = definition.providerKey ?? "provider";
@@ -532,6 +602,12 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
             <span>{plugin.commands.length} commands</span>
             <span className="px-1.5">/</span>
             <span>{plugin.tools.length} tools</span>
+            {plugin.permissions?.length ? (
+              <>
+                <span className="px-1.5">·</span>
+                <span>{plugin.permissions.filter((permission) => permission.granted).length}/{plugin.permissions.length} permissions</span>
+              </>
+            ) : null}
             {plugin.manifest?.configuration?.properties?.length ? (
               <>
                 <span className="px-1.5">·</span>
@@ -578,6 +654,55 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
       )}
     </div>
   );
+
+  const renderPermissionSection = (plugin: PsmPluginStatus) => {
+    const permissions = plugin.permissions ?? [];
+    if (permissions.length === 0) {
+      return (
+        <div className="rounded-md border border-border/60 bg-surface/30 px-3 py-2.5 text-xs text-muted-foreground">
+          {t("settings.psmPlugins.noPermissions", "No host permissions declared.")}
+        </div>
+      );
+    }
+
+    const disabled = updatingId === `permissions:${plugin.id}`;
+
+    return (
+      <div className="rounded-md border border-border/60 bg-surface/30">
+        <div className="flex items-center justify-between gap-3 border-b border-border/50 px-3 py-2.5">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-foreground">{t("settings.psmPlugins.authorization", "Authorization")}</div>
+            <div className="text-xs text-muted-foreground">
+              {t("settings.psmPlugins.authorizationHint", "Grant only the host capabilities this plugin should use.")}
+            </div>
+          </div>
+          <div className="shrink-0 text-xs text-muted-foreground">
+            {permissions.filter((permission) => permission.granted).length}/{permissions.length}
+          </div>
+        </div>
+        <div className="divide-y divide-border/45 px-3">
+          {permissions.map((permission) => (
+            <SettingsToggleRow
+              key={`${plugin.id}-${permission.permission}`}
+              title={
+                <span className="flex min-w-0 items-center gap-2">
+                  {permission.granted ? <ShieldCheck className="h-4 w-4 text-emerald-500" /> : <ShieldOff className="h-4 w-4 text-muted-foreground" />}
+                  <span>{permissionLabel(permission.permission)}</span>
+                  <span className="font-mono text-[11px] font-normal text-muted-foreground">{permission.permission}</span>
+                </span>
+              }
+              description={permissionDescription(permission.permission)}
+              checked={permission.granted}
+              onChange={(granted) => void updatePluginPermission(plugin, permission.permission, granted)}
+              toggleSize="sm"
+              disabled={disabled}
+              className="border-0 py-2.5"
+            />
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   const renderSettingControl = (plugin: PsmPluginStatus, definition: PsmPluginSettingDefinition) => {
     const resolvedPlugin = withDraftSettings(plugin);
@@ -754,6 +879,8 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
         <div className="mt-1 text-xl font-semibold text-foreground">{configurablePluginCount}</div>
         <div className="text-[11px] text-muted-foreground">
           {t("settings.psmPlugins.capabilities", "{{count}} capabilities", { count: capabilityCount })}
+          <span className="px-1">·</span>
+          {grantedPermissionCount} permissions
         </div>
       </div>
       <div className="rounded-lg border border-border/60 bg-background/45 px-3 py-2.5">
@@ -1118,9 +1245,12 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
           >
             <div className="space-y-4">
               {renderPluginSummary(selectedPlugin)}
-              <div className="rounded-md border border-border/60 bg-surface/30 px-3">
-                {(selectedPlugin.manifest?.configuration?.properties ?? []).map((definition) => renderSettingControl(selectedPlugin, definition))}
-              </div>
+              {renderPermissionSection(selectedPlugin)}
+              {(selectedPlugin.manifest?.configuration?.properties?.length ?? 0) > 0 ? (
+                <div className="rounded-md border border-border/60 bg-surface/30 px-3">
+                  {(selectedPlugin.manifest?.configuration?.properties ?? []).map((definition) => renderSettingControl(selectedPlugin, definition))}
+                </div>
+              ) : null}
             </div>
           </SettingsCard>
         ) : null}

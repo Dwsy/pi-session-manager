@@ -26,6 +26,8 @@ enum PluginPermission {
     ConfigWrite,
     ModelInvoke,
     AgentInvoke,
+    FsRead,
+    WindowsOpen,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -63,6 +65,8 @@ fn parse_plugin_permission(value: &str) -> Option<PluginPermission> {
         "config:write" => Some(PluginPermission::ConfigWrite),
         "model:invoke" => Some(PluginPermission::ModelInvoke),
         "agent:invoke" => Some(PluginPermission::AgentInvoke),
+        "fs:read" => Some(PluginPermission::FsRead),
+        "windows:open" => Some(PluginPermission::WindowsOpen),
         _ => None,
     }
 }
@@ -92,6 +96,8 @@ fn required_permissions_for_command(command: &str) -> &'static [PluginPermission
         "invoke_model_text" | "invoke_model_text_stream" => &[PluginPermission::ModelInvoke],
         "list_model_options_fast" => &[PluginPermission::ModelInvoke],
         "plugin_agent_create_session" | "plugin_agent_run" | "plugin_agent_abort" | "plugin_agent_dispose" => &[PluginPermission::AgentInvoke],
+        "plugin_fs_roots" | "plugin_fs_list" | "plugin_fs_read" | "plugin_fs_stat" => &[PluginPermission::FsRead],
+        "plugin_window_open" | "plugin_window_close" => &[PluginPermission::WindowsOpen],
         _ => &[],
     }
 }
@@ -329,6 +335,16 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::search_plugin_records(query, record_type, plugin_id, limit).await?;
             Ok(to_val(result, "serialize plugin record search")?)
         }
+        "set_psm_plugin_permissions" => {
+            let plugin_id = extract(payload, "plugin_id").or_else(|_| extract(payload, "pluginId"))?;
+            let permission_overrides = payload.get("permission_overrides").or_else(|| payload.get("permissionOverrides")).cloned().map(serde_json::from_value).transpose().map_err(|e| format!("Invalid plugin permission overrides: {e}"))?.unwrap_or_default();
+            let source = extract_optional_string(payload, "source");
+            let package_name = extract_optional_string(payload, "package_name").or_else(|| extract_optional_string(payload, "packageName"));
+            let entry_path = extract_optional_string(payload, "entry_path").or_else(|| extract_optional_string(payload, "entryPath"));
+            let project_path = extract_optional_string(payload, "project_path").or_else(|| extract_optional_string(payload, "projectPath"));
+            let result = crate::set_psm_plugin_permissions(plugin_id, permission_overrides, source, package_name, entry_path, project_path).await?;
+            Ok(to_val(result, "serialize plugin config")?)
+        }
         "refresh_session_intelligence_record" => {
             let path = extract(payload, "path").or_else(|_| extract(payload, "sessionPath")).or_else(|_| extract(payload, "session_path"))?;
             let provider = extract_optional_string(payload, "provider");
@@ -342,6 +358,30 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let index_values = payload.get("index_values").or_else(|| payload.get("indexValues")).cloned().map(serde_json::from_value).transpose().map_err(|e| format!("Invalid plugin record index values: {e}"))?;
             crate::upsert_plugin_record(record, index_values).await?;
             Ok(Value::Null)
+        }
+        "plugin_fs_roots" => {
+            let result = crate::plugin_fs_roots().await?;
+            Ok(to_val(result, "serialize plugin fs roots")?)
+        }
+        "plugin_fs_list" => {
+            let root_id = extract(payload, "root_id").or_else(|_| extract(payload, "rootId"))?;
+            let path = extract_optional_string(payload, "path");
+            let result = crate::plugin_fs_list(root_id, path).await?;
+            Ok(to_val(result, "serialize plugin fs entries")?)
+        }
+        "plugin_fs_read" => {
+            let root_id = extract(payload, "root_id").or_else(|_| extract(payload, "rootId"))?;
+            let path = extract(payload, "path")?;
+            let encoding = extract_optional_string(payload, "encoding");
+            let max_bytes = payload.get("max_bytes").or_else(|| payload.get("maxBytes")).and_then(|value| value.as_u64());
+            let result = crate::plugin_fs_read(root_id, path, encoding, max_bytes).await?;
+            Ok(to_val(result, "serialize plugin fs read result")?)
+        }
+        "plugin_fs_stat" => {
+            let root_id = extract(payload, "root_id").or_else(|_| extract(payload, "rootId"))?;
+            let path = extract(payload, "path")?;
+            let result = crate::plugin_fs_stat(root_id, path).await?;
+            Ok(to_val(result, "serialize plugin fs stat")?)
         }
         "full_text_search" => {
             let query = extract(payload, "query")?;

@@ -127,7 +127,7 @@ function pluginSettingsSectionMeta(plugin: PsmPluginStatus): SettingsSectionMeta
 function getPluginSettingsSections(): SettingsSectionMeta[] {
   return psmPluginHost
     .listPlugins()
-    .filter((plugin) => (plugin.manifest?.configuration?.properties?.length ?? 0) > 0)
+    .filter((plugin) => (plugin.manifest?.configuration?.properties?.length ?? 0) > 0 || (plugin.permissions?.length ?? 0) > 0)
     .map(pluginSettingsSectionMeta);
 }
 

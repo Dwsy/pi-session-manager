@@ -29,6 +29,7 @@ import {
   reloadPsmPlugins,
   removePathPsmPlugin,
   searchPsmPluginMarket,
+  setPsmPluginPermissions,
   uninstallPsmPlugin,
   updatePsmPlugins,
 } from '../service'
@@ -57,6 +58,29 @@ describe('runtime-host service plugin lifecycle commands', () => {
     })
     expect(mocks.invoke).toHaveBeenNthCalledWith(3, 'update_psm_plugins', undefined)
     expect(mocks.invoke).toHaveBeenNthCalledWith(4, 'reload_psm_plugins', undefined)
+  })
+
+  it('maps plugin permission updates to Tauri commands with camelCase payloads', async () => {
+    mocks.isTauri.mockReturnValue(true)
+    mocks.invoke.mockResolvedValue({ version: 1, plugins: {} })
+
+    await setPsmPluginPermissions({
+      pluginId: 'builtin.sidechat',
+      permissionOverrides: { 'agent:invoke': false },
+      source: 'builtin',
+      packageName: null,
+      entryPath: null,
+      projectPath: null,
+    })
+
+    expect(mocks.invoke).toHaveBeenCalledWith('set_psm_plugin_permissions', {
+      pluginId: 'builtin.sidechat',
+      permissionOverrides: { 'agent:invoke': false },
+      source: 'builtin',
+      packageName: null,
+      entryPath: null,
+      projectPath: null,
+    })
   })
 
   it('maps npm market search calls to Tauri commands with camelCase payloads', async () => {

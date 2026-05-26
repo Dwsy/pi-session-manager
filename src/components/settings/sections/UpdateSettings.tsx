@@ -1,8 +1,19 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { invoke } from '@tauri-apps/api/core'
-import { check, Update } from '@tauri-apps/plugin-updater'
-import { getCurrentAppVersion } from '@/utils/updateChecker'
+import { isTauri } from '@/transport'
+import {
+  checkAppUpdate,
+  downloadAndInstallAppUpdate,
+  getFallbackCurrentVersion,
+  type AppUpdateDownloadState,
+} from '@/utils/appUpdater'
+import {
+  getLastUpdateCheckAt,
+  setLastUpdateCheckAt,
+  type AvailableUpdateInfo,
+} from '@/utils/updateChecker'
+import { getReleasesPageUrl, normalizeUpdateChannel } from '@/utils/updateChannel'
 import {
   AlertCircle,
   ArrowUpRight,
@@ -15,16 +26,16 @@ import {
 import SettingsCard from '@/components/settings/SettingsCard'
 import SettingsField from '@/components/settings/SettingsField'
 import SettingsOptionGroup from '@/components/settings/SettingsOptionGroup'
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
 import type { UpdateSettingsProps } from '@/components/settings/types'
-import { getLastUpdateCheckAt } from '@/utils/updateChecker'
 
 type UpdateState =
   | { phase: 'idle' }
   | { phase: 'checking' }
   | { phase: 'latest'; currentVersion: string }
-  | { phase: 'available'; update: Update; currentVersion: string; latestVersion: string }
-  | { phase: 'downloading'; update: Update; progress: number; downloaded: number; total: number | null }
-  | { phase: 'ready'; update: Update }
+  | { phase: 'available'; update: AvailableUpdateInfo; currentVersion: string; latestVersion: string }
+  | { phase: 'downloading'; update: AvailableUpdateInfo; progress: number; downloaded: number; total: number | null }
+  | { phase: 'ready'; update: AvailableUpdateInfo }
   | { phase: 'error'; message: string }
 
 function formatBytes(bytes: number): string {
@@ -42,9 +53,6 @@ function formatDateTime(value: string | null): string | null {
   return date.toLocaleString()
 }
 
-/**
- * Current version badge displayed at top of the card
- */
 function VersionBadge({ version, label }: { version: string; label?: string }) {
   return (
     <div className="inline-flex items-center gap-2">
@@ -60,9 +68,6 @@ function VersionBadge({ version, label }: { version: string; label?: string }) {
   )
 }
 
-/**
- * Release notes preview — rendered as sanitized markdown-ish text
- */
 function ReleaseNotesPreview({ body }: { body: string }) {
   const lines = body.split('\n').filter(Boolean).slice(0, 6)
   const hasMore = body.split('\n').filter(Boolean).length > 6
@@ -100,27 +105,42 @@ function ReleaseNotesPreview({ body }: { body: string }) {
 export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsProps) {
   const { t } = useTranslation()
   const [state, setState] = useState<UpdateState>({ phase: 'idle' })
-  const [lastCheckedAt] = useState<string | null>(() => getLastUpdateCheckAt())
+  const channel = normalizeUpdateChannel(settings.update.channel)
+  const desktopRuntime = isTauri()
+  const [lastCheckedAt, setLastCheckedAtState] = useState<string | null>(() => getLastUpdateCheckAt(channel))
+
+  useEffect(() => {
+    setLastCheckedAtState(getLastUpdateCheckAt(channel))
+  }, [channel])
 
   const lastCheckedLabel = useMemo(() => {
     return formatDateTime(lastCheckedAt) || t('settings.update.neverChecked', 'Not checked yet')
   }, [lastCheckedAt, t])
 
+  const openReleasePage = (releaseUrl?: string) => {
+    window.open(releaseUrl || getReleasesPageUrl(), '_blank', 'noopener,noreferrer')
+  }
+
   const handleCheck = async () => {
     setState({ phase: 'checking' })
+    const checkedAt = new Date().toISOString()
     try {
-      const update = await check()
+      const update = await checkAppUpdate(channel)
       if (update) {
         setState({
           phase: 'available',
           update,
           currentVersion: update.currentVersion,
-          latestVersion: update.version,
+          latestVersion: update.latestVersion,
         })
       } else {
-        setState({ phase: 'latest', currentVersion: getCurrentAppVersion() })
+        setState({ phase: 'latest', currentVersion: getFallbackCurrentVersion() })
       }
+      setLastUpdateCheckAt(channel, checkedAt)
+      setLastCheckedAtState(checkedAt)
     } catch (err) {
+      setLastUpdateCheckAt(channel, checkedAt)
+      setLastCheckedAtState(checkedAt)
       setState({
         phase: 'error',
         message: err instanceof Error ? err.message : 'Unknown error',
@@ -136,27 +156,19 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
     setState({ phase: 'downloading', update, progress: 0, downloaded: 0, total: null })
 
     try {
-      await update.downloadAndInstall((event) => {
-        if (event.event === 'Started') {
-          setState({
+      await downloadAndInstallAppUpdate(channel, ({ progress, downloaded, total }: AppUpdateDownloadState) => {
+        setState((prev) => {
+          const activeUpdate = prev.phase === 'downloading' ? prev.update : update
+          return {
             phase: 'downloading',
-            update,
-            progress: 0,
-            downloaded: 0,
-            total: event.data.contentLength ?? null,
-          })
-        } else if (event.event === 'Progress') {
-          setState((prev) => {
-            if (prev.phase !== 'downloading') return prev
-            const downloaded = prev.downloaded + event.data.chunkLength
-            const total = prev.total
-            const progress = total ? (downloaded / total) * 100 : 0
-            return { ...prev, downloaded, progress }
-          })
-        } else if (event.event === 'Finished') {
-          setState({ phase: 'ready', update })
-        }
+            update: activeUpdate,
+            progress,
+            downloaded,
+            total,
+          }
+        })
       })
+      setState({ phase: 'ready', update })
     } catch (err) {
       setState({
         phase: 'error',
@@ -182,24 +194,17 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
     setState({ phase: 'idle' })
   }
 
-  const openReleasePage = () => {
-    window.open('https://github.com/Dwsy/pi-session-manager/releases', '_blank', 'noopener,noreferrer')
-  }
-
-  /* ─── State renderers ─── */
-
   const renderContent = () => {
     switch (state.phase) {
       case 'idle':
         return (
           <div className="space-y-4">
-            {/* Quick info */}
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
-                {t('settings.update.source', 'Updates from GitHub Releases')}
+                {t('settings.update.source', 'Updates from release channel manifests')}
               </p>
               <button
-                onClick={openReleasePage}
+                onClick={() => openReleasePage()}
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-info transition-colors"
               >
                 <ArrowUpRight className="h-3 w-3" />
@@ -207,7 +212,6 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
               </button>
             </div>
 
-            {/* Check now button */}
             <button
               onClick={handleCheck}
               className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-info hover:bg-info/90 text-white text-sm font-medium motion-color motion-press focus-ring"
@@ -216,7 +220,6 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
               {t('settings.update.checkNow', 'Check for updates now')}
             </button>
 
-            {/* Last checked */}
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">
                 {t('settings.update.lastCheckedAt', 'Last checked')}
@@ -240,7 +243,6 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
         const currentVersion = state.currentVersion !== '0.0.0' ? state.currentVersion : '—'
         return (
           <div className="space-y-4">
-            {/* Up-to-date card */}
             <div className="rounded-xl border border-success/20 bg-success/5 p-4 space-y-3">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 rounded-full bg-success/15 p-1.5">
@@ -260,7 +262,6 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
               </div>
             </div>
 
-            {/* Check again */}
             <button
               onClick={handleCheck}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted motion-color motion-press focus-ring"
@@ -276,7 +277,6 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
         const { currentVersion, latestVersion } = state
         return (
           <div className="space-y-4">
-            {/* Update available card */}
             <div className="rounded-xl border border-info/30 bg-info/5 p-4 space-y-3">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 rounded-full bg-info/15 p-1.5">
@@ -294,25 +294,25 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
                 </div>
               </div>
 
-              {/* Release notes */}
-              {state.update.body && (
+              {state.update.releaseNotesMarkdown && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-1.5 font-medium">
                     {t('settings.update.releaseNotes', 'Release Notes')}
                   </p>
-                  <ReleaseNotesPreview body={state.update.body} />
+                  <ReleaseNotesPreview body={state.update.releaseNotesMarkdown} />
                 </div>
               )}
             </div>
 
-            {/* Action buttons */}
             <div className="flex flex-col gap-2">
               <button
-                onClick={handleDownload}
+                onClick={desktopRuntime ? handleDownload : () => openReleasePage(state.update.releaseUrl)}
                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-info hover:bg-info/90 text-white text-sm font-medium motion-color motion-press focus-ring"
               >
                 <Download className="h-4 w-4" />
-                {t('settings.update.downloadAndInstall', 'Download & Install')}
+                {desktopRuntime
+                  ? t('settings.update.downloadAndInstall', 'Download & Install')
+                  : t('settings.update.viewOnGitHub', 'View on GitHub')}
               </button>
               <div className="flex items-center justify-between">
                 <button
@@ -323,7 +323,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
                   {t('settings.update.later', 'Remind me later')}
                 </button>
                 <button
-                  onClick={openReleasePage}
+                  onClick={() => openReleasePage(state.update.releaseUrl)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-info hover:text-info/80 motion-color"
                 >
                   <ArrowUpRight className="h-3.5 w-3.5" />
@@ -338,10 +338,10 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
       case 'downloading': {
         const { progress, downloaded, total } = state
         const estimatedSize = total ? formatBytes(total) : '—'
+        const progressText = total ? `${progress.toFixed(0)}%` : t('settings.update.checking', 'Checking for updates...')
 
         return (
           <div className="space-y-4">
-            {/* Progress card */}
             <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3">
               <div className="flex items-center gap-3">
                 <Loader2 className="h-5 w-5 animate-spin text-info" />
@@ -354,15 +354,14 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
                   </p>
                 </div>
                 <span className="text-lg font-mono font-semibold text-info">
-                  {progress.toFixed(0)}%
+                  {progressText}
                 </span>
               </div>
 
-              {/* Progress bar */}
               <div className="h-2.5 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-info to-info/60 rounded-full motion-width"
-                  style={{ width: `${Math.min(progress, 100)}%` }}
+                  style={{ width: `${Math.min(progress || 8, 100)}%` }}
                 />
               </div>
             </div>
@@ -373,7 +372,6 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
       case 'ready':
         return (
           <div className="space-y-4">
-            {/* Ready to install */}
             <div className="rounded-xl border border-success/20 bg-success/5 p-4 space-y-3">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 rounded-full bg-success/15 p-1.5">
@@ -387,13 +385,12 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
                     {t('settings.update.readyDesc', 'Restart to finish applying the update')}
                   </p>
                   <div className="mt-2">
-                    <VersionBadge version={state.update.version} />
+                    <VersionBadge version={state.update.latestVersion} />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Install button */}
             <button
               onClick={handleRestart}
               className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-success hover:bg-success/90 text-white text-sm font-medium motion-color motion-press focus-ring"
@@ -402,7 +399,6 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
               {t('settings.update.installAndRestart', 'Restart Now')}
             </button>
 
-            {/* Skip option */}
             <button
               onClick={handleReset}
               className="w-full text-center text-xs text-muted-foreground hover:text-foreground motion-color"
@@ -415,7 +411,6 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
       case 'error':
         return (
           <div className="space-y-4">
-            {/* Error card */}
             <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 space-y-2">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 rounded-full bg-destructive/15 p-1.5">
@@ -432,7 +427,6 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
               </div>
             </div>
 
-            {/* Action buttons */}
             <div className="flex items-center gap-2">
               <button
                 onClick={handleCheck}
@@ -442,7 +436,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
                 {t('settings.update.retry', 'Retry')}
               </button>
               <button
-                onClick={openReleasePage}
+                onClick={() => openReleasePage()}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-info hover:text-info/80 motion-color"
               >
                 <ArrowUpRight className="h-3.5 w-3.5" />
@@ -459,21 +453,26 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
 
   return (
     <div className="space-y-6">
-      {/* Main update card */}
       <SettingsCard
         title={t('settings.update.title', 'Updates')}
         description={t(
           'settings.update.description',
-          'Manage app updates from GitHub Releases',
+          'Manage app updates from release channel manifests',
         )}
         icon={<Download className="h-4 w-4" />}
       >
         <div className="space-y-5">
+          <SettingsToggleRow
+            title={t('settings.update.autoCheck', 'Auto Check Updates')}
+            description={t('settings.update.autoCheckHelp', 'Automatically check once per day')}
+            checked={settings.update.autoCheck !== false}
+            onChange={(enabled) => onUpdate('update', 'autoCheck', enabled)}
+            searchKey="update-auto-check"
+          />
           {renderContent()}
         </div>
       </SettingsCard>
 
-      {/* Update channel card */}
       <SettingsCard
         title={t('settings.update.channel.title', 'Update Channel')}
         description={t(
@@ -486,11 +485,11 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
         <SettingsField label={t('settings.update.channel.label', 'Channel')}>
           <SettingsOptionGroup
             options={['stable', 'beta'] as const}
-            value={(settings.update.channel as 'stable' | 'beta') ?? 'stable'}
-            onChange={(channel) => onUpdate('update', 'channel', channel)}
-            renderLabel={(channel) => (
+            value={channel}
+            onChange={(nextChannel) => onUpdate('update', 'channel', nextChannel)}
+            renderLabel={(optionChannel) => (
               <span className="flex items-center gap-1.5">
-                {channel === 'stable' ? (
+                {optionChannel === 'stable' ? (
                   <>
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     {t('settings.update.channel.stable', 'Stable')}

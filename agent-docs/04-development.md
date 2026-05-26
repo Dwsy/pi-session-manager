@@ -42,6 +42,22 @@ cargo test                       # Tests
 
 `node scripts/release-version.mjs sync <version>` → sync package.json, Cargo.toml × 2, tauri.conf.json → git tag `v<x.y.z>`
 
+### Update Channels
+
+Release workflow now publishes updater manifests to the `update-manifests` branch using shared config from `src/runtime-data/update-channels.json`.
+
+Rules:
+- Stable tag: `vX.Y.Z` → updates both `stable/latest.json` and `beta/latest.json`
+- Prerelease tag: `vX.Y.Z-beta.N`, `vX.Y.Z-alpha.N`, `vX.Y.Z-rc.N` → updates `beta/latest.json` only
+- Desktop default updater endpoint points at `stable/latest.json`
+- Manual channel switching in app overrides endpoints at runtime
+
+Local reproduction:
+```bash
+node scripts/update-channel-manifests.mjs prepare release-metadata/latest.json channel-manifests v0.6.4
+node scripts/update-channel-manifests.mjs prepare release-metadata/latest.json channel-manifests v0.7.0-beta.2
+```
+
 ## Local Signing
 
 Copy `.env.tauri-signing.local.example` to `.env.tauri-signing.local`, fill in your local key path/password, then run `npm run tauri:build:local-signed`.

@@ -206,6 +206,45 @@ jobs:
               raise SystemExit(1)
           PY
 
+      - name: Prepare channel manifests
+        run: |
+          node scripts/update-channel-manifests.mjs \
+            prepare \
+            release-metadata/latest.json \
+            channel-manifests \
+            "${GITHUB_REF_NAME}"
+
+      - name: Publish channel manifests branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p manifest-publish
+          cd manifest-publish
+          git init -b update-manifests
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch origin update-manifests || true
+          if git rev-parse --verify FETCH_HEAD >/dev/null 2>&1; then
+            git checkout -B update-manifests FETCH_HEAD
+          fi
+          mkdir -p stable beta
+          cp ../channel-manifests/beta/latest.json beta/latest.json
+          git add beta/latest.json
+          if [ -f ../channel-manifests/stable/latest.json ]; then
+            cp ../channel-manifests/stable/latest.json stable/latest.json
+            git add stable/latest.json
+          fi
+          if git diff --cached --quiet; then
+            echo "No channel manifest changes"
+            exit 0
+          fi
+          git commit -m "chore: update channel manifests for ${VERSION}"
+          git push origin update-manifests
+
       - name: List release assets
         run: |
           ls -lhR cli-artifacts/

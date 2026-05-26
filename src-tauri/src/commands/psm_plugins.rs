@@ -34,6 +34,8 @@ pub struct PsmPluginConfigEntry {
     pub project_path: Option<String>,
     #[serde(default)]
     pub settings: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub permission_overrides: BTreeMap<String, bool>,
 }
 
 fn default_enabled() -> bool {
@@ -743,7 +745,15 @@ pub async fn load_psm_plugin_config() -> Result<PsmPluginsConfig, String> {
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn set_psm_plugin_enabled(plugin_id: String, enabled: bool, source: Option<String>, package_name: Option<String>, entry_path: Option<String>, project_path: Option<String>) -> Result<PsmPluginsConfig, String> {
     let mut config = read_plugins_config()?;
-    let entry = config.plugins.entry(plugin_id).or_insert_with(|| PsmPluginConfigEntry { enabled, source: source.clone().unwrap_or_default(), package_name: package_name.clone(), entry_path: entry_path.clone(), project_path: project_path.clone(), settings: BTreeMap::new() });
+    let entry = config.plugins.entry(plugin_id).or_insert_with(|| PsmPluginConfigEntry {
+        enabled,
+        source: source.clone().unwrap_or_default(),
+        package_name: package_name.clone(),
+        entry_path: entry_path.clone(),
+        project_path: project_path.clone(),
+        settings: BTreeMap::new(),
+        permission_overrides: BTreeMap::new(),
+    });
     entry.enabled = enabled;
     if let Some(source) = source {
         entry.source = source;
@@ -764,7 +774,15 @@ pub async fn set_psm_plugin_enabled(plugin_id: String, enabled: bool, source: Op
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn set_psm_plugin_settings(plugin_id: String, settings: BTreeMap<String, Value>, source: Option<String>, package_name: Option<String>, entry_path: Option<String>, project_path: Option<String>) -> Result<PsmPluginsConfig, String> {
     let mut config = read_plugins_config()?;
-    let entry = config.plugins.entry(plugin_id).or_insert_with(|| PsmPluginConfigEntry { enabled: true, source: source.clone().unwrap_or_default(), package_name: package_name.clone(), entry_path: entry_path.clone(), project_path: project_path.clone(), settings: BTreeMap::new() });
+    let entry = config.plugins.entry(plugin_id).or_insert_with(|| PsmPluginConfigEntry {
+        enabled: true,
+        source: source.clone().unwrap_or_default(),
+        package_name: package_name.clone(),
+        entry_path: entry_path.clone(),
+        project_path: project_path.clone(),
+        settings: BTreeMap::new(),
+        permission_overrides: BTreeMap::new(),
+    });
     if let Some(source) = source {
         entry.source = source;
     }
@@ -778,6 +796,35 @@ pub async fn set_psm_plugin_settings(plugin_id: String, settings: BTreeMap<Strin
         entry.project_path = project_path;
     }
     entry.settings = settings;
+    write_plugins_config(&config)?;
+    Ok(config)
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn set_psm_plugin_permissions(plugin_id: String, permission_overrides: BTreeMap<String, bool>, source: Option<String>, package_name: Option<String>, entry_path: Option<String>, project_path: Option<String>) -> Result<PsmPluginsConfig, String> {
+    let mut config = read_plugins_config()?;
+    let entry = config.plugins.entry(plugin_id).or_insert_with(|| PsmPluginConfigEntry {
+        enabled: true,
+        source: source.clone().unwrap_or_default(),
+        package_name: package_name.clone(),
+        entry_path: entry_path.clone(),
+        project_path: project_path.clone(),
+        settings: BTreeMap::new(),
+        permission_overrides: BTreeMap::new(),
+    });
+    if let Some(source) = source {
+        entry.source = source;
+    }
+    if package_name.is_some() {
+        entry.package_name = package_name;
+    }
+    if entry_path.is_some() {
+        entry.entry_path = entry_path;
+    }
+    if project_path.is_some() {
+        entry.project_path = project_path;
+    }
+    entry.permission_overrides = permission_overrides;
     write_plugins_config(&config)?;
     Ok(config)
 }
@@ -969,12 +1016,37 @@ mod tests {
 
         let mut config = read_plugins_config().unwrap();
         assert_eq!(config, PsmPluginsConfig::default());
-        config.plugins.insert("builtin.sidechat".to_string(), PsmPluginConfigEntry { enabled: false, source: "builtin".to_string(), package_name: None, entry_path: None, project_path: None, settings: BTreeMap::new() });
+        config.plugins.insert("builtin.sidechat".to_string(), PsmPluginConfigEntry { enabled: false, source: "builtin".to_string(), package_name: None, entry_path: None, project_path: None, settings: BTreeMap::new(), permission_overrides: BTreeMap::new() });
         write_plugins_config(&config).unwrap();
 
         let loaded = read_plugins_config().unwrap();
         assert_eq!(loaded.plugins["builtin.sidechat"].enabled, false);
         assert!(plugins_config_path().unwrap().ends_with("plugins.json"));
+
+        if let Some(old_home) = old_home {
+            env::set_var("HOME", old_home);
+        } else {
+            env::remove_var("HOME");
+        }
+    }
+
+    #[test]
+    fn writes_plugin_permission_overrides_without_disabling_plugin() {
+        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let home = tempfile::tempdir().unwrap();
+        let old_home = env::var("HOME").ok();
+        env::set_var("HOME", home.path());
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let mut permission_overrides = BTreeMap::new();
+        permission_overrides.insert("agent:invoke".to_string(), false);
+
+        let saved = runtime.block_on(set_psm_plugin_permissions("builtin.sidechat".to_string(), permission_overrides, Some("builtin".to_string()), None, None, None)).unwrap();
+
+        let entry = &saved.plugins["builtin.sidechat"];
+        assert!(entry.enabled);
+        assert_eq!(entry.source, "builtin");
+        assert_eq!(entry.permission_overrides.get("agent:invoke"), Some(&false));
 
         if let Some(old_home) = old_home {
             env::set_var("HOME", old_home);
@@ -1076,9 +1148,9 @@ mod tests {
     #[test]
     fn removes_uninstalled_npm_plugin_config_entries() {
         let mut config = PsmPluginsConfig::default();
-        config.plugins.insert("npm.sidechat".to_string(), PsmPluginConfigEntry { enabled: false, source: "npm".to_string(), package_name: Some("@acme/psm-sidechat".to_string()), entry_path: None, project_path: None, settings: BTreeMap::new() });
-        config.plugins.insert("npm.other".to_string(), PsmPluginConfigEntry { enabled: true, source: "npm".to_string(), package_name: Some("@acme/other".to_string()), entry_path: None, project_path: None, settings: BTreeMap::new() });
-        config.plugins.insert("builtin.sidechat".to_string(), PsmPluginConfigEntry { enabled: true, source: "builtin".to_string(), package_name: Some("@acme/psm-sidechat".to_string()), entry_path: None, project_path: None, settings: BTreeMap::new() });
+        config.plugins.insert("npm.sidechat".to_string(), PsmPluginConfigEntry { enabled: false, source: "npm".to_string(), package_name: Some("@acme/psm-sidechat".to_string()), entry_path: None, project_path: None, settings: BTreeMap::new(), permission_overrides: BTreeMap::new() });
+        config.plugins.insert("npm.other".to_string(), PsmPluginConfigEntry { enabled: true, source: "npm".to_string(), package_name: Some("@acme/other".to_string()), entry_path: None, project_path: None, settings: BTreeMap::new(), permission_overrides: BTreeMap::new() });
+        config.plugins.insert("builtin.sidechat".to_string(), PsmPluginConfigEntry { enabled: true, source: "builtin".to_string(), package_name: Some("@acme/psm-sidechat".to_string()), entry_path: None, project_path: None, settings: BTreeMap::new(), permission_overrides: BTreeMap::new() });
 
         remove_npm_plugin_config_entries(&mut config, "@acme/psm-sidechat");
 
@@ -1238,7 +1310,15 @@ mod tests {
         let mut stored = read_plugins_config().unwrap();
         stored.plugins.insert(
             "dev.plugin".to_string(),
-            PsmPluginConfigEntry { enabled: true, source: "dev".to_string(), package_name: Some("@acme/dev-plugin".to_string()), entry_path: Some(built.entries[0].entry_path.clone()), project_path: Some(built.entries[0].project_path.clone()), settings: BTreeMap::new() },
+            PsmPluginConfigEntry {
+                enabled: true,
+                source: "dev".to_string(),
+                package_name: Some("@acme/dev-plugin".to_string()),
+                entry_path: Some(built.entries[0].entry_path.clone()),
+                project_path: Some(built.entries[0].project_path.clone()),
+                settings: BTreeMap::new(),
+                permission_overrides: BTreeMap::new(),
+            },
         );
         write_plugins_config(&stored).unwrap();
 

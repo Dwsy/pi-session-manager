@@ -1,17 +1,23 @@
-const GITHUB_RELEASE_API_URL =
-  'https://api.github.com/repos/Dwsy/pi-session-manager/releases/latest'
-const GITHUB_RELEASE_PAGE_URL =
-  'https://github.com/Dwsy/pi-session-manager/releases/latest'
+import {
+  getGithubLatestReleaseApiUrl,
+  getGithubReleasesApiUrl,
+  getReleaseUrl,
+  normalizeUpdateChannel,
+  type UpdateChannel,
+} from './updateChannel'
+
 const LAST_CHECK_AT_KEY = 'psm.update.lastCheckAt'
 const DISMISSED_VERSION_KEY = 'psm.update.dismissedVersion'
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
 interface GithubRelease {
-  tag_name: string
+  tag_name?: string
   html_url?: string
   name?: string
   body?: string
   published_at?: string
+  prerelease?: boolean
+  draft?: boolean
 }
 
 interface NormalizedVersion {
@@ -20,6 +26,7 @@ interface NormalizedVersion {
 }
 
 export interface AvailableUpdateInfo {
+  channel: UpdateChannel
   currentVersion: string
   latestVersion: string
   releaseUrl: string
@@ -46,6 +53,10 @@ export type UpdateCheckResult =
       checkedAt: string
       errorMessage: string
     }
+
+function channelStorageKey(prefix: string, channel: UpdateChannel) {
+  return `${prefix}:${channel}`
+}
 
 function normalizeVersion(value: string): string {
   return value.trim().replace(/^v/i, '')
@@ -124,8 +135,16 @@ function trimReleaseNotes(value?: string): string {
   return value.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200)
 }
 
-async function fetchLatestRelease(): Promise<GithubRelease> {
-  const response = await fetch(GITHUB_RELEASE_API_URL, {
+function isValidRelease(value: Partial<GithubRelease> | null | undefined): value is GithubRelease & { tag_name: string } {
+  return Boolean(value && value.tag_name && !value.draft)
+}
+
+function isPreferredBetaRelease(release: GithubRelease): boolean {
+  return release.prerelease === true
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
     headers: {
       Accept: 'application/vnd.github+json',
     },
@@ -135,18 +154,31 @@ async function fetchLatestRelease(): Promise<GithubRelease> {
     throw new Error(`GitHub API error: ${response.status}`)
   }
 
-  const payload = (await response.json()) as Partial<GithubRelease>
-  if (!payload.tag_name) {
-    throw new Error('Missing tag_name in GitHub release payload')
-  }
+  return response.json() as Promise<T>
+}
 
-  return {
-    tag_name: payload.tag_name,
-    html_url: payload.html_url,
-    name: payload.name,
-    body: payload.body,
-    published_at: payload.published_at,
+async function fetchStableRelease(): Promise<GithubRelease & { tag_name: string }> {
+  const payload = await fetchJson<Partial<GithubRelease>>(getGithubLatestReleaseApiUrl())
+  if (!isValidRelease(payload)) {
+    throw new Error('Missing tag_name in GitHub latest release payload')
   }
+  return payload
+}
+
+async function fetchBetaRelease(): Promise<GithubRelease & { tag_name: string }> {
+  const releases = await fetchJson<Array<Partial<GithubRelease>>>(getGithubReleasesApiUrl())
+  const validReleases = releases.filter(isValidRelease)
+  const preferred = validReleases.find(isPreferredBetaRelease)
+  const fallback = validReleases.find((release) => !release.prerelease)
+  const chosen = preferred ?? fallback
+  if (!chosen) {
+    throw new Error('No GitHub releases available for beta channel')
+  }
+  return chosen
+}
+
+async function fetchReleaseForChannel(channel: UpdateChannel): Promise<GithubRelease & { tag_name: string }> {
+  return channel === 'beta' ? fetchBetaRelease() : fetchStableRelease()
 }
 
 export function getCurrentAppVersion(): string {
@@ -156,68 +188,72 @@ export function getCurrentAppVersion(): string {
   return '0.0.0'
 }
 
-export function getLastUpdateCheckAt(): string | null {
+export function getLastUpdateCheckAt(channelInput: UpdateChannel | string = 'stable'): string | null {
+  const channel = normalizeUpdateChannel(channelInput)
   try {
-    return localStorage.getItem(LAST_CHECK_AT_KEY)
+    return localStorage.getItem(channelStorageKey(LAST_CHECK_AT_KEY, channel))
   } catch {
     return null
   }
 }
 
-function setLastUpdateCheckAt(value: string): void {
+export function setLastUpdateCheckAt(channelInput: UpdateChannel | string = 'stable', value: string): void {
+  const channel = normalizeUpdateChannel(channelInput)
   try {
-    localStorage.setItem(LAST_CHECK_AT_KEY, value)
+    localStorage.setItem(channelStorageKey(LAST_CHECK_AT_KEY, channel), value)
   } catch {
     // Ignore localStorage errors.
   }
 }
 
-export function shouldRunDailyUpdateCheck(now: number = Date.now()): boolean {
-  const lastCheckAt = getLastUpdateCheckAt()
+export function shouldRunDailyUpdateCheck(channelInput: UpdateChannel | string = 'stable', now: number = Date.now()): boolean {
+  const lastCheckAt = getLastUpdateCheckAt(channelInput)
   if (!lastCheckAt) return true
   const lastTime = new Date(lastCheckAt).getTime()
   if (Number.isNaN(lastTime)) return true
   return now - lastTime >= ONE_DAY_MS
 }
 
-export function getDismissedUpdateVersion(): string | null {
+export function getDismissedUpdateVersion(channelInput: UpdateChannel | string = 'stable'): string | null {
+  const channel = normalizeUpdateChannel(channelInput)
   try {
-    return localStorage.getItem(DISMISSED_VERSION_KEY)
+    return localStorage.getItem(channelStorageKey(DISMISSED_VERSION_KEY, channel))
   } catch {
     return null
   }
 }
 
-export function dismissUpdateVersion(version: string): void {
+export function dismissUpdateVersion(channelInput: UpdateChannel | string = 'stable', version: string): void {
+  const channel = normalizeUpdateChannel(channelInput)
   try {
-    localStorage.setItem(DISMISSED_VERSION_KEY, normalizeVersion(version))
+    localStorage.setItem(channelStorageKey(DISMISSED_VERSION_KEY, channel), normalizeVersion(version))
   } catch {
     // Ignore localStorage errors.
   }
 }
 
-export async function checkForUpdates(): Promise<UpdateCheckResult> {
+export async function checkForUpdates(
+  channelInput: UpdateChannel | string = 'stable',
+  currentVersion = getCurrentAppVersion(),
+): Promise<UpdateCheckResult> {
+  const channel = normalizeUpdateChannel(channelInput)
   const checkedAt = new Date().toISOString()
   try {
-    const [currentVersion, latestRelease] = await Promise.all([
-      Promise.resolve(getCurrentAppVersion()),
-      fetchLatestRelease(),
-    ])
-
-    const latestVersion = normalizeVersion(latestRelease.tag_name)
+    const release = await fetchReleaseForChannel(channel)
+    const latestVersion = normalizeVersion(release.tag_name)
     if (compareVersions(latestVersion, currentVersion) > 0) {
       return {
         status: 'update',
         checkedAt,
         update: {
+          channel,
           currentVersion,
           latestVersion,
-          releaseUrl: latestRelease.html_url || GITHUB_RELEASE_PAGE_URL,
-          releaseName:
-            latestRelease.name || `v${latestRelease.tag_name.replace(/^v/i, '')}`,
-          releaseNotes: trimReleaseNotes(latestRelease.body),
-          releaseNotesMarkdown: latestRelease.body || '',
-          publishedAt: latestRelease.published_at || null,
+          releaseUrl: release.html_url || getReleaseUrl(latestVersion),
+          releaseName: release.name || `Pi Session Manager v${latestVersion}`,
+          releaseNotes: trimReleaseNotes(release.body),
+          releaseNotesMarkdown: release.body || '',
+          publishedAt: release.published_at || null,
         },
       }
     }
@@ -235,6 +271,6 @@ export async function checkForUpdates(): Promise<UpdateCheckResult> {
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
     }
   } finally {
-    setLastUpdateCheckAt(checkedAt)
+    setLastUpdateCheckAt(channel, checkedAt)
   }
 }

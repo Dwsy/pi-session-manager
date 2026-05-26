@@ -66,6 +66,17 @@ describe('runtime-sdk manifest contract', () => {
     expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
   })
 
+  it('accepts restricted local capability permissions', () => {
+    const manifest: PsmPluginManifest = {
+      id: 'builtin.generative-ui-renderer',
+      name: 'Generative UI Renderer',
+      version: '1.0.0',
+      permissions: ['fs:read', 'windows:open'],
+    }
+
+    expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
+  })
+
   it('accepts agent invocation permissions', () => {
     const manifest: PsmPluginManifest = {
       id: 'builtin.agent-search',
@@ -404,6 +415,79 @@ describe('plugin capability client', () => {
       { command: 'assign_tag', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
       { command: 'remove_tag_from_session', payload: { sessionId: '/repo/session.jsonl', tagId: 'tag-active', __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
       { command: 'get_all_session_tags', payload: { __psm: { pluginId: 'builtin.session-summary', permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke'] } } },
+    ])
+  })
+
+  it('sends widget reads through the restricted filesystem transport', async () => {
+    const widgetPermissions: PsmPermissionContext = {
+      pluginId: 'builtin.generative-ui-renderer',
+      permissions: ['fs:read'],
+    }
+    const calls: Array<{ command: string; payload?: unknown }> = []
+    const transport: PsmTransport = {
+      invoke: async (command, payload) => {
+        calls.push({ command, payload })
+        if (command === 'plugin_fs_read' && payload?.path === 'index.json') {
+          return {
+            rootId: 'widgets',
+            path: 'index.json',
+            content: JSON.stringify([{
+              id: 'widget-1',
+              title: 'Widget',
+              timestamp: '2026-05-26T00-00-00',
+              file: 'widget.html',
+              width: 760,
+              height: 420,
+              isSVG: false,
+            }]),
+            encoding: 'utf-8',
+            bytes: 128,
+          }
+        }
+        if (command === 'plugin_fs_read' && payload?.path === 'widget.html') {
+          return {
+            rootId: 'widgets',
+            path: 'widget.html',
+            content: '<div>Widget</div>',
+            encoding: 'utf-8',
+            bytes: 17,
+          }
+        }
+        return null
+      },
+    }
+
+    const client = createPluginCapabilityClient({ transport, permissions: widgetPermissions })
+    const result = await client.widgets.readHtml('widget.html', { maxBytes: 2048 })
+
+    expect(result?.record.height).toBe(420)
+    expect(calls).toEqual([
+      {
+        command: 'plugin_fs_read',
+        payload: {
+          rootId: 'widgets',
+          path: 'index.json',
+          encoding: undefined,
+          maxBytes: 1024 * 1024,
+          __psm: {
+            pluginId: 'builtin.generative-ui-renderer',
+            permissions: ['fs:read'],
+          },
+        },
+      },
+      {
+        command: 'plugin_fs_read',
+        payload: {
+          rootId: 'widgets',
+          path: 'widget.html',
+          encoding: undefined,
+          maxBytes: 2048,
+          __psm: {
+            pluginId: 'builtin.generative-ui-renderer',
+            permissions: ['fs:read'],
+          },
+        },
+      },
     ])
   })
 

@@ -12,7 +12,7 @@ import type {
   PsmPluginPaths,
   PsmPluginsConfig,
 } from './types'
-import type { PsmPluginSettingValue } from '@pi-session-manager/plugin-sdk'
+import type { PsmPermission, PsmPluginSettingValue } from '@pi-session-manager/plugin-sdk'
 
 export const defaultPsmPluginsConfig: PsmPluginsConfig = {
   version: 1,
@@ -92,6 +92,24 @@ export async function setPsmPluginSettings(options: {
   return invokePluginCommand<PsmPluginsConfig>('set_psm_plugin_settings', {
     pluginId: options.pluginId,
     settings: options.settings,
+    source: options.source,
+    packageName: options.packageName ?? null,
+    entryPath: options.entryPath ?? null,
+    projectPath: options.projectPath ?? null,
+  })
+}
+
+export async function setPsmPluginPermissions(options: {
+  pluginId: string
+  permissionOverrides: Partial<Record<PsmPermission, boolean>>
+  source?: string
+  packageName?: string | null
+  entryPath?: string | null
+  projectPath?: string | null
+}): Promise<PsmPluginsConfig> {
+  return invokePluginCommand<PsmPluginsConfig>('set_psm_plugin_permissions', {
+    pluginId: options.pluginId,
+    permissionOverrides: options.permissionOverrides,
     source: options.source,
     packageName: options.packageName ?? null,
     entryPath: options.entryPath ?? null,

@@ -171,7 +171,8 @@ Supported field types:
 
 ## Permissions
 
-The host injects a plugin permission context into every SDK call.
+Plugins declare requested permissions in `manifest.permissions`. The Settings -> Plugins area shows those declarations and lets the user revoke individual permissions per plugin. The host injects only currently granted permissions into every SDK call; revoked permissions make the matching host capability fail permission checks.
+
 Plugin-safe permissions currently include:
 
 | Permission | Scope |
@@ -187,6 +188,8 @@ Plugin-safe permissions currently include:
 | `events:read` | Subscribe to host-emitted events |
 | `model:invoke` | Read model options and invoke model-backed plugin features |
 | `agent:invoke` | Create and run host-managed Pi Agent sessions through `ctx.psm.agent` |
+| `fs:read` | Read files through declared restricted filesystem roots, including saved widget HTML under the `widgets` root |
+| `windows:open` | Open host-managed popup windows |
 
 ## AI Plugin Guidance
 

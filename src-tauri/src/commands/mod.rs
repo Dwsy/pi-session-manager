@@ -9,6 +9,7 @@ mod models;
 mod notification;
 #[cfg(feature = "gui")]
 mod pi_live;
+mod plugin_fs;
 mod plugin_records;
 mod psm_plugins;
 pub mod search;
@@ -25,6 +26,8 @@ mod skills;
 mod tags;
 #[cfg(feature = "gui")]
 pub mod terminal;
+#[cfg(feature = "gui")]
+mod update;
 mod version_check;
 
 pub use auth::*;
@@ -38,6 +41,7 @@ pub use models::*;
 pub use notification::*;
 #[cfg(feature = "gui")]
 pub use pi_live::*;
+pub use plugin_fs::*;
 pub use plugin_records::*;
 pub use psm_plugins::*;
 pub use search::*;
@@ -50,6 +54,8 @@ pub use skills::*;
 pub use tags::*;
 #[cfg(feature = "gui")]
 pub use terminal::*;
+#[cfg(feature = "gui")]
+pub use update::*;
 pub use version_check::*;
 
 #[cfg(feature = "gui")]

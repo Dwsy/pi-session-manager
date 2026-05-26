@@ -6,6 +6,7 @@ interface SettingsToggleRowProps {
   description?: ReactNode
   checked: boolean
   onChange: (checked: boolean) => void
+  disabled?: boolean
   className?: string
   titleClassName?: string
   descriptionClassName?: string
@@ -24,6 +25,7 @@ export default function SettingsToggleRow({
   description,
   checked,
   onChange,
+  disabled = false,
   className = '',
   titleClassName = 'text-sm font-medium text-foreground',
   descriptionClassName = 'text-xs text-muted-foreground',
@@ -44,6 +46,7 @@ export default function SettingsToggleRow({
       <Toggle
         checked={checked}
         onChange={onChange}
+        disabled={disabled}
         size={toggleSize}
         className={toggleClassName}
       />

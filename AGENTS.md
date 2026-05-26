@@ -24,6 +24,7 @@
 | **PSM plugin SDK / extensions** | [Plugin Authoring](agent-docs/06-plugins.md) + [Plugin SDK](docs/PSM_PLUGIN_SDK.md) + [Capability Audit](docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md) + [Extensions](extensions/README.md) |
 | **Build & test** | [Development](agent-docs/04-development.md) |
 | **Release** | [Development](agent-docs/04-development.md) → Release section |
+| **Beta release / update channels** | [Development](agent-docs/04-development.md) → Update Channels |
 
 ---
 
@@ -71,6 +72,9 @@
 | Data layer | `src-tauri/src/data/` |
 | Protocol | `src-tauri/src/server/` |
 | New command | `src-tauri/src/commands/` + `dispatch.rs` |
+| Stable release | `node scripts/release-version.mjs sync <x.y.z>` → tag `v<x.y.z>` |
+| Beta release | `node scripts/release-version.mjs sync <x.y.z-beta.N>` → tag `v<x.y.z-beta.N>` |
+| Channel manifest rule | stable tag updates `stable/latest.json` + `beta/latest.json`; prerelease tag updates `beta/latest.json` only |
 
 ---
 
@@ -86,6 +90,16 @@ Protocols: Tauri IPC | WebSocket (/ws) | HTTP (/api) | SSE
 **Key insight**: HTTP and WS requests converge at `dispatch()`. Add command once, available via both.
 
 ---
+
+## Release Notes
+
+- **Version sync first**: run `node scripts/release-version.mjs sync <version>` before tagging.
+- **Stable tag format**: `vX.Y.Z`
+- **Beta tag format**: `vX.Y.Z-beta.N` (same prerelease lane also applies to `-alpha.N` / `-rc.N`)
+- **Workflow trigger**: pushing a `v*` tag runs [release.yml](.github/workflows/release.yml)
+- **Updater manifests**: shared channel config lives in [src/runtime-data/update-channels.json](src/runtime-data/update-channels.json); workflow publishes manifests to `update-manifests` branch
+- **Beta behavior**: beta/prerelease tags mark GitHub Release as prerelease and update `beta/latest.json` only
+- **Stable behavior**: stable tags update both `stable/latest.json` and `beta/latest.json`
 
 ## Known Issues
 

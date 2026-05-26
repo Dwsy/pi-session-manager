@@ -15,11 +15,15 @@ import type {
   PsmCapabilityClient,
   PsmCreateTagParams,
   PsmFullTextSearchParams,
+  PsmFsClient,
+  PsmFsReadOptions,
   PsmModelOption,
+  PsmWidgetRecord,
   PsmPermissionContext,
   PsmSessionListParams,
   PsmSessionOpenOptions,
   PsmSessionReadChunkOptions,
+  PsmWindowOpenParams,
 } from './types'
 
 function parsePayload(record: DbPluginRecord): PluginRecord {
@@ -178,6 +182,38 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
     },
   }
 
+  const fsClient: PsmFsClient = {
+    roots() {
+      return invoke('plugin_fs_roots')
+    },
+    list(rootId, path) {
+      return invoke('plugin_fs_list', { rootId, path })
+    },
+    read(rootId, path, readOptions?: PsmFsReadOptions) {
+      return invoke('plugin_fs_read', {
+        rootId,
+        path,
+        encoding: readOptions?.encoding,
+        maxBytes: readOptions?.maxBytes,
+      })
+    },
+    stat(rootId, path) {
+      return invoke('plugin_fs_stat', { rootId, path })
+    },
+  }
+
+  const readWidgetIndex = async (): Promise<PsmWidgetRecord[]> => {
+    try {
+      const result = await fsClient.read('widgets', 'index.json', { maxBytes: 1024 * 1024 })
+      const parsed = JSON.parse(result.content)
+      return Array.isArray(parsed) ? parsed as PsmWidgetRecord[] : []
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.includes('File not found')) return []
+      throw error
+    }
+  }
+
   return {
     records,
     sessions: {
@@ -264,6 +300,49 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
           key,
           value,
         })
+      },
+    },
+    fs: fsClient,
+    widgets: {
+      async list(options) {
+        let records = await readWidgetIndex()
+        if (!options?.includeArchived) records = records.filter((record) => !record.archivedAt)
+        if (options?.cwd) records = records.filter((record) => record.cwd === options.cwd)
+        return options?.limit === undefined ? records : records.slice(0, options.limit)
+      },
+      async get(file) {
+        const records = await readWidgetIndex()
+        return records.find((record) => record.file === file) ?? null
+      },
+      async readHtml(file, options) {
+        const [record, result] = await Promise.all([
+          this.get(file),
+          fsClient.read('widgets', file, { maxBytes: options?.maxBytes }),
+        ])
+        return {
+          record: record ?? {
+            id: file,
+            title: file,
+            timestamp: '',
+            file,
+            width: 0,
+            height: 0,
+            isSVG: file.toLowerCase().endsWith('.svg'),
+          },
+          html: result.content,
+          bytes: result.bytes,
+        }
+      },
+    },
+    windows: {
+      async open(params: PsmWindowOpenParams) {
+        const handle = await invoke<{ id: string }>('plugin_window_open', params as unknown as Record<string, unknown>)
+        return {
+          id: handle.id,
+          close() {
+            return invoke<void>('plugin_window_close', { id: handle.id })
+          },
+        }
       },
     },
   }

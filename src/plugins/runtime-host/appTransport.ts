@@ -35,8 +35,10 @@ export const appPsmTransport: PsmTransport = {
         payload: (payload ?? {}) as Record<string, unknown>,
       })
     }
-    const runtimeResult = await invokeRuntimeSessionCommand<T>(command, payload)
-    if (runtimeResult !== undefined) return runtimeResult
+    if (command === 'read_session_file_chunk' || command === 'get_session_labels') {
+      const runtimeResult = await invokeRuntimeSessionCommand<T>(command, payload)
+      if (runtimeResult !== undefined) return runtimeResult
+    }
     return baseInvoke<T>(command, payload)
   },
   stream(command, payload, handlers) {

@@ -10,6 +10,8 @@ export type PsmPermission =
   | 'events:read'
   | 'model:invoke'
   | 'agent:invoke'
+  | 'fs:read'
+  | 'windows:open'
 
 export interface PsmPermissionContext {
   pluginId?: string
@@ -317,7 +319,7 @@ export interface PsmSessionToolbarItemRegistration {
 export interface PsmSessionPanelRegistration {
   id: string
   title: string
-  side?: 'right'
+  side?: 'right' | 'bottom'
   render(props: PsmSessionUiRenderProps): unknown
 }
 
@@ -686,6 +688,85 @@ export interface PsmJsonConfigClient {
   write<T = unknown>(key: string, value: T): Promise<void>
 }
 
+export interface PsmFsRootInfo {
+  id: string
+  path: string
+  read: boolean
+}
+
+export interface PsmFsEntry {
+  rootId: string
+  path: string
+  name: string
+  kind: 'file' | 'directory'
+  size?: number
+  modifiedAt?: string
+}
+
+export interface PsmFsReadOptions {
+  encoding?: 'utf-8' | 'base64'
+  maxBytes?: number
+}
+
+export interface PsmFsReadResult {
+  rootId: string
+  path: string
+  content: string
+  encoding: 'utf-8' | 'base64'
+  bytes: number
+  mimeType?: string
+}
+
+export interface PsmFsClient {
+  roots(): Promise<PsmFsRootInfo[]>
+  list(rootId: string, path?: string): Promise<PsmFsEntry[]>
+  read(rootId: string, path: string, options?: PsmFsReadOptions): Promise<PsmFsReadResult>
+  stat(rootId: string, path: string): Promise<PsmFsEntry | null>
+}
+
+export interface PsmWidgetRecord {
+  id: string
+  title: string
+  timestamp: string
+  file: string
+  width: number
+  height: number
+  isSVG: boolean
+  cwd?: string
+  interactionData?: unknown
+  archivedAt?: string
+}
+
+export interface PsmWidgetHtml {
+  record: PsmWidgetRecord
+  html: string
+  bytes: number
+}
+
+export interface PsmWidgetsClient {
+  list(options?: { includeArchived?: boolean; cwd?: string; limit?: number }): Promise<PsmWidgetRecord[]>
+  get(file: string): Promise<PsmWidgetRecord | null>
+  readHtml(file: string, options?: { maxBytes?: number }): Promise<PsmWidgetHtml | null>
+}
+
+export interface PsmWindowOpenParams {
+  title: string
+  html?: string
+  url?: string
+  width?: number
+  height?: number
+  floating?: boolean
+}
+
+export interface PsmWindowHandle {
+  id: string
+  close(): Promise<void>
+}
+
+export interface PsmWindowsClient {
+  open(params: PsmWindowOpenParams): Promise<PsmWindowHandle>
+}
+
 export interface PsmCapabilityClient {
   records: PsmRecordsClient
   sessions: PsmSessionsClient
@@ -694,6 +775,9 @@ export interface PsmCapabilityClient {
   models: PsmModelsClient
   tags: PsmTagsClient
   config: PsmJsonConfigClient
+  fs: PsmFsClient
+  widgets: PsmWidgetsClient
+  windows: PsmWindowsClient
 }
 
 export interface CreatePsmClientOptions {

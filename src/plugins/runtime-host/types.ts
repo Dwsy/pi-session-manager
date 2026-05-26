@@ -1,4 +1,5 @@
 import type {
+  PsmPermission,
   PsmPluginManifest,
   PsmPluginSettingValue,
   PsmAppSidebarViewRegistration,
@@ -24,6 +25,7 @@ export interface PsmPluginConfigEntry {
   entryPath?: string | null
   projectPath?: string | null
   settings?: Record<string, PsmPluginSettingValue>
+  permissionOverrides?: Partial<Record<PsmPermission, boolean>>
 }
 
 export interface PsmPluginsConfig {
@@ -116,6 +118,11 @@ export interface PsmPluginDiagnostic {
   message: string
 }
 
+export interface PsmPluginPermissionStatus {
+  permission: PsmPermission
+  granted: boolean
+}
+
 export interface PsmPluginStatus {
   id: string
   name: string
@@ -134,6 +141,7 @@ export interface PsmPluginStatus {
   appSidebarViews?: string[]
   toolRenderers?: string[]
   diagnostics: PsmPluginDiagnostic[]
+  permissions?: PsmPluginPermissionStatus[]
   settings?: Record<string, PsmPluginSettingValue>
   loadTimeMs?: number
   moduleModifiedMs?: number | null

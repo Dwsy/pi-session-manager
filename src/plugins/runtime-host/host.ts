@@ -2,6 +2,7 @@ import {
   assertPsmPluginManifest,
   createPluginCapabilityClient,
   type PsmAgentClient,
+  type PsmTransport,
   type PsmPluginDisposable,
   type PsmPluginEventEnvelope,
   type PsmPluginEventsClient,
@@ -10,6 +11,7 @@ import {
   type PsmPluginManifest,
   type PsmPluginModule,
   type PsmPluginLogger,
+  type PsmPermission,
   type PsmPermissionContext,
   type PsmPluginSettingValue,
   type PsmPluginSettingsClient,
@@ -38,7 +40,11 @@ import {
   readDevPsmPluginModuleSource,
   readNpmPsmPluginModuleSource,
   readPathPsmPluginModuleSource,
+  setPsmPluginPermissions,
 } from './service'
+import { psmPluginPermissionRequests } from './permissionRequests'
+import type { PsmPluginPermissionRequestInput } from './permissionRequests'
+import { requiredRuntimeRequestPermissions } from './permissions'
 import type {
   PsmPluginConfigEntry,
   PsmPluginCommandContext,
@@ -88,6 +94,15 @@ interface PsmPluginHostServices {
   readNpmModuleSource(entryPath: string): Promise<string>
   readPathModuleSource(entryPath: string): Promise<string>
   readDevModuleSource(entryPath: string, projectPath: string): Promise<string>
+  setPluginPermissions(options: {
+    pluginId: string
+    permissionOverrides: Partial<Record<PsmPermission, boolean>>
+    source?: string
+    packageName?: string | null
+    entryPath?: string | null
+    projectPath?: string | null
+  }): Promise<PsmPluginsConfig>
+  requestPermission(request: PsmPluginPermissionRequestInput): Promise<boolean>
 }
 
 interface PsmPluginHostOptions {
@@ -110,6 +125,8 @@ const defaultServices: PsmPluginHostServices = {
   readNpmModuleSource: readNpmPsmPluginModuleSource,
   readPathModuleSource: readPathPsmPluginModuleSource,
   readDevModuleSource: readDevPsmPluginModuleSource,
+  setPluginPermissions: setPsmPluginPermissions,
+  requestPermission: (request) => psmPluginPermissionRequests.request(request),
 }
 
 function moduleFromUnknown(input: unknown): PsmPluginModule {
@@ -138,6 +155,7 @@ function configEntryFor(
     entryPath: config.plugins[manifest.id]?.entryPath ?? entryPath ?? null,
     projectPath: config.plugins[manifest.id]?.projectPath ?? projectPath ?? null,
     settings: config.plugins[manifest.id]?.settings ?? {},
+    permissionOverrides: config.plugins[manifest.id]?.permissionOverrides ?? {},
   }
 }
 
@@ -151,6 +169,21 @@ function defaultSettingsFor(manifest: PsmPluginManifest): Record<string, PsmPlug
 
 function settingsFor(manifest: PsmPluginManifest, entry: PsmPluginConfigEntry): Record<string, PsmPluginSettingValue> {
   return { ...defaultSettingsFor(manifest), ...(entry.settings ?? {}) }
+}
+
+function permissionStatusesFor(manifest: PsmPluginManifest, entry: PsmPluginConfigEntry) {
+  return (manifest.permissions ?? []).map((permission) => ({
+    permission,
+    granted: permission === 'fs:read'
+      ? entry.permissionOverrides?.[permission] === true
+      : entry.permissionOverrides?.[permission] !== false,
+  }))
+}
+
+function effectivePermissionsFor(manifest: PsmPluginManifest, entry: PsmPluginConfigEntry): PsmPermission[] {
+  return permissionStatusesFor(manifest, entry)
+    .filter((permission) => permission.granted)
+    .map((permission) => permission.permission)
 }
 
 function mergePluginI18n(manifest: PsmPluginManifest) {
@@ -220,6 +253,18 @@ function diagnosticsMatch(a: PsmPluginDiagnostic, b: PsmPluginDiagnostic) {
 
 function diagnostic(level: PsmPluginDiagnostic['level'], message: string): PsmPluginDiagnostic {
   return { level, message }
+}
+
+function payloadWithCurrentPermissions(payload: Record<string, unknown> | undefined, permissions: PsmPermissionContext) {
+  if (!payload?.__psm || typeof payload.__psm !== 'object' || Array.isArray(payload.__psm)) return payload
+  return {
+    ...payload,
+    __psm: {
+      ...(payload.__psm as Record<string, unknown>),
+      pluginId: permissions.pluginId,
+      permissions: permissions.permissions ?? [],
+    },
+  }
 }
 
 function hasEventPermission(permissions: PsmPermissionContext | { permissions?: string[] }) {
@@ -573,6 +618,78 @@ export class PsmPluginHost {
     return this.listPlugins()
   }
 
+  private async ensureRuntimePermission(
+    manifest: PsmPluginManifest,
+    configEntry: PsmPluginConfigEntry,
+    permissions: PsmPermissionContext,
+    permission: PsmPermission,
+  ) {
+    const explicitlyGranted = configEntry.permissionOverrides?.[permission] === true
+    if (permissions.permissions?.includes(permission) && (permission !== 'fs:read' || explicitlyGranted)) return
+    if (!manifest.permissions?.includes(permission)) {
+      throw new Error(`Plugin permission denied: ${manifest.id} did not declare ${permission}`)
+    }
+
+    const allowed = await this.services.requestPermission({
+      pluginId: manifest.id,
+      pluginName: manifest.name,
+      permission,
+    })
+    if (!allowed) {
+      throw new Error(`Plugin permission denied: ${manifest.id} missing ${permission}`)
+    }
+
+    const nextOverrides = { ...(configEntry.permissionOverrides ?? {}) }
+    nextOverrides[permission] = true
+    await this.services.setPluginPermissions({
+      pluginId: manifest.id,
+      permissionOverrides: nextOverrides,
+      source: configEntry.source,
+      packageName: configEntry.packageName ?? null,
+      entryPath: configEntry.entryPath ?? null,
+      projectPath: configEntry.projectPath ?? null,
+    })
+
+    configEntry.permissionOverrides = nextOverrides
+    permissions.permissions = [...(permissions.permissions ?? []), permission]
+    const status = this.statuses.get(manifest.id)
+    if (status?.permissions) {
+      this.statuses.set(manifest.id, {
+        ...status,
+        permissions: status.permissions.map((item) => item.permission === permission ? { ...item, granted: true } : item),
+      })
+      this.notify()
+    }
+  }
+
+  private createRuntimePermissionTransport(
+    manifest: PsmPluginManifest,
+    configEntry: PsmPluginConfigEntry,
+    permissions: PsmPermissionContext,
+  ): PsmTransport {
+    const ensureForCommand = async (command: string) => {
+      for (const permission of requiredRuntimeRequestPermissions(command)) {
+        await this.ensureRuntimePermission(manifest, configEntry, permissions, permission)
+      }
+    }
+
+    return {
+      async invoke<T>(command: string, payload?: Record<string, unknown>): Promise<T> {
+        await ensureForCommand(command)
+        return appPsmTransport.invoke<T>(command, payloadWithCurrentPermissions(payload, permissions))
+      },
+      stream<TEvent, TResult>(command: string, payload: Record<string, unknown> | undefined, handlers: { onEvent?: (event: TEvent) => void; onError?: (error: string) => void }) {
+        if (!appPsmTransport.stream) return undefined
+        return (async () => {
+          await ensureForCommand(command)
+          const result = appPsmTransport.stream?.<TEvent, TResult>(command, payloadWithCurrentPermissions(payload, permissions), handlers)
+          if (!result) throw new Error(`PSM plugin stream command is unavailable: ${command}`)
+          return result
+        })()
+      },
+    }
+  }
+
   private async loadEntry(entry: PsmPluginLoadEntry, config: PsmPluginsConfig) {
     const startedAt = Date.now()
     let module: PsmPluginModule
@@ -650,6 +767,8 @@ export class PsmPluginHost {
 
     const configEntry = configEntryFor(config, manifest, entry.source, entry.packageName, entry.entryPath, entry.projectPath)
     const settings = settingsFor(manifest, configEntry)
+    const permissionStatuses = permissionStatusesFor(manifest, configEntry)
+    const effectivePermissions = effectivePermissionsFor(manifest, configEntry)
     if (!configEntry.enabled) {
       this.statuses.set(manifest.id, {
         id: manifest.id,
@@ -666,6 +785,7 @@ export class PsmPluginHost {
         commands: [],
         tools: [],
         diagnostics: [],
+        permissions: permissionStatuses,
         settings,
         loadTimeMs: Date.now() - startedAt,
         ...metadataFor(entry),
@@ -685,8 +805,9 @@ export class PsmPluginHost {
     const diagnostics: PsmPluginDiagnostic[] = []
     const permissions = {
       pluginId: manifest.id,
-      permissions: manifest.permissions ?? [],
+      permissions: effectivePermissions,
     }
+    const transport = this.createRuntimePermissionTransport(manifest, configEntry, permissions)
     const cleanup: Array<() => void | Promise<void>> = []
 
     const context: PsmPluginHostContext = {
@@ -694,9 +815,9 @@ export class PsmPluginHost {
       permissions,
       events: createPluginEventsClient(manifest.id, permissions, cleanup),
       psm: createPluginCapabilityClient({
-        transport: appPsmTransport,
+        transport,
         permissions,
-        agent: this.services.createAgentBridge?.({ pluginId: manifest.id, permissions: manifest.permissions ?? [] }),
+        agent: this.services.createAgentBridge?.({ pluginId: manifest.id, permissions: effectivePermissions }),
       }),
       settings: settingsClient(settings),
       i18n: i18nClient(),
@@ -823,6 +944,7 @@ export class PsmPluginHost {
         appSidebarViews: appSidebarViewIds,
         toolRenderers: toolRendererIds,
         diagnostics,
+        permissions: permissionStatuses,
         settings,
         loadTimeMs: Date.now() - startedAt,
         ...metadataFor(entry),
@@ -853,6 +975,7 @@ export class PsmPluginHost {
         commands: [],
         tools: [],
         diagnostics: [diagnostic('error', `Failed to activate plugin: ${normalizeError(error)}`)],
+        permissions: permissionStatuses,
         settings,
         loadTimeMs: Date.now() - startedAt,
         ...metadataFor(entry),

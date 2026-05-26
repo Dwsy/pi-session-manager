@@ -1,0 +1,13 @@
+{
+  "owner": "Dwsy",
+  "repo": "pi-session-manager",
+  "manifestBranch": "update-manifests",
+  "channels": {
+    "stable": {
+      "manifestPath": "stable/latest.json"
+    },
+    "beta": {
+      "manifestPath": "beta/latest.json"
+    }
+  }
+}

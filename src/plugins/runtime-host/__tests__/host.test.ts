@@ -11,7 +11,9 @@ vi.mock('@/transport', () => ({
   isTauri: () => false,
 }))
 
+import { invoke as appInvoke } from '@/transport'
 import { toolRenderRegistry } from '@/plugins/tools-render/registry'
+import { psmPluginPermissionRequests } from '../permissionRequests'
 import { psmRuntimeEventBus } from '../eventBus'
 import { builtinPsmPluginEntries } from '../builtins'
 import { PsmPluginHost } from '../host'
@@ -25,6 +27,14 @@ afterEach(() => {
   toolRenderRegistry.unregister('test-renderer')
   toolRenderRegistry.unregister('shared-renderer')
   psmRuntimeEventBus.clear()
+  psmPluginPermissionRequests.reset()
+  vi.mocked(appInvoke).mockReset()
+  vi.mocked(appInvoke).mockImplementation(async (command: string) => {
+    if (command === 'load_pi_settings_full') return { defaultProvider: 'openai', defaultModel: 'gpt-5.5' }
+    if (command === 'list_model_options_fast') return [{ provider: 'openai', model: 'gpt-5.5' }]
+    if (command === 'invoke_model_text') return { text: 'ok', provider: 'openai', model: 'gpt-5.5' }
+    return []
+  })
 })
 
 function entry(id: string, activate = true): PsmPluginLoadEntry {
@@ -62,8 +72,202 @@ describe('PsmPluginHost', () => {
     expect(sourceIds).toContain('extensions/psm-loop-renderer')
     expect(sourceIds).toContain('extensions/psm-subagent-renderer')
     expect(sourceIds).toContain('extensions/psm-cross-agent-tool-renderer')
+    expect(sourceIds).toContain('extensions/psm-generative-ui-renderer')
     expect(sourceIds).toContain('extensions/psm-session-graph')
     expect(sourceIds).not.toContain('extensions/psm-word-cloud')
+  })
+
+  it('applies permission overrides before injecting ctx.psm permissions', async () => {
+    let injectedPermissions: string[] = []
+    const host = new PsmPluginHost({
+      builtinEntries: [{
+        source: 'builtin',
+        sourceId: 'extensions/permissioned',
+        async load() {
+          return {
+            manifest: {
+              manifestVersion: 1,
+              id: 'permissioned',
+              name: 'permissioned',
+              version: '1.0.0',
+              permissions: ['sessions:read', 'agent:invoke'],
+            },
+            activate(ctx: any) {
+              injectedPermissions = ctx.permissions.permissions
+            },
+          }
+        },
+      }],
+      services: {
+        loadConfig: async () => config({
+          permissioned: {
+            enabled: true,
+            permissionOverrides: { 'agent:invoke': false },
+          },
+        }),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    const plugins = await host.reload()
+
+    expect(injectedPermissions).toEqual(['sessions:read'])
+    expect(plugins[0].permissions).toEqual([
+      { permission: 'sessions:read', granted: true },
+      { permission: 'agent:invoke', granted: false },
+    ])
+  })
+
+  it('requests revoked fs permission, persists the grant, and retries local file reads', async () => {
+    const requestPermission = vi.fn(async () => true)
+    const setPluginPermissions = vi.fn(async () => config())
+    const host = new PsmPluginHost({
+      builtinEntries: [{
+        source: 'builtin',
+        sourceId: 'extensions/local-file-plugin',
+        async load() {
+          return {
+            manifest: {
+              manifestVersion: 1,
+              id: 'local-file-plugin',
+              name: 'Local File Plugin',
+              version: '1.0.0',
+              permissions: ['fs:read'],
+            },
+            activate(ctx: any) {
+              ctx.registerCommand('local-file.read', async () => ctx.psm.fs.read('widgets', 'widget.html'))
+            },
+          }
+        },
+      }],
+      services: {
+        loadConfig: async () => config({
+          'local-file-plugin': {
+            enabled: true,
+            source: 'builtin',
+            permissionOverrides: { 'fs:read': false },
+          },
+        }),
+        listNpmEntries: async () => [],
+        listPathEntries: async () => [],
+        listDevEntries: async () => [],
+        setPluginPermissions,
+        requestPermission,
+      },
+    })
+
+    await host.reload()
+    vi.mocked(appInvoke).mockResolvedValueOnce({
+      rootId: 'widgets',
+      path: 'widget.html',
+      content: '<div>Widget</div>',
+      encoding: 'utf-8',
+      bytes: 17,
+    })
+
+    await expect(host.executeCommand('local-file.read')).resolves.toMatchObject({ content: '<div>Widget</div>' })
+    expect(requestPermission).toHaveBeenCalledWith({
+      pluginId: 'local-file-plugin',
+      pluginName: 'Local File Plugin',
+      permission: 'fs:read',
+    })
+    expect(setPluginPermissions).toHaveBeenCalledWith({
+      pluginId: 'local-file-plugin',
+      permissionOverrides: { 'fs:read': true },
+      source: 'builtin',
+      packageName: null,
+      entryPath: null,
+      projectPath: null,
+    })
+    expect(appInvoke).toHaveBeenCalledWith('plugin_fs_read', {
+      rootId: 'widgets',
+      path: 'widget.html',
+      encoding: undefined,
+      maxBytes: undefined,
+      __psm: {
+        pluginId: 'local-file-plugin',
+        permissions: ['fs:read'],
+      },
+    })
+  })
+
+  it('does not call local file transport when fs permission request is denied', async () => {
+    const requestPermission = vi.fn(async () => false)
+    const host = new PsmPluginHost({
+      builtinEntries: [{
+        source: 'builtin',
+        sourceId: 'extensions/local-file-denied',
+        async load() {
+          return {
+            manifest: {
+              manifestVersion: 1,
+              id: 'local-file-denied',
+              name: 'Local File Denied',
+              version: '1.0.0',
+              permissions: ['fs:read'],
+            },
+            activate(ctx: any) {
+              ctx.registerCommand('local-file.denied', async () => ctx.psm.fs.read('widgets', 'widget.html'))
+            },
+          }
+        },
+      }],
+      services: {
+        loadConfig: async () => config({
+          'local-file-denied': {
+            enabled: true,
+            permissionOverrides: { 'fs:read': false },
+          },
+        }),
+        listNpmEntries: async () => [],
+        listPathEntries: async () => [],
+        listDevEntries: async () => [],
+        requestPermission,
+      },
+    })
+
+    await host.reload()
+
+    await expect(host.executeCommand('local-file.denied')).rejects.toThrow('missing fs:read')
+    expect(requestPermission).toHaveBeenCalledTimes(1)
+    expect(appInvoke).not.toHaveBeenCalledWith('plugin_fs_read', expect.anything())
+  })
+
+  it('rejects undeclared fs reads without prompting', async () => {
+    const requestPermission = vi.fn(async () => true)
+    const host = new PsmPluginHost({
+      builtinEntries: [{
+        source: 'builtin',
+        sourceId: 'extensions/local-file-undeclared',
+        async load() {
+          return {
+            manifest: {
+              manifestVersion: 1,
+              id: 'local-file-undeclared',
+              name: 'Local File Undeclared',
+              version: '1.0.0',
+              permissions: [],
+            },
+            activate(ctx: any) {
+              ctx.registerCommand('local-file.undeclared', async () => ctx.psm.fs.read('widgets', 'widget.html'))
+            },
+          }
+        },
+      }],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+        listPathEntries: async () => [],
+        listDevEntries: async () => [],
+        requestPermission,
+      },
+    })
+
+    await host.reload()
+
+    await expect(host.executeCommand('local-file.undeclared')).rejects.toThrow('did not declare fs:read')
+    expect(requestPermission).not.toHaveBeenCalled()
+    expect(appInvoke).not.toHaveBeenCalledWith('plugin_fs_read', expect.anything())
   })
 
   it('activates enabled plugins and exposes commands/tools', async () => {
@@ -558,6 +762,37 @@ describe('PsmPluginHost', () => {
         { level: 'warn', message: 'Session panel already registered: session.ask.panel' },
       ],
     })
+  })
+
+  it('keeps session panel side metadata for right and bottom panels', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/panels',
+          async load() {
+            return {
+              manifest: { manifestVersion: 1, id: 'builtin.panels', name: 'Panels', version: '1.0.0' },
+              activate: (ctx: any) => {
+                ctx.ui.registerSessionPanel({ id: 'session.right.panel', title: 'Right', render: () => 'right' })
+                ctx.ui.registerSessionPanel({ id: 'session.bottom.panel', title: 'Bottom', side: 'bottom', render: () => 'bottom' })
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    await host.reload()
+
+    expect(host.getSessionUiSnapshot().panels).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'session.right.panel', side: 'right', pluginId: 'builtin.panels' }),
+      expect.objectContaining({ id: 'session.bottom.panel', side: 'bottom', pluginId: 'builtin.panels' }),
+    ]))
   })
 
   it('registers tool renderers and removes them on reload', async () => {

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   reload: vi.fn(),
   subscribe: vi.fn(),
   setPsmPluginEnabled: vi.fn(),
+  setPsmPluginPermissions: vi.fn(),
   setPsmPluginSettings: vi.fn(),
   removeDevPsmPlugin: vi.fn(),
   removePathPsmPlugin: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock('@/plugins/runtime-host', () => ({
     subscribe: mocks.subscribe,
   },
   setPsmPluginEnabled: mocks.setPsmPluginEnabled,
+  setPsmPluginPermissions: mocks.setPsmPluginPermissions,
   setPsmPluginSettings: mocks.setPsmPluginSettings,
   searchPsmPluginMarket: mocks.searchPsmPluginMarket,
   removeDevPsmPlugin: mocks.removeDevPsmPlugin,
@@ -61,6 +63,10 @@ const builtinPlugin = {
   commands: ['sidechat.ask'],
   tools: [],
   diagnostics: [],
+  permissions: [
+    { permission: 'sessions:read' as const, granted: true },
+    { permission: 'agent:invoke' as const, granted: true },
+  ],
   settings: {
     provider: 'openai',
     model: 'gpt-4o',
@@ -72,6 +78,7 @@ const builtinPlugin = {
     id: 'builtin.sidechat',
     name: 'Built-in Sidechat',
     version: '0.1.0',
+    permissions: ['sessions:read' as const, 'agent:invoke' as const],
     configuration: {
       title: 'Sidechat Settings',
       properties: [
@@ -168,6 +175,7 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
     mocks.reload.mockReset()
     mocks.subscribe.mockReset()
     mocks.setPsmPluginEnabled.mockReset()
+    mocks.setPsmPluginPermissions.mockReset()
     mocks.setPsmPluginSettings.mockReset()
     mocks.searchPsmPluginMarket.mockReset()
     mocks.removeDevPsmPlugin.mockReset()
@@ -194,6 +202,7 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
     mocks.searchPsmPluginMarket.mockResolvedValue({ query: 'psm plugin', total: 0, results: [] })
     mocks.uninstallPsmPlugin.mockResolvedValue({ entries: [], stdout: '', stderr: '' })
     mocks.updatePsmPlugins.mockResolvedValue({ entries: [], stdout: '', stderr: '' })
+    mocks.setPsmPluginPermissions.mockResolvedValue({ version: 1, plugins: {} })
     mocks.setPsmPluginSettings.mockResolvedValue({ version: 1, plugins: {} })
     mocks.invoke.mockImplementation(async (command: string) => {
       if (command === 'list_model_options_fast' || command === 'list_model_options_full') {
@@ -277,6 +286,34 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
 
     await waitFor(() => expect(mocks.buildDevPsmPlugin).toHaveBeenCalledWith('/Users/test/plugins/dev-plugin'))
     expect(mocks.reload).toHaveBeenCalledTimes(2)
+  })
+
+  it('renders per-plugin authorization and persists permission updates', async () => {
+    mocks.reload.mockResolvedValueOnce([builtinPlugin, npmPlugin]).mockResolvedValueOnce([
+      {
+        ...builtinPlugin,
+        permissions: [
+          { permission: 'sessions:read' as const, granted: true },
+          { permission: 'agent:invoke' as const, granted: false },
+        ],
+      },
+      npmPlugin,
+    ])
+
+    render(<PsmPluginsSettings pluginId="builtin.sidechat" />)
+
+    await screen.findByText('Authorization')
+    const checkboxes = screen.getAllByRole('checkbox')
+    fireEvent.click(checkboxes[2])
+
+    await waitFor(() => expect(mocks.setPsmPluginPermissions).toHaveBeenCalledWith({
+      pluginId: 'builtin.sidechat',
+      permissionOverrides: { 'agent:invoke': false },
+      source: 'builtin',
+      packageName: null,
+      entryPath: null,
+      projectPath: null,
+    }))
   })
 
   it('renders per-plugin configuration and persists setting updates', async () => {
