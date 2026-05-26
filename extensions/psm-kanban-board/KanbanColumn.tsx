@@ -15,7 +15,11 @@ import {
   buildCopyResumeCommand,
   openSessionInTerminalDirect,
 } from '@/utils/sessionResume'
-import type { KanbanCardDensity } from './kanbanBoardModel'
+import {
+  DESKTOP_KANBAN_COLUMN_WIDTH,
+  type KanbanCardDensity,
+  visibleCardTagsForColumn,
+} from './kanbanBoardModel'
 
 interface KanbanColumnProps {
   id: string
@@ -55,8 +59,9 @@ interface KanbanColumnProps {
 
 // Threshold for enabling virtualization
 const VIRTUALIZATION_THRESHOLD = 50
-const ESTIMATED_CARD_HEIGHT = 88
+const COMFORTABLE_CARD_HEIGHT = 100
 const COMPACT_CARD_HEIGHT = 64
+const CARD_ROW_GAP = 8
 
 export default function KanbanColumn({
   id,
@@ -115,6 +120,17 @@ export default function KanbanColumn({
 
   const isHex = tag?.color?.startsWith('#')
   const useVirtual = sessions.length > VIRTUALIZATION_THRESHOLD
+  const isEmptyColumn = sessions.length === 0
+  const cardHeight = density === 'compact' ? COMPACT_CARD_HEIGHT : COMFORTABLE_CARD_HEIGHT
+  const estimatedCardRowHeight = cardHeight + CARD_ROW_GAP
+  const emptyDropHeight = cardHeight
+  const emptyDropInnerHeight = Math.max(0, emptyDropHeight - 12)
+  const columnContentSizingClass = isEmptyColumn
+    ? 'flex-none'
+    : useVirtual
+      ? 'flex-1 min-h-0'
+      : 'flex-initial min-h-0'
+  const scrollAreaClass = useVirtual ? 'h-full overflow-y-auto' : 'overflow-y-auto'
 
   const liveCount = useMemo(
     () => sessions.filter(
@@ -127,12 +143,12 @@ export default function KanbanColumn({
   const virtualizer = useVirtualizer({
     count: sessions.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => density === 'compact' ? COMPACT_CARD_HEIGHT : ESTIMATED_CARD_HEIGHT,
+    estimateSize: () => estimatedCardRowHeight,
     getItemKey: (index) => sessions[index]?.id ?? index,
     overscan: 5,
     enabled: useVirtual,
     measureElement: (element) =>
-      Math.ceil((element as HTMLElement).getBoundingClientRect().height) || ESTIMATED_CARD_HEIGHT,
+      Math.ceil((element as HTMLElement).getBoundingClientRect().height) || estimatedCardRowHeight,
   })
 
   // Reset size cache when sessions change so virtualizer re-measures
@@ -144,6 +160,9 @@ export default function KanbanColumn({
 
   // Memoize session IDs for SortableContext
   const sessionIds = useMemo(() => sessions.map(s => s.id), [sessions])
+  const getVisibleCardTags = (sessionId: string) => (
+    visibleCardTagsForColumn(getTagsForSession(sessionId), tag)
+  )
 
   // Render cards - virtualized or normal
   const renderCards = () => {
@@ -175,7 +194,7 @@ export default function KanbanColumn({
                 <div className="pb-2">
                   <KanbanCard
                     session={session}
-                    tags={getTagsForSession(session.id)}
+                    tags={getVisibleCardTags(session.id)}
                     isSelected={selectedSession?.id === session.id}
                     onSelect={(rect, clickPoint) => onSelectSession(session, rect, clickPoint)}
                     onContextMenu={(e) => handleContextMenu(session, e)}
@@ -200,7 +219,7 @@ export default function KanbanColumn({
           <KanbanCard
             key={session.id}
             session={session}
-            tags={getTagsForSession(session.id)}
+            tags={getVisibleCardTags(session.id)}
             isSelected={selectedSession?.id === session.id}
             onSelect={(rect, clickPoint) => onSelectSession(session, rect, clickPoint)}
             onContextMenu={(e) => handleContextMenu(session, e)}
@@ -216,7 +235,15 @@ export default function KanbanColumn({
   }
 
   return (
-    <div className={`flex flex-col flex-shrink-0 h-full min-h-0 overflow-hidden ${isMobile ? 'w-full' : 'w-64 min-w-[256px]'} ${isColumnDragging ? 'opacity-80' : ''}`}>
+    <div
+      className={`flex flex-col flex-shrink-0 h-full min-h-0 overflow-hidden ${isMobile ? 'w-full' : 'flex-none'} ${isColumnDragging ? 'opacity-80' : ''}`}
+      style={isMobile ? undefined : {
+        flex: `0 0 ${DESKTOP_KANBAN_COLUMN_WIDTH}px`,
+        width: DESKTOP_KANBAN_COLUMN_WIDTH,
+        minWidth: DESKTOP_KANBAN_COLUMN_WIDTH,
+        maxWidth: DESKTOP_KANBAN_COLUMN_WIDTH,
+      }}
+    >
       {/* Column Header - hidden on mobile (tabs handle this) */}
       {!isMobile && (
       <div className="flex items-center gap-2 px-3 py-2.5 mb-1">
@@ -271,19 +298,25 @@ export default function KanbanColumn({
       <div
         ref={setNodeRef}
         className={[
-          'flex-1 min-h-0 rounded-lg border p-1.5 motion-color',
+          columnContentSizingClass,
+          'overflow-hidden rounded-lg border p-1.5 motion-color',
           'bg-muted/20 border-border/30',
           isOver || isDropTarget ? 'border-primary/60 bg-primary/5 ring-1 ring-primary/25' : '',
         ].filter(Boolean).join(' ')}
+        style={isEmptyColumn ? { minHeight: emptyDropHeight } : undefined}
       >
         <div
           ref={scrollRef}
-          className="h-full overflow-y-auto"
+          className={scrollAreaClass}
+          style={isEmptyColumn ? { minHeight: emptyDropInnerHeight } : undefined}
         >
           <SortableContext items={sessionIds} strategy={verticalListSortingStrategy}>
             {renderCards()}
             {sessions.length === 0 && (
-              <div className="text-[10px] text-muted-foreground/50 text-center py-6">
+              <div
+                className="flex items-center justify-center text-center text-[10px] text-muted-foreground/50"
+                style={{ minHeight: emptyDropInnerHeight }}
+              >
                 {columnSearchQuery.trim()
                   ? t('plugins.kanbanBoard.noColumnMatches', 'No matches')
                   : t('plugins.kanbanBoard.dropSessionsHere', 'Drop sessions here')}

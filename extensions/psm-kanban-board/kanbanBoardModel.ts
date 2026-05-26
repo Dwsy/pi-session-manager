@@ -1,6 +1,7 @@
 import type { SessionInfo, SessionTag, Tag } from '@/types'
 
 export const UNTAGGED_COLUMN_ID = '__untagged__'
+export const DESKTOP_KANBAN_COLUMN_WIDTH = 240
 
 export type KanbanCardDensity = 'comfortable' | 'compact'
 
@@ -65,6 +66,11 @@ export function filterColumnSessions(sessions: SessionInfo[], query: string): Se
       .toLowerCase()
     return haystack.includes(normalized)
   })
+}
+
+export function visibleCardTagsForColumn(tags: Tag[], columnTag: Tag | null): Tag[] {
+  if (!columnTag) return tags
+  return tags.filter((tag) => tag.id !== columnTag.id)
 }
 
 export function buildKanbanColumns({

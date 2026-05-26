@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  Archive,
   Check,
   ChevronDown,
   Filter,
@@ -9,6 +10,7 @@ import {
   FolderOpen,
   LayoutGrid,
   Loader2,
+  Pin,
   Plus,
   Search,
   Settings,
@@ -34,6 +36,7 @@ interface WorkspacePanelProps {
     | 'sessionTags'
     | 'sourceOptions'
     | 'getDescendantIds'
+    | 'onToggleTag'
     | 'onClearSelectedSession'
   >
   workspaceStore: KanbanWorkspaceStore
@@ -97,6 +100,8 @@ export default function WorkspacePanel({
       .sort((a, b) => b.lastModified - a.lastModified)
   }, [effectiveSessions, searchQuery, t])
 
+  const archiveTag = data.tags.find((tag) => tag.id === 'builtin-archive')
+
   const hasFilters =
     activeWorkspace.config.projectFilter ||
     activeWorkspace.config.filterTagIds.length > 0 ||
@@ -117,6 +122,28 @@ export default function WorkspacePanel({
     data.onClearSelectedSession()
   }
 
+  const togglePinnedProject = (project: string) => {
+    const nextProject = activeWorkspace.config.projectFilter === project ? null : project
+    void workspaceStore.updateActiveWorkspaceConfig({ projectFilter: nextProject })
+    workspaceStore.selectProject(null)
+    data.onClearSelectedSession()
+  }
+
+  const archiveProject = (project: string) => {
+    if (!archiveTag) return
+    const archivedSessionIds = new Set(
+      data.sessionTags
+        .filter((sessionTag) => sessionTag.tagId === archiveTag.id)
+        .map((sessionTag) => sessionTag.sessionId),
+    )
+    for (const session of effectiveSessions) {
+      if (session.cwd === project && !archivedSessionIds.has(session.id)) {
+        data.onToggleTag(session.id, archiveTag.id, true)
+      }
+    }
+    data.onClearSelectedSession()
+  }
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center bg-card border-r border-border/10">
@@ -126,7 +153,7 @@ export default function WorkspacePanel({
   }
 
   return (
-    <div className="h-full flex flex-col bg-card border-r border-border/10">
+    <div className="h-full min-h-0 flex flex-col bg-card border-r border-border/10">
       <div className="px-2 py-2 border-b border-border/10 relative">
         <button
           onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
@@ -236,7 +263,7 @@ export default function WorkspacePanel({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <button
           onClick={() => selectProject(null)}
           className={`w-full px-3 py-2 flex items-center gap-2 text-xs border-b border-border/5 ${
@@ -248,19 +275,57 @@ export default function WorkspacePanel({
           {effectiveProjectFilter === null && <Check className="h-3 w-3" />}
         </button>
 
-        {projects.map((project) => (
-          <button
-            key={project.dir}
-            onClick={() => selectProject(project.dir)}
-            className={`w-full px-3 py-2 flex items-center gap-2 text-xs border-b border-border/5 ${
-              effectiveProjectFilter === project.dir ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted text-muted-foreground'
-            }`}
-          >
-            <FolderOpen className="h-3.5 w-3.5 opacity-60" />
-            <span className="flex-1 text-left truncate">{project.dirName}</span>
-            <span className="text-[10px] opacity-60">{project.sessionCount}</span>
-          </button>
-        ))}
+        {projects.map((project) => {
+          const isActiveProject = effectiveProjectFilter === project.dir
+          const isPinnedProject = activeWorkspace.config.projectFilter === project.dir
+
+          return (
+            <div
+              key={project.dir}
+              className={`group flex items-stretch border-b border-border/5 ${
+                isActiveProject ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              <button
+                type="button"
+                aria-label={`Select project ${project.dirName}`}
+                onClick={() => selectProject(project.dir)}
+                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-xs"
+              >
+                <FolderOpen className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                <span className="flex-1 truncate text-left">{project.dirName}</span>
+              </button>
+              <div className="relative flex w-14 shrink-0 items-center justify-end pr-2">
+                <span className={`text-[10px] ${isPinnedProject ? 'opacity-0' : 'opacity-60 group-hover:opacity-0'}`}>
+                  {project.sessionCount}
+                </span>
+                <div className={`absolute right-1 flex items-center gap-0.5 ${isPinnedProject ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                  <button
+                    type="button"
+                    aria-label={`Archive project ${project.dirName}`}
+                    title="Archive project"
+                    onClick={() => archiveProject(project.dir)}
+                    disabled={!archiveTag}
+                    className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-primary focus-ring disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Archive className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${isPinnedProject ? 'Unpin' : 'Pin'} project ${project.dirName}`}
+                    title={isPinnedProject ? 'Unpin project' : 'Pin project'}
+                    onClick={() => togglePinnedProject(project.dir)}
+                    className={`flex h-5 w-5 items-center justify-center rounded focus-ring hover:text-primary ${
+                      isPinnedProject ? 'text-primary' : 'text-muted-foreground'
+                    }`}
+                  >
+                    <Pin className={`h-3.5 w-3.5 ${isPinnedProject ? 'fill-current' : ''}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })}
 
         {projects.length === 0 && (
           <div className="px-3 py-4 text-center text-xs text-muted-foreground">

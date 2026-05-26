@@ -88,7 +88,7 @@ function KanbanCardInner({
   const isCompact = density === 'compact'
   const cardClasses = [
     'group relative rounded-md border motion-surface motion-color',
-    isCompact ? 'p-2' : 'p-2.5',
+    isCompact ? 'h-16 p-2' : 'h-[100px] p-2.5',
     'bg-card hover:border-border',
     isSelected || isBulkSelected ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20' : 'border-border/40',
     dragging ? 'opacity-40 border-primary/40 shadow-lg ring-1 ring-primary/20' : '',

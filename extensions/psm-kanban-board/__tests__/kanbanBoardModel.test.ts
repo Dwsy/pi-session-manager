@@ -6,6 +6,7 @@ import {
   filterColumnSessions,
   orderTagsByColumnOrder,
   reorderTagColumnIds,
+  visibleCardTagsForColumn,
 } from '../kanbanBoardModel'
 
 const baseSession = (id: string, modified = '2026-04-15T12:00:00.000Z'): SessionInfo => ({
@@ -105,5 +106,20 @@ describe('kanban board model', () => {
     expect(selection.ids).toEqual(['b'])
     expect(selection.has('b')).toBe(true)
     expect(selection.has('a')).toBe(false)
+  })
+})
+
+describe('visibleCardTagsForColumn', () => {
+  it('hides the current column tag from cards', () => {
+    const todo = tag('todo', 1)
+    const important = tag('important', 2)
+
+    expect(visibleCardTagsForColumn([todo, important], todo)).toEqual([important])
+  })
+
+  it('keeps all card tags in the unlabeled column', () => {
+    const todo = tag('todo', 1)
+
+    expect(visibleCardTagsForColumn([todo], null)).toEqual([todo])
   })
 })

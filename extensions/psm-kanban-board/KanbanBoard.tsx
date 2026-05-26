@@ -32,6 +32,7 @@ import { filterSessions } from '@/utils/sessionFilters'
 import { getPathBasename } from '@/utils/path'
 import {
   buildKanbanColumns,
+  DESKTOP_KANBAN_COLUMN_WIDTH,
   filterColumnSessions,
   reorderTagColumnIds,
   UNTAGGED_COLUMN_ID,
@@ -127,8 +128,12 @@ function SortableColumnFrame({ column, disabled, children }: SortableColumnFrame
   return (
     <div
       ref={setNodeRef}
-      className="h-full min-h-0 min-w-[280px]"
+      className="h-full min-h-0 flex-none"
       style={{
+        flex: `0 0 ${DESKTOP_KANBAN_COLUMN_WIDTH}px`,
+        width: DESKTOP_KANBAN_COLUMN_WIDTH,
+        minWidth: DESKTOP_KANBAN_COLUMN_WIDTH,
+        maxWidth: DESKTOP_KANBAN_COLUMN_WIDTH,
         scrollSnapAlign: 'start',
         transform: CSS.Transform.toString(transform),
         transition,
@@ -627,9 +632,9 @@ export default function KanbanBoard({
           </div>
         ) : (
           /* Desktop: horizontal scroll */
-          <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-4">
+          <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-3">
             <div
-              className="flex items-stretch gap-3 h-full min-h-0 overflow-x-auto"
+              className="flex items-stretch gap-2 h-full min-h-0 overflow-x-auto"
               style={{ WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory' }}
             >
               <SortableContext items={sortableColumnIds} strategy={horizontalListSortingStrategy}>
