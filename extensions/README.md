@@ -60,6 +60,9 @@ Current `ctx.psm` namespaces:
 | `models` | `listOptions` |
 | `tags` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` |
 | `config` | `read`, `write` |
+| `widgets` | `list`, `get`, `readHtml` |
+| `fs` | `roots`, `list`, `read`, `stat` |
+| `windows` | `open` |
 
 AI plugins should use the host-managed Pi Agent bridge through `ctx.psm.agent`.
 Older `ctx.psm.ai`, `ctx.psm.sidechat`, and
@@ -76,12 +79,13 @@ the recommended plugin authoring path.
 | [psm-sidechat](./psm-sidechat/) | Session Q&A command/tool and toolbar panel example | `sessions:read`, `model:invoke`, `agent:invoke`, `records:read`, `records:write` |
 | [psm-semantic-search](./psm-semantic-search/) | Runs host-managed Pi Agent ReAct search over sessions with controlled PSM tools | `agent:invoke`, `sessions:read`, `search:read`, `model:invoke` |
 | [psm-trace](./psm-trace/) | Session trace analytics main view parsed in the plugin runtime | `sessions:read` |
+| [psm-generative-ui-renderer](./psm-generative-ui-renderer/) | Renders saved `show_widget` HTML through the restricted filesystem widget root | `fs:read` |
 | [psm-word-cloud](./psm-word-cloud/) | Demonstrates Cmd+K plugin commands plus global/project user-message word cloud app views from session-list preview fields | `config:read`, `config:write` |
 
 ## SDK Capability Notes
 
 The public SDK is a browser-plugin contract, not the whole app.
-A good plugin starts with the SDK docs and only uses host-owned surfaces through the permission-aware `ctx.psm` client.
+A good plugin starts with the SDK docs and only uses host-owned surfaces through the permission-aware `ctx.psm` client. Declared permissions are visible in Settings -> Plugins, where individual grants can be revoked per plugin.
 
 The most important current capabilities to remember are:
 
