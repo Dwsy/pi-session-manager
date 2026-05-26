@@ -12,7 +12,6 @@ type VersionDowngradeInfo = {
   db_path: string;
 };
 import { useRouteSync } from "./hooks/useRouteSync";
-import { useNavigate } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSwipe } from "./hooks/useSwipe";
 import { triggerHaptic } from "./utils/haptics";
@@ -102,6 +101,8 @@ const startDragging = () => {
     getCurrentWindow().startDragging();
   }
 };
+
+const MAX_TERMINAL_SCOPES = 5;
 
 const GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY = [
   // Keep app-level navigation shortcuts available while typing, but do not
@@ -402,7 +403,6 @@ function App() {
     }
   }, [loadSettings, loadSessions, loadTags]);
 
-  const navigate = useNavigate();
   const {
     ready: pluginUiReady,
     appViews,
@@ -416,6 +416,9 @@ function App() {
   const {
     navigateToSession,
     navigateToSessions,
+    navigateToProjects,
+    navigateToProject,
+    navigateToPath,
     pendingSessionRoute,
     pendingAppRoute,
   } = useRouteSync({
@@ -441,9 +444,9 @@ function App() {
       setSelectedSession(null);
       setSelectedProject(null);
       setShowFavorites(false);
-      navigate(getAppViewRoute(view));
+      navigateToPath(getAppViewRoute(view));
     },
-    [navigate, setSelectedSession],
+    [navigateToPath, setSelectedSession],
   );
   const openPluginAppViewById = useCallback(
     (viewId: string) => {
@@ -515,7 +518,10 @@ function App() {
   );
 
   // Deep link: pi-session://sessions/{id} etc.
-  const handleDeepLink = useCallback((path: string) => navigate(path), [navigate]);
+  const handleDeepLink = useCallback(
+    (path: string) => navigateToPath(path),
+    [navigateToPath],
+  );
   useDeepLink({ onNavigate: handleDeepLink });
 
   useSwipe(mobileViewerRef, {
@@ -600,9 +606,20 @@ function App() {
       ) {
         return prev;
       }
-      return { ...prev, [scope.key]: scope };
+
+      const next = { ...prev, [scope.key]: scope };
+      const keys = Object.keys(next);
+      if (keys.length <= MAX_TERMINAL_SCOPES) {
+        return next;
+      }
+
+      const evictKey = keys.find((key) => key !== scope.key && key !== activeTerminalScopeKey) ?? keys[0];
+      if (evictKey) {
+        delete next[evictKey];
+      }
+      return next;
     });
-  }, []);
+  }, [activeTerminalScopeKey]);
   const openTerminalScope = useCallback((scope: TerminalScope, command?: string | null) => {
     ensureTerminalScope(scope);
     setActiveTerminalScopeKey(scope.key);
@@ -682,6 +699,22 @@ function App() {
       navigateToSession(session.id);
     },
     [setSelectedSession, navigateToSession, clearBadge],
+  );
+
+  const handleSelectProject = useCallback(
+    (projectPath: string | null) => {
+      setSelectedProject(projectPath);
+      setSelectedSession(null);
+      setActiveAppViewId(null);
+      setSidebarMode("project");
+      setShowFavorites(false);
+      if (projectPath) {
+        navigateToProject(projectPath);
+      } else {
+        navigateToProjects();
+      }
+    },
+    [navigateToProject, navigateToProjects, setSelectedSession],
   );
 
   const buildResumeCommand = useCallback(
@@ -884,7 +917,7 @@ function App() {
         setActiveAppViewId(null);
         setSelectedProject(null);
         setShowFavorites(false);
-        navigateToSessions();
+        navigateToProjects();
       },
       ...appViewShortcuts,
       "cmd+,": () => setShowSettings(true),
@@ -921,8 +954,7 @@ function App() {
             setShowTerminal(false);
           }
         } else if (selectedProject) {
-          setSelectedProject(null);
-          navigateToSessions();
+          handleSelectProject(null);
         } else {
           navigateToSessions();
         }
@@ -949,6 +981,8 @@ function App() {
       terminalConfig.enabled,
       toggleCurrentTerminalScope,
       navigateToSessions,
+      navigateToProjects,
+      handleSelectProject,
       appViewShortcuts,
     ],
   );
@@ -1289,7 +1323,7 @@ function App() {
       projectScrollRef={projectScrollRef}
       selectedProject={selectedProject}
       selectedProjectSummary={selectedProjectSummary}
-      onBackFromProject={() => { setSelectedProject(null); navigateToSessions(); }}
+      onBackFromProject={() => handleSelectProject(null)}
       backLabel={t("project.list.back", "Back")}
       sessionListCommonProps={runtimeSessionListCommonProps}
       sidebarSessions={sidebarSessions}
@@ -1298,7 +1332,7 @@ function App() {
       sidebarLoadingMore={sidebarLoadingMore}
       onLoadMoreSidebarSessions={loadMoreSidebarSessions}
       filteredSessions={filteredSessions}
-      onSelectProject={setSelectedProject}
+      onSelectProject={handleSelectProject}
       loading={loading}
       favorites={favorites}
       onToggleFavorite={toggleFavorite}
@@ -1311,14 +1345,12 @@ function App() {
   );
 
   const handleDatasetOverviewProjectSelect = (path: string) => {
-    setSelectedProject(path);
     if (isMobile) {
+      setSelectedProject(path);
       setMobileTab("projects");
       return;
     }
-    setActiveAppViewId(null);
-    setSidebarMode("project");
-    setShowFavorites(false);
+    handleSelectProject(path);
   };
 
   const renderStandaloneDatasetOverview = () => (
@@ -1457,6 +1489,8 @@ function App() {
     setShowTerminal,
     setShowSettings,
     navigateToSessions,
+    navigateToProjects,
+    navigateToProject,
   });
 
   // ═══════════════════════════════════
@@ -1564,7 +1598,7 @@ function App() {
       onLoadMoreSidebarSessions={loadMoreSidebarSessions}
       onSelectFavoriteProject={handleSelectFavoriteProject}
       onSelectSession={handleSelectSession}
-      onSelectProject={setSelectedProject}
+      onSelectProject={handleSelectProject}
       onRemoveFavorite={removeFavorite}
       onToggleFavorite={toggleFavorite}
       liveSessionIds={liveSessionIds}

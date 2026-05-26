@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
@@ -19,11 +19,9 @@ const makeSession = (id: string): SessionInfo => ({
   last_message_role: "user",
 });
 
-function renderUseRouteSync(
-  path: string,
-  selectedSession: SessionInfo | null,
-  overrides: Partial<Parameters<typeof useRouteSync>[0]> = {},
-) {
+type HookProps = Parameters<typeof useRouteSync>[0];
+
+function renderUseRouteSync(path: string, initialProps: Partial<HookProps> = {}) {
   const session = makeSession("target-session");
   const wrapper = ({ children }: { children: ReactNode }) => (
     <MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>
@@ -38,42 +36,45 @@ function renderUseRouteSync(
     setActiveAppViewId: vi.fn(),
   };
 
-  const hook = renderHook(
-    () =>
-      useRouteSync({
-        selectedSession,
-        sessions: [session],
-        sessionsLoading: true,
-        viewMode: "list",
-        ...spies,
-        appRoutes: [],
-        appRoutesReady: true,
-        ...overrides,
-      }),
-    { wrapper },
-  );
-  return { ...hook, spies };
+  const baseProps: HookProps = {
+    selectedSession: null,
+    sessions: [session],
+    sessionsLoading: true,
+    viewMode: "list",
+    ...spies,
+    appRoutes: [],
+    appRoutesReady: true,
+    ...initialProps,
+  };
+
+  const hook = renderHook((props: HookProps) => useRouteSync(props), {
+    wrapper,
+    initialProps: baseProps,
+  });
+  return { ...hook, spies, session, baseProps };
 }
 
 describe("useRouteSync", () => {
   it("reports pending while a session URL has not been selected yet", () => {
-    const { result } = renderUseRouteSync("/sessions/target-session", null);
+    const { result } = renderUseRouteSync("/sessions/target-session", {
+      selectedSession: null,
+    });
 
     expect(result.current.pendingSessionRoute).toBe(true);
   });
 
   it("does not report pending once the URL session is selected", () => {
     const selectedSession = makeSession("target-session");
-    const { result } = renderUseRouteSync(
-      "/sessions/target-session",
+    const { result } = renderUseRouteSync("/sessions/target-session", {
       selectedSession,
-    );
+    });
 
     expect(result.current.pendingSessionRoute).toBe(false);
   });
 
   it("activates a registered app route generically", async () => {
-    const { spies } = renderUseRouteSync("/boards", null, {
+    const { spies } = renderUseRouteSync("/boards", {
+      selectedSession: null,
       sessionsLoading: false,
       appRoutes: [{ id: "app.board", route: "/boards" }],
       appRoutesReady: true,
@@ -82,6 +83,35 @@ describe("useRouteSync", () => {
     await waitFor(() => {
       expect(spies.setActiveAppViewId).toHaveBeenCalledWith("app.board");
       expect(spies.setViewMode).toHaveBeenCalledWith("app");
+    });
+  });
+
+  it("activates project list route when user navigates from an app route to projects", async () => {
+    const { spies, result } = renderUseRouteSync("/kanban", {
+      selectedSession: null,
+      sessionsLoading: false,
+      appRoutes: [{ id: "builtin.kanban-board.view", route: "/kanban" }],
+      appRoutesReady: true,
+      viewMode: "app",
+    });
+
+    await waitFor(() => {
+      expect(spies.setActiveAppViewId).toHaveBeenCalledWith("builtin.kanban-board.view");
+      expect(spies.setViewMode).toHaveBeenCalledWith("app");
+    });
+
+    spies.setViewMode.mockClear();
+    spies.setSelectedProject.mockClear();
+    spies.setActiveAppViewId.mockClear();
+
+    act(() => {
+      result.current.navigateToProjects();
+    });
+
+    await waitFor(() => {
+      expect(spies.setActiveAppViewId).toHaveBeenCalledWith(null);
+      expect(spies.setSelectedProject).toHaveBeenCalledWith(null);
+      expect(spies.setViewMode).toHaveBeenCalledWith("project");
     });
   });
 });

@@ -19,6 +19,7 @@ import CommandSearchInput from "./CommandSearchInput";
 import CommandFilterBar from "./CommandFilterBar";
 import CommandActionList from "./CommandActionList";
 import CommandResultList from "./CommandResultList";
+import CommandDevPanel from "./CommandDevPanel";
 import SessionPreviewPanel from "./SessionPreviewPanel";
 import type { CommandActionItem, CommandPaletteMode } from "./commandActions";
 import { useCommandSearch } from "./hooks/useCommandSearch";
@@ -40,6 +41,10 @@ interface CommandMenuProps {
   selectedResult: SearchPluginResult | null;
   setSelectedResult: (result: SearchPluginResult | null) => void;
   registryRef: React.MutableRefObject<any>;
+  activeTab: TabType;
+  setActiveTab: (tab: TabType) => void;
+  mode: CommandPaletteMode;
+  setMode: (mode: CommandPaletteMode | ((mode: CommandPaletteMode) => CommandPaletteMode)) => void;
 }
 
 // Memoize CommandMenu to prevent unnecessary re-renders when results change
@@ -59,12 +64,14 @@ export default memo(function CommandMenu({
   selectedResult,
   setSelectedResult,
   registryRef,
+  activeTab,
+  setActiveTab,
+  mode,
+  setMode,
 }: CommandMenuProps) {
   const { t } = useTranslation();
   const { registry, search } = useSearchPlugins(context);
   const pluginCommands = usePsmPluginCommands();
-  const [activeTab, setActiveTab] = useState<TabType>("all");
-  const [mode, setMode] = useState<CommandPaletteMode>("search");
   const [selectedAction, setSelectedAction] = useState<CommandActionItem | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
 
@@ -239,9 +246,20 @@ export default memo(function CommandMenu({
   const inputPlaceholder =
     mode === 'commands'
       ? t("command.commands.placeholder", "Search plugin commands...")
+      : mode === 'dev'
+      ? t("command.dev.placeholder", "Inspect dev plugins...")
       : effectiveSourceFilter === "labels_only"
       ? t("search.fullText.labelsPlaceholder", "Browse all labels...")
       : t("command.placeholder", "Search sessions, projects, messages...");
+
+  const cycleMode = useCallback((direction: 1 | -1 = 1) => {
+    const modes: CommandPaletteMode[] = ['search', 'commands', 'dev'];
+    setMode((value) => {
+      const index = modes.indexOf(value);
+      return modes[(index + direction + modes.length) % modes.length];
+    });
+    setCommandError(null);
+  }, [setMode]);
 
   const handleInputKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -257,8 +275,7 @@ export default memo(function CommandMenu({
 
       if (event.key === 'Tab') {
         event.preventDefault();
-        setMode((value) => value === 'search' ? 'commands' : 'search');
-        setCommandError(null);
+        cycleMode(event.shiftKey ? -1 : 1);
         return;
       }
 
@@ -278,7 +295,7 @@ export default memo(function CommandMenu({
         setSelectedAction(nextIndex >= 0 ? commandActions[nextIndex] : null);
       }
     },
-    [applySuggestedSourceFilter, commandActions, handleRunCommand, mode, selectedAction, sourceFilterSuggestions],
+    [applySuggestedSourceFilter, commandActions, cycleMode, handleRunCommand, mode, selectedAction, sourceFilterSuggestions],
   );
 
   useEffect(() => {
@@ -349,7 +366,7 @@ export default memo(function CommandMenu({
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
         <div
-          className={`${previewCollapsed || mode === 'commands' ? "flex-1 w-auto" : "w-[400px] flex-shrink-0"} border-r border-border/70 flex flex-col h-full overflow-hidden bg-surface/[0.22]`}
+          className={`${previewCollapsed || mode !== 'search' ? "flex-1 w-auto" : "w-[400px] flex-shrink-0"} border-r border-border/70 flex flex-col h-full overflow-hidden bg-surface/[0.22]`}
         >
           {mode === 'commands' ? (
             <CommandActionList
@@ -359,6 +376,8 @@ export default memo(function CommandMenu({
               setSelectedAction={setSelectedAction}
               error={commandError}
             />
+          ) : mode === 'dev' ? (
+            <CommandDevPanel />
           ) : (
             <CommandResultList
               results={results}
@@ -375,7 +394,7 @@ export default memo(function CommandMenu({
           )}
         </div>
         <div
-          className={`${previewCollapsed || mode === 'commands' ? "flex-none w-0" : "flex-1 w-auto"} h-full min-h-0 overflow-hidden bg-background motion-layout`}
+          className={`${previewCollapsed || mode !== 'search' ? "flex-none w-0" : "flex-1 w-auto"} h-full min-h-0 overflow-hidden bg-background motion-layout`}
         >
           {!previewCollapsed && mode === 'search' && (
             <SessionPreviewPanel
@@ -395,6 +414,8 @@ export default memo(function CommandMenu({
             <span className="text-[11px]">
               {mode === 'search'
                 ? t("command.actions.commands", "Commands")
+                : mode === 'commands'
+                ? t("command.actions.dev", "Dev")
                 : t("command.actions.search", "Search")}
             </span>
           </div>
@@ -427,18 +448,18 @@ export default memo(function CommandMenu({
         </div>
         <button
           onClick={mode === 'commands' ? () => void handleRunCommand() : handleSelect}
-          disabled={mode === 'commands' ? !selectedAction || selectedAction.disabled : !selectedResult}
+          disabled={mode === 'commands' ? !selectedAction || selectedAction.disabled : mode === 'search' ? !selectedResult : true}
           className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[12px] font-medium motion-surface motion-color ${
-            mode === 'commands' ? selectedAction && !selectedAction.disabled : selectedResult
+            mode === 'commands' ? selectedAction && !selectedAction.disabled : mode === 'search' ? selectedResult : false
               ? "border-foreground/10 bg-foreground text-background hover:opacity-90"
               : "border-border/60 text-muted-foreground/45 cursor-not-allowed bg-surface/30"
           }`}
         >
           <ArrowUpRight className="w-4 h-4" />
-          <span>{mode === 'commands' ? t("command.actions.run", "Run") : t("command.actions.go")}</span>
+          <span>{mode === 'commands' ? t("command.actions.run", "Run") : mode === 'dev' ? t("command.actions.inspect", "Inspect") : t("command.actions.go")}</span>
           <kbd
             className={`rounded-full px-2 py-0.5 text-[10px] font-mono ${
-              mode === 'commands' ? selectedAction && !selectedAction.disabled : selectedResult
+              mode === 'commands' ? selectedAction && !selectedAction.disabled : mode === 'search' ? selectedResult : false
                 ? "bg-background/10 text-background/90"
                 : "bg-surface text-muted-foreground/55"
             }`}

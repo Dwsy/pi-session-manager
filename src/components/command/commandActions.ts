@@ -1,6 +1,6 @@
 import type { PsmPluginCommandRuntimeRegistration } from '@/plugins/runtime-host'
 
-export type CommandPaletteMode = 'search' | 'commands'
+export type CommandPaletteMode = 'search' | 'commands' | 'dev'
 
 export interface CommandActionItem {
   id: string

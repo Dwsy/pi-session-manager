@@ -12,6 +12,7 @@ export const ROUTES = {
   SESSION_DETAIL: '/sessions/:sessionId',
 
   // Project view
+  PROJECTS: '/projects',
   PROJECT: '/projects/:projectPath',
 
   // Feature views
@@ -28,7 +29,7 @@ export type RouteKey = keyof typeof ROUTES;
  */
 export type ParsedRoute =
   | { route: 'session'; sessionId: string }
-  | { route: 'project'; projectPath: string }
+  | { route: 'project'; projectPath: string | null }
   | { route: 'feature'; feature: 'dashboard' | 'settings' | 'terminal' | 'favorites' }
   | { route: 'app'; path: string }
   | { route: 'root' };
@@ -50,8 +51,8 @@ export function parseRoute(pathname: string): ParsedRoute {
     return { route: 'session', sessionId: decodeURIComponent(parts[1]) };
   }
 
-  if (parts[0] === 'projects' && parts[1]) {
-    return { route: 'project', projectPath: decodeURIComponent(parts[1]) };
+  if (parts[0] === 'projects') {
+    return { route: 'project', projectPath: parts[1] ? decodeURIComponent(parts[1]) : null };
   }
 
   if (parts[0] && parts[0] in FEATURE_ROUTES) {
@@ -77,6 +78,13 @@ export function buildSessionUrl(sessionId: string): string {
  */
 export function buildProjectUrl(projectPath: string): string {
   return `/projects/${encodeURIComponent(projectPath)}`;
+}
+
+/**
+ * Build the project list URL.
+ */
+export function buildProjectsUrl(): string {
+  return '/projects';
 }
 
 /**

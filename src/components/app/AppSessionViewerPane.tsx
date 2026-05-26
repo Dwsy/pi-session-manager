@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ComponentProps, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type { ComponentProps, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { PanelRightOpen, Plus, Terminal as TerminalIcon, X } from "lucide-react";
+import { PanelRightOpen, Terminal as TerminalIcon } from "lucide-react";
 
 import SessionViewer from "@/components/SessionViewer";
 import { useSettings } from "@/hooks/useSettings";
@@ -9,9 +9,11 @@ import { useDeferredPresence } from "@/hooks/useDeferredPresence";
 import { PluginContributionBoundary, PluginContributionSlot, usePsmPluginSessionUi } from "@/plugins/runtime-host";
 import type { PsmSessionToolbarItemRuntimeRegistration } from "@/plugins/runtime-host/types";
 
-const RIGHT_PANEL_BUTTONS_PINNED_KEY = "pi-session-manager-right-panel-buttons-pinned";
 const PANEL_ANIMATION_MS = 180;
-const DOCK_DRAG_THRESHOLD_PX = 6;
+const SESSION_PANEL_ITEM_LIMIT = 5;
+const RIGHT_FEATURE_PANEL_WIDTH_KEY = "__right_feature_picker__";
+const RIGHT_PANEL_MIN_WIDTH = 280;
+const RIGHT_PANEL_MAX_WIDTH = 720;
 
 interface SessionFeatureItem {
   id: string;
@@ -69,28 +71,18 @@ function AppSessionViewerPane({
   const { toolbarItems, panels, treeViews, mainViews = [] } = usePsmPluginSessionUi();
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
   const [renderedPanelId, setRenderedPanelId] = useState<string | null>(null);
+  const [activeBottomPanelId, setActiveBottomPanelId] = useState<string | null>(null);
+  const [renderedBottomPanelId, setRenderedBottomPanelId] = useState<string | null>(null);
   const [activeMainViewId, setActiveMainViewId] = useState<string | null>(null);
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  const [rightFeaturePickerOpen, setRightFeaturePickerOpen] = useState(false);
   const [bottomFeatureTrayOpen, setBottomFeatureTrayOpen] = useState(false);
   const [panelWidths, setPanelWidths] = useState<Record<string, number>>({});
-  const [rightPanelButtonsPinned, setRightPanelButtonsPinned] = useState(() => {
-    try {
-      return localStorage.getItem(RIGHT_PANEL_BUTTONS_PINNED_KEY) === "toolbar";
-    } catch {
-      return false;
-    }
-  });
-  const dockDragRef = useRef<{
-    node: HTMLDivElement | null;
-    mode: "floating" | "toolbar";
-    pointerId: number;
+  const rightPanelResizeRef = useRef<{
+    panelId: string;
     startX: number;
-    startY: number;
-    dragging: boolean;
-    captured: boolean;
+    startWidth: number;
   } | null>(null);
-  const dockDragFrameRef = useRef<number | null>(null);
-  const suppressDockClickRef = useRef(false);
 
   const togglePanel = useCallback((id: string) => {
     setActivePanelId((prev) => (prev === id ? null : id));
@@ -98,6 +90,17 @@ function AppSessionViewerPane({
 
   const closePanel = useCallback((id: string) => {
     setActivePanelId((prev) => (prev === id ? null : prev));
+  }, []);
+
+  const toggleBottomPanel = useCallback((id: string) => {
+    setActiveBottomPanelId((prev) => (prev === id ? null : id));
+    setActivePanelId(null);
+    setRightFeaturePickerOpen(false);
+    setBottomFeatureTrayOpen(false);
+  }, []);
+
+  const closeBottomPanel = useCallback((id: string) => {
+    setActiveBottomPanelId((prev) => (prev === id ? null : prev));
   }, []);
 
   const toggleMainView = useCallback((id: string) => {
@@ -109,132 +112,73 @@ function AppSessionViewerPane({
   }, []);
 
   const setPanelWidth = useCallback((id: string, width: number) => {
-    setPanelWidths((prev) => ({ ...prev, [id]: width }));
+    const nextWidth = Math.min(RIGHT_PANEL_MAX_WIDTH, Math.max(RIGHT_PANEL_MIN_WIDTH, width));
+    setPanelWidths((prev) => ({ ...prev, [id]: nextWidth }));
   }, []);
 
-  const setRightPanelButtonsPinnedMode = useCallback((pinned: boolean) => {
-    setRightPanelButtonsPinned(pinned);
-    try {
-      localStorage.setItem(RIGHT_PANEL_BUTTONS_PINNED_KEY, pinned ? "toolbar" : "floating");
-    } catch {
-      // Keep the in-memory preference when storage is unavailable.
-    }
-  }, []);
-
-  const scheduleDockTransform = useCallback((node: HTMLDivElement, x: number, y: number) => {
-    if (dockDragFrameRef.current !== null) {
-      window.cancelAnimationFrame(dockDragFrameRef.current);
-    }
-    dockDragFrameRef.current = window.requestAnimationFrame(() => {
-      node.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-      dockDragFrameRef.current = null;
-    });
-  }, []);
-
-  const resetDockTransform = useCallback((node: HTMLDivElement) => {
-    if (dockDragFrameRef.current !== null) {
-      window.cancelAnimationFrame(dockDragFrameRef.current);
-      dockDragFrameRef.current = null;
-    }
-    node.style.transform = "";
-  }, []);
-
-  const isPointerInToolbarDropZone = useCallback((event: ReactPointerEvent) => {
-    const toolbar = document.querySelector("[data-session-toolbar-right]");
-    const rect = toolbar?.getBoundingClientRect();
-    if (!rect) {
-      return event.clientY <= 64;
-    }
-    const padding = 28;
-    return (
-      event.clientX >= rect.left - padding &&
-      event.clientX <= rect.right + padding &&
-      event.clientY >= rect.top - padding &&
-      event.clientY <= rect.bottom + padding
-    );
-  }, []);
-
-  const isPointerAtRightDock = useCallback((event: ReactPointerEvent) => (
-    window.innerWidth - event.clientX <= 96
-  ), []);
-
-  const handleDockPointerDown = useCallback((
+  const handleRightPanelResizePointerDown = useCallback((
     event: ReactPointerEvent<HTMLDivElement>,
-    mode: "floating" | "toolbar",
+    panelId: string,
+    width: number,
   ) => {
     if (event.button !== 0) {
       return;
     }
-    dockDragRef.current = {
-      node: event.currentTarget,
-      mode,
-      pointerId: event.pointerId,
+    event.preventDefault();
+    rightPanelResizeRef.current = {
+      panelId,
       startX: event.clientX,
-      startY: event.clientY,
-      dragging: false,
-      captured: false,
+      startWidth: width,
     };
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const resize = rightPanelResizeRef.current;
+      if (!resize) {
+        return;
+      }
+      setPanelWidth(resize.panelId, resize.startWidth + resize.startX - moveEvent.clientX);
+    };
+
+    const handlePointerUp = () => {
+      rightPanelResizeRef.current = null;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
+  }, [setPanelWidth]);
+
+  const toggleRightFeaturePanel = useCallback(() => {
+    setRightFeaturePickerOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setBottomFeatureTrayOpen(false);
+        setActivePanelId(null);
+        setActiveBottomPanelId(null);
+      }
+      return next;
+    });
   }, []);
 
-  const handleDockPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = dockDragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId || !drag.node) {
-      return;
-    }
-
-    const deltaX = event.clientX - drag.startX;
-    const deltaY = event.clientY - drag.startY;
-    if (!drag.dragging && Math.hypot(deltaX, deltaY) < DOCK_DRAG_THRESHOLD_PX) {
-      return;
-    }
-
-    drag.dragging = true;
-    suppressDockClickRef.current = true;
-    drag.node.dataset.dragging = "true";
-    if (!drag.captured) {
-      drag.node.setPointerCapture?.(event.pointerId);
-      drag.captured = true;
-    }
-    scheduleDockTransform(drag.node, deltaX, deltaY);
-  }, [scheduleDockTransform]);
-
-  const handleDockPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = dockDragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId || !drag.node) {
-      return;
-    }
-
-    const wasDragging = drag.dragging;
-    if (drag.captured) {
-      drag.node.releasePointerCapture?.(event.pointerId);
-    }
-    delete drag.node.dataset.dragging;
-    resetDockTransform(drag.node);
-    dockDragRef.current = null;
-
-    if (!wasDragging) {
-      return;
-    }
-
-    event.preventDefault();
-    if (drag.mode === "floating" && isPointerInToolbarDropZone(event)) {
-      setRightPanelButtonsPinnedMode(true);
-    } else if (drag.mode === "toolbar" && isPointerAtRightDock(event)) {
-      setRightPanelButtonsPinnedMode(false);
-    }
-  }, [isPointerAtRightDock, isPointerInToolbarDropZone, resetDockTransform, setRightPanelButtonsPinnedMode]);
-
-  const handleDockClickCapture = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
-    if (!suppressDockClickRef.current) {
-      return;
-    }
-    suppressDockClickRef.current = false;
-    event.preventDefault();
-    event.stopPropagation();
+  const toggleBottomFeatureTray = useCallback(() => {
+    setBottomFeatureTrayOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setRightFeaturePickerOpen(false);
+        setActivePanelId(null);
+        setActiveBottomPanelId(null);
+      }
+      return next;
+    });
   }, []);
 
   const rightPanels = useMemo(
-    () => panels.filter((panel) => (panel.side ?? "right") === "right"),
+    () => panels.filter((panel) => (panel.side ?? "right") === "right").slice(0, SESSION_PANEL_ITEM_LIMIT),
+    [panels],
+  );
+  const bottomPanels = useMemo(
+    () => panels.filter((panel) => panel.side === "bottom").slice(0, SESSION_PANEL_ITEM_LIMIT),
     [panels],
   );
   const activePanel = useMemo(
@@ -245,7 +189,16 @@ function AppSessionViewerPane({
     () => activePanel ?? rightPanels.find((panel) => panel.id === renderedPanelId) ?? null,
     [activePanel, renderedPanelId, rightPanels],
   );
+  const activeBottomPanel = useMemo(
+    () => bottomPanels.find((panel) => panel.id === activeBottomPanelId) ?? null,
+    [activeBottomPanelId, bottomPanels],
+  );
+  const renderedBottomPanel = useMemo(
+    () => activeBottomPanel ?? bottomPanels.find((panel) => panel.id === renderedBottomPanelId) ?? null,
+    [activeBottomPanel, renderedBottomPanelId, bottomPanels],
+  );
   const rightPanelPresent = useDeferredPresence(Boolean(activePanel), PANEL_ANIMATION_MS);
+  const bottomPanelPresent = useDeferredPresence(Boolean(activeBottomPanel), PANEL_ANIMATION_MS);
   const activeMainView = useMemo(
     () => mainViews.find((view) => view.id === activeMainViewId) ?? null,
     [activeMainViewId, mainViews],
@@ -254,29 +207,49 @@ function AppSessionViewerPane({
     () => new Set(rightPanels.map((panel) => panel.id)),
     [rightPanels],
   );
+  const bottomPanelIds = useMemo(
+    () => new Set(bottomPanels.map((panel) => panel.id)),
+    [bottomPanels],
+  );
   const rightPanelToolbarItems = useMemo(
-    () => toolbarItems.filter((item) => item.panelId && rightPanelIds.has(item.panelId)),
+    () => toolbarItems.filter((item) => item.panelId && rightPanelIds.has(item.panelId)).slice(0, SESSION_PANEL_ITEM_LIMIT),
     [rightPanelIds, toolbarItems],
   );
+  const bottomPanelToolbarItems = useMemo(
+    () => toolbarItems.filter((item) => item.panelId && bottomPanelIds.has(item.panelId)).slice(0, SESSION_PANEL_ITEM_LIMIT),
+    [bottomPanelIds, toolbarItems],
+  );
   const toolbarSlotItems = useMemo(
-    () => toolbarItems.filter((item) => !item.panelId || !rightPanelIds.has(item.panelId)),
-    [rightPanelIds, toolbarItems],
+    () => toolbarItems.filter((item) => !item.panelId || (!rightPanelIds.has(item.panelId) && !bottomPanelIds.has(item.panelId))),
+    [bottomPanelIds, rightPanelIds, toolbarItems],
   );
   const openPanelDescription = t("session.toolbar.openPanel", "Open panel");
   const terminalTitle = t("terminal.title", "Terminal");
   const terminalDescription = t("terminal.sessionDescription", "Session shell");
-  const sessionFeatureItems = useMemo<SessionFeatureItem[]>(() => {
-    const items = rightPanelToolbarItems.map((item) => ({
+  const rightFeatureItems = useMemo<SessionFeatureItem[]>(() => rightPanelToolbarItems.map((item) => ({
+    id: item.id,
+    title: item.title,
+    description: openPanelDescription,
+    active: item.panelId ? activePanelId === item.panelId : false,
+    onSelect: () => {
+      if (item.panelId) {
+        togglePanel(item.panelId);
+      }
+    },
+    icon: <PanelRightOpen className="h-4 w-4" aria-hidden="true" />,
+  })), [activePanelId, openPanelDescription, rightPanelToolbarItems, togglePanel]);
+  const bottomFeatureItems = useMemo<SessionFeatureItem[]>(() => {
+    const items = bottomPanelToolbarItems.map((item) => ({
       id: item.id,
       title: item.title,
       description: openPanelDescription,
-      active: item.panelId ? activePanelId === item.panelId : false,
+      active: item.panelId ? activeBottomPanelId === item.panelId : false,
       onSelect: () => {
         if (item.panelId) {
-          togglePanel(item.panelId);
+          toggleBottomPanel(item.panelId);
         }
       },
-      icon: <PanelRightOpen className="h-4 w-4" aria-hidden="true" />,
+      icon: <TerminalIcon className="h-4 w-4" aria-hidden="true" />,
     }));
     if (terminalFeatureEnabled && onToggleTerminalFeature) {
       items.push({
@@ -288,158 +261,212 @@ function AppSessionViewerPane({
         icon: <TerminalIcon className="h-4 w-4" aria-hidden="true" />,
       });
     }
-    return items;
+    return items.slice(0, SESSION_PANEL_ITEM_LIMIT);
   }, [
-    activePanelId,
+    activeBottomPanelId,
+    bottomPanelToolbarItems,
     onToggleTerminalFeature,
     openPanelDescription,
-    rightPanelToolbarItems,
     terminalDescription,
     terminalFeatureEnabled,
     terminalFeatureOpen,
     terminalTitle,
-    togglePanel,
+    toggleBottomPanel,
   ]);
 
   useEffect(() => {
     if (activePanelId) {
       setRenderedPanelId(activePanelId);
+      setActiveBottomPanelId(null);
+      setRightFeaturePickerOpen(false);
+      setBottomFeatureTrayOpen(false);
     }
   }, [activePanelId]);
+
+  useEffect(() => {
+    if (activeBottomPanelId) {
+      setRenderedBottomPanelId(activeBottomPanelId);
+      setActivePanelId(null);
+      setRightFeaturePickerOpen(false);
+      setBottomFeatureTrayOpen(false);
+    }
+  }, [activeBottomPanelId]);
+
+  useEffect(() => {
+    if (terminalFeatureOpen) {
+      setRightFeaturePickerOpen(false);
+      setBottomFeatureTrayOpen(false);
+    }
+  }, [terminalFeatureOpen]);
 
   const renderToolbarItem = useCallback((item: PsmSessionToolbarItemRuntimeRegistration) => {
     const panelId = item.panelId;
     const mainViewId = item.mainViewId;
+    const isRightPanelItem = panelId ? rightPanelIds.has(panelId) : false;
+    const isBottomPanelItem = panelId ? bottomPanelIds.has(panelId) : false;
     return (
       <Fragment key={item.id}>
         <PluginContributionBoundary pluginId={item.pluginId} contributionId={item.id} title={item.title}>
           <PluginContributionSlot render={() => item.render({
             session,
             activeEntryId,
-            panelOpen: panelId ? activePanelId === panelId : undefined,
-            togglePanel: panelId ? () => togglePanel(panelId) : undefined,
+            panelOpen: panelId
+              ? isBottomPanelItem
+                ? activeBottomPanelId === panelId
+                : activePanelId === panelId
+              : undefined,
+            togglePanel: panelId
+              ? () => {
+                if (isBottomPanelItem) {
+                  toggleBottomPanel(panelId);
+                } else if (isRightPanelItem) {
+                  togglePanel(panelId);
+                }
+              }
+              : undefined,
             mainViewOpen: mainViewId ? activeMainViewId === mainViewId : undefined,
             toggleMainView: mainViewId ? () => toggleMainView(mainViewId) : undefined,
           })} />
         </PluginContributionBoundary>
       </Fragment>
     );
-  }, [activeEntryId, activeMainViewId, activePanelId, session, toggleMainView, togglePanel]);
+  }, [
+    activeBottomPanelId,
+    activeEntryId,
+    activeMainViewId,
+    activePanelId,
+    bottomPanelIds,
+    rightPanelIds,
+    session,
+    toggleBottomPanel,
+    toggleMainView,
+    togglePanel,
+  ]);
 
-  const sessionToolbarSlot = useMemo(() => (
-    <>
-      {slots?.right}
-      {toolbarSlotItems.map(renderToolbarItem)}
-      {rightPanelButtonsPinned && sessionFeatureItems.length > 0 && (
-        <div
-          className="psm-session-right-panel-toolbar-dock"
-          data-no-window-drag
-          onPointerDown={(event) => handleDockPointerDown(event, "toolbar")}
-          onPointerMove={handleDockPointerMove}
-          onPointerUp={handleDockPointerUp}
-          onClickCapture={handleDockClickCapture}
-          title={t("session.toolbar.dragRightPanelButtons", "Drag to the right edge to unpin")}
-          aria-label={t("session.toolbar.rightPanelButtons", "Right panel buttons")}
-        >
-          {sessionFeatureItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={item.onSelect}
-              className={`psm-session-feature-card psm-session-feature-card--toolbar ${item.active ? "psm-session-feature-card--active" : ""}`}
-              aria-pressed={item.active}
-              title={item.title}
-            >
-              {item.icon}
-              <span className="sr-only">{item.title}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </>
-  ), [
-    handleDockClickCapture,
-    handleDockPointerDown,
-    handleDockPointerMove,
-    handleDockPointerUp,
+  const featureToggleClass = "p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors";
+  const featureToggleActiveClass = "border-primary/35 bg-primary/12 text-foreground";
+  const featureToggleInactiveClass = "text-muted-foreground";
+  const rightFeatureToggleLabel = t("session.toolbar.rightPanelButtons", "Right panel buttons");
+  const bottomFeatureToggleLabel = t("session.toolbar.sessionFeatures", "Session features");
+
+  const sessionToolbarSlot = useMemo(() => {
+    const singleBottomItem = bottomFeatureItems.length === 1 ? bottomFeatureItems[0] : null;
+    return (
+      <>
+        {slots?.right}
+        {toolbarSlotItems.map(renderToolbarItem)}
+        {singleBottomItem && (
+          <button
+            type="button"
+            className={`${featureToggleClass} ${singleBottomItem.active ? featureToggleActiveClass : featureToggleInactiveClass}`}
+            onClick={singleBottomItem.onSelect}
+            aria-pressed={singleBottomItem.active}
+            aria-label={singleBottomItem.title}
+            title={singleBottomItem.title}
+          >
+            {singleBottomItem.icon}
+          </button>
+        )}
+        {bottomFeatureItems.length > 1 && (
+          <button
+            type="button"
+            className={`${featureToggleClass} ${bottomFeatureTrayOpen ? featureToggleActiveClass : featureToggleInactiveClass}`}
+            onClick={toggleBottomFeatureTray}
+            aria-expanded={bottomFeatureTrayOpen}
+            aria-label={bottomFeatureToggleLabel}
+            title={bottomFeatureToggleLabel}
+          >
+            <TerminalIcon className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {rightFeatureItems.length > 0 && (
+          <button
+            type="button"
+            className={`${featureToggleClass} ${rightFeaturePickerOpen ? featureToggleActiveClass : featureToggleInactiveClass}`}
+            onClick={toggleRightFeaturePanel}
+            aria-expanded={rightFeaturePickerOpen}
+            aria-label={rightFeatureToggleLabel}
+            title={rightFeatureToggleLabel}
+          >
+            <PanelRightOpen className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </>
+    );
+  }, [
+    bottomFeatureItems,
+    bottomFeatureToggleLabel,
+    bottomFeatureTrayOpen,
+    featureToggleActiveClass,
+    featureToggleClass,
+    featureToggleInactiveClass,
     renderToolbarItem,
-    rightPanelButtonsPinned,
-    sessionFeatureItems,
+    rightFeatureItems.length,
+    rightFeaturePickerOpen,
+    rightFeatureToggleLabel,
     slots?.right,
-    t,
+    toggleBottomFeatureTray,
+    toggleRightFeaturePanel,
     toolbarSlotItems,
   ]);
 
-  const floatingRightPanelButtons = useMemo(() => (!rightPanelButtonsPinned && sessionFeatureItems.length > 0 ? (
-    <div
-      className="psm-session-right-panel-floating-dock"
-      data-no-window-drag
-      onPointerDown={(event) => handleDockPointerDown(event, "floating")}
-      onPointerMove={handleDockPointerMove}
-      onPointerUp={handleDockPointerUp}
-      onClickCapture={handleDockClickCapture}
-      title={t("session.toolbar.dragRightPanelButtonsToToolbar", "Drag to the toolbar to pin")}
-      aria-label={t("session.toolbar.rightPanelButtons", "Right panel buttons")}
-    >
-      {sessionFeatureItems.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={item.onSelect}
-          className={`psm-session-feature-card psm-session-feature-card--side ${item.active ? "psm-session-feature-card--active" : ""}`}
-          aria-pressed={item.active}
-        >
-          {item.icon}
-          <span className="psm-session-feature-card__title">{item.title}</span>
-          <span className="psm-session-feature-card__description">{item.description}</span>
-        </button>
-      ))}
-    </div>
-  ) : null), [
-    handleDockClickCapture,
-    handleDockPointerDown,
-    handleDockPointerMove,
-    handleDockPointerUp,
-    rightPanelButtonsPinned,
-    sessionFeatureItems,
-    t,
-  ]);
+  const rightFeaturePanelWidth = panelWidths[RIGHT_FEATURE_PANEL_WIDTH_KEY] ?? 430;
+  const rightFeaturePanel = useMemo(() => (rightFeaturePickerOpen && rightFeatureItems.length > 0 ? (
+    <aside className="psm-session-right-feature-panel" style={{ width: rightFeaturePanelWidth }} data-no-window-drag>
+      <div
+        className="psm-session-right-panel__resize-handle"
+        data-no-window-drag
+        onPointerDown={(event) => handleRightPanelResizePointerDown(event, RIGHT_FEATURE_PANEL_WIDTH_KEY, rightFeaturePanelWidth)}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={t("session.toolbar.resizeRightPanel", "Resize right panel")}
+      />
+      <div className="psm-session-right-feature-panel__grid">
+        {rightFeatureItems.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => {
+              item.onSelect();
+              setRightFeaturePickerOpen(false);
+            }}
+            className={`psm-session-feature-card psm-session-feature-card--side ${item.active ? "psm-session-feature-card--active" : ""}`}
+            aria-pressed={item.active}
+          >
+            {item.icon}
+            <span className="psm-session-feature-card__title">{item.title}</span>
+            <span className="psm-session-feature-card__description">{item.description}</span>
+          </button>
+        ))}
+      </div>
+    </aside>
+  ) : null), [handleRightPanelResizePointerDown, rightFeatureItems, rightFeaturePanelWidth, rightFeaturePickerOpen, t]);
 
-  const bottomFeatureTray = useMemo(() => (sessionFeatureItems.length > 0 ? (
+  const bottomFeatureTray = useMemo(() => (bottomFeatureTrayOpen && bottomFeatureItems.length > 1 ? (
     <div className="psm-session-bottom-features" data-no-window-drag>
-      <button
-        type="button"
-        className="psm-session-bottom-features__toggle"
-        onClick={() => setBottomFeatureTrayOpen((value) => !value)}
-        aria-expanded={bottomFeatureTrayOpen}
-        aria-label={t("session.toolbar.sessionFeatures", "Session features")}
-      >
-        {bottomFeatureTrayOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-      </button>
-      {bottomFeatureTrayOpen && (
-        <div className="psm-session-bottom-features__panel">
-          <div className="psm-session-bottom-features__grid">
-            {sessionFeatureItems.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  item.onSelect();
-                  setBottomFeatureTrayOpen(false);
-                }}
-                className={`psm-session-feature-card psm-session-feature-card--bottom ${item.active ? "psm-session-feature-card--active" : ""}`}
-                aria-pressed={item.active}
-              >
-                {item.icon}
-                <span className="psm-session-feature-card__title">{item.title}</span>
-                <span className="psm-session-feature-card__description">{item.description}</span>
-              </button>
-            ))}
-          </div>
+      <div className="psm-session-bottom-features__panel">
+        <div className="psm-session-bottom-features__grid">
+          {bottomFeatureItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                item.onSelect();
+                setBottomFeatureTrayOpen(false);
+                setRightFeaturePickerOpen(false);
+              }}
+              className={`psm-session-feature-card psm-session-feature-card--bottom ${item.active ? "psm-session-feature-card--active" : ""}`}
+              aria-pressed={item.active}
+            >
+              {item.icon}
+              <span className="psm-session-feature-card__title">{item.title}</span>
+              <span className="psm-session-feature-card__description">{item.description}</span>
+            </button>
+          ))}
         </div>
-      )}
+      </div>
     </div>
-  ) : null), [bottomFeatureTrayOpen, sessionFeatureItems, t]);
+  ) : null), [bottomFeatureItems, bottomFeatureTrayOpen]);
 
   const rightPanelSlot = useMemo(() => (rightPanelPresent && renderedPanel ? (
     <aside
@@ -448,6 +475,14 @@ function AppSessionViewerPane({
       data-no-window-drag
       aria-hidden={!activePanel}
     >
+      <div
+        className="psm-session-right-panel__resize-handle"
+        data-no-window-drag
+        onPointerDown={(event) => handleRightPanelResizePointerDown(event, renderedPanel.id, panelWidths[renderedPanel.id] ?? 380)}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={t("session.toolbar.resizeRightPanel", "Resize right panel")}
+      />
       {rightPanels.length > 1 && (
         <div className="relative z-10 flex items-center gap-1 border-b border-border/70 bg-background/20 px-2 py-2" data-no-window-drag>
           {rightPanels.map((panel) => {
@@ -488,12 +523,64 @@ function AppSessionViewerPane({
     activeEntryId,
     activePanel,
     closePanel,
+    handleRightPanelResizePointerDown,
     panelWidths,
     renderedPanel,
     rightPanelPresent,
     rightPanels,
     session,
     setPanelWidth,
+    t,
+  ]);
+
+  const bottomPanelSlot = useMemo(() => (bottomPanelPresent && renderedBottomPanel ? (
+    <div
+      className={`psm-session-bottom-panel ${activeBottomPanel ? "psm-session-bottom-panel--open" : "psm-session-bottom-panel--closed"}`}
+      data-no-window-drag
+      aria-hidden={!activeBottomPanel}
+    >
+      {bottomPanels.length > 1 && (
+        <div className="relative z-10 flex items-center gap-1 border-b border-border/70 bg-background/20 px-2 py-2" data-no-window-drag>
+          {bottomPanels.map((panel) => {
+            const active = panel.id === renderedBottomPanel.id;
+            return (
+              <button
+                key={panel.id}
+                type="button"
+                onClick={() => setActiveBottomPanelId(panel.id)}
+                data-no-window-drag
+                className={[
+                  "inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors",
+                  active
+                    ? "border-primary/30 bg-primary/12 text-foreground"
+                    : "border-transparent bg-transparent text-muted-foreground hover:border-border/60 hover:bg-background/25 hover:text-foreground",
+                ].join(" ")}
+              >
+                {panel.title}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="min-h-0 flex-1 overflow-hidden" data-no-window-drag>
+        <PluginContributionBoundary pluginId={renderedBottomPanel.pluginId} contributionId={renderedBottomPanel.id} title={renderedBottomPanel.title}>
+          <PluginContributionSlot render={() => renderedBottomPanel.render({
+            session,
+            activeEntryId,
+            panelOpen: Boolean(activeBottomPanel),
+            closePanel: () => closeBottomPanel(renderedBottomPanel.id),
+          })} />
+        </PluginContributionBoundary>
+      </div>
+    </div>
+  ) : null), [
+    activeBottomPanel,
+    activeEntryId,
+    bottomPanelPresent,
+    bottomPanels,
+    closeBottomPanel,
+    renderedBottomPanel,
+    session,
   ]);
 
   const mainViewSlot = useMemo(() => (activeMainView ? (
@@ -512,10 +599,10 @@ function AppSessionViewerPane({
   );
   const layoutSlots = useMemo(
     () => ({
-      right: <>{floatingRightPanelButtons}{rightPanelSlot}</>,
-      bottom: bottomFeatureTray,
+      right: <>{rightFeaturePanel}{rightPanelSlot}</>,
+      bottom: <>{bottomPanelSlot}{bottomFeatureTray}</>,
     }),
-    [bottomFeatureTray, floatingRightPanelButtons, rightPanelSlot],
+    [bottomFeatureTray, bottomPanelSlot, rightFeaturePanel, rightPanelSlot],
   );
 
   return (

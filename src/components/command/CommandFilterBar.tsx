@@ -8,6 +8,7 @@ import {
   ArrowUpDown,
   Star,
   Command,
+  Wrench,
 } from 'lucide-react'
 import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearchPlugin'
 import type { FullTextSearchSourceFilter } from '@/types'
@@ -51,65 +52,73 @@ export default function CommandFilterBar({
   const { t } = useTranslation()
   const showAdvancedMessageFilters = supportsMessageFilters
 
+  const segmentBase =
+    'inline-flex items-center gap-1.5 rounded-[5px] px-2.5 py-[3px] text-[11px] transition-colors select-none'
+  const segmentActive =
+    'bg-background text-foreground shadow-[0_0_0_0.5px_rgb(var(--color-border)/0.9),0_1px_1.5px_rgb(0_0_0/0.06)]'
+  const segmentInactive = 'text-muted-foreground hover:text-foreground'
+  const segmentedGroup =
+    'inline-flex items-center gap-[2px] rounded-md border border-border/70 bg-surface/35 p-[2px]'
+
   return (
     <div className="mt-4 flex flex-wrap items-center gap-3">
-      <div className="flex items-center gap-1 rounded-full border border-border/70 bg-background p-1">
-        {(['search', 'commands'] as const).map((value) => {
+      <div className={segmentedGroup}>
+        {(['search', 'commands', 'dev'] as const).map((value) => {
           const isActive = mode === value
-          const Icon = value === 'search' ? Search : Command
+          const Icon = value === 'search' ? Search : value === 'commands' ? Command : Wrench
           return (
             <button
               key={value}
               onClick={() => setMode(value)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
-                isActive
-                  ? 'bg-foreground/[0.06] text-foreground font-medium'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+              className={`${segmentBase} ${isActive ? segmentActive : segmentInactive}`}
             >
               <Icon className="h-3.5 w-3.5" />
-              <span>{value === 'search' ? t('command.mode.search', 'Search') : t('command.mode.commands', 'Commands')}</span>
+              <span>
+                {value === 'search'
+                  ? t('command.mode.search', 'Search')
+                  : value === 'commands'
+                  ? t('command.mode.commands', 'Commands')
+                  : t('command.mode.dev', 'Dev')}
+              </span>
             </button>
           )
         })}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {mode === 'search' && TABS.map((tab) => {
-          const isActive = activeTab === tab.id
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`inline-flex items-center gap-2 rounded-full border px-2 py-1.5 text-[12px] transition-colors ${
-                isActive
-                  ? 'border-foreground/10 bg-foreground/[0.06] text-foreground font-medium'
-                  : 'border-border/70 bg-background text-muted-foreground hover:text-foreground hover:border-border'
-              }`}
-            >
-              <tab.Icon className="w-3.5 h-3.5" />
-              <span>{getTabLabel(t, tab)}</span>
-              {tabCounts[tab.id] > 0 && (
-                <span
-                  className={`inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${
-                    isActive
-                      ? 'bg-foreground text-background'
-                      : 'bg-surface text-muted-foreground'
-                  }`}
-                >
-                  {tabCounts[tab.id]}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      {mode === 'search' && (
+        <div className={segmentedGroup}>
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`${segmentBase} ${isActive ? segmentActive : segmentInactive}`}
+              >
+                <tab.Icon className="w-3.5 h-3.5" />
+                <span>{getTabLabel(t, tab)}</span>
+                {tabCounts[tab.id] > 0 && (
+                  <span
+                    className={`inline-flex min-w-[16px] items-center justify-center rounded-[3px] px-1 text-[10px] font-semibold tabular-nums ${
+                      isActive
+                        ? 'bg-foreground/85 text-background'
+                        : 'bg-surface/60 text-muted-foreground'
+                    }`}
+                  >
+                    {tabCounts[tab.id]}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {mode === 'search' && showAdvancedMessageFilters && (
         <>
           <div className="h-5 w-px bg-border/70" />
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 rounded-full border border-border/70 bg-background p-1">
+            <div className={segmentedGroup}>
               {(['all', 'user', 'assistant'] as const).map((value) => (
                 <button
                   key={value}
@@ -120,11 +129,7 @@ export default function CommandFilterBar({
                       page: 0,
                     })
                   }
-                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
-                    ftsOptions.roleFilter === value
-                      ? 'bg-foreground/[0.06] text-foreground font-medium'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`${segmentBase} ${ftsOptions.roleFilter === value ? segmentActive : segmentInactive}`}
                 >
                   {value === 'all' && (
                     <>
@@ -139,16 +144,12 @@ export default function CommandFilterBar({
               ))}
             </div>
 
-            <div className="flex items-center gap-1 rounded-full border border-border/70 bg-background p-1">
+            <div className={segmentedGroup}>
               {SOURCE_FILTERS.map((value) => (
                 <button
                   key={value}
                   onClick={() => onSourceFilterChange(value)}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
-                    effectiveSourceFilter === value
-                      ? 'bg-foreground/[0.06] text-foreground font-medium'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`${segmentBase} ${effectiveSourceFilter === value ? segmentActive : segmentInactive}`}
                 >
                   {value === 'labels_only' && <Tag className="w-3 h-3" />}
                   {value === 'content_only' && (
@@ -160,29 +161,25 @@ export default function CommandFilterBar({
               ))}
             </div>
 
-            <div className="flex items-center gap-1 rounded-full border border-border/70 bg-background p-1">
-              {(['newest', 'oldest', 'score'] as const).map((mode) => (
+            <div className={segmentedGroup}>
+              {(['newest', 'oldest', 'score'] as const).map((sortValue) => (
                 <button
-                  key={mode}
+                  key={sortValue}
                   onClick={() =>
                     setFtsOptions({
                       ...ftsOptions,
-                      sortMode: mode,
+                      sortMode: sortValue,
                       page: 0,
                     })
                   }
-                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
-                    effectiveSortMode === mode
-                      ? 'bg-foreground/[0.06] text-foreground font-medium'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`${segmentBase} ${effectiveSortMode === sortValue ? segmentActive : segmentInactive}`}
                 >
-                  {mode === 'newest' && (
+                  {sortValue === 'newest' && (
                     <ArrowUpDown className="w-3 h-3 rotate-180" />
                   )}
-                  {mode === 'oldest' && <ArrowUpDown className="w-3 h-3" />}
-                  {mode === 'score' && <Star className="w-3 h-3" />}
-                  <span>{getSortLabel(mode)}</span>
+                  {sortValue === 'oldest' && <ArrowUpDown className="w-3 h-3" />}
+                  {sortValue === 'score' && <Star className="w-3 h-3" />}
+                  <span>{getSortLabel(sortValue)}</span>
                 </button>
               ))}
             </div>

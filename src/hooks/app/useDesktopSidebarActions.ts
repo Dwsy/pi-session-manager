@@ -11,6 +11,8 @@ export interface UseDesktopSidebarActionsOptions {
   setShowTerminal: Dispatch<SetStateAction<boolean>>;
   setShowSettings: Dispatch<SetStateAction<boolean>>;
   navigateToSessions: () => void;
+  navigateToProjects: () => void;
+  navigateToProject: (path: string) => void;
 }
 
 export interface UseDesktopSidebarActionsReturn {
@@ -31,6 +33,8 @@ export function useDesktopSidebarActions({
   setShowTerminal,
   setShowSettings,
   navigateToSessions,
+  navigateToProjects,
+  navigateToProject,
 }: UseDesktopSidebarActionsOptions): UseDesktopSidebarActionsReturn {
   const onSelectListView = useCallback(() => {
     setViewMode("list");
@@ -45,8 +49,8 @@ export function useDesktopSidebarActions({
     setActiveAppViewId(null);
     setSelectedProject(null);
     setShowFavorites(false);
-    navigateToSessions();
-  }, [setActiveAppViewId, setSelectedProject, setShowFavorites, setViewMode, navigateToSessions]);
+    navigateToProjects();
+  }, [setActiveAppViewId, setSelectedProject, setShowFavorites, setViewMode, navigateToProjects]);
 
   const onToggleFavorites = useCallback(() => {
     setShowFavorites((prev) => !prev);
@@ -72,8 +76,9 @@ export function useDesktopSidebarActions({
       setActiveAppViewId(null);
       setViewMode("project");
       setShowFavorites(false);
+      navigateToProject(path);
     },
-    [setActiveAppViewId, setSelectedProject, setShowFavorites, setViewMode],
+    [navigateToProject, setActiveAppViewId, setSelectedProject, setShowFavorites, setViewMode],
   );
 
   return {

@@ -35,6 +35,17 @@ vi.mock('@/plugins/runtime-host', () => ({
         ),
       },
       {
+        id: 'test.bottom.toolbar',
+        pluginId: 'test.plugin',
+        title: 'Test Bottom',
+        panelId: 'test.bottom.panel',
+        render: (props: any) => (
+          <button type="button" onClick={props.togglePanel} data-testid="plugin-bottom-toggle">
+            bottom
+          </button>
+        ),
+      },
+      {
         id: 'test.main.toolbar',
         pluginId: 'test.plugin',
         title: 'Test Main',
@@ -56,6 +67,13 @@ vi.mock('@/plugins/runtime-host', () => ({
           panelRenderSpy(props)
           return <div data-testid="plugin-panel">{props.activeEntryId ?? 'none'}</div>
         },
+      },
+      {
+        id: 'test.bottom.panel',
+        pluginId: 'test.plugin',
+        title: 'Test Bottom',
+        side: 'bottom',
+        render: (props: any) => <div data-testid="plugin-bottom-panel">{props.activeEntryId ?? 'none'}</div>,
       },
     ],
     treeViews: [],
@@ -81,6 +99,7 @@ vi.mock('@/components/SessionViewer', () => ({
         {slots?.right}
         {mainViewSlot}
         {layoutSlots?.right}
+        {layoutSlots?.bottom}
       </div>
     )
   },
@@ -116,9 +135,11 @@ describe('AppSessionViewerPane', () => {
       />,
     )
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Right panel buttons' }))
     fireEvent.click(await screen.findByRole('button', { name: /Test Toolbar/ }))
 
     expect((await screen.findByTestId('plugin-panel')).textContent).toBe('entry-42')
+    expect(document.querySelector('.psm-session-right-feature-panel__grid')).toBeNull()
     expect(panelRenderSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         activeEntryId: 'entry-42',
@@ -127,7 +148,7 @@ describe('AppSessionViewerPane', () => {
     )
   })
 
-  it('renders right panel toolbar buttons in the floating dock by default', async () => {
+  it('renders feature toggles in the session toolbar by default', async () => {
     render(
       <AppSessionViewerPane
         session={{
@@ -147,12 +168,12 @@ describe('AppSessionViewerPane', () => {
       />,
     )
 
-    expect((await screen.findByRole('button', { name: /Test Toolbar/ })).closest('.psm-session-right-panel-floating-dock')).not.toBeNull()
+    expect(await screen.findByRole('button', { name: 'Right panel buttons' })).not.toBeNull()
+    expect(await screen.findByRole('button', { name: 'Test Bottom' })).not.toBeNull()
+    expect(screen.queryByRole('button', { name: /Test Toolbar/ })).toBeNull()
   })
 
-  it('keeps right panel buttons in the toolbar when pinned', async () => {
-    localStorage.setItem('pi-session-manager-right-panel-buttons-pinned', 'toolbar')
-
+  it('expands right panel actions as a feature grid', async () => {
     render(
       <AppSessionViewerPane
         session={{
@@ -172,7 +193,94 @@ describe('AppSessionViewerPane', () => {
       />,
     )
 
-    expect((await screen.findByRole('button', { name: 'Test Toolbar' })).closest('.psm-session-right-panel-toolbar-dock')).not.toBeNull()
+    fireEvent.click(await screen.findByRole('button', { name: 'Right panel buttons' }))
+
+    expect((await screen.findByRole('button', { name: /Test Toolbar/ })).closest('.psm-session-right-feature-panel__grid')).not.toBeNull()
+  })
+
+  it('resizes the right feature panel with the resize handle', async () => {
+    render(
+      <AppSessionViewerPane
+        session={{
+          id: 'session-1',
+          path: '/tmp/session.jsonl',
+          cwd: '/tmp',
+          created: '2026-05-23T00:00:00Z',
+          modified: '2026-05-23T00:00:00Z',
+          message_count: 0,
+          first_message: '',
+          last_message: '',
+          last_message_role: 'assistant',
+          model: 'claude-4',
+        }}
+        onExport={() => {}}
+        slots={{}}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Right panel buttons' }))
+    const handle = await screen.findByRole('separator', { name: 'Resize right panel' })
+    fireEvent.pointerDown(handle, { button: 0, clientX: 500 })
+    fireEvent.pointerMove(window, { clientX: 400 })
+    fireEvent.pointerUp(window)
+
+    expect(document.querySelector<HTMLElement>('.psm-session-right-feature-panel')?.style.width).toBe('530px')
+  })
+
+  it('opens a bottom plugin panel from its separate toolbar item', async () => {
+    render(
+      <AppSessionViewerPane
+        session={{
+          id: 'session-1',
+          path: '/tmp/session.jsonl',
+          cwd: '/tmp',
+          created: '2026-05-23T00:00:00Z',
+          modified: '2026-05-23T00:00:00Z',
+          message_count: 0,
+          first_message: '',
+          last_message: '',
+          last_message_role: 'assistant',
+          model: 'claude-4',
+        }}
+        onExport={() => {}}
+        slots={{}}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Test Bottom' }))
+
+    expect((await screen.findByTestId('plugin-bottom-panel')).textContent).toBe('entry-42')
+  })
+
+  it('closes the bottom tray after selecting the terminal feature', async () => {
+    const onToggleTerminalFeature = vi.fn()
+
+    render(
+      <AppSessionViewerPane
+        session={{
+          id: 'session-1',
+          path: '/tmp/session.jsonl',
+          cwd: '/tmp',
+          created: '2026-05-23T00:00:00Z',
+          modified: '2026-05-23T00:00:00Z',
+          message_count: 0,
+          first_message: '',
+          last_message: '',
+          last_message_role: 'assistant',
+          model: 'claude-4',
+        }}
+        onExport={() => {}}
+        slots={{}}
+        terminalFeatureEnabled
+        onToggleTerminalFeature={onToggleTerminalFeature}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Session features' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Terminal/ }))
+
+    expect(onToggleTerminalFeature).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('.psm-session-bottom-features__grid')).toBeNull()
   })
 
   it('opens plugin session main view from toolbar item', async () => {

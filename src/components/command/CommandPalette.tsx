@@ -4,6 +4,8 @@ import type { SearchContext, SearchPluginResult } from '@/plugins/types'
 import CommandMenu from './CommandMenu'
 import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearchPlugin'
 import type { FullTextSearchSourceFilter } from '@/types'
+import type { CommandPaletteMode } from './commandActions'
+import type { TabType } from './utils'
 
 interface CommandPaletteProps {
   context: SearchContext
@@ -18,6 +20,8 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
   const enterFrame2Ref = useRef<number | null>(null)
 
   const [searchCurrentProjectOnly, setSearchCurrentProjectOnly] = useState(false)
+  const [activeTab, setActiveTab] = useState<TabType>('all')
+  const [mode, setMode] = useState<CommandPaletteMode>('search')
   const [ftsOptions, setFtsOptions] = useState<MessageSearchPluginOptions>({
     ftsMode: true,
     roleFilter: 'all',
@@ -212,6 +216,10 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
           selectedResult={selectedResult}
           setSelectedResult={setSelectedResult}
           registryRef={registryRef}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          mode={mode}
+          setMode={setMode}
         />
       </div>
     </div>

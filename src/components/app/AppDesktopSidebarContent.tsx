@@ -130,7 +130,7 @@ function AppDesktopSidebarContent({
       ) : sidebarMode === "app" ? null : sidebarMode === "project" &&
         selectedProject &&
         selectedProjectSummary ? (
-        <div className="flex flex-col">
+        <div className="flex min-h-0 flex-col">
           <SelectedProjectHeader
             projectName={selectedProjectSummary.projectName}
             sessionCount={selectedProjectSummary.sessionCount}
@@ -138,7 +138,7 @@ function AppDesktopSidebarContent({
             onBack={() => onSelectProject(null)}
             backLabel={t("project.list.back")}
           />
-          <div>
+          <div className="min-h-0">
             <SessionList
               {...sessionListCommonProps}
               sessions={sidebarSessions}

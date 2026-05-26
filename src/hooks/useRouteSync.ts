@@ -1,9 +1,23 @@
 import { useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { buildSessionUrl, buildFeatureUrl, parseRoute } from '../router/config';
+import type { NavigateOptions } from 'react-router-dom';
+import {
+  buildFeatureUrl,
+  buildProjectUrl,
+  buildProjectsUrl,
+  buildSessionUrl,
+  parseRoute,
+} from '../router/config';
 import { getRuntimeSessionById } from '../runtime-data/sessionSource';
 import type { SessionInfo } from '../types';
 import type { AppSidebarViewMode } from './app/useSidebarSessions';
+import {
+  beginRouteTransition,
+  canApplyRouteState,
+  IDLE_ROUTE_TRANSITION,
+  normalizeRouteTransitionPath,
+  settleRouteTransition,
+} from './app/routeTransitionMachine';
 
 interface RouteSyncOptions {
   setSelectedSession: (session: SessionInfo | null) => void;
@@ -67,12 +81,38 @@ export function useRouteSync({
   const pendingAppRoute =
     parsedRoute.route === 'app' && (!appRoutesReady || !matchingAppRoute);
   const prevPathnameRef = useRef(location.pathname);
+  const currentPathRef = useRef(normalizeRouteTransitionPath(location.pathname));
+  const routeTransitionRef = useRef(IDLE_ROUTE_TRANSITION);
+  currentPathRef.current = normalizeRouteTransitionPath(location.pathname);
+  const canSyncCurrentRoute = canApplyRouteState(
+    routeTransitionRef.current,
+    location.pathname,
+  );
+
+  const navigateToPath = useCallback(
+    (path: string, options?: NavigateOptions) => {
+      routeTransitionRef.current = beginRouteTransition(
+        currentPathRef.current,
+        path,
+      );
+      navigate(path, options);
+    },
+    [navigate],
+  );
 
   // ─── URL → State (single source of truth) ─────────────
   // This effect syncs ALL app state from the URL.
   // No circular deps: we read selectedSession but only write when mismatch.
   useEffect(() => {
+    if (!canSyncCurrentRoute) {
+      return;
+    }
+
     let cancelled = false;
+    routeTransitionRef.current = settleRouteTransition(
+      routeTransitionRef.current,
+      location.pathname,
+    );
     const routeChanged = prevPathnameRef.current !== location.pathname;
     prevPathnameRef.current = location.pathname;
 
@@ -93,11 +133,11 @@ export function useRouteSync({
             if (resolved) {
               setSelectedSession(resolved);
             } else {
-              navigate('/', { replace: true });
+              navigateToPath('/', { replace: true });
             }
           }).catch(() => {
             if (!cancelled) {
-              navigate('/', { replace: true });
+              navigateToPath('/', { replace: true });
             }
           });
         }
@@ -154,7 +194,7 @@ export function useRouteSync({
           break;
         }
         if (!matchingAppRoute) {
-          navigate('/', { replace: true });
+          navigateToPath('/', { replace: true });
           break;
         }
 
@@ -189,23 +229,34 @@ export function useRouteSync({
     // selectedSession is intentionally NOT in deps to avoid circular updates.
     // We only read it to check if a sync is needed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, parsedRoute, sessions, sessionsLoading, navigate, appRoutesReady, matchingAppRoute, viewMode]);
+  }, [canSyncCurrentRoute, location.pathname, parsedRoute, sessions, sessionsLoading, navigateToPath, appRoutesReady, matchingAppRoute, viewMode]);
 
   // ─── Navigation helpers ───────────────────────────────────
   const navigateToSession = useCallback(
-    (id: string) => navigate(buildSessionUrl(id)),
-    [navigate],
+    (id: string) => navigateToPath(buildSessionUrl(id)),
+    [navigateToPath],
   );
-  const navigateToSessions = useCallback(() => navigate('/'), [navigate]);
+  const navigateToSessions = useCallback(() => navigateToPath('/'), [navigateToPath]);
+  const navigateToProjects = useCallback(
+    () => navigateToPath(buildProjectsUrl()),
+    [navigateToPath],
+  );
+  const navigateToProject = useCallback(
+    (projectPath: string) => navigateToPath(buildProjectUrl(projectPath)),
+    [navigateToPath],
+  );
   const navigateToFeature = useCallback(
-    (feature: string) => navigate(buildFeatureUrl(feature)),
-    [navigate],
+    (feature: string) => navigateToPath(buildFeatureUrl(feature)),
+    [navigateToPath],
   );
 
   return {
     navigateToSession,
     navigateToSessions,
+    navigateToProjects,
+    navigateToProject,
     navigateToFeature,
+    navigateToPath,
     pendingSessionRoute,
     pendingAppRoute,
   };

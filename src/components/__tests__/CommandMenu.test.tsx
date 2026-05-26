@@ -11,6 +11,8 @@ import type { SearchContext, SearchPluginResult } from '@/plugins/types'
 import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearchPlugin'
 import type { FullTextSearchSourceFilter } from '@/types'
 import { useSearchPlugins } from '@/hooks/useSearchPlugins'
+import type { CommandPaletteMode } from '../command/commandActions'
+import type { TabType } from '../command/utils'
 
 const mockSearch = vi.fn()
 const mockPluginSearch = vi.fn()
@@ -112,6 +114,8 @@ function CommandMenuHarness({
     pageSize: 20,
   })
   const [selectedResult, setSelectedResult] = useState<SearchPluginResult | null>(null)
+  const [activeTab, setActiveTab] = useState<TabType>('all')
+  const [mode, setMode] = useState<CommandPaletteMode>('search')
   const registryRef = useRef<any>(null)
 
   return (
@@ -132,6 +136,10 @@ function CommandMenuHarness({
         selectedResult={selectedResult}
         setSelectedResult={setSelectedResult}
         registryRef={registryRef}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        mode={mode}
+        setMode={setMode}
       />
     </I18nextProvider>
   )

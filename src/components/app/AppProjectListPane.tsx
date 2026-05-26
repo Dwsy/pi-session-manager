@@ -84,7 +84,7 @@ function AppProjectListPane({
   return (
     <>
       {isMobile && mobileFilterBar}
-      <div className="flex-1 overflow-y-auto" ref={projectScrollRef}>
+      <div className="flex-1 min-h-0 overflow-y-auto" ref={projectScrollRef}>
         {selectedProject && selectedProjectSummary ? (
           <div className="flex flex-col h-full">
             <SelectedProjectHeader

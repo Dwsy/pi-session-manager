@@ -2,7 +2,7 @@ import type { RefObject } from "react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { FolderOpen, Star } from "lucide-react";
+import { FolderOpen, Pin } from "lucide-react";
 
 export type ProjectListSortMode = "recent" | "sessions" | "messages" | "name";
 
@@ -118,7 +118,7 @@ export default function ProjectList({
   const virtualItems = projectsVirtualizer.getVirtualItems();
 
   return (
-    <div>
+    <div className="min-h-0">
       <div className="px-3 py-2 text-[11px] text-muted-foreground border-b border-border/10">
         {t("project.list.count", { count: projects.length })}
       </div>
@@ -156,7 +156,7 @@ export default function ProjectList({
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <div className="p-0.5 rounded flex-shrink-0">
                         {isFavorite ? (
-                          <Star className="h-4 w-4 flex-shrink-0 text-yellow-500 fill-current" />
+                          <Pin className="h-4 w-4 flex-shrink-0 text-yellow-500 fill-current" />
                         ) : (
                           <FolderOpen className="h-4 w-4 flex-shrink-0 text-blue-400" />
                         )}
@@ -215,9 +215,9 @@ export default function ProjectList({
                       isFavorite ? t("favorites.remove") : t("favorites.add")
                     }
                   >
-                    {/* <Star
-                      className={`h-3 w-3 ${isFavorite ? "fill-current" : ""}`}
-                    /> */}
+                    <Pin
+                      className={`h-3.5 w-3.5 ${isFavorite ? "fill-current" : ""}`}
+                    />
                   </button>
                 )}
               </div>

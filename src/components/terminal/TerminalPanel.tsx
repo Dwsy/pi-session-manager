@@ -62,7 +62,7 @@ const TERM_THEME_LIGHT = {
   brightWhite: '#1a1b2e',
 }
 
-interface Tab { id: string; shell: string; label: string }
+interface Tab { id: string; shell: string; label: string; closeRequested?: boolean }
 
 interface TerminalPanelProps {
   isOpen: boolean
@@ -217,6 +217,8 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme
 /* ── TerminalPanel ── */
 const MIN_HEIGHT = 120
 const DEFAULT_HEIGHT = 280
+const MAX_TERMINAL_TABS = 5
+const CLOSE_CONFIRM_TIMEOUT_MS = 3000
 
 export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cwd, defaultShell: propShell, fontSize = 13, pendingCommand, onCommandConsumed }: TerminalPanelProps) {
   const { t } = useTranslation()
@@ -228,6 +230,7 @@ export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cw
   const [shellsLoaded, setShellsLoaded] = useState(false)
   const [showShellMenu, setShowShellMenu] = useState(false)
   const tabCounter = useRef(0)
+  const closeConfirmTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   // New states
   const [maximized, setMaximized] = useState(false)
@@ -237,8 +240,19 @@ export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cw
   const [dragTabId, setDragTabId] = useState<string | null>(null)
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null)
   const [isDraggingResize, setIsDraggingResize] = useState(false)
+  const [panelCloseRequested, setPanelCloseRequested] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
+  const panelCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    Object.values(closeConfirmTimersRef.current).forEach(clearTimeout)
+    closeConfirmTimersRef.current = {}
+    if (panelCloseTimerRef.current) {
+      clearTimeout(panelCloseTimerRef.current)
+      panelCloseTimerRef.current = null
+    }
+  }, [])
 
   // Shells
   useEffect(() => {
@@ -274,6 +288,10 @@ export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cw
 
   // Tab management
   const addTab = useCallback((shell?: string) => {
+    if (tabs.length >= MAX_TERMINAL_TABS) {
+      setShowShellMenu(false)
+      return false
+    }
     const resolvedShell = resolveShellPath(shell)
     if (!resolvedShell) {
       setShowShellMenu(false)
@@ -285,7 +303,7 @@ export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cw
     setActiveTabId(id)
     setShowShellMenu(false)
     return true
-  }, [resolveShellPath, scopeKey])
+  }, [resolveShellPath, scopeKey, tabs.length])
 
   useEffect(() => {
     if (isOpen && tabs.length === 0 && shellsLoaded) addTab()
@@ -303,6 +321,21 @@ export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cw
   }, [isOpen, pendingCommand, activeTabId, onCommandConsumed])
 
   const closeTab = useCallback((tabId: string) => {
+    const tab = tabs.find(t => t.id === tabId)
+    if (!tab) return
+
+    if (!tab.closeRequested) {
+      setTabs(prev => prev.map(t => t.id === tabId ? { ...t, closeRequested: true } : t))
+      clearTimeout(closeConfirmTimersRef.current[tabId])
+      closeConfirmTimersRef.current[tabId] = setTimeout(() => {
+        setTabs(prev => prev.map(t => t.id === tabId ? { ...t, closeRequested: false } : t))
+        delete closeConfirmTimersRef.current[tabId]
+      }, CLOSE_CONFIRM_TIMEOUT_MS)
+      return
+    }
+
+    clearTimeout(closeConfirmTimersRef.current[tabId])
+    delete closeConfirmTimersRef.current[tabId]
     const nextTabs = tabs.filter(t => t.id !== tabId)
     setTabs(nextTabs)
     setActiveTabId(current =>
@@ -310,6 +343,25 @@ export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cw
     )
     if (nextTabs.length === 0) onClose()
   }, [onClose, tabs])
+
+  const requestPanelClose = useCallback(() => {
+    if (tabs.length > 0 && !panelCloseRequested) {
+      setPanelCloseRequested(true)
+      if (panelCloseTimerRef.current) clearTimeout(panelCloseTimerRef.current)
+      panelCloseTimerRef.current = setTimeout(() => {
+        setPanelCloseRequested(false)
+        panelCloseTimerRef.current = null
+      }, CLOSE_CONFIRM_TIMEOUT_MS)
+      return
+    }
+
+    if (panelCloseTimerRef.current) {
+      clearTimeout(panelCloseTimerRef.current)
+      panelCloseTimerRef.current = null
+    }
+    setPanelCloseRequested(false)
+    onClose()
+  }, [onClose, panelCloseRequested, tabs.length])
 
   // Dismiss shell menu
   useEffect(() => {
@@ -447,7 +499,9 @@ export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cw
               )}
               <button
                 onClick={(e) => { e.stopPropagation(); closeTab(tab.id) }}
-                className="p-0.5 rounded hover:bg-secondary opacity-0 group-hover:opacity-100 motion-opacity motion-color focus-ring"
+                className={`p-0.5 rounded hover:bg-secondary motion-opacity motion-color focus-ring ${tab.closeRequested ? 'text-destructive opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                title={tab.closeRequested ? t('components.terminalPanel.confirmCloseTab', 'Click again to close terminal') : t('components.terminalPanel.closeTab', 'Close terminal tab')}
+                aria-label={tab.closeRequested ? t('components.terminalPanel.confirmCloseTab', 'Click again to close terminal') : t('components.terminalPanel.closeTab', 'Close terminal tab')}
               >
                 <X className="h-2.5 w-2.5" />
               </button>
@@ -457,7 +511,12 @@ export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cw
 
         {/* Actions */}
         <div className="relative flex items-center gap-0.5 ml-1 shrink-0">
-          <button onClick={() => addTab()} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground motion-color motion-press focus-ring" title={t('components.terminalPanel.newTerminal')}>
+          <button
+            onClick={() => addTab()}
+            disabled={tabs.length >= MAX_TERMINAL_TABS}
+            className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-color motion-press focus-ring"
+            title={tabs.length >= MAX_TERMINAL_TABS ? t('components.terminalPanel.maxTabs', 'Maximum terminal tabs reached') : t('components.terminalPanel.newTerminal')}
+          >
             <Plus className="h-3.5 w-3.5" />
           </button>
           <button onClick={(e) => { e.stopPropagation(); setShowShellMenu(!showShellMenu) }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground motion-color motion-press focus-ring" title={t('components.terminalPanel.selectShell')}>
@@ -476,7 +535,12 @@ export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cw
           <button onClick={toggleMaximize} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground motion-color motion-press focus-ring" title={maximized ? 'Restore panel' : 'Maximize panel'}>
             {maximized ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
           </button>
-          <button onClick={onClose} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground motion-color motion-press focus-ring" title={t('components.terminalPanel.hidePanel')}>
+          <button
+            onClick={requestPanelClose}
+            className={`p-1 rounded hover:bg-secondary motion-color motion-press focus-ring ${panelCloseRequested ? 'text-destructive' : 'text-muted-foreground hover:text-foreground'}`}
+            title={panelCloseRequested ? t('components.terminalPanel.confirmHidePanel', 'Click again to hide terminal panel') : t('components.terminalPanel.hidePanel', 'Hide terminal panel')}
+            aria-label={panelCloseRequested ? t('components.terminalPanel.confirmHidePanel', 'Click again to hide terminal panel') : t('components.terminalPanel.hidePanel', 'Hide terminal panel')}
+          >
             <ChevronDown className="h-3 w-3" />
           </button>
         </div>

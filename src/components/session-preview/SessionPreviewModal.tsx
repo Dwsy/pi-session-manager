@@ -1,9 +1,8 @@
-import { useLayoutEffect, useCallback, useState, useRef } from "react";
+import { useLayoutEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Play, X, Maximize2, Minus } from "lucide-react";
 import KbdTooltip from "@/components/ui/KbdTooltip";
 import type { SessionInfo } from "@/types";
-import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import type { TerminalType } from "@/components/settings/types";
 import SessionViewer from "@/components/SessionViewer";
 import type { SessionViewerToolbarSlots } from "@/components/session-viewer/SessionViewerToolbarTypes";
@@ -29,20 +28,6 @@ export interface SessionPreviewModalProps {
   onCloseAnimationComplete?: () => void;
 }
 
-const MODAL_OPEN_ANIMATION_DURATION_MS = 180;
-const MODAL_CLOSE_ANIMATION_DURATION_MS = 140;
-
-function resolveAnimationMode(
-  explicitMode: SessionPreviewAnimationMode,
-  prefersReducedMotion: boolean,
-): SessionPreviewAnimationMode {
-  if (prefersReducedMotion) {
-    return "stable";
-  }
-
-  return explicitMode;
-}
-
 export default function SessionPreviewModal({
   session,
   isOpen,
@@ -57,107 +42,27 @@ export default function SessionPreviewModal({
   piPath,
   customCommand,
   resumeCommand,
-  initialClickPoint,
-  animationMode = "stable",
   onCloseAnimationComplete,
 }: SessionPreviewModalProps) {
   const { t } = useTranslation();
-  const prefersReducedMotion = usePrefersReducedMotion();
-  const [animationStyles, setAnimationStyles] = useState<React.CSSProperties>(
-    {},
-  );
   const modalRef = useRef<HTMLDivElement>(null);
-  const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const focusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const closeInFlightRef = useRef(false);
-  const resolvedAnimationMode = resolveAnimationMode(
-    animationMode,
-    prefersReducedMotion,
-  );
-
-  const openAnimationDuration = prefersReducedMotion
-    ? 1
-    : MODAL_OPEN_ANIMATION_DURATION_MS;
-  const closeAnimationDuration = prefersReducedMotion
-    ? 1
-    : MODAL_CLOSE_ANIMATION_DURATION_MS;
-  const openAnimationTransition = `transform ${openAnimationDuration}ms cubic-bezier(0.16, 1, 0.3, 1), opacity ${openAnimationDuration}ms cubic-bezier(0.16, 1, 0.3, 1)`;
-  const closeAnimationTransition = `transform ${closeAnimationDuration}ms cubic-bezier(0.4, 0, 1, 1), opacity ${closeAnimationDuration}ms cubic-bezier(0.4, 0, 1, 1)`;
-
-  const getTransformOrigin = useCallback(() => {
-    if (resolvedAnimationMode !== "origin-point" || !initialClickPoint) {
-      return "center center";
-    }
-
-    const rect = modalRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return "center center";
-    }
-
-    const x = Math.min(
-      Math.max(initialClickPoint.x - rect.left, 0),
-      rect.width,
-    );
-    const y = Math.min(
-      Math.max(initialClickPoint.y - rect.top, 0),
-      rect.height,
-    );
-    return `${x}px ${y}px`;
-  }, [initialClickPoint, resolvedAnimationMode]);
 
   const handleCloseWithAnimation = useCallback(() => {
     if (closeInFlightRef.current) {
       return;
     }
 
-    // Clear any pending open animation timeout to prevent it from
-    // overwriting the close animation styles mid-flight.
-    if (animationTimeoutRef.current) {
-      clearTimeout(animationTimeoutRef.current);
-      animationTimeoutRef.current = null;
-    }
-
     closeInFlightRef.current = true;
     onCloseStart?.();
-
-    if (!session) {
-      onClose();
-      onCloseAnimationComplete?.();
-      closeInFlightRef.current = false;
-      return;
-    }
-
-    if (prefersReducedMotion) {
-      onClose();
-      onCloseAnimationComplete?.();
-      closeInFlightRef.current = false;
-      return;
-    }
-
-    const transformOrigin = getTransformOrigin();
-
-    setAnimationStyles({
-      transformOrigin,
-      transform: "scale(0.92)",
-      opacity: 0,
-      transition: closeAnimationTransition,
-    });
-
-    animationTimeoutRef.current = setTimeout(() => {
-      setAnimationStyles({});
-      onClose();
-      onCloseAnimationComplete?.();
-      closeInFlightRef.current = false;
-    }, closeAnimationDuration + 10);
+    onClose();
+    onCloseAnimationComplete?.();
+    closeInFlightRef.current = false;
   }, [
-    closeAnimationDuration,
-    closeAnimationTransition,
-    getTransformOrigin,
     onClose,
     onCloseStart,
     onCloseAnimationComplete,
-    prefersReducedMotion,
-    session,
   ]);
 
   const handleMinimize = useCallback(() => {
@@ -272,61 +177,20 @@ export default function SessionPreviewModal({
         }
       }, 50);
 
-      if (!prefersReducedMotion) {
-        const transformOrigin = getTransformOrigin();
-        const initialScale =
-          resolvedAnimationMode === "origin-point"
-            ? "scale(0.92)"
-            : "scale(0.97)";
-
-        // Set initial state (before animation)
-        setAnimationStyles({
-          transformOrigin,
-          transform: initialScale,
-          opacity: 0,
-          transition: "none",
-        });
-
-        // Trigger animation in next frame
-        requestAnimationFrame(() => {
-          setAnimationStyles({
-            transformOrigin,
-            transform: "scale(1)",
-            opacity: 1,
-            transition: openAnimationTransition,
-          });
-
-          // Clean up transition property after animation completes, keep transformOrigin
-          animationTimeoutRef.current = setTimeout(() => {
-            setAnimationStyles({
-              transformOrigin,
-            });
-          }, openAnimationDuration + 10);
-        });
-      }
     } else {
       closeInFlightRef.current = false;
-      setAnimationStyles({});
     }
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
-      if (animationTimeoutRef.current) {
-        clearTimeout(animationTimeoutRef.current);
-      }
       if (focusTimeoutRef.current) {
         clearTimeout(focusTimeoutRef.current);
       }
     };
   }, [
     isOpen,
-    getTransformOrigin,
     handleKeyDown,
-    openAnimationDuration,
-    openAnimationTransition,
-    prefersReducedMotion,
-    resolvedAnimationMode,
   ]);
 
   const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -350,9 +214,6 @@ export default function SessionPreviewModal({
       <div
         ref={modalRef}
         className="bg-surface rounded-lg shadow-2xl flex flex-col overflow-hidden border border-border w-full h-full sm:w-[90vw] sm:h-[90vh] sm:max-w-[90vw] sm:max-h-[90vh]"
-        style={{
-          ...animationStyles,
-        }}
       >
         <div className="flex-1 overflow-hidden bg-background">
           <SessionViewer
