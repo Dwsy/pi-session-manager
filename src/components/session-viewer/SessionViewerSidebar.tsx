@@ -20,6 +20,7 @@ interface SessionLabelState {
 
 export interface SessionViewerSidebarProps {
   showSidebar: boolean;
+  open?: boolean;
   isMobile: boolean;
   placement?: "overlay" | "embedded";
   sidebarWidth: number;
@@ -40,6 +41,7 @@ export interface SessionViewerSidebarProps {
 
 export default function SessionViewerSidebar({
   showSidebar,
+  open = showSidebar,
   isMobile,
   placement = "overlay",
   sidebarWidth,
@@ -63,7 +65,7 @@ export default function SessionViewerSidebar({
   });
 
   useEffect(() => {
-    if (!showSidebar) {
+    if (!open) {
       return;
     }
 
@@ -85,7 +87,7 @@ export default function SessionViewerSidebar({
     return () => {
       cancelled = true;
     };
-  }, [showSidebar, sessionPath, entries.length]);
+  }, [open, sessionPath, entries.length]);
 
   const resolvedLabelsByTargetId = useMemo(
     () => (labelState.sessionPath === sessionPath ? labelState.labels : {}),
@@ -124,8 +126,9 @@ export default function SessionViewerSidebar({
       )}
       <aside
         ref={sidebarRef}
-        className={`session-sidebar ${isMobile ? "safe-area-top" : isEmbedded ? "session-sidebar--embedded" : "absolute left-0 top-0 bottom-0 z-20 shadow-xl"}`}
+        className={`session-sidebar ${open ? "session-sidebar--open" : "session-sidebar--closed"} ${isMobile ? "safe-area-top" : isEmbedded ? "session-sidebar--embedded" : "absolute left-0 top-0 bottom-0 z-20 shadow-xl"}`}
         style={isMobile ? mobileSidebarStyle : desktopSidebarStyle}
+        aria-hidden={!open}
       >
         {isMobile ? (
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/95 backdrop-blur-sm flex-shrink-0">
@@ -168,7 +171,7 @@ export default function SessionViewerSidebar({
         </div>
       </aside>
 
-      {!isMobile && (
+      {!isMobile && open && (
         <div
           ref={resizeHandleRef}
           className={`sidebar-resize-handle ${isEmbedded ? "sidebar-resize-handle--embedded" : "absolute z-30"} ${isResizing ? "resizing" : ""}`}

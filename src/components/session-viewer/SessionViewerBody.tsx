@@ -22,6 +22,7 @@ import SessionViewerToolbar from "@/components/session-viewer/SessionViewerToolb
 import type { SessionViewerToolbarProps, SessionViewerLayoutSlots } from "@/components/session-viewer/SessionViewerToolbarTypes";
 import type { SessionPreviewVariant } from "@/components/session-viewer/previewTypes";
 import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
+import { useDeferredPresence } from "@/hooks/useDeferredPresence";
 import type { PsmSessionTreeViewRuntimeRegistration } from "@/plugins/runtime-host/types";
 import type { SessionSearchTarget } from "@/hooks/useSessionViewerInMessageSearch";
 import type { LegacySessionStats, SessionEntry, SessionInfo } from "@/types";
@@ -123,12 +124,14 @@ export default function SessionViewerBody({
   isLive,
   onChatSent,
 }: SessionViewerBodyProps) {
-  const shouldRenderSidebar = !previewMode && !mainViewSlot && sidebar.showSidebar;
-  const sidebarNode = shouldRenderSidebar ? (
+  const shouldShowSidebar = !previewMode && !mainViewSlot && sidebar.showSidebar;
+  const shouldMountSidebar = useDeferredPresence(shouldShowSidebar);
+  const sidebarNode = shouldMountSidebar ? (
     <SessionViewerSidebar
-      showSidebar={sidebar.showSidebar}
+      showSidebar={shouldMountSidebar}
+      open={shouldShowSidebar}
       isMobile={isMobile}
-      placement={isMobile ? "overlay" : "embedded"}
+      placement="overlay"
       sidebarWidth={sidebar.sidebarWidth}
       isResizing={sidebar.isResizing}
       entries={entries}
@@ -150,29 +153,27 @@ export default function SessionViewerBody({
     <div
       className={`h-full flex relative ${showToolExpandIndicator ? "" : "tool-expand-indicators-hidden"} ${previewMode ? "session-viewer-preview" : ""}`}
     >
-      {isMobile ? sidebarNode : null}
-
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
 
         {layoutSlots?.top}
-        <div className="flex min-h-0 flex-1 min-w-0">
-          {!isMobile ? sidebarNode : null}
+        <SessionViewerToolbar {...toolbarProps} />
+
+        {session.parent_session_path && (
+          <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border bg-secondary/30 flex items-center gap-1.5">
+            <span className="text-muted-foreground/60">↩️</span>
+            <span>{forkedFromLabel}:</span>
+            <span className="truncate max-w-[200px]" title={session.parent_session_path}>
+              {session.parent_session_path.split("/").pop()?.replace(/\.jsonl$/, "") || session.parent_session_path}
+            </span>
+          </div>
+        )}
+
+        {isSearchOpen && <SessionViewerSearchBar {...searchBarProps} />}
+
+        <div className="session-viewer-stage flex min-h-0 flex-1 min-w-0">
+          {sidebarNode}
           {layoutSlots?.left}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <SessionViewerToolbar {...toolbarProps} />
-
-            {session.parent_session_path && (
-              <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border bg-secondary/30 flex items-center gap-1.5">
-                <span className="text-muted-foreground/60">↩️</span>
-                <span>{forkedFromLabel}:</span>
-                <span className="truncate max-w-[200px]" title={session.parent_session_path}>
-                  {session.parent_session_path.split("/").pop()?.replace(/\.jsonl$/, "") || session.parent_session_path}
-                </span>
-              </div>
-            )}
-
-            {isSearchOpen && <SessionViewerSearchBar {...searchBarProps} />}
-
             {mainViewSlot ? (
               mainViewSlot
             ) : (

@@ -4,6 +4,7 @@ export default {
     open: '打开终端',
     close: '关闭终端',
     clear: '清除终端',
+    sessionDescription: '会话 Shell',
     connecting: '连接中...',
     connected: '已连接',
     disconnected: '已断开',

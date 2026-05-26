@@ -12,6 +12,12 @@ vi.mock('@/hooks/useSettings', () => ({
   }),
 }))
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (_key: string, fallback?: string) => fallback ?? _key,
+  }),
+}))
+
 vi.mock('@/plugins/runtime-host', () => ({
   PluginContributionBoundary: ({ children }: any) => children,
   PluginContributionSlot: ({ render }: any) => render(),
@@ -84,6 +90,7 @@ import AppSessionViewerPane from './AppSessionViewerPane'
 
 afterEach(() => {
   cleanup()
+  localStorage.clear()
 })
 
 describe('AppSessionViewerPane', () => {
@@ -109,7 +116,7 @@ describe('AppSessionViewerPane', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByTestId('plugin-toggle'))
+    fireEvent.click(await screen.findByRole('button', { name: /Test Toolbar/ }))
 
     expect((await screen.findByTestId('plugin-panel')).textContent).toBe('entry-42')
     expect(panelRenderSpy).toHaveBeenCalledWith(
@@ -118,6 +125,54 @@ describe('AppSessionViewerPane', () => {
         panelOpen: true,
       }),
     )
+  })
+
+  it('renders right panel toolbar buttons in the floating dock by default', async () => {
+    render(
+      <AppSessionViewerPane
+        session={{
+          id: 'session-1',
+          path: '/tmp/session.jsonl',
+          cwd: '/tmp',
+          created: '2026-05-23T00:00:00Z',
+          modified: '2026-05-23T00:00:00Z',
+          message_count: 0,
+          first_message: '',
+          last_message: '',
+          last_message_role: 'assistant',
+          model: 'claude-4',
+        }}
+        onExport={() => {}}
+        slots={{}}
+      />,
+    )
+
+    expect((await screen.findByRole('button', { name: /Test Toolbar/ })).closest('.psm-session-right-panel-floating-dock')).not.toBeNull()
+  })
+
+  it('keeps right panel buttons in the toolbar when pinned', async () => {
+    localStorage.setItem('pi-session-manager-right-panel-buttons-pinned', 'toolbar')
+
+    render(
+      <AppSessionViewerPane
+        session={{
+          id: 'session-1',
+          path: '/tmp/session.jsonl',
+          cwd: '/tmp',
+          created: '2026-05-23T00:00:00Z',
+          modified: '2026-05-23T00:00:00Z',
+          message_count: 0,
+          first_message: '',
+          last_message: '',
+          last_message_role: 'assistant',
+          model: 'claude-4',
+        }}
+        onExport={() => {}}
+        slots={{}}
+      />,
+    )
+
+    expect((await screen.findByRole('button', { name: 'Test Toolbar' })).closest('.psm-session-right-panel-toolbar-dock')).not.toBeNull()
   })
 
   it('opens plugin session main view from toolbar item', async () => {

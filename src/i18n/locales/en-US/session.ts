@@ -64,6 +64,11 @@ export const session = {
     collapseTools: 'Collapse tools',
     showUserMarkers: 'Show message markers',
     hideUserMarkers: 'Hide message markers',
+    rightPanelButtons: 'Right panel buttons',
+    dragRightPanelButtons: 'Drag to the right edge to unpin',
+    dragRightPanelButtonsToToolbar: 'Drag to the toolbar to pin',
+    sessionFeatures: 'Session features',
+    openPanel: 'Open panel',
   },
   intelligence: {
     title: 'Session intelligence',

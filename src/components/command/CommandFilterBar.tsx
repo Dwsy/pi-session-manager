@@ -7,12 +7,10 @@ import {
   FileText,
   ArrowUpDown,
   Star,
-  Globe,
   Command,
 } from 'lucide-react'
 import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearchPlugin'
 import type { FullTextSearchSourceFilter } from '@/types'
-import CompositionInput from '@/components/ui/CompositionInput'
 import {
   TABS,
   SOURCE_FILTERS,
@@ -192,22 +190,22 @@ export default function CommandFilterBar({
         </>
       )}
 
-      {mode === 'search' && <div className="ml-auto flex min-w-[190px] items-center gap-2 rounded-full border border-border/70 bg-background px-3 py-2">
-        <Globe className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0" />
-        <CompositionInput
-          type="text"
-          value={ftsOptions.globPattern || ''}
-          onChange={(value) =>
-            setFtsOptions({
-              ...ftsOptions,
-              globPattern: value || undefined,
-              page: 0,
-            })
-          }
-          placeholder="path..."
-          className="w-full bg-transparent text-[12px] text-foreground placeholder:text-muted-foreground/55 outline-none"
-        />
-      </div>}
+        {/*{mode === 'search' && <div className="ml-auto flex min-w-[190px] items-center gap-2 rounded-full border border-border/70 bg-background px-3 py-2">*/}
+        {/*  <Globe className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0" />*/}
+        {/*  <CompositionInput*/}
+        {/*    type="text"*/}
+        {/*    value={ftsOptions.globPattern || ''}*/}
+        {/*    onChange={(value) =>*/}
+        {/*      setFtsOptions({*/}
+        {/*        ...ftsOptions,*/}
+        {/*        globPattern: value || undefined,*/}
+        {/*        page: 0,*/}
+        {/*      })*/}
+        {/*    }*/}
+        {/*    placeholder="path..."*/}
+        {/*    className="w-full bg-transparent text-[12px] text-foreground placeholder:text-muted-foreground/55 outline-none"*/}
+        {/*  />*/}
+        {/*</div>}*/}
     </div>
   )
 }

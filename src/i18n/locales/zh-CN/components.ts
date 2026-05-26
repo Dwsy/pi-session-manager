@@ -21,6 +21,8 @@ export const components = {
     noFilterResults: '没有匹配当前筛选的操作',
     noRenderableOutput: '该操作没有捕获到可渲染输出。',
     copyOperation: '复制操作详情',
+    contentFullscreen: '全屏内容区',
+    exitContentFullscreen: '退出内容全屏',
     error: '错误',
     errorOutput: '错误输出',
     inspector: '检查器',

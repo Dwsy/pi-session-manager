@@ -159,6 +159,12 @@ const LoadingSpinner = () => (
   </div>
 );
 
+interface TerminalScope {
+  key: string;
+  cwd: string;
+  label: string;
+}
+
 function App() {
   const { t } = useTranslation();
   const standaloneDatasetRuntime = isStandaloneDatasetRuntime();
@@ -329,6 +335,9 @@ function App() {
     }
   });
   const [showTerminal, setShowTerminal] = useState(false);
+  const [activeTerminalScopeKey, setActiveTerminalScopeKey] = useState<string | null>(null);
+  const [terminalScopes, setTerminalScopes] = useState<Record<string, TerminalScope>>({});
+  const [terminalPendingCommands, setTerminalPendingCommands] = useState<Record<string, string | null>>({});
   const [versionDowngradeInfo, setVersionDowngradeInfo] = useState<VersionDowngradeInfo | null>(null);
 
   useEffect(() => {
@@ -528,11 +537,9 @@ function App() {
     setSelectionModeTrigger((value) => value + 1);
   }, []);
   const [terminalMaximized, setTerminalMaximized] = useState(false);
-  const [terminalPendingCommand, setTerminalPendingCommand] = useState<
-    string | null
-  >(null);
   const handleBuiltinTerminalDisabled = useCallback(() => {
     setShowTerminal(false);
+    setTerminalMaximized(false);
   }, []);
   useEffect(() => {
     if (standaloneDatasetRuntime) {
@@ -561,6 +568,73 @@ function App() {
       patchSessions,
       onBuiltinTerminalDisabled: handleBuiltinTerminalDisabled,
     });
+  const getTerminalScopeForSession = useCallback((session: SessionInfo): TerminalScope => ({
+    key: `session:${session.id || session.path}`,
+    cwd: session.cwd || "/",
+    label: session.name || session.id || "Session",
+  }), []);
+  const currentTerminalScope = useMemo<TerminalScope>(() => {
+    if (selectedSession) {
+      return getTerminalScopeForSession(selectedSession);
+    }
+    if (selectedProject) {
+      return {
+        key: `project:${selectedProject}`,
+        cwd: selectedProject,
+        label: selectedProject.split("/").pop() || selectedProject,
+      };
+    }
+    return {
+      key: "workspace",
+      cwd: sessions[0]?.cwd || "/",
+      label: t("app.workspace", "Workspace"),
+    };
+  }, [getTerminalScopeForSession, selectedProject, selectedSession, sessions, t]);
+  const ensureTerminalScope = useCallback((scope: TerminalScope) => {
+    setTerminalScopes((prev) => {
+      const existing = prev[scope.key];
+      if (
+        existing &&
+        existing.cwd === scope.cwd &&
+        existing.label === scope.label
+      ) {
+        return prev;
+      }
+      return { ...prev, [scope.key]: scope };
+    });
+  }, []);
+  const openTerminalScope = useCallback((scope: TerminalScope, command?: string | null) => {
+    ensureTerminalScope(scope);
+    setActiveTerminalScopeKey(scope.key);
+    if (command != null) {
+      setTerminalPendingCommands((prev) => ({ ...prev, [scope.key]: command }));
+    }
+    setShowTerminal(true);
+  }, [ensureTerminalScope]);
+  const toggleCurrentTerminalScope = useCallback(() => {
+    if (!terminalConfig.enabled || standaloneDatasetRuntime) {
+      return;
+    }
+    ensureTerminalScope(currentTerminalScope);
+    setActiveTerminalScopeKey(currentTerminalScope.key);
+    setShowTerminal((open) => !(open && activeTerminalScopeKey === currentTerminalScope.key));
+  }, [
+    activeTerminalScopeKey,
+    currentTerminalScope,
+    ensureTerminalScope,
+    standaloneDatasetRuntime,
+    terminalConfig.enabled,
+  ]);
+  useEffect(() => {
+    if (!showTerminal) {
+      return;
+    }
+    ensureTerminalScope(currentTerminalScope);
+    setActiveTerminalScopeKey(currentTerminalScope.key);
+  }, [currentTerminalScope, ensureTerminalScope, showTerminal]);
+  useEffect(() => {
+    setTerminalMaximized(false);
+  }, [activeTerminalScopeKey]);
 
   // Signal frontend ready to native shell (prevents white flash)
   useEffect(() => {
@@ -620,10 +694,21 @@ function App() {
   );
 
   const openResumeCommandInTerminal = useCallback(
-    async (path: string, cwd: string, commandOverride?: string | null) => {
+    async (
+      path: string,
+      cwd: string,
+      commandOverride?: string | null,
+      scopeOverride?: TerminalScope,
+    ) => {
       if (!isTauri()) {
-        setTerminalPendingCommand(commandOverride || "");
-        setShowTerminal(true);
+        openTerminalScope(
+          scopeOverride ?? {
+            key: `cwd:${cwd || path || "workspace"}`,
+            cwd: cwd || "/",
+            label: cwd.split("/").pop() || "Terminal",
+          },
+          commandOverride || "",
+        );
         return;
       }
       try {
@@ -639,7 +724,7 @@ function App() {
         throw err;
       }
     },
-    [terminal, customCommand, piPath, resumeCommand],
+    [openTerminalScope, terminal, customCommand, piPath, resumeCommand],
   );
 
   const handleResumeSessionWithTarget = useCallback(
@@ -647,7 +732,12 @@ function App() {
       const sourceSlug = getSessionSourceSlug(session.path);
       if ((!sourceSlug || sourceSlug === "pi") && target === "pi") {
         const command = isTauri() ? null : buildResumeCommand(session);
-        await openResumeCommandInTerminal(session.path, session.cwd, command);
+        await openResumeCommandInTerminal(
+          session.path,
+          session.cwd,
+          command,
+          getTerminalScopeForSession(session),
+        );
         return;
       }
 
@@ -665,9 +755,10 @@ function App() {
         writtenPath,
         session.cwd,
         result.resume_command || null,
+        getTerminalScopeForSession(session),
       );
     },
-    [buildResumeCommand, openResumeCommandInTerminal],
+    [buildResumeCommand, getTerminalScopeForSession, openResumeCommandInTerminal],
   );
 
   const requestResumeSession = useCallback(
@@ -712,8 +803,14 @@ function App() {
   const handleNewSession = useCallback(
     async (cwd: string) => {
       if (!isTauri()) {
-        setTerminalPendingCommand(cwd ? `cd "${cwd}" && pi` : "pi");
-        setShowTerminal(true);
+        openTerminalScope(
+          {
+            key: `cwd:${cwd || "workspace"}`,
+            cwd: cwd || "/",
+            label: cwd.split("/").pop() || "Terminal",
+          },
+          cwd ? `cd "${cwd}" && pi` : "pi",
+        );
         return;
       }
       // Build new session command: cd to folder, then pi (no --session)
@@ -732,7 +829,7 @@ function App() {
         throw err;
       }
     },
-    [terminal, customCommand, piPath],
+    [openTerminalScope, terminal, customCommand, piPath],
   );
 
   const handleResumeSession = useCallback(async () => {
@@ -791,11 +888,7 @@ function App() {
       },
       ...appViewShortcuts,
       "cmd+,": () => setShowSettings(true),
-      "cmd+`": () => {
-        if (!standaloneDatasetRuntime && terminalConfig.enabled) {
-          setShowTerminal((v) => !v);
-        }
-      },
+      "cmd+`": toggleCurrentTerminalScope,
       "cmd+shift+i": async () => {
         if (isTauri()) {
           await invoke("toggle_devtools");
@@ -854,6 +947,7 @@ function App() {
       isBlockingShortcutOverlayOpen,
       standaloneDatasetRuntime,
       terminalConfig.enabled,
+      toggleCurrentTerminalScope,
       navigateToSessions,
       appViewShortcuts,
     ],
@@ -1048,9 +1142,8 @@ function App() {
     if (!command) {
       return;
     }
-    setTerminalPendingCommand(command);
-    setShowTerminal(true);
-  }, []);
+    openTerminalScope(currentTerminalScope, command);
+  }, [currentTerminalScope, openTerminalScope]);
 
   const handleConvertAgain = useCallback(() => {
     setConvertResult(null);
@@ -1080,6 +1173,7 @@ function App() {
       getTagsForSession,
       onToggleTag: handleToggleSessionTag,
       onDeleteSession: standaloneDatasetRuntime ? undefined : handleDeleteSession,
+      onDeleteSessions: standaloneDatasetRuntime ? undefined : handleDeleteSessionsWithRef,
       onConvertSession: standaloneDatasetRuntime ? undefined : handleStartConvertSession,
       onResumeSession: standaloneDatasetRuntime ? undefined : requestResumeSession,
       onCopyResumeSession: standaloneDatasetRuntime ? undefined : requestCopyResumeCommand,
@@ -1108,6 +1202,7 @@ function App() {
       handleToggleSessionTag,
       standaloneDatasetRuntime,
       handleDeleteSession,
+      handleDeleteSessionsWithRef,
       handleStartConvertSession,
       requestResumeSession,
       requestCopyResumeCommand,
@@ -1274,9 +1369,10 @@ function App() {
           ? undefined
           : () => {
               if (selectedSession) {
-                setTerminalPendingCommand(buildResumeCommand(selectedSession));
+                openTerminalScope(currentTerminalScope, buildResumeCommand(selectedSession));
+              } else {
+                openTerminalScope(currentTerminalScope);
               }
-              setShowTerminal(true);
             }
       }
       terminal={standaloneDatasetRuntime ? undefined : terminal}
@@ -1284,6 +1380,9 @@ function App() {
       customCommand={standaloneDatasetRuntime ? undefined : customCommand}
       resumeCommand={standaloneDatasetRuntime ? undefined : resumeCommand}
       initialEntryId={pendingScrollEntryId || undefined}
+      terminalFeatureEnabled={!standaloneDatasetRuntime && terminalConfig.enabled}
+      terminalFeatureOpen={showTerminal && activeTerminalScopeKey === currentTerminalScope.key}
+      onToggleTerminalFeature={toggleCurrentTerminalScope}
     />
   );
 
@@ -1484,23 +1583,46 @@ function App() {
         renderDashboard,
       });
 
+  const terminalScopeList = useMemo(
+    () => Object.values(terminalScopes),
+    [terminalScopes],
+  );
+  const closeDesktopTerminal = useCallback(() => {
+    setShowTerminal(false);
+    setTerminalMaximized(false);
+  }, []);
+  const clearTerminalPendingCommand = useCallback((scopeKey: string) => {
+    setTerminalPendingCommands((prev) => {
+      if (prev[scopeKey] == null) {
+        return prev;
+      }
+      return { ...prev, [scopeKey]: null };
+    });
+  }, []);
   const desktopTerminalPanel = standaloneDatasetRuntime ? null : (
-    <AppTerminalPane
-      enabled={terminalConfig.enabled}
-      fallback={null}
-      TerminalPanelComponent={TerminalPanel}
-      isOpen={showTerminal}
-      onClose={() => {
-        setShowTerminal(false);
-        setTerminalMaximized(false);
-      }}
-      onMaximizedChange={setTerminalMaximized}
-      cwd={selectedSession?.cwd || selectedProject || sessions[0]?.cwd || "/"}
-      defaultShell={terminalConfig.defaultShell}
-      fontSize={terminalConfig.fontSize}
-      pendingCommand={terminalPendingCommand}
-      onCommandConsumed={() => setTerminalPendingCommand(null)}
-    />
+    <>
+      {terminalScopeList.map((scope) => (
+        <AppTerminalPane
+          key={scope.key}
+          enabled={terminalConfig.enabled}
+          fallback={null}
+          TerminalPanelComponent={TerminalPanel}
+          isOpen={showTerminal && activeTerminalScopeKey === scope.key}
+          scopeKey={scope.key}
+          onClose={closeDesktopTerminal}
+          onMaximizedChange={(maximized) => {
+            if (activeTerminalScopeKey === scope.key) {
+              setTerminalMaximized(maximized);
+            }
+          }}
+          cwd={scope.cwd}
+          defaultShell={terminalConfig.defaultShell}
+          fontSize={terminalConfig.fontSize}
+          pendingCommand={terminalPendingCommands[scope.key] ?? null}
+          onCommandConsumed={() => clearTerminalPendingCommand(scope.key)}
+        />
+      ))}
+    </>
   );
 
   // ═══════════════════════════════════
@@ -1570,7 +1692,7 @@ function App() {
             sidebarMode={sidebarMode}
             showFavorites={showFavorites}
             showDashboardButton={!standaloneDatasetRuntime}
-            terminalEnabled={!standaloneDatasetRuntime && terminalConfig.enabled}
+            terminalEnabled={false}
             showTerminal={showTerminal}
             onShowDashboard={handleSidebarShowDashboard}
             onSelectListView={handleSidebarSelectListView}

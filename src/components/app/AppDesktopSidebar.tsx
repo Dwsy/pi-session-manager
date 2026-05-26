@@ -1,7 +1,7 @@
-import { Fragment } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { FolderOpen, LayoutDashboard, List, Search, Settings, Star, Terminal } from "lucide-react";
+import { FolderOpen, LayoutDashboard, List, MoreHorizontal, Search, Settings, Star, Terminal } from "lucide-react";
 
 import KbdTooltip from "@/components/ui/KbdTooltip";
 import AppViewIcon from "./AppViewIcon";
@@ -63,6 +63,36 @@ function AppDesktopSidebar({
   listScrollRef,
 }: AppDesktopSidebarProps) {
   const { t } = useTranslation();
+  const [appMenuOpen, setAppMenuOpen] = useState(false);
+  const appMenuRef = useRef<HTMLDivElement>(null);
+  const { visibleAppViewItems, overflowAppViewItems } = useMemo(() => {
+    const visible = new Set<string>();
+    const pinned = appViewItems.slice(0, 1);
+    for (const item of pinned) visible.add(item.id);
+    const activeItem = appViewItems.find((item) => item.active);
+    if (activeItem) visible.add(activeItem.id);
+    return {
+      visibleAppViewItems: appViewItems.filter((item) => visible.has(item.id)),
+      overflowAppViewItems: appViewItems.filter((item) => !visible.has(item.id)),
+    };
+  }, [appViewItems]);
+
+  useEffect(() => {
+    if (!appMenuOpen) return;
+    const closeOnOutsidePointer = (event: MouseEvent) => {
+      if (appMenuRef.current?.contains(event.target as Node)) return;
+      setAppMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAppMenuOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [appMenuOpen]);
 
   return (
     <div
@@ -77,7 +107,7 @@ function AppDesktopSidebar({
           : {})}
       >
         <div
-          className="flex items-center gap-0.5 ml-auto no-drag"
+          className="relative flex min-w-0 items-center gap-0.5 ml-auto no-drag"
           role="toolbar"
           aria-label={t("app.sidebar.toolbar", "App controls")}
         >
@@ -123,7 +153,7 @@ function AppDesktopSidebar({
                 <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </KbdTooltip>
-            {appViewItems.map((item) => {
+            {visibleAppViewItems.map((item) => {
               const button = (
                 <button
                   type="button"
@@ -149,6 +179,62 @@ function AppDesktopSidebar({
               );
             })}
           </div>
+          {overflowAppViewItems.length > 0 && (
+            <div className="relative" ref={appMenuRef}>
+              <button
+                type="button"
+                onClick={() => setAppMenuOpen((open) => !open)}
+                aria-label={t("app.sidebar.moreApps", "More apps")}
+                aria-haspopup="menu"
+                aria-expanded={appMenuOpen}
+                className={`p-1 rounded motion-color motion-press focus-ring ml-0.5 ${
+                  appMenuOpen
+                    ? "text-blue-400 bg-secondary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                }`}
+                title={t("app.sidebar.moreApps", "More apps")}
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+              {appMenuOpen && (
+                <div
+                  className="absolute left-1/2 top-[calc(100%+0.25rem)] z-50 w-44 max-w-[calc(100vw-1rem)] -translate-x-[42%] rounded-md border border-border/70 bg-background py-1 shadow-[0_10px_28px_rgba(0,0,0,0.22)]"
+                  role="menu"
+                  aria-label={t("app.sidebar.moreApps", "More apps")}
+                >
+                  {overflowAppViewItems.map((item) => {
+                    const menuItem = (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setAppMenuOpen(false);
+                          item.onSelect();
+                        }}
+                        className="grid h-8 w-full grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 px-2.5 text-left text-[13px] text-muted-foreground hover:bg-surface/80 hover:text-foreground motion-color motion-press focus-ring"
+                      >
+                        <AppViewIcon icon={item.icon} />
+                        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      </button>
+                    );
+
+                    return item.shortcut ? (
+                      <KbdTooltip
+                        key={item.id}
+                        shortcut={item.shortcut}
+                        position="right"
+                        className="relative flex w-full"
+                      >
+                        {menuItem}
+                      </KbdTooltip>
+                    ) : (
+                      <Fragment key={item.id}>{menuItem}</Fragment>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
           <button
             type="button"
             onClick={onToggleFavorites}

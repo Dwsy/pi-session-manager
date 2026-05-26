@@ -9,8 +9,9 @@ interface KbdTooltipProps {
   shortcut: string;
   label?: string;
   children: ReactNode;
-  position?: "top" | "bottom";
+  position?: "top" | "bottom" | "right";
   delay?: number;
+  className?: string;
 }
 
 /**
@@ -23,6 +24,7 @@ export default function KbdTooltip({
   children,
   position = "bottom",
   delay = 400,
+  className = "relative inline-flex",
 }: KbdTooltipProps) {
   const isMobile = useIsMobile();
   const [visible, setVisible] = useState(false);
@@ -59,21 +61,25 @@ export default function KbdTooltip({
   const keys = shortcut.split("+").map((k) => modMap[k] ?? k);
 
   const posClass =
-    position === "top" ? "bottom-full mb-1.5" : "top-full mt-1.5";
+    position === "top"
+      ? "bottom-full left-1/2 mb-1.5 -translate-x-1/2"
+      : position === "right"
+        ? "left-full top-1/2 ml-1.5 -translate-y-1/2"
+        : "left-1/2 top-full mt-1.5 -translate-x-1/2";
 
   return (
     <div
       ref={ref}
-      className="relative inline-flex"
+      className={className}
       onMouseEnter={show}
       onMouseLeave={hide}
     >
       {children}
       {visible && (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 ${posClass} z-50 pointer-events-none
+          className={`absolute ${posClass} z-50 pointer-events-none
             flex items-center gap-1 px-1.5 py-0.5 rounded-md
-            bg-[var(--bg-subtle)] border border-[var(--borderMuted)]
+            bg-background border border-[var(--borderMuted)]
             shadow-sm whitespace-nowrap text-[11px] text-[var(--muted)]`}
         >
           {label && <span className="mr-0.5">{label}</span>}

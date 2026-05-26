@@ -115,6 +115,7 @@ export default function SessionViewerToolbar({
     <>
       <div
         className={`border-b border-border relative z-20 ${isMobile ? "px-2.5 py-2" : "px-3 py-1.5"}`}
+        data-session-toolbar
         data-tauri-drag-region
         onMouseDown={handleToolbarMouseDown}
       >
@@ -162,7 +163,10 @@ export default function SessionViewerToolbar({
           </div>
 
           {!isMobile && (
-            <div className="flex items-center gap-1 flex-shrink-0">
+            <div
+              className="flex items-center gap-1 flex-shrink-0"
+              data-session-toolbar-right
+            >
               {!previewMode && liveSession && (
                 <>
                   <SessionViewerModelControls liveSession={liveSession} />

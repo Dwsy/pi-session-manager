@@ -21,6 +21,8 @@ export const components = {
     noFilterResults: 'No operations match this filter',
     noRenderableOutput: 'No renderable output was captured for this operation.',
     copyOperation: 'Copy operation details',
+    contentFullscreen: 'Fullscreen content',
+    exitContentFullscreen: 'Exit content fullscreen',
     error: 'Error',
     errorOutput: 'Error output',
     inspector: 'Inspector',

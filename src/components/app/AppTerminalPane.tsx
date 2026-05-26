@@ -7,6 +7,7 @@ import {
 
 interface TerminalPanelRenderProps {
   isOpen: boolean;
+  scopeKey: string;
   onClose: () => void;
   onMaximizedChange?: (maximized: boolean) => void;
   cwd: string;
@@ -29,6 +30,7 @@ function AppTerminalPane({
   fallback,
   TerminalPanelComponent,
   isOpen,
+  scopeKey,
   onClose,
   onMaximizedChange,
   cwd,
@@ -45,6 +47,7 @@ function AppTerminalPane({
     <Suspense fallback={fallback}>
       <TerminalPanelComponent
         isOpen={isOpen}
+        scopeKey={scopeKey}
         onClose={onClose}
         onMaximizedChange={onMaximizedChange}
         cwd={cwd}

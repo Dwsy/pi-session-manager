@@ -66,6 +66,7 @@ interface Tab { id: string; shell: string; label: string }
 
 interface TerminalPanelProps {
   isOpen: boolean
+  scopeKey: string
   onClose: () => void
   onMaximizedChange?: (maximized: boolean) => void
   cwd: string
@@ -217,7 +218,7 @@ function TerminalTabContent({ id, shell, cwd, isVisible, fontSize, resolvedTheme
 const MIN_HEIGHT = 120
 const DEFAULT_HEIGHT = 280
 
-export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, defaultShell: propShell, fontSize = 13, pendingCommand, onCommandConsumed }: TerminalPanelProps) {
+export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cwd, defaultShell: propShell, fontSize = 13, pendingCommand, onCommandConsumed }: TerminalPanelProps) {
   const { t } = useTranslation()
   const resolvedTheme = useResolvedTheme()
   const [tabs, setTabs] = useState<Tab[]>([])
@@ -279,12 +280,12 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
       console.warn('[TerminalPanel] Skip opening terminal: shell is unavailable')
       return false
     }
-    const id = `term-${++tabCounter.current}`
+    const id = `${scopeKey}:term-${++tabCounter.current}`
     setTabs(prev => [...prev, { id, shell: resolvedShell, label: getShellLabel(resolvedShell) }])
     setActiveTabId(id)
     setShowShellMenu(false)
     return true
-  }, [resolveShellPath])
+  }, [resolveShellPath, scopeKey])
 
   useEffect(() => {
     if (isOpen && tabs.length === 0 && shellsLoaded) addTab()
@@ -292,14 +293,14 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
 
   // Write pending command to active terminal after it's ready
   useEffect(() => {
-    if (!pendingCommand || !activeTabId) return
+    if (!isOpen || !pendingCommand || !activeTabId) return
     // Delay to ensure terminal_create has completed and shell is ready
     const timer = setTimeout(() => {
       invoke('terminal_write', { id: activeTabId, data: pendingCommand + '\n' }).catch(() => {})
       onCommandConsumed?.()
     }, 500)
     return () => clearTimeout(timer)
-  }, [pendingCommand, activeTabId, onCommandConsumed])
+  }, [isOpen, pendingCommand, activeTabId, onCommandConsumed])
 
   const closeTab = useCallback((tabId: string) => {
     const nextTabs = tabs.filter(t => t.id !== tabId)
@@ -397,7 +398,13 @@ export function TerminalPanel({ isOpen, onClose, onMaximizedChange, cwd, default
     : { height: isOpen ? panelHeight : 0, overflow: 'hidden' }
 
   return (
-    <div ref={panelRef} className="border-t border-border bg-background flex flex-col" style={panelStyle}>
+    <div
+      ref={panelRef}
+      className="border-t border-border bg-background flex flex-col"
+      style={panelStyle}
+      data-terminal-scope={scopeKey}
+      data-terminal-open={isOpen ? "true" : "false"}
+    >
       {/* Resize handle */}
       {isOpen && !maximized && (
         <div

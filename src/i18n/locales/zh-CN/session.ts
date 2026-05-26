@@ -64,6 +64,11 @@ export const session = {
     collapseTools: '收起工具',
     showUserMarkers: '显示消息锚点',
     hideUserMarkers: '隐藏消息锚点',
+    rightPanelButtons: '右侧面板按钮',
+    dragRightPanelButtons: '拖到右侧边缘取消固定',
+    dragRightPanelButtonsToToolbar: '拖到工具栏固定',
+    sessionFeatures: '会话功能',
+    openPanel: '打开面板',
   },
   intelligence: {
     title: '会话智能',
