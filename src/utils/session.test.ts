@@ -116,6 +116,56 @@ describe('parseSessionEntriesWithLineCount', () => {
     });
   });
 
+  it('maps raw Codex event messages and message items without payload type', () => {
+    const content = [
+      JSON.stringify({
+        type: 'event_msg',
+        timestamp: 1737300001.0,
+        payload: {
+          type: 'user_message',
+          message: 'Fix the bug',
+        },
+      }),
+      JSON.stringify({
+        type: 'event_msg',
+        timestamp: 1737300002.0,
+        payload: {
+          type: 'agent_reasoning',
+          text: 'Need to inspect the failing path',
+        },
+      }),
+      JSON.stringify({
+        type: 'response_item',
+        timestamp: 1737300003.0,
+        payload: {
+          role: 'assistant',
+          content: [{ type: 'output_text', text: 'Fixed.' }],
+        },
+      }),
+    ].join('\n');
+
+    const { entries } = parseSessionEntriesWithLineCount(content);
+
+    expect(entries).toHaveLength(3);
+    expect(entries[0].message).toMatchObject({
+      role: 'user',
+      content: [{ type: 'text', text: 'Fix the bug' }],
+    });
+    expect(entries[1].message).toMatchObject({
+      role: 'assistant',
+      content: [{ type: 'thinking', thinking: 'Need to inspect the failing path' }],
+    });
+    expect(entries[2].message).toMatchObject({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Fixed.' }],
+    });
+    expect(entries.map((entry) => entry.timestamp)).toEqual([
+      '2025-01-19T15:20:01.000Z',
+      '2025-01-19T15:20:02.000Z',
+      '2025-01-19T15:20:03.000Z',
+    ]);
+  });
+
   it('maps raw Claude Code tool_result content to a linked tool result message', () => {
     const content = JSON.stringify({
       type: 'user',

@@ -415,10 +415,28 @@ fn extract_tool_results(content: Option<&serde_json::Value>) -> Vec<ToolResult> 
             if obj.get("type")?.as_str()? != "tool_result" {
                 return None;
             }
-            let text = obj.get("content").and_then(|v| v.as_str()).or_else(|| obj.get("output").and_then(|v| v.as_str())).unwrap_or("").to_string();
+            let text = stringify_tool_result_content(obj.get("content").or_else(|| obj.get("output")));
             Some(ToolResult { call_id: obj.get("tool_use_id").and_then(|v| v.as_str()).map(String::from), content: text, is_error: obj.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false) })
         })
         .collect()
+}
+
+fn stringify_tool_result_content(value: Option<&serde_json::Value>) -> String {
+    match value {
+        Some(serde_json::Value::String(text)) => text.clone(),
+        Some(serde_json::Value::Array(items)) => items
+            .iter()
+            .map(|item| match item {
+                serde_json::Value::String(text) => text.clone(),
+                serde_json::Value::Object(obj) => obj.get("text").and_then(serde_json::Value::as_str).map(str::to_string).unwrap_or_else(|| item.to_string()),
+                _ => item.to_string(),
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        Some(serde_json::Value::Object(obj)) => obj.get("text").and_then(serde_json::Value::as_str).map(str::to_string).unwrap_or_else(|| serde_json::Value::Object(obj.clone()).to_string()),
+        Some(value) => value.to_string(),
+        None => String::new(),
+    }
 }
 
 fn claude_entry_type(role: &MessageRole) -> &'static str {

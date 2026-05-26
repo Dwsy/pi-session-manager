@@ -200,7 +200,11 @@ function normalizeSessionEntry(raw: any): SessionEntry | null {
   }
 
   if (type === 'response_item') {
-    return convertCodexResponseItem(raw.payload)
+    return convertCodexResponseItem(raw)
+  }
+
+  if (type === 'event_msg') {
+    return convertCodexEventMsg(raw)
   }
 
   if (type === 'message') {
@@ -377,13 +381,53 @@ function convertClaudeContentItem(item: any): Content[] {
   }
 }
 
-function convertCodexResponseItem(payload: any): SessionEntry | null {
+function convertCodexEventMsg(envelope: any): SessionEntry | null {
+  const payload = envelope?.payload
+  if (!payload || typeof payload !== 'object') return null
+
+  const timestamp = normalizeCodexTimestamp(envelope.timestamp)
+  const payloadType = payload.type as string | undefined
+
+  if (payloadType === 'user_message') {
+    const text = typeof payload.message === 'string' ? payload.message : ''
+    if (!text.trim() || isCodexBootstrapText(text)) return null
+    return {
+      type: 'message',
+      id: payload.id || generateFallbackId('codex-user'),
+      timestamp,
+      message: {
+        role: 'user',
+        content: [{ type: 'text', text }],
+      },
+    }
+  }
+
+  if (payloadType === 'agent_reasoning') {
+    const thinking = typeof payload.text === 'string' ? payload.text : ''
+    if (!thinking.trim()) return null
+    return {
+      type: 'message',
+      id: payload.id || generateFallbackId('codex-reasoning'),
+      timestamp,
+      message: {
+        role: 'assistant',
+        content: [{ type: 'thinking', thinking }],
+        provider: 'openai-codex',
+      },
+    }
+  }
+
+  return null
+}
+
+function convertCodexResponseItem(envelope: any): SessionEntry | null {
+  const payload = envelope?.payload
   if (!payload || typeof payload !== 'object') return null
   const payloadType = payload.type as string | undefined
-  if (!payloadType) return null
+  const timestamp = normalizeCodexTimestamp(envelope.timestamp ?? payload.timestamp)
 
-  if (payloadType === 'message') {
-    const rawRole = typeof payload.role === 'string' ? payload.role : 'user'
+  if (payloadType === 'message' || (!payloadType && (payload.role || payload.content))) {
+    const rawRole = typeof payload.role === 'string' ? payload.role : 'assistant'
     if (rawRole === 'developer' || rawRole === 'system') {
       return null
     }
@@ -397,10 +441,6 @@ function convertCodexResponseItem(payload: any): SessionEntry | null {
     if (role === 'user' && isCodexBootstrapText(visibleText)) {
       return null
     }
-    const timestamp =
-      typeof payload.timestamp === 'string'
-        ? payload.timestamp
-        : new Date().toISOString()
     return {
       type: 'message',
       id: payload.id || generateFallbackId('codex-entry'),
@@ -408,43 +448,32 @@ function convertCodexResponseItem(payload: any): SessionEntry | null {
       message: {
         role,
         content,
-        model: role === 'assistant' ? 'gpt-5.4' : undefined,
+        model: role === 'assistant' ? payload.model : undefined,
         provider: role === 'assistant' ? 'openai-codex' : undefined,
       },
     }
   }
 
-  if (payloadType === 'function_call_output') {
-    const timestamp =
-      typeof payload.timestamp === 'string'
-        ? payload.timestamp
-        : new Date().toISOString()
+  if (payloadType === 'function_call_output' || payloadType === 'custom_tool_call_output') {
     return {
       type: 'message',
-      id: payload.call_id || generateFallbackId('codex-tool'),
+      id: payload.call_id || payload.id || generateFallbackId('codex-tool'),
       timestamp,
       message: {
         role: 'toolResult',
-        toolCallId: payload.call_id,
+        toolCallId: payload.call_id || payload.tool_use_id || payload.id,
         isError: typeof payload.is_error === 'boolean' ? payload.is_error : undefined,
         content: [
           {
             type: 'text',
-            text:
-              typeof payload.output === 'string'
-                ? payload.output
-                : JSON.stringify(payload.output),
+            text: stringifyCodexOutput(payload.output ?? payload.content ?? payload.result),
           },
         ],
       },
     }
   }
 
-  if (payloadType === 'function_call') {
-    const timestamp =
-      typeof payload.timestamp === 'string'
-        ? payload.timestamp
-        : new Date().toISOString()
+  if (payloadType === 'function_call' || payloadType === 'custom_tool_call') {
     return {
       type: 'message',
       id: payload.id || payload.call_id || generateFallbackId('codex-tool-call'),
@@ -454,13 +483,12 @@ function convertCodexResponseItem(payload: any): SessionEntry | null {
         content: [
           {
             type: 'toolCall',
-            id: payload.call_id,
+            id: payload.call_id || payload.id,
             name: payload.name,
-            arguments: payload.arguments,
+            arguments: normalizeCodexArguments(payload.arguments ?? payload.input ?? payload.args),
             text: payload.name || 'function call',
           },
         ],
-        model: 'gpt-5.4',
         provider: 'openai-codex',
       },
     }
@@ -469,13 +497,19 @@ function convertCodexResponseItem(payload: any): SessionEntry | null {
   return null
 }
 
-function normalizeCodexContent(items: unknown[]): Content[] {
+function normalizeCodexContent(value: unknown): Content[] {
+  const items = Array.isArray(value) ? value : [value]
   const content: Content[] = []
   for (const item of items) {
+    if (typeof item === 'string') {
+      content.push({ type: 'text', text: item })
+      continue
+    }
     if (!item || typeof item !== 'object') continue
     const candidate = item as Record<string, any>
     const type = candidate.type as string | undefined
     switch (type) {
+      case 'text':
       case 'input_text':
       case 'output_text':
         if (typeof candidate.text === 'string') {
@@ -488,12 +522,20 @@ function normalizeCodexContent(items: unknown[]): Content[] {
         }
         break
       case 'function_call':
+      case 'custom_tool_call':
+      case 'tool_use':
         content.push({
           type: 'toolCall',
-          id: candidate.call_id,
+          id: candidate.call_id || candidate.id,
           name: candidate.name,
-          arguments: candidate.arguments,
+          arguments: normalizeCodexArguments(candidate.arguments ?? candidate.input ?? candidate.args),
           text: candidate.name || 'function call',
+        })
+        break
+      case 'tool_result':
+        content.push({
+          type: 'text',
+          text: stringifyCodexOutput(candidate.content ?? candidate.output ?? candidate.result),
         })
         break
       case 'input_image':
@@ -509,6 +551,48 @@ function normalizeCodexContent(items: unknown[]): Content[] {
     }
   }
   return content
+}
+
+function normalizeCodexTimestamp(value: unknown): string {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return new Date(value < 100_000_000_000 ? value * 1000 : value).toISOString()
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric)) {
+      return new Date(numeric < 100_000_000_000 ? numeric * 1000 : numeric).toISOString()
+    }
+    const parsed = Date.parse(value)
+    if (Number.isFinite(parsed)) {
+      return new Date(parsed).toISOString()
+    }
+  }
+  return new Date().toISOString()
+}
+
+function normalizeCodexArguments(value: unknown): Record<string, any> | undefined {
+  if (value === undefined || value === null) return undefined
+
+  let parsed = value
+  if (typeof value === 'string') {
+    if (!value.trim()) return undefined
+    try {
+      parsed = JSON.parse(value)
+    } catch {
+      return { value }
+    }
+  }
+
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return parsed as Record<string, any>
+  }
+
+  return { value: parsed }
+}
+
+function stringifyCodexOutput(value: unknown): string {
+  if (typeof value === 'string') return value
+  return JSON.stringify(value ?? '')
 }
 
 function isCodexBootstrapText(text: string): boolean {

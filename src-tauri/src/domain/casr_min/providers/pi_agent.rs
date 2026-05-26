@@ -149,9 +149,14 @@ pub fn render_session(session: &CanonicalSession, target_session_id: &str) -> Re
 
         let effective_content = if msg.content.trim().is_empty() && msg.tool_calls.is_empty() && !msg.tool_results.is_empty() { msg.tool_results.iter().map(|tr| tr.content.clone()).collect::<Vec<_>>().join("\n") } else { msg.content.clone() };
 
+        let is_reasoning = is_reasoning_message(msg);
         let mut blocks = Vec::new();
         if !effective_content.trim().is_empty() {
-            blocks.push(json!({"type": "text", "text": effective_content}));
+            if is_reasoning {
+                blocks.push(json!({"type": "thinking", "thinking": effective_content}));
+            } else {
+                blocks.push(json!({"type": "text", "text": effective_content}));
+            }
         }
         for tc in &msg.tool_calls {
             blocks.push(json!({
@@ -163,7 +168,9 @@ pub fn render_session(session: &CanonicalSession, target_session_id: &str) -> Re
         }
         let mut inner = json!({"role": role_str, "content": Value::Array(blocks)});
         if let Some(ref author) = msg.author {
-            inner["model"] = Value::String(author.clone());
+            if !is_reasoning {
+                inner["model"] = Value::String(author.clone());
+            }
         }
         if matches!(msg.role, MessageRole::Tool) {
             if let Some(result) = msg.tool_results.first() {
@@ -220,6 +227,28 @@ fn extract_tool_calls(content: &Value) -> Vec<ToolCall> {
             Some(ToolCall { id: block.get("id").and_then(|v| v.as_str()).map(String::from), name: block.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(), arguments: block.get("arguments").cloned().unwrap_or(Value::Null) })
         })
         .collect()
+}
+
+fn is_reasoning_message(msg: &CanonicalMessage) -> bool {
+    msg.author.as_deref() == Some("reasoning") || original_content_is_thinking_only(&msg.extra)
+}
+
+fn original_content_is_thinking_only(extra: &Value) -> bool {
+    let Some(Value::Array(blocks)) = extra.pointer("/message/content") else {
+        return false;
+    };
+
+    let mut has_thinking = false;
+    let mut has_non_thinking = false;
+    for block in blocks {
+        match block.get("type").and_then(Value::as_str) {
+            Some("thinking") => has_thinking = true,
+            Some("text") | Some("tool_use") | Some("tool_result") => has_non_thinking = true,
+            _ => {}
+        }
+    }
+
+    has_thinking && !has_non_thinking
 }
 
 fn shell_escape(path: &Path) -> String {

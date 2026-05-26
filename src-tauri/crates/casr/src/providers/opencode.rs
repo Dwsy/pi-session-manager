@@ -26,6 +26,7 @@ pub struct OpenCode;
 
 const DB_FILENAME: &str = "opencode.db";
 const DATA_DIRNAME: &str = ".opencode";
+const XDG_DATA_DIRNAME: &str = "opencode";
 
 impl OpenCode {
     /// Parse OPENCODE environment overrides into a target DB path.
@@ -100,7 +101,7 @@ impl OpenCode {
         };
 
         for ancestor in cwd.ancestors() {
-            paths.push(ancestor.join(DATA_DIRNAME).join(DB_FILENAME));
+            paths.push(normalize_macos_private_path(ancestor.join(DATA_DIRNAME).join(DB_FILENAME)));
         }
 
         paths
@@ -114,10 +115,20 @@ impl OpenCode {
             return if env_db.is_file() { vec![env_db] } else { Vec::new() };
         }
 
+        let local = dedup_existing_files(Self::cwd_ancestor_db_paths());
+        if !local.is_empty() {
+            return local;
+        }
+
         let mut candidates = Vec::new();
-        candidates.extend(Self::cwd_ancestor_db_paths());
         if let Some(home) = dirs::home_dir() {
             candidates.push(home.join(DATA_DIRNAME).join(DB_FILENAME));
+            candidates.push(home.join(".local").join("share").join(XDG_DATA_DIRNAME).join(DB_FILENAME));
+        }
+        if let Ok(xdg_data_home) = std::env::var("XDG_DATA_HOME")
+            && !xdg_data_home.trim().is_empty()
+        {
+            candidates.push(PathBuf::from(xdg_data_home).join(XDG_DATA_DIRNAME).join(DB_FILENAME));
         }
         for data_dir in Self::configured_data_dirs() {
             candidates.push(data_dir.join(DB_FILENAME));
@@ -243,29 +254,38 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
     }
 
     fn session_exists(conn: &Connection, session_id: &str) -> bool {
-        if !Self::table_exists(conn, "sessions") {
-            return false;
+        if Self::table_exists(conn, "session") {
+            return conn.prepare("SELECT 1 FROM session WHERE id = ?1 LIMIT 1").and_then(|mut stmt| stmt.exists(rusqlite::params![session_id])).unwrap_or(false);
         }
-        conn.prepare("SELECT 1 FROM sessions WHERE id = ?1 LIMIT 1").and_then(|mut stmt| stmt.exists(rusqlite::params![session_id])).unwrap_or(false)
+        if Self::table_exists(conn, "sessions") {
+            return conn.prepare("SELECT 1 FROM sessions WHERE id = ?1 LIMIT 1").and_then(|mut stmt| stmt.exists(rusqlite::params![session_id])).unwrap_or(false);
+        }
+        false
     }
 
     fn newest_root_session_id(conn: &Connection) -> Option<String> {
-        if !Self::table_exists(conn, "sessions") {
-            return None;
+        if Self::table_exists(conn, "session") {
+            return conn.query_row("SELECT id FROM session WHERE parent_id IS NULL ORDER BY time_created DESC LIMIT 1", [], |row| row.get(0)).ok();
         }
-
-        conn.query_row("SELECT id FROM sessions WHERE parent_session_id IS NULL ORDER BY created_at DESC LIMIT 1", [], |row| row.get(0)).ok()
-    }
-
-    fn workspace_from_db_path(db_path: &Path) -> Option<PathBuf> {
-        let data_dir = db_path.parent()?;
-        if data_dir.file_name().and_then(|n| n.to_str()) == Some(DATA_DIRNAME) {
-            return data_dir.parent().map(Path::to_path_buf);
+        if Self::table_exists(conn, "sessions") {
+            return conn.query_row("SELECT id FROM sessions WHERE parent_session_id IS NULL ORDER BY created_at DESC LIMIT 1", [], |row| row.get(0)).ok();
         }
         None
     }
 
+    fn workspace_from_db_path(db_path: &Path) -> Option<PathBuf> {
+        let data_dir = db_path.parent()?;
+        match data_dir.file_name().and_then(|n| n.to_str()) {
+            Some(DATA_DIRNAME) => data_dir.parent().map(Path::to_path_buf),
+            Some(XDG_DATA_DIRNAME) => None,
+            _ => None,
+        }
+    }
+
     fn read_session_by_id(conn: &Connection, db_path: &Path, session_id: &str) -> anyhow::Result<CanonicalSession> {
+        if Self::table_exists(conn, "session") && Self::table_exists(conn, "message") && Self::table_exists(conn, "part") {
+            return Self::read_current_session_by_id(conn, db_path, session_id);
+        }
         if !Self::table_exists(conn, "sessions") {
             anyhow::bail!("OpenCode DB has no sessions table: {}", db_path.display());
         }
@@ -363,6 +383,137 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
             source_path: source,
             model_name,
         })
+    }
+
+    fn read_current_session_by_id(conn: &Connection, db_path: &Path, session_id: &str) -> anyhow::Result<CanonicalSession> {
+        let (title_raw, directory, created_raw, updated_raw, parent_session_id): (String, String, i64, i64, Option<String>) = conn
+            .query_row(
+                "SELECT title, directory, time_created, time_updated, parent_id
+                 FROM session
+                 WHERE id = ?1
+                 LIMIT 1",
+                rusqlite::params![session_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            )
+            .with_context(|| format!("session '{session_id}' not found in {}", db_path.display()))?;
+
+        let mut started_at = parse_timestamp(&serde_json::Value::from(created_raw));
+        let mut ended_at = parse_timestamp(&serde_json::Value::from(updated_raw)).or(started_at);
+        let mut model_counts: HashMap<String, usize> = HashMap::new();
+        let mut messages = Vec::new();
+        let mut part_map = Self::current_parts_by_message(conn, session_id)?;
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, data, time_created, time_updated
+                 FROM message
+                 WHERE session_id = ?1
+                 ORDER BY time_created ASC, id ASC",
+            )
+            .context("failed to prepare OpenCode message query")?;
+
+        let rows = stmt.query_map(rusqlite::params![session_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, i64>(2)?, row.get::<_, i64>(3)?)))?;
+
+        for row in rows {
+            let (message_id, data_json, created_at_raw, updated_at_raw) = row?;
+            let data = serde_json::from_str::<serde_json::Value>(&data_json).unwrap_or(serde_json::Value::Null);
+            let raw_parts = serde_json::Value::Array(part_map.remove(&message_id).unwrap_or_default());
+            let (content, tool_calls, tool_results) = parse_parts(&raw_parts);
+            let timestamp = data.pointer("/time/created").and_then(parse_timestamp).or_else(|| parse_timestamp(&serde_json::Value::from(created_at_raw))).or(Some(created_at_raw));
+            if let Some(ts) = timestamp {
+                started_at = Some(started_at.map_or(ts, |current| current.min(ts)));
+                ended_at = Some(ended_at.map_or(ts, |current| current.max(ts)));
+            }
+            if let Some(updated_ts) = data.pointer("/time/completed").and_then(parse_timestamp).or_else(|| parse_timestamp(&serde_json::Value::from(updated_at_raw))) {
+                ended_at = Some(ended_at.map_or(updated_ts, |current| current.max(updated_ts)));
+            }
+
+            let role_raw = data.get("role").and_then(serde_json::Value::as_str).unwrap_or("assistant");
+            let role = normalize_role(role_raw);
+            let model = current_model_name(&data);
+            if let Some(model_name) = model.as_deref().filter(|m| !m.is_empty()) {
+                *model_counts.entry(model_name.to_string()).or_insert(0) += 1;
+            }
+
+            let reasoning_only = parts_have_reasoning_content_only(&raw_parts);
+            let author = if reasoning_only { Some("reasoning".to_string()) } else { model.clone() };
+            let primary_tool_results = if role == MessageRole::Tool { tool_results.clone() } else { Vec::new() };
+            if !content.trim().is_empty() || !tool_calls.is_empty() || !primary_tool_results.is_empty() {
+                messages.push(CanonicalMessage {
+                    idx: 0,
+                    role: role.clone(),
+                    content,
+                    timestamp,
+                    author,
+                    tool_calls,
+                    tool_results: primary_tool_results,
+                    extra: serde_json::json!({
+                        "opencode_message_id": message_id,
+                        "opencode_message": data,
+                        "opencode_parts": raw_parts,
+                    }),
+                });
+            }
+
+            if role != MessageRole::Tool {
+                for result in tool_results {
+                    messages.push(CanonicalMessage {
+                        idx: 0,
+                        role: MessageRole::Tool,
+                        content: result.content.clone(),
+                        timestamp,
+                        author: None,
+                        tool_calls: Vec::new(),
+                        tool_results: vec![result],
+                        extra: serde_json::json!({
+                            "opencode_message_id": message_id,
+                        }),
+                    });
+                }
+            }
+        }
+
+        reindex_messages(&mut messages);
+        let title = (!title_raw.trim().is_empty()).then_some(title_raw).or_else(|| messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 80)).filter(|t| !t.is_empty()));
+        let model_name = model_counts.into_iter().max_by_key(|(_, count)| *count).map(|(name, _)| name);
+        let source = Self::virtual_session_path(db_path, session_id);
+
+        Ok(CanonicalSession {
+            session_id: session_id.to_string(),
+            provider_slug: "opencode".to_string(),
+            workspace: Some(PathBuf::from(directory)).filter(|path| !path.as_os_str().is_empty()).or_else(|| Self::workspace_from_db_path(db_path)),
+            title,
+            started_at,
+            ended_at,
+            messages,
+            metadata: serde_json::json!({
+                "opencode_db": db_path.display().to_string(),
+                "parent_session_id": parent_session_id,
+                "schema": "current",
+            }),
+            source_path: source,
+            model_name,
+        })
+    }
+
+    fn current_parts_by_message(conn: &Connection, session_id: &str) -> anyhow::Result<HashMap<String, Vec<serde_json::Value>>> {
+        let mut stmt = conn
+            .prepare(
+                "SELECT message_id, data
+                 FROM part
+                 WHERE session_id = ?1
+                 ORDER BY message_id ASC, id ASC",
+            )
+            .context("failed to prepare OpenCode part query")?;
+        let rows = stmt.query_map(rusqlite::params![session_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?;
+
+        let mut by_message: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
+        for row in rows {
+            let (message_id, data_json) = row?;
+            let data = serde_json::from_str::<serde_json::Value>(&data_json).unwrap_or(serde_json::Value::Null);
+            by_message.entry(message_id).or_default().push(data);
+        }
+        Ok(by_message)
     }
 }
 
@@ -519,11 +670,15 @@ impl Provider for OpenCode {
             let Ok(conn) = Self::open_db(db_path) else {
                 continue;
             };
-            if !Self::table_exists(&conn, "sessions") {
+            let query = if Self::table_exists(&conn, "session") {
+                "SELECT id FROM session ORDER BY time_created DESC"
+            } else if Self::table_exists(&conn, "sessions") {
+                "SELECT id FROM sessions ORDER BY created_at DESC"
+            } else {
                 continue;
-            }
+            };
 
-            let Ok(mut stmt) = conn.prepare("SELECT id FROM sessions ORDER BY created_at DESC") else {
+            let Ok(mut stmt) = conn.prepare(query) else {
                 continue;
             };
 
@@ -539,6 +694,16 @@ impl Provider for OpenCode {
 
         Some(results)
     }
+}
+
+fn normalize_macos_private_path(path: PathBuf) -> PathBuf {
+    if cfg!(target_os = "macos") {
+        let text = path.to_string_lossy();
+        if let Some(rest) = text.strip_prefix("/private/var/") {
+            return PathBuf::from(format!("/var/{rest}"));
+        }
+    }
+    path
 }
 
 fn dedup_existing_files(paths: Vec<PathBuf>) -> Vec<PathBuf> {
@@ -559,6 +724,44 @@ fn parse_tool_call_arguments(input: &str) -> serde_json::Value {
     serde_json::from_str(trimmed).unwrap_or_else(|_| serde_json::json!({ "input": input }))
 }
 
+fn current_model_name(data: &serde_json::Value) -> Option<String> {
+    let provider = data.get("providerID").and_then(serde_json::Value::as_str).or_else(|| data.pointer("/model/providerID").and_then(serde_json::Value::as_str));
+    let model = data.get("modelID").and_then(serde_json::Value::as_str).or_else(|| data.pointer("/model/modelID").and_then(serde_json::Value::as_str));
+    match (provider, model) {
+        (Some(provider), Some(model)) if !provider.is_empty() && !model.is_empty() => Some(format!("{provider}/{model}")),
+        (_, Some(model)) if !model.is_empty() => Some(model.to_string()),
+        _ => None,
+    }
+}
+
+fn parts_have_reasoning_content_only(parts: &serde_json::Value) -> bool {
+    let Some(items) = parts.as_array() else {
+        return false;
+    };
+    let mut has_reasoning = false;
+    let mut has_text = false;
+    for item in items {
+        let part_type = item.get("type").and_then(serde_json::Value::as_str).or_else(|| item.pointer("/data/type").and_then(serde_json::Value::as_str)).unwrap_or_default();
+        match part_type {
+            "reasoning" => has_reasoning = true,
+            "text" => has_text = true,
+            _ => {}
+        }
+    }
+    has_reasoning && !has_text
+}
+
+fn stringify_tool_output(value: &serde_json::Value) -> String {
+    if let Some(text) = value.as_str() {
+        return text.to_string();
+    }
+    let flattened = flatten_content(value);
+    if !flattened.trim().is_empty() {
+        return flattened;
+    }
+    if value.is_null() { String::new() } else { serde_json::to_string(value).unwrap_or_default() }
+}
+
 fn parse_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<ToolResult>) {
     let mut text_chunks: Vec<String> = Vec::new();
     let mut reasoning_chunks: Vec<String> = Vec::new();
@@ -570,8 +773,8 @@ fn parse_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<ToolRes
     };
 
     for item in items {
-        let part_type = item.get("type").and_then(serde_json::Value::as_str).unwrap_or_default();
-        let data = item.get("data").unwrap_or(&serde_json::Value::Null);
+        let data = item.get("data").unwrap_or(item);
+        let part_type = item.get("type").and_then(serde_json::Value::as_str).or_else(|| data.get("type").and_then(serde_json::Value::as_str)).unwrap_or_default();
 
         match part_type {
             "text" => {
@@ -582,7 +785,7 @@ fn parse_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<ToolRes
                 }
             }
             "reasoning" => {
-                if let Some(thinking) = data.get("thinking").and_then(serde_json::Value::as_str)
+                if let Some(thinking) = data.get("thinking").or_else(|| data.get("text")).and_then(serde_json::Value::as_str)
                     && !thinking.trim().is_empty()
                 {
                     reasoning_chunks.push(thinking.to_string());
@@ -595,8 +798,21 @@ fn parse_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<ToolRes
 
                 tool_calls.push(ToolCall { id, name, arguments: parse_tool_call_arguments(input) });
             }
+            "tool" => {
+                let id = data.get("callID").and_then(serde_json::Value::as_str).filter(|id| !id.is_empty()).map(ToString::to_string);
+                let name = data.get("tool").and_then(serde_json::Value::as_str).filter(|name| !name.is_empty()).unwrap_or("tool").to_string();
+                let state = data.get("state").unwrap_or(&serde_json::Value::Null);
+                let arguments = state.get("input").cloned().unwrap_or_else(|| serde_json::json!({}));
+                tool_calls.push(ToolCall { id: id.clone(), name, arguments });
+
+                match state.get("status").and_then(serde_json::Value::as_str).unwrap_or_default() {
+                    "completed" => tool_results.push(ToolResult { call_id: id, content: stringify_tool_output(state.get("output").unwrap_or(&serde_json::Value::Null)), is_error: false }),
+                    "error" => tool_results.push(ToolResult { call_id: id, content: stringify_tool_output(state.get("error").unwrap_or(&serde_json::Value::Null)), is_error: true }),
+                    _ => {}
+                }
+            }
             "tool_result" => {
-                let content = data.get("content").and_then(serde_json::Value::as_str).unwrap_or_default().to_string();
+                let content = stringify_tool_output(data.get("content").unwrap_or(&serde_json::Value::Null));
                 let call_id = data.get("tool_call_id").and_then(serde_json::Value::as_str).filter(|id| !id.is_empty()).map(ToString::to_string);
                 let is_error = data.get("is_error").and_then(serde_json::Value::as_bool).unwrap_or(false);
 

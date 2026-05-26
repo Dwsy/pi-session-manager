@@ -1,4 +1,5 @@
 use crate::domain::session_bridge::*;
+use rusqlite::Connection;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
@@ -138,6 +139,44 @@ fn codex_mixed_event_array_discards_bootstrap_and_keeps_conversation_chain() {
 }
 
 #[test]
+fn codex_reasoning_preview_renders_as_thinking_not_model() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let path = temp.path().join("codex-reasoning.jsonl");
+    let lines = [
+        serde_json::json!({
+            "type": "session_meta",
+            "timestamp": 1737300000.0,
+            "payload": { "id": "codex-reasoning-preview", "cwd": "/repo/demo" }
+        }),
+        serde_json::json!({
+            "type": "event_msg",
+            "timestamp": 1737300001.0,
+            "payload": { "type": "user_message", "message": "Fix the bug" }
+        }),
+        serde_json::json!({
+            "type": "event_msg",
+            "timestamp": 1737300002.0,
+            "payload": { "type": "agent_reasoning", "text": "Need to inspect the failing path" }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": 1737300003.0,
+            "payload": { "role": "assistant", "content": [{ "type": "output_text", "text": "Fixed." }] }
+        }),
+    ];
+    std::fs::write(&path, lines.iter().map(|value| serde_json::to_string(value).unwrap()).collect::<Vec<_>>().join("\n")).expect("write");
+
+    let preview = preview_session_for_viewer(&path).expect("preview");
+    let entries = preview.lines().skip(1).map(|line| serde_json::from_str::<Value>(line).expect("json line")).collect::<Vec<_>>();
+    let reasoning = entries.iter().find(|entry| entry["message"]["content"].as_array().is_some_and(|content| content.iter().any(|item| item["type"] == "thinking"))).expect("reasoning entry should render as thinking");
+
+    assert_eq!(reasoning["message"]["role"], Value::String("assistant".to_string()));
+    assert_eq!(reasoning["message"]["content"][0]["type"], Value::String("thinking".to_string()));
+    assert_eq!(reasoning["message"]["content"][0]["thinking"], Value::String("Need to inspect the failing path".to_string()));
+    assert!(reasoning["message"].get("model").is_none(), "reasoning must not be presented as a model name");
+}
+
+#[test]
 fn claude_tool_result_chain_survives_pi_preview() {
     let temp = tempfile::tempdir().expect("tempdir");
     let path = temp.path().join("claude-mixed.jsonl");
@@ -199,6 +238,8 @@ fn claude_tool_result_chain_survives_pi_preview() {
     assert!(roles.contains(&"user"));
     assert!(roles.contains(&"assistant"));
     assert!(roles.contains(&"toolResult"));
+    let thinking = entries.iter().flat_map(|entry| entry["message"]["content"].as_array().into_iter().flatten()).find(|content| content["type"] == "thinking").expect("thinking content");
+    assert_eq!(thinking["thinking"], Value::String("Need to inspect auth flow".to_string()));
     let tool_call = entries.iter().flat_map(|entry| entry["message"]["content"].as_array().into_iter().flatten()).find(|content| content["type"] == "toolCall").expect("tool call content");
     assert_eq!(tool_call["id"], Value::String("toolu_1".to_string()));
     assert_eq!(tool_call["name"], Value::String("Read".to_string()));
@@ -209,6 +250,54 @@ fn claude_tool_result_chain_survives_pi_preview() {
     for pair in entries.windows(2) {
         assert_eq!(pair[1]["parentId"], pair[0]["id"]);
     }
+}
+
+#[test]
+fn claude_tool_result_array_content_survives_pi_preview() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let path = temp.path().join("claude-tool-array.jsonl");
+    let lines = [
+        serde_json::json!({
+            "type": "assistant",
+            "uuid": "a1",
+            "sessionId": "claude-array-tool-1",
+            "cwd": "/repo/demo",
+            "timestamp": "2026-04-08T10:00:02.000Z",
+            "message": {
+                "role": "assistant",
+                "model": "claude-opus-4-6",
+                "content": [{ "type": "tool_use", "id": "toolu_array", "name": "Read", "input": { "file_path": "src/auth.ts" } }]
+            }
+        }),
+        serde_json::json!({
+            "type": "user",
+            "uuid": "u1",
+            "sessionId": "claude-array-tool-1",
+            "cwd": "/repo/demo",
+            "timestamp": "2026-04-08T10:00:03.000Z",
+            "message": {
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": "toolu_array",
+                    "content": [{ "type": "text", "text": "first line" }, { "type": "text", "text": "second line" }],
+                    "is_error": false
+                }]
+            }
+        }),
+    ]
+    .iter()
+    .map(|value| serde_json::to_string(value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&path, lines).expect("write");
+
+    let preview = preview_session_for_viewer(&path).expect("preview");
+    let entries = preview.lines().skip(1).map(|line| serde_json::from_str::<Value>(line).expect("json line")).collect::<Vec<_>>();
+    let tool_result = entries.iter().find(|entry| entry["message"]["role"] == "toolResult").expect("tool result entry");
+
+    assert_eq!(tool_result["message"]["toolCallId"], Value::String("toolu_array".to_string()));
+    assert_eq!(tool_result["message"]["content"][0]["text"], Value::String("first line\nsecond line".to_string()));
 }
 
 #[test]
@@ -296,6 +385,119 @@ fn opencode_virtual_session_path_previews_as_pi() {
     assert_eq!(entries.len(), 2);
     assert_eq!(entries[0]["message"]["role"], Value::String("user".to_string()));
     assert_eq!(entries[1]["parentId"], entries[0]["id"]);
+}
+
+#[test]
+fn opencode_current_sqlite_schema_previews_parts_as_pi() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let db_path = temp.path().join("opencode.db");
+    let conn = Connection::open(&db_path).expect("open db");
+    conn.execute_batch(
+        r#"
+CREATE TABLE session (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    parent_id TEXT,
+    slug TEXT NOT NULL,
+    directory TEXT NOT NULL,
+    title TEXT NOT NULL,
+    version TEXT NOT NULL,
+    share_url TEXT,
+    time_created INTEGER NOT NULL,
+    time_updated INTEGER NOT NULL,
+    time_compacting INTEGER,
+    time_archived INTEGER
+);
+CREATE TABLE message (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    time_created INTEGER NOT NULL,
+    time_updated INTEGER NOT NULL,
+    data TEXT NOT NULL
+);
+CREATE TABLE part (
+    id TEXT PRIMARY KEY,
+    message_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    time_created INTEGER NOT NULL,
+    time_updated INTEGER NOT NULL,
+    data TEXT NOT NULL
+);
+"#,
+    )
+    .expect("schema");
+
+    let session_id = "oc-current-1";
+    conn.execute(
+        "INSERT INTO session (id, project_id, parent_id, slug, directory, title, version, share_url, time_created, time_updated, time_compacting, time_archived) VALUES (?1, 'proj-1', NULL, 'current', '/repo/demo', 'Current schema', '1', NULL, 1700000000000, 1700000004000, NULL, NULL)",
+        [session_id],
+    )
+    .expect("insert session");
+
+    let user_data = serde_json::json!({
+        "role": "user",
+        "time": { "created": 1700000001000_i64 },
+        "agent": "build",
+        "model": { "providerID": "anthropic", "modelID": "claude-sonnet-4" }
+    });
+    let assistant_data = serde_json::json!({
+        "role": "assistant",
+        "time": { "created": 1700000002000_i64, "completed": 1700000004000_i64 },
+        "parentID": "msg-user",
+        "modelID": "claude-sonnet-4",
+        "providerID": "anthropic",
+        "mode": "build",
+        "agent": "build",
+        "path": { "cwd": "/repo/demo", "root": "/repo/demo" },
+        "cost": 0,
+        "tokens": { "input": 1, "output": 2, "reasoning": 3, "cache": { "read": 4, "write": 5 } }
+    });
+    conn.execute("INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?1, ?2, ?3, ?4, ?5)", rusqlite::params!["msg-user", session_id, 1700000001000_i64, 1700000001000_i64, user_data.to_string()]).expect("insert user message");
+    conn.execute("INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?1, ?2, ?3, ?4, ?5)", rusqlite::params!["msg-assistant", session_id, 1700000002000_i64, 1700000004000_i64, assistant_data.to_string()]).expect("insert assistant message");
+
+    let parts = [
+        ("part-user-text", "msg-user", 1700000001000_i64, serde_json::json!({ "type": "text", "text": "Fix OpenCode current schema" })),
+        ("part-reason", "msg-assistant", 1700000002000_i64, serde_json::json!({ "type": "reasoning", "text": "Need to inspect current tables", "time": { "start": 1700000002000_i64 } })),
+        (
+            "part-tool",
+            "msg-assistant",
+            1700000003000_i64,
+            serde_json::json!({
+                "type": "tool",
+                "callID": "call-read",
+                "tool": "read",
+                "state": {
+                    "status": "completed",
+                    "input": { "file": "src/main.rs" },
+                    "output": "file contents",
+                    "title": "Read file",
+                    "metadata": {},
+                    "time": { "start": 1700000003000_i64, "end": 1700000004000_i64 }
+                }
+            }),
+        ),
+    ];
+    for (part_id, message_id, timestamp, data) in parts {
+        conn.execute("INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?1, ?2, ?3, ?4, ?5, ?6)", rusqlite::params![part_id, message_id, session_id, timestamp, timestamp, data.to_string()]).expect("insert part");
+    }
+
+    let virtual_path = db_path.join(session_id);
+    let (source, parsed) = read_canonical_session_from_path(&virtual_path).expect("read current opencode");
+    assert_eq!(source, SessionBridgeSource::OpenCode);
+    assert_eq!(parsed.session_id, session_id);
+    assert_eq!(parsed.messages.len(), 3);
+
+    let preview = preview_session_for_viewer(&virtual_path).expect("preview");
+    let entries = preview.lines().skip(1).map(|line| serde_json::from_str::<Value>(line).expect("json line")).collect::<Vec<_>>();
+    let thinking = entries.iter().flat_map(|entry| entry["message"]["content"].as_array().into_iter().flatten()).find(|content| content["type"] == "thinking").expect("thinking content");
+    assert_eq!(thinking["thinking"], Value::String("Need to inspect current tables".to_string()));
+    let tool_call = entries.iter().flat_map(|entry| entry["message"]["content"].as_array().into_iter().flatten()).find(|content| content["type"] == "toolCall").expect("tool call content");
+    assert_eq!(tool_call["id"], Value::String("call-read".to_string()));
+    assert_eq!(tool_call["name"], Value::String("read".to_string()));
+    assert_eq!(tool_call["arguments"]["file"], Value::String("src/main.rs".to_string()));
+    let tool_result = entries.iter().find(|entry| entry["message"]["role"] == "toolResult").expect("tool result entry");
+    assert_eq!(tool_result["message"]["toolCallId"], Value::String("call-read".to_string()));
+    assert_eq!(tool_result["message"]["content"][0]["text"], Value::String("file contents".to_string()));
 }
 
 #[test]
