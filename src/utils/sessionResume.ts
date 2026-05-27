@@ -122,8 +122,8 @@ export async function buildCopyResumeCommand(
 
   const result = await invoke<SessionConvertResult>("convert_session_format", {
     path: session.path,
-    targetFormat: getFallbackExternalResumeTarget(),
-    dryRun: false,
+    target_format: getFallbackExternalResumeTarget(),
+    dry_run: false,
     force: false,
   });
   return result.resume_command || "";
@@ -141,8 +141,8 @@ export async function buildCopyResumeCommandForTarget(
 
   const result = await invoke<SessionConvertResult>("convert_session_format", {
     path: session.path,
-    targetFormat: target,
-    dryRun: false,
+    target_format: target,
+    dry_run: false,
     force: false,
   });
   return result.resume_command || "";

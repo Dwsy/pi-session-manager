@@ -64,8 +64,8 @@ export function useSessionActions(): UseSessionActionsReturn {
     try {
       const result = await invoke<SessionConvertResult>('convert_session_format', {
         path: session.path,
-        targetFormat: target,
-        dryRun: options.dryRun ?? false,
+        target_format: target,
+        dry_run: options.dryRun ?? false,
         force: options.force ?? false,
       })
       return result

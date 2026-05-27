@@ -778,8 +778,8 @@ function App() {
         "convert_session_format",
         {
           path: session.path,
-          targetFormat: target,
-          dryRun: false,
+          target_format: target,
+          dry_run: false,
           force: false,
         },
       );
