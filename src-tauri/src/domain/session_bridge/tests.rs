@@ -501,6 +501,114 @@ CREATE TABLE part (
 }
 
 #[test]
+fn convert_codex_to_pi_writes_existing_pi_style_bridge_file() {
+    let _guard = crate::paths::test_env_lock().lock().expect("test env lock");
+    let previous_home = std::env::var("HOME").ok();
+    let temp = tempfile::tempdir().expect("tempdir");
+    std::env::set_var("HOME", temp.path());
+
+    let source_path = temp.path().join("codex-source.jsonl");
+    let lines = [
+        serde_json::json!({
+            "type": "session_meta",
+            "timestamp": 1737300000.0,
+            "payload": { "id": "codex-source-1", "cwd": "/repo/demo" }
+        }),
+        serde_json::json!({
+            "type": "event_msg",
+            "timestamp": 1737300001.0,
+            "payload": { "type": "user_message", "message": "Fix auth" }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": 1737300002.0,
+            "payload": { "role": "assistant", "content": [{ "type": "output_text", "text": "Done" }] }
+        }),
+    ]
+    .iter()
+    .map(|value| serde_json::to_string(value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&source_path, lines).expect("write source");
+
+    let result = convert_session_format(&source_path, SessionBridgeSource::Pi, SessionBridgeConvertOptions { dry_run: false, force: false }).expect("convert codex to pi");
+
+    let written_path = PathBuf::from(&result.written_paths[0]);
+    assert!(written_path.exists(), "converted Pi bridge file should exist");
+    assert!(written_path.to_string_lossy().contains("/.pi/agent/sessions/bridge/"));
+    assert!(result.resume_command.contains(written_path.to_string_lossy().as_ref()));
+
+    let content = std::fs::read_to_string(&written_path).expect("read written");
+    let entries = content.lines().map(|line| serde_json::from_str::<Value>(line).expect("json line")).collect::<Vec<_>>();
+    assert_eq!(entries[0]["type"], Value::String("session".to_string()));
+    assert_eq!(entries[0]["version"], Value::from(3));
+    assert!(entries[1..].iter().all(|entry| entry["type"] == "message"));
+    assert!(entries[1].get("id").is_some());
+    assert!(entries[1].get("parentId").is_some());
+
+    if let Some(home) = previous_home {
+        std::env::set_var("HOME", home);
+    } else {
+        std::env::remove_var("HOME");
+    }
+}
+
+#[test]
+fn convert_claude_code_to_pi_writes_existing_pi_style_bridge_file() {
+    let _guard = crate::paths::test_env_lock().lock().expect("test env lock");
+    let previous_home = std::env::var("HOME").ok();
+    let temp = tempfile::tempdir().expect("tempdir");
+    std::env::set_var("HOME", temp.path());
+
+    let source_path = temp.path().join("claude-source.jsonl");
+    let lines = [
+        serde_json::json!({
+            "type": "user",
+            "uuid": "u1",
+            "sessionId": "claude-source-1",
+            "cwd": "/repo/demo",
+            "timestamp": "2026-04-08T10:00:01.000Z",
+            "message": { "role": "user", "content": "Fix auth" }
+        }),
+        serde_json::json!({
+            "type": "assistant",
+            "uuid": "a1",
+            "parentUuid": "u1",
+            "sessionId": "claude-source-1",
+            "cwd": "/repo/demo",
+            "timestamp": "2026-04-08T10:00:02.000Z",
+            "message": { "role": "assistant", "model": "claude-sonnet-4", "content": [{ "type": "text", "text": "Done" }] }
+        }),
+    ]
+    .iter()
+    .map(|value| serde_json::to_string(value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&source_path, lines).expect("write source");
+
+    let result = convert_session_format(&source_path, SessionBridgeSource::Pi, SessionBridgeConvertOptions { dry_run: false, force: false }).expect("convert claude to pi");
+
+    let written_path = PathBuf::from(&result.written_paths[0]);
+    assert!(written_path.exists(), "converted Pi bridge file should exist");
+    assert!(written_path.to_string_lossy().contains("/.pi/agent/sessions/bridge/"));
+    assert!(result.resume_command.contains(written_path.to_string_lossy().as_ref()));
+
+    let content = std::fs::read_to_string(&written_path).expect("read written");
+    let entries = content.lines().map(|line| serde_json::from_str::<Value>(line).expect("json line")).collect::<Vec<_>>();
+    assert_eq!(entries[0]["type"], Value::String("session".to_string()));
+    assert_eq!(entries[0]["version"], Value::from(3));
+    assert!(entries[1..].iter().all(|entry| entry["type"] == "message"));
+    assert!(entries[1].get("id").is_some());
+    assert!(entries[1].get("parentId").is_some());
+
+    if let Some(home) = previous_home {
+        std::env::set_var("HOME", home);
+    } else {
+        std::env::remove_var("HOME");
+    }
+}
+
+#[test]
 fn gemini_pretty_json_previews_as_pi() {
     let temp = tempfile::tempdir().expect("tempdir");
     let root = temp.path().join(".gemini").join("tmp").join("hash").join("chats");

@@ -171,7 +171,7 @@ pub fn expand_opencode_session_paths(path: &Path) -> Vec<PathBuf> {
 }
 
 pub fn convert_session_format(path: &Path, target: SessionBridgeSource, options: SessionBridgeConvertOptions) -> Result<SessionBridgeConvertResult, String> {
-    if !options.dry_run {
+    if !options.dry_run && target != SessionBridgeSource::Pi {
         return super::vendor::convert_session_format(path, target, options.force);
     }
 
@@ -189,6 +189,20 @@ pub fn convert_session_format(path: &Path, target: SessionBridgeSource, options:
             resume_command,
             dry_run: true,
             warnings: vec!["Source and target provider are the same; skipped writing.".to_string(), "Dry run only; no files were written.".to_string()],
+        });
+    }
+
+    if !options.dry_run {
+        let outcome = crate::domain::casr_min::bridge_ops::convert_canonical_session(source.into(), &canonical, target_kind, false, options.force)?;
+        return Ok(SessionBridgeConvertResult {
+            source_provider: source.display_name().to_string(),
+            target_provider: target.display_name().to_string(),
+            source_session_id: canonical.session_id.clone(),
+            target_session_id: outcome.target_session_id,
+            written_paths: outcome.written_paths.into_iter().map(|path| path.to_string_lossy().to_string()).collect(),
+            resume_command: outcome.resume_command,
+            dry_run: false,
+            warnings: outcome.warnings,
         });
     }
 
