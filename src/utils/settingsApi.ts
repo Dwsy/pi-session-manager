@@ -14,6 +14,7 @@ let lastBackendSyncSignature: string | null = null;
 
 interface BackendSyncState {
   extraPaths: string[];
+  includeDefaultPiSessionDir: boolean;
   sourceMode: "local" | "dataset";
   activeDatasetId: string;
   activeDatasetIds: string[];
@@ -30,6 +31,7 @@ function buildBackendSyncState(settings: AppSettings): BackendSyncState {
     extraPaths: (settings.advanced.sessionDirs || []).filter(
       (d: string) => d !== "~/.pi/agent/sessions" && d.trim() !== "",
     ),
+    includeDefaultPiSessionDir: settings.advanced.includeDefaultPiSessionDir !== false,
     sourceMode: settings.session.sourceMode,
     activeDatasetId: settings.session.activeDatasetId || "",
     activeDatasetIds: settings.session.activeDatasetIds || [],
@@ -66,7 +68,13 @@ function markBackendStateLoaded(settings: AppSettings) {
 }
 
 function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
-  const advanced = { ...defaultSettings.advanced, ...raw.advanced };
+  const advanced = {
+    ...defaultSettings.advanced,
+    ...raw.advanced,
+    includeDefaultPiSessionDir:
+      (raw.advanced as Record<string, unknown> | undefined)
+        ?.includeDefaultPiSessionDir !== false,
+  };
   const update = {
     ...defaultSettings.update,
     ...raw.update,
@@ -304,6 +312,21 @@ export async function saveAppSettings(settings: AppSettings): Promise<void> {
       await invoke("save_session_paths", { paths: nextBackendSyncState.extraPaths });
     } catch (e) {
       console.warn("Failed to sync session paths:", e);
+      syncSucceeded = false;
+    }
+  }
+
+  if (
+    !previousBackendSyncState ||
+    previousBackendSyncState.includeDefaultPiSessionDir !==
+      nextBackendSyncState.includeDefaultPiSessionDir
+  ) {
+    try {
+      await invoke("save_default_pi_session_dir_enabled", {
+        enabled: nextBackendSyncState.includeDefaultPiSessionDir,
+      });
+    } catch (e) {
+      console.warn("Failed to sync default Pi session directory setting:", e);
       syncSucceeded = false;
     }
   }

@@ -189,6 +189,7 @@ pub fn run() {
             get_psm_config_dir,
             get_session_paths,
             save_session_paths,
+            save_default_pi_session_dir_enabled,
             get_all_session_dirs,
             add_favorite,
             remove_favorite,

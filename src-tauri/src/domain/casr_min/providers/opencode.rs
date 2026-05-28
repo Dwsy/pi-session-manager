@@ -162,7 +162,7 @@ fn candidate_data_dirs() -> Vec<PathBuf> {
 
     dirs.extend(cwd_ancestor_data_dirs());
 
-    if let Some(home) = dirs::home_dir() {
+    for home in crate::paths::local_and_wsl_home_dirs() {
         dirs.push(home.join(DATA_DIRNAME));
         dirs.push(home.join(".local").join("share").join(XDG_DATA_DIRNAME));
     }

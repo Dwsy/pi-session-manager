@@ -19,6 +19,27 @@ export default function StorageSettingsTab({
   onClearCache,
 }: StorageSettingsTabProps) {
   const { t } = useTranslation();
+  const defaultSessionDir = "~/.pi/agent/sessions";
+  const includeDefaultDir = settings.advanced.includeDefaultPiSessionDir !== false;
+  const extraDirs = (settings.advanced.sessionDirs || []).filter(
+    (dir: string) => dir !== defaultSessionDir,
+  );
+  const buildSessionDirs = (includeDefault: boolean, nextDirs: string[]) =>
+    includeDefault ? [defaultSessionDir, ...nextDirs] : nextDirs;
+  const setIncludeDefaultDir = (checked: boolean) => {
+    if (
+      !confirm(
+        t(
+          "settings.advanced.defaultSessionDirRebuildConfirm",
+          "Changing the default Pi session directory setting will clear and rebuild the session cache. Continue?",
+        ),
+      )
+    ) {
+      return;
+    }
+    onUpdate("advanced", "includeDefaultPiSessionDir", checked);
+    onUpdate("advanced", "sessionDirs", buildSessionDirs(checked, extraDirs));
+  };
 
   return (
         <div className="space-y-6">
@@ -26,53 +47,62 @@ export default function StorageSettingsTab({
             title={t("settings.advanced.sessionDir", "Session directories")}
             description={t(
               "settings.advanced.sessionDirHelp",
-              "Storage location for Pi session files, default path is always included",
+              "Locations where Pi session files are scanned. You can turn off the default path and add extra paths.",
             )}
             icon={<FolderOpen className="h-4 w-4" />}
             searchKey="advanced-sessionDir"
           >
             <div className="space-y-3">
+              <SettingsToggleRow
+                title={t("settings.advanced.includeDefaultSessionDir", "Scan default Pi session directory")}
+                description={t(
+                  "settings.advanced.includeDefaultSessionDirHelp",
+                  "Turn this off when you only want to scan custom paths or external CLI session sources. Switching rebuilds the session cache.",
+                )}
+                checked={includeDefaultDir}
+                onChange={setIncludeDefaultDir}
+                className="items-start py-2"
+                descriptionClassName="text-xs text-muted-foreground mt-0.5"
+              />
               <div className="flex gap-2 items-center">
                 <SettingsInput
                   type="text"
-                  value="~/.pi/agent/sessions"
+                  value={defaultSessionDir}
                   disabled
                   className={`flex-1 w-auto ${inputAccentClass} opacity-80 cursor-not-allowed`}
                 />
                 <span className="text-xs text-muted-foreground whitespace-nowrap px-2 py-1 bg-secondary/50 rounded">
-                  {t("settings.advanced.defaultSessionDir", "Default")}
+                  {includeDefaultDir
+                    ? t("settings.advanced.defaultSessionDir", "Default")
+                    : t("settings.advanced.disabledSessionDir", "Disabled")}
                 </span>
               </div>
-              {(settings.advanced.sessionDirs || [])
-                .filter((d: string) => d !== "~/.pi/agent/sessions")
-                .map((dir: string, index: number) => (
+              {extraDirs.map((dir: string, index: number) => (
                   <div key={index} className="flex gap-2 items-center">
                     <SettingsInput
                       type="text"
                       value={dir}
                       onChange={(e) => {
-                        const extraDirs = (
-                          settings.advanced.sessionDirs || []
-                        ).filter((d: string) => d !== "~/.pi/agent/sessions");
-                        extraDirs[index] = e.target.value;
-                        onUpdate("advanced", "sessionDirs", [
-                          "~/.pi/agent/sessions",
-                          ...extraDirs,
-                        ]);
+                        const nextDirs = [...extraDirs];
+                        nextDirs[index] = e.target.value;
+                        onUpdate(
+                          "advanced",
+                          "sessionDirs",
+                          buildSessionDirs(includeDefaultDir, nextDirs),
+                        );
                       }}
                       className={`flex-1 w-auto ${inputAccentClass}`}
                       placeholder="/path/to/sessions"
                     />
                     <button
                       onClick={() => {
-                        const extraDirs = (
-                          settings.advanced.sessionDirs || []
-                        ).filter((d: string) => d !== "~/.pi/agent/sessions");
-                        extraDirs.splice(index, 1);
-                        onUpdate("advanced", "sessionDirs", [
-                          "~/.pi/agent/sessions",
-                          ...extraDirs,
-                        ]);
+                        const nextDirs = [...extraDirs];
+                        nextDirs.splice(index, 1);
+                        onUpdate(
+                          "advanced",
+                          "sessionDirs",
+                          buildSessionDirs(includeDefaultDir, nextDirs),
+                        );
                       }}
                       className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg motion-color motion-press focus-ring"
                       title={t("settings.advanced.removeSessionDir", "Remove")}
@@ -83,10 +113,11 @@ export default function StorageSettingsTab({
                 ))}
               <button
                 onClick={() => {
-                  const current = settings.advanced.sessionDirs || [
-                    "~/.pi/agent/sessions",
-                  ];
-                  onUpdate("advanced", "sessionDirs", [...current, ""]);
+                  onUpdate(
+                    "advanced",
+                    "sessionDirs",
+                    buildSessionDirs(includeDefaultDir, [...extraDirs, ""]),
+                  );
                 }}
                 className="flex items-center gap-2 px-3 py-2 text-sm text-info hover:bg-info/10 rounded-lg motion-color motion-press focus-ring"
               >

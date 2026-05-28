@@ -71,7 +71,13 @@ export interface AppSettings {
     fontFamilyMono: string;
     sidebarWidth: number;
     fontSize: "small" | "medium" | "large";
-    codeBlockTheme: "github" | "monokai" | "dracula" | "one-dark";
+    codeBlockTheme: string;
+    /** Code block font size in px (12–20) */
+    codeFontSize: number;
+    /** Code block font weight (400, 500, 600, 700) */
+    codeFontWeight: 400 | 500 | 600 | 700;
+    /** Enable font ligatures in code blocks */
+    codeLigatures: boolean;
     messageSpacing: "compact" | "comfortable" | "spacious";
     disableToolSuccessStyle: boolean;
   };
@@ -124,6 +130,7 @@ export interface AppSettings {
   };
   advanced: {
     sessionDirs: string[];
+    includeDefaultPiSessionDir: boolean;
     cacheEnabled: boolean;
     debugMode: boolean;
     demoMode: boolean;
@@ -159,6 +166,9 @@ export const defaultSettings: AppSettings = {
     sidebarWidth: 320,
     fontSize: "medium",
     codeBlockTheme: "github",
+    codeFontSize: 13,
+    codeFontWeight: 400,
+    codeLigatures: true,
     messageSpacing: "comfortable",
     disableToolSuccessStyle: true,
   },
@@ -207,6 +217,7 @@ export const defaultSettings: AppSettings = {
   },
   advanced: {
     sessionDirs: ["~/.pi/agent/sessions"],
+    includeDefaultPiSessionDir: true,
     cacheEnabled: true,
     debugMode: false,
     demoMode: false,

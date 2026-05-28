@@ -7,22 +7,25 @@ use sha2::{Digest, Sha256};
 use crate::domain::casr_min::model::{flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult};
 
 pub fn session_roots() -> Vec<PathBuf> {
-    let Some(tmp) = tmp_dir() else {
-        return vec![];
-    };
-    if !tmp.is_dir() {
-        return vec![];
-    }
-
-    std::fs::read_dir(&tmp)
+    gemini_tmp_dirs()
         .into_iter()
-        .flatten()
-        .flatten()
-        .filter_map(|entry| {
-            let chats = entry.path().join("chats");
-            chats.is_dir().then_some(chats)
+        .flat_map(|tmp| {
+            std::fs::read_dir(&tmp)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .filter_map(|entry| {
+                    let chats = entry.path().join("chats");
+                    chats.is_dir().then_some(chats)
+                })
+                .collect::<Vec<_>>()
         })
-        .collect()
+        .fold(Vec::new(), |mut dirs, path| {
+            if !dirs.iter().any(|existing| existing == &path) {
+                dirs.push(path);
+            }
+            dirs
+        })
 }
 
 pub fn matches_path(path: &Path) -> bool {
@@ -110,6 +113,19 @@ fn home_dir() -> Option<PathBuf> {
 
 fn tmp_dir() -> Option<PathBuf> {
     home_dir().map(|home| home.join("tmp"))
+}
+
+fn gemini_tmp_dirs() -> Vec<PathBuf> {
+    if let Some(tmp) = tmp_dir().filter(|path| path.is_dir()) {
+        return vec![tmp];
+    }
+
+    crate::paths::local_and_wsl_home_dirs().into_iter().map(|home| home.join(".gemini").join("tmp")).filter(|path| path.is_dir()).fold(Vec::new(), |mut dirs, path| {
+        if !dirs.iter().any(|existing| existing == &path) {
+            dirs.push(path);
+        }
+        dirs
+    })
 }
 
 fn parse_root(path: &Path, root: &Value) -> Result<CanonicalSession, String> {

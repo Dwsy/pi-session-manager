@@ -3,6 +3,7 @@ import { FolderOpen, Plus, X } from "lucide-react";
 
 import SettingsCard from "@/components/settings/SettingsCard";
 import SettingsInput from "@/components/settings/SettingsInput";
+import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
 import type { AppSettings } from "@/components/settings/types";
 import ExternalSessionsSettings from "./ExternalSessionsSettings";
 import SessionSettings from "./SessionSettings";
@@ -25,14 +26,33 @@ export default function DataSourcesSettings({
   mode = "all",
 }: DataSourcesSettingsProps) {
   const { t } = useTranslation();
+  const includeDefaultDir = settings.advanced.includeDefaultPiSessionDir !== false;
   const extraDirs = (settings.advanced.sessionDirs || []).filter(
     (dir: string) => dir !== DEFAULT_SESSION_DIR,
   );
   const inputAccentClass =
     "placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-info/40";
 
+  const buildSessionDirs = (includeDefault: boolean, nextDirs: string[]) =>
+    includeDefault ? [DEFAULT_SESSION_DIR, ...nextDirs] : nextDirs;
+
   const setExtraDirs = (nextDirs: string[]) => {
-    onUpdate("advanced", "sessionDirs", [DEFAULT_SESSION_DIR, ...nextDirs]);
+    onUpdate("advanced", "sessionDirs", buildSessionDirs(includeDefaultDir, nextDirs));
+  };
+
+  const setIncludeDefaultDir = (checked: boolean) => {
+    if (
+      !window.confirm(
+        t(
+          "settings.advanced.defaultSessionDirRebuildConfirm",
+          "Changing the default Pi session directory setting will clear and rebuild the session cache. Continue?",
+        ),
+      )
+    ) {
+      return;
+    }
+    onUpdate("advanced", "includeDefaultPiSessionDir", checked);
+    onUpdate("advanced", "sessionDirs", buildSessionDirs(checked, extraDirs));
   };
 
   return (
@@ -42,13 +62,24 @@ export default function DataSourcesSettings({
           title={t("settings.dataSources.localTitle", "Local session directories")}
           description={t(
             "settings.advanced.sessionDirHelp",
-            "Storage location for Pi session files, default path is always included",
+            "Locations where Pi session files are scanned. You can turn off the default path and add extra paths.",
           )}
           icon={<FolderOpen className="h-4 w-4" />}
           searchKey="advanced-sessionDir"
           contentClassName="p-4"
         >
           <div className="space-y-2">
+            <SettingsToggleRow
+              title={t("settings.advanced.includeDefaultSessionDir", "Scan default Pi session directory")}
+              description={t(
+                "settings.advanced.includeDefaultSessionDirHelp",
+                "Turn this off when you only want to scan custom paths or external CLI session sources. Switching rebuilds the session cache.",
+              )}
+              checked={includeDefaultDir}
+              onChange={setIncludeDefaultDir}
+              className="items-start py-2"
+              descriptionClassName="text-xs text-muted-foreground mt-0.5"
+            />
             <div className="flex gap-2 items-center">
               <SettingsInput
                 type="text"
@@ -57,7 +88,9 @@ export default function DataSourcesSettings({
                 className={`flex-1 w-auto ${inputAccentClass} opacity-80 cursor-not-allowed`}
               />
               <span className="text-xs text-muted-foreground whitespace-nowrap px-2 py-1 bg-secondary/50 rounded">
-                {t("settings.advanced.defaultSessionDir", "Default")}
+                {includeDefaultDir
+                  ? t("settings.advanced.defaultSessionDir", "Default")
+                  : t("settings.advanced.disabledSessionDir", "Disabled")}
               </span>
             </div>
 

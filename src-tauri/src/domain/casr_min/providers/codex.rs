@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use crate::domain::casr_min::model::{flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult};
 
 pub fn session_roots() -> Vec<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".codex").join("sessions")).filter(|p| p.is_dir()).map(|p| vec![p]).unwrap_or_default()
+    crate::paths::existing_home_relative_dirs(&[".codex", "sessions"])
 }
 
 pub fn build_target_path(target_session_id: &str, now: DateTime<Utc>) -> Result<PathBuf, String> {

@@ -46,17 +46,11 @@ impl SessionBridgeSource {
     pub fn session_roots(self) -> Vec<PathBuf> {
         match self {
             Self::Pi => crate::paths::pi_agent_sessions_dir().ok().filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default(),
-            Self::ClaudeCode => dirs::home_dir().map(|home| home.join(".claude").join("projects")).filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default(),
-            Self::Codex => dirs::home_dir().map(|home| home.join(".codex").join("sessions")).filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default(),
+            Self::ClaudeCode => crate::domain::casr_min::providers::claude_code::session_roots(),
+            Self::Codex => crate::domain::casr_min::providers::codex::session_roots(),
             Self::Gemini => crate::domain::casr_min::providers::gemini::session_roots(),
-            Self::Factory => {
-                let root = if let Ok(home) = std::env::var("FACTORY_HOME") { PathBuf::from(home) } else { dirs::home_dir().unwrap_or_default().join(".factory").join("sessions") };
-                root.is_dir().then_some(vec![root]).unwrap_or_default()
-            }
-            Self::ClawdBot => {
-                let root = if let Ok(home) = std::env::var("CLAWDBOT_HOME") { PathBuf::from(home) } else { dirs::home_dir().unwrap_or_default().join(".clawdbot").join("sessions") };
-                root.is_dir().then_some(vec![root]).unwrap_or_default()
-            }
+            Self::Factory => crate::domain::casr_min::providers::factory::session_roots(),
+            Self::ClawdBot => crate::domain::casr_min::providers::clawdbot::session_roots(),
             Self::OpenCode => crate::domain::casr_min::providers::opencode::session_roots(),
         }
     }

@@ -58,6 +58,9 @@ pub struct Config {
     #[serde(default)]
     pub session_paths: Vec<String>,
 
+    #[serde(default = "default_include_default_pi_session_dir")]
+    pub include_default_pi_session_dir: bool,
+
     #[serde(default = "default_scan_other_agent_jsonl")]
     pub scan_other_agent_jsonl: bool,
 
@@ -113,6 +116,10 @@ fn default_scan_other_agent_jsonl() -> bool {
     false
 }
 
+fn default_include_default_pi_session_dir() -> bool {
+    true
+}
+
 fn default_external_sessions_include_in_stats() -> bool {
     false
 }
@@ -142,6 +149,7 @@ impl Default for Config {
             preload_count: 20,
             auto_cleanup_days: None,
             session_paths: vec![],
+            include_default_pi_session_dir: true,
             scan_other_agent_jsonl: false,
             external_session_provider_slugs: vec![],
             external_sessions_include_in_stats: false,

@@ -6,12 +6,11 @@ use serde_json::{json, Map, Value};
 use crate::domain::casr_min::model::{flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult};
 
 pub fn session_roots() -> Vec<PathBuf> {
-    let root = home_dir();
-    if root.is_dir() {
-        vec![root]
-    } else {
-        vec![]
+    if std::env::var("FACTORY_HOME").is_ok() {
+        let root = home_dir();
+        return root.is_dir().then_some(vec![root]).unwrap_or_default();
     }
+    crate::paths::existing_home_relative_dirs(&[".factory", "sessions"])
 }
 
 pub fn matches_path(path: &Path) -> bool {

@@ -7,6 +7,7 @@ use tauri::Manager;
 use tracing::warn;
 
 const SESSION_PATHS_KEY: &str = "session_paths";
+const INCLUDE_DEFAULT_PI_SESSION_DIR_KEY: &str = "include_default_pi_session_dir";
 
 fn normalized_provider_slugs(provider_slugs: Vec<String>) -> Vec<String> {
     let mut normalized = provider_slugs.into_iter().map(|value| value.trim().to_ascii_lowercase()).filter(|value| !value.is_empty() && value != "pi").collect::<Vec<_>>();
@@ -138,6 +139,14 @@ fn inject_session_source_settings(settings: &mut Value) {
         session.insert("externalSessionsIncludeInStats".to_string(), Value::Bool(config.external_sessions_include_in_stats));
         session.insert("externalSessionsIncludeInSearch".to_string(), Value::Bool(config.external_sessions_include_in_search));
     }
+
+    let advanced_value = root.entry("advanced".to_string()).or_insert_with(|| serde_json::json!({}));
+    if !advanced_value.is_object() {
+        *advanced_value = serde_json::json!({});
+    }
+    if let Some(advanced) = advanced_value.as_object_mut() {
+        advanced.insert("includeDefaultPiSessionDir".to_string(), Value::Bool(config.include_default_pi_session_dir));
+    }
 }
 
 /// Get configured session paths (extra paths beyond the default)
@@ -172,6 +181,41 @@ pub async fn save_session_paths(paths: Vec<String>, app_handle: tauri::AppHandle
     let watcher_state: tauri::State<'_, crate::file_watcher::FileWatcherState> = app_handle.state();
     if let Err(e) = crate::file_watcher::restart_watcher_with_config(&watcher_state, app_handle.clone()) {
         warn!("Failed to restart file watcher: {}", e);
+    }
+
+    Ok(())
+}
+
+pub async fn save_default_pi_session_dir_enabled_core(enabled: bool) -> Result<bool, String> {
+    let mut config = crate::config::Config::load().unwrap_or_default();
+    if config.include_default_pi_session_dir == enabled {
+        return Ok(false);
+    }
+
+    config.include_default_pi_session_dir = enabled;
+    crate::config::save_config(&config)?;
+    crate::settings_store::set(INCLUDE_DEFAULT_PI_SESSION_DIR_KEY, &enabled)?;
+
+    let conn = crate::data::sqlite::init_db_with_config(&config)?;
+    let _ = crate::data::sqlite::clear_all_cache(&conn)?;
+    crate::core::scanner::invalidate_cache();
+    Ok(true)
+}
+
+#[cfg(feature = "gui")]
+#[tauri::command]
+pub async fn save_default_pi_session_dir_enabled(enabled: bool, app_handle: tauri::AppHandle) -> Result<(), String> {
+    if !save_default_pi_session_dir_enabled_core(enabled).await? {
+        return Ok(());
+    }
+
+    let watcher_state: tauri::State<'_, crate::file_watcher::FileWatcherState> = app_handle.state();
+    if let Err(e) = crate::file_watcher::restart_watcher_with_config(&watcher_state, app_handle.clone()) {
+        warn!("Failed to restart file watcher after save_default_pi_session_dir_enabled: {}", e);
+    }
+
+    if let Err(e) = refresh_sessions_after_settings_change(app_handle.clone()).await {
+        warn!("Failed to refresh sessions after save_default_pi_session_dir_enabled: {}", e);
     }
 
     Ok(())

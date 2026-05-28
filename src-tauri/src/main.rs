@@ -520,6 +520,7 @@ fn main() {
             pi_session_manager::get_psm_config_dir,
             pi_session_manager::get_session_paths,
             pi_session_manager::save_session_paths,
+            pi_session_manager::save_default_pi_session_dir_enabled,
             pi_session_manager::get_all_session_dirs,
             pi_session_manager::terminal_create,
             pi_session_manager::terminal_write,

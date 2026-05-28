@@ -92,6 +92,55 @@ describe('saveAppSettings', () => {
     expect(saveSessionSourceMock).not.toHaveBeenCalled()
   })
 
+  it('syncs default Pi session directory changes', async () => {
+    const { saveAppSettings, getCachedSettings, loadAppSettings } = await import('./settingsApi')
+    const defaults = getCachedSettings()
+    const base: AppSettings = {
+      ...defaults,
+      advanced: {
+        ...defaults.advanced,
+        sessionDirs: ['~/.pi/agent/sessions'],
+        includeDefaultPiSessionDir: true,
+      },
+      session: {
+        ...defaults.session,
+        sourceMode: 'local',
+        activeDatasetId: '',
+        activeDatasetIds: [],
+        scanOtherAgentJsonl: false,
+        externalSessionProviders: [],
+      },
+    }
+
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'load_app_settings') {
+        return base
+      }
+      return undefined
+    })
+
+    await loadAppSettings()
+    invokeMock.mockClear()
+    saveSessionSourceMock.mockClear()
+
+    await saveAppSettings({
+      ...base,
+      advanced: {
+        ...base.advanced,
+        sessionDirs: [],
+        includeDefaultPiSessionDir: false,
+      },
+    })
+
+    expect(invokeMock.mock.calls.map((call) => call[0])).toEqual([
+      'save_app_settings',
+      'save_default_pi_session_dir_enabled',
+    ])
+    expect(invokeMock).toHaveBeenCalledWith('save_default_pi_session_dir_enabled', {
+      enabled: false,
+    })
+  })
+
   it('syncs only changed heavy settings fields', async () => {
     const { saveAppSettings, getCachedSettings, loadAppSettings } = await import('./settingsApi')
     const defaults = getCachedSettings()

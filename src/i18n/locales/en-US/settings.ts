@@ -5,6 +5,8 @@ export const settings = {
   searchEmpty: "No matching settings",
   searchResults: "Settings",
   saved: "Saved",
+  savedJustNow: "Saved",
+  saving: "Saving…",
   inlineSaveHint: "This page saves changes in its own controls.",
   readOnlyHint: "This page is read-only.",
   reset: "Reset Settings",
@@ -613,10 +615,16 @@ export const settings = {
     createKey: "Create Key",
     sessionDir: "Session Directories",
     sessionDirHelp:
-      "Locations where Pi session files are stored. The default path is always included.",
+      "Locations where Pi session files are scanned. You can turn off the default path and add extra paths.",
     addSessionDir: "Add Path",
     removeSessionDir: "Remove",
     defaultSessionDir: "Default",
+    disabledSessionDir: "Disabled",
+    includeDefaultSessionDir: "Scan default Pi session directory",
+    includeDefaultSessionDirHelp:
+      "Turn this off when you only want to scan custom paths or enabled external CLI session sources. Switching rebuilds the session cache.",
+    defaultSessionDirRebuildConfirm:
+      "Changing the default Pi session directory setting will clear and rebuild the session cache. This may take a moment. Continue?",
     cacheEnabled: "Enable Cache",
     cacheEnabledHelp: "Cache session data for better performance",
     maxCacheSize: "Max Cache Size",

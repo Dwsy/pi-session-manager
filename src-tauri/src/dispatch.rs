@@ -37,7 +37,7 @@ struct PluginPermissionContext {
 }
 
 // Re-export for backward compatibility
-use crate::utils::payload::extract_optional_string;
+use crate::utils::payload::{extract_bool, extract_optional_string};
 pub use crate::utils::payload::{extract_optional_string as extract_optional, extract_string as extract, extract_usize};
 
 /// Serialize to JSON value, returning a descriptive error instead of panicking.
@@ -783,6 +783,11 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
         "save_session_paths" => {
             let paths: Vec<String> = serde_json::from_value(payload.get("paths").cloned().unwrap_or(Value::Array(vec![]))).map_err(|e| format!("Invalid paths: {e}"))?;
             crate::save_session_paths_core(paths).await?;
+            Ok(Value::Null)
+        }
+        "save_default_pi_session_dir_enabled" => {
+            let enabled = extract_bool(payload, "enabled", true);
+            crate::save_default_pi_session_dir_enabled_core(enabled).await?;
             Ok(Value::Null)
         }
         "get_all_session_dirs" => {

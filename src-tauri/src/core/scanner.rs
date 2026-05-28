@@ -259,9 +259,11 @@ pub fn get_all_session_dirs(config: &Config) -> Vec<PathBuf> {
 
     for source in crate::domain::session_bridge::SessionBridgeSource::ALL {
         if source == crate::domain::session_bridge::SessionBridgeSource::Pi {
-            for root in source.session_roots() {
-                if root.exists() && !dirs.iter().any(|existing| existing == &root) {
-                    dirs.push(root);
+            if config.include_default_pi_session_dir {
+                for root in source.session_roots() {
+                    if root.exists() && !dirs.iter().any(|existing| existing == &root) {
+                        dirs.push(root);
+                    }
                 }
             }
             continue;
@@ -1312,6 +1314,22 @@ pub fn start_background_scanner(sessions_dir: PathBuf, interval_secs: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn get_all_session_dirs_respects_default_pi_toggle() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let extra_path = temp.path().to_path_buf();
+        let mut config = Config::default();
+        config.include_default_pi_session_dir = false;
+        config.session_paths = vec![extra_path.to_string_lossy().to_string()];
+
+        let dirs = get_all_session_dirs(&config);
+
+        assert!(dirs.iter().any(|dir| dir == &extra_path));
+        if let Ok(pi_root) = crate::paths::pi_agent_sessions_dir() {
+            assert!(!dirs.iter().any(|dir| dir == &pi_root));
+        }
+    }
 
     #[test]
     fn test_full_parse_populates_details_and_message_entries() {
