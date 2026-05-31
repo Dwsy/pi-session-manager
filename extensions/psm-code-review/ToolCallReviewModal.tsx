@@ -7,6 +7,7 @@ import {
   Braces,
   Check,
   Code2,
+  Columns2,
   Copy,
   FileEdit,
   FilePlus,
@@ -15,8 +16,11 @@ import {
   Loader2,
   Maximize2,
   Minimize2,
+  Rows3,
   Search,
   Terminal,
+  UnfoldVertical,
+  WrapText,
   Wrench,
   X,
 } from "lucide-react";
@@ -315,12 +319,12 @@ function SummaryItem({
           : "text-foreground";
 
   return (
-    <div className="min-w-0 px-2.5 py-2">
-      <div className="truncate text-[8px] uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="min-w-0 px-3 py-2.5">
+      <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         {t(label, fallbackLabel)}
       </div>
       <div
-        className={`mt-0.5 font-mono text-[12px] font-semibold leading-none tabular-nums ${valueClass}`}
+        className={`mt-1 font-mono text-[14px] font-semibold leading-none tabular-nums ${valueClass}`}
       >
         {value}
       </div>
@@ -341,13 +345,15 @@ function FilterBar({
 
   return (
     <div
-      className="flex flex-shrink-0 gap-0.5"
+      className="flex flex-shrink-0 flex-wrap gap-1"
       role="radiogroup"
       aria-label={t("components.toolCallReview.filterLabel", "Review filter")}
     >
       {FILTER_OPTIONS.map((option) => {
         const active = activeFilter === option.id;
+        const disabled = counts[option.id] === 0 && option.id !== "all";
         const Icon = option.icon;
+        const label = t(option.labelKey, option.fallbackLabel);
         return (
           <button
             key={option.id}
@@ -355,21 +361,28 @@ function FilterBar({
             onClick={() => onChange(option.id)}
             role="radio"
             aria-checked={active}
-            title={`${t(option.labelKey, option.fallbackLabel)} (${counts[option.id]})`}
-            className={`group flex h-8 min-w-10 items-center justify-center gap-1 rounded-[5px] border px-1.5 text-[11px] font-medium motion-surface focus-ring ${
+            disabled={disabled}
+            title={`${label} (${counts[option.id]})`}
+            className={`group inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium motion-surface focus-ring ${
               active
                 ? "border-border/70 bg-background text-foreground shadow-[0_1px_2px_rgba(var(--shadow-rgb),0.16)]"
-                : "border-transparent text-muted-foreground hover:bg-background/55 hover:text-foreground"
+                : disabled
+                  ? "border-transparent text-muted-foreground/45"
+                  : "border-transparent text-muted-foreground hover:bg-background/55 hover:text-foreground"
             }`}
           >
             <Icon
               className={`h-3.5 w-3.5 flex-shrink-0 ${active ? "text-[var(--accent)]" : "text-muted-foreground/70 group-hover:text-foreground"}`}
               aria-hidden="true"
             />
-            <span className="sr-only">
-              {t(option.labelKey, option.fallbackLabel)}
-            </span>
-            <span className="min-w-[1.2em] text-center font-mono text-[10px] leading-none tabular-nums opacity-80">
+            <span className="truncate">{label}</span>
+            <span
+              className={`inline-flex h-4 min-w-[1.25rem] items-center justify-center rounded-full px-1 font-mono text-[10px] leading-none tabular-nums ${
+                active
+                  ? "bg-surface text-foreground"
+                  : "bg-background/45 text-muted-foreground/85"
+              }`}
+            >
               {counts[option.id]}
             </span>
           </button>
@@ -438,13 +451,13 @@ function InspectorRow({
   const { t } = useTranslation();
 
   return (
-    <div className="border-b border-border/35 px-3 py-2.5">
-      <div className="text-[8px] uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="flex items-baseline gap-2 border-b border-border/30 px-3 py-2">
+      <span className="w-[3.5rem] flex-shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         {t(label, fallbackLabel)}
-      </div>
-      <div className="mt-1 break-words font-mono text-[11px] leading-5 text-foreground">
+      </span>
+      <span className="min-w-0 flex-1 truncate font-mono text-[11px] leading-5 text-foreground">
         {value}
-      </div>
+      </span>
     </div>
   );
 }
@@ -463,11 +476,11 @@ function DetailMetric({
   const { t } = useTranslation();
 
   return (
-    <div className="min-w-0 border-b border-r border-border/35 px-3 py-2 last:border-r-0 [&:nth-child(2n)]:border-r-0">
-      <div className="truncate text-[8px] uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="min-w-0 border-b border-r border-border/30 px-3 py-2 last:border-r-0 [&:nth-child(2n)]:border-r-0">
+      <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         {t(label, fallbackLabel)}
       </div>
-      <div className={`mt-1 font-mono text-[13px] font-semibold tabular-nums ${className}`}>
+      <div className={`mt-1 font-mono text-[14px] font-semibold tabular-nums ${className}`}>
         {value}
       </div>
     </div>
@@ -516,6 +529,81 @@ function ReviewStatusStrip({
   );
 }
 
+interface CodeViewControls {
+  splitView: boolean;
+  wrap: boolean;
+  expandUnchanged: boolean;
+  setSplitView: (value: boolean) => void;
+  setWrap: (value: boolean) => void;
+  setExpandUnchanged: (value: boolean) => void;
+}
+
+function ViewControlsToolbar({ controls }: { controls: CodeViewControls }) {
+  const { t } = useTranslation();
+
+  const buttons: Array<{
+    key: string;
+    icon: typeof Columns2;
+    active: boolean;
+    onClick: () => void;
+    labelKey: string;
+    fallback: string;
+  }> = [
+    {
+      key: "split",
+      icon: controls.splitView ? Columns2 : Rows3,
+      active: controls.splitView,
+      onClick: () => controls.setSplitView(!controls.splitView),
+      labelKey: controls.splitView
+        ? "components.toolCallReview.controls.splitView"
+        : "components.toolCallReview.controls.unifiedView",
+      fallback: controls.splitView ? "Split view" : "Unified view",
+    },
+    {
+      key: "wrap",
+      icon: WrapText,
+      active: controls.wrap,
+      onClick: () => controls.setWrap(!controls.wrap),
+      labelKey: "components.toolCallReview.controls.wrap",
+      fallback: "Wrap long lines",
+    },
+    {
+      key: "expand",
+      icon: UnfoldVertical,
+      active: controls.expandUnchanged,
+      onClick: () => controls.setExpandUnchanged(!controls.expandUnchanged),
+      labelKey: "components.toolCallReview.controls.expandUnchanged",
+      fallback: "Expand context",
+    },
+  ];
+
+  return (
+    <div className="hidden flex-shrink-0 items-center gap-0.5 rounded-[6px] border border-border/40 bg-background/40 p-0.5 md:inline-flex">
+      {buttons.map((button) => {
+        const Icon = button.icon;
+        const label = t(button.labelKey, button.fallback);
+        return (
+          <button
+            key={button.key}
+            type="button"
+            onClick={button.onClick}
+            aria-pressed={button.active}
+            title={label}
+            aria-label={label}
+            className={`inline-flex h-7 w-7 items-center justify-center rounded-[4px] motion-surface focus-ring ${
+              button.active
+                ? "bg-surface text-foreground shadow-[0_1px_2px_rgba(var(--shadow-rgb),0.14)]"
+                : "text-muted-foreground hover:bg-surface/55 hover:text-foreground"
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function DetailPanel({
   operation,
   codeViewItems,
@@ -524,6 +612,7 @@ function DetailPanel({
   copied,
   contentExpanded,
   onToggleContentExpanded,
+  controls,
 }: {
   operation: FileOperation | null;
   codeViewItems: CodeViewItem[];
@@ -532,6 +621,7 @@ function DetailPanel({
   copied: boolean;
   contentExpanded: boolean;
   onToggleContentExpanded: () => void;
+  controls: CodeViewControls;
 }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -638,6 +728,7 @@ function DetailPanel({
             {displayPath}
           </div>
         </div>
+        {usesCodeView && <ViewControlsToolbar controls={controls} />}
         <button
           type="button"
           onClick={onToggleContentExpanded}
@@ -701,10 +792,16 @@ function DetailPanel({
                   options={{
                     theme: { dark: "pierre-dark", light: "pierre-light" },
                     themeType,
-                    diffStyle: "split",
-                    overflow: "scroll",
+                    diffStyle: controls.splitView ? "split" : "stacked",
+                    overflow: controls.wrap ? "wrap" : "scroll",
                     stickyHeaders: true,
                     hunkSeparators: "line-info",
+                    diffIndicators: "bars",
+                    lineDiffType: "word",
+                    expandUnchanged: controls.expandUnchanged,
+                    lineHoverHighlight: true,
+                    enableLineSelection: true,
+                    enableGutterUtility: true,
                     itemMetrics: {
                       lineHeight: 20,
                       diffHeaderHeight: 36,
@@ -770,16 +867,22 @@ function DetailPanel({
                 />
               </div>
             ) : (
-              <div className="border border-border/45 bg-background p-6 text-center text-sm text-muted-foreground">
-                {t(
-                  "components.toolCallReview.noRenderableOutput",
-                  "No renderable output was captured for this operation.",
-                )}
-              </div>
-            )}
-
-            {!hasPrimaryOutput && (
-              <div className="tool-review-code-surface border border-border/45 bg-background">
+              <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
+                <div className="flex items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.45)] px-3 py-2">
+                  <Braces
+                    className="h-3.5 w-3.5 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0 flex-1 text-xs font-medium text-foreground">
+                    {t("components.toolCall.arguments", "Arguments")}
+                  </div>
+                  <span className="text-[10px] font-medium text-muted-foreground/80">
+                    {t(
+                      "components.toolCallReview.noRenderableOutput",
+                      "No renderable output was captured for this operation.",
+                    )}
+                  </span>
+                </div>
                 <CodeBlock
                   code={argsText}
                   language="json"
@@ -790,15 +893,15 @@ function DetailPanel({
         </div>
 
         {!contentExpanded && (
-          <aside className="hidden min-h-0 w-64 flex-shrink-0 flex-col border-l border-border/55 bg-[rgb(var(--color-surface-dark)/0.46)] xl:flex">
-            <div className="flex min-h-[38px] items-center gap-2 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.64)] px-3 py-2 text-xs font-semibold text-foreground">
+          <aside className="hidden min-h-0 w-72 flex-shrink-0 flex-col border-l border-border/55 bg-[rgb(var(--color-surface-dark)/0.46)] xl:flex">
+            <div className="flex min-h-[40px] items-center gap-2 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.64)] px-3 py-2 text-[12px] font-semibold text-foreground">
               <Braces
                 className="h-3.5 w-3.5 text-muted-foreground"
                 aria-hidden="true"
               />
               {t("components.toolCallReview.inspector", "Inspector")}
             </div>
-            <div className="grid grid-cols-2 border-b border-border/45 bg-background/35">
+            <div className="grid grid-cols-2 border-b border-border/40 bg-background/35">
               <DetailMetric
                 label="components.toolCallReview.sequence"
                 fallbackLabel="Sequence"
@@ -833,7 +936,7 @@ function DetailPanel({
               value={formatTimestamp(operation.timestamp) || "-"}
             />
             <div className="min-h-0 flex-1 overflow-hidden border-t border-border/45 bg-background/45">
-              <div className="border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.34)] px-3 py-2 text-[8px] uppercase tracking-[0.14em] text-muted-foreground">
+              <div className="border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.34)] px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 {t("components.toolCall.arguments", "Arguments")}
               </div>
               <div
@@ -867,6 +970,21 @@ export default function ToolCallReviewModal({
   const [activeMode, setActiveMode] = useState<ReviewMode>("files");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [contentExpanded, setContentExpanded] = useState(false);
+  const [splitView, setSplitView] = useState(true);
+  const [wrap, setWrap] = useState(false);
+  const [expandUnchanged, setExpandUnchanged] = useState(false);
+
+  const codeViewControls = useMemo<CodeViewControls>(
+    () => ({
+      splitView,
+      wrap,
+      expandUnchanged,
+      setSplitView,
+      setWrap,
+      setExpandUnchanged,
+    }),
+    [splitView, wrap, expandUnchanged],
+  );
 
   const allOperations = useMemo(
     () => extractFileOperations(entries, toolResultByCallId),
@@ -1055,15 +1173,26 @@ export default function ToolCallReviewModal({
         aria-labelledby="tool-call-review-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="relative flex min-h-[36px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.66)] px-3 py-1">
+        <div className="relative flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.66)] px-4 py-2">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
           <div className="flex min-w-0 flex-1 items-center gap-2">
+            <Wrench
+              className="h-4 w-4 flex-shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
             <h2
               id="tool-call-review-title"
-              className="truncate text-[13px] font-semibold text-foreground"
+              className="truncate text-[14px] font-semibold text-foreground"
             >
               {t("components.toolCallReview.title", "Tool Call Review")}
             </h2>
+            {allOperations.length > 0 && (
+              <span className="ml-1 inline-flex h-5 items-center rounded-full bg-background/55 px-2 font-mono text-[10px] font-medium tabular-nums text-muted-foreground">
+                {t("components.toolCallReview.operationCount", "{{count}} operations", {
+                  count: allOperations.length,
+                })}
+              </span>
+            )}
           </div>
           <button
             type="button"
@@ -1136,7 +1265,7 @@ export default function ToolCallReviewModal({
           >
             {!contentExpanded && (
               <aside className="flex h-[min(300px,38dvh)] min-h-0 flex-shrink-0 flex-col border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.42)] ui-enter-fade md:h-auto md:w-[360px] md:border-b-0 md:border-r xl:w-[400px]">
-                <div className="flex items-center gap-1.5 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.55)] p-1.5">
+                <div className="flex flex-col gap-2 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.55)] p-2">
                   <ReviewModeSwitch
                     activeMode={resolvedMode}
                     counts={modeCounts}
@@ -1215,6 +1344,7 @@ export default function ToolCallReviewModal({
               }
               contentExpanded={contentExpanded}
               onToggleContentExpanded={handleToggleContentExpanded}
+              controls={codeViewControls}
             />
           </div>
         )}

@@ -9,6 +9,7 @@ import type {
 } from '@pi-session-manager/plugin-sdk'
 
 import type { SessionEntry } from '@/types'
+import { subscribeToolReview } from '@/contexts/toolReviewBus'
 import { manifest } from './manifest'
 import ToolCallReviewModal from './ToolCallReviewModal'
 import { extractFileOperations } from './tool-review/model'
@@ -56,10 +57,18 @@ function CodeReviewToolbarButton({
 }) {
   const [open, setOpen] = useState(false)
   const [entries, setEntries] = useState<SessionEntry[]>([])
+  const [overrideEntries, setOverrideEntries] = useState<SessionEntry[] | null>(null)
+  const [overrideMap, setOverrideMap] = useState<Map<string, SessionEntry> | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const toolResultByCallId = useMemo(() => buildToolResultByCallId(entries), [entries])
+  const sessionToolResultByCallId = useMemo(
+    () => buildToolResultByCallId(entries),
+    [entries],
+  )
+
+  const activeEntries = overrideEntries ?? entries
+  const activeToolResultByCallId = overrideMap ?? sessionToolResultByCallId
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -76,8 +85,25 @@ function CodeReviewToolbarButton({
 
   useEffect(() => {
     if (!open) return
+    if (overrideEntries) return
     void refresh()
-  }, [open, refresh])
+  }, [open, overrideEntries, refresh])
+
+  useEffect(() => {
+    return subscribeToolReview(({ entries: nextEntries, toolResultByCallId }) => {
+      setOverrideEntries(nextEntries)
+      setOverrideMap(toolResultByCallId)
+      setError(null)
+      setLoading(false)
+      setOpen(true)
+    })
+  }, [])
+
+  const handleClose = useCallback(() => {
+    setOpen(false)
+    setOverrideEntries(null)
+    setOverrideMap(null)
+  }, [])
 
   const title = i18n.t('session.codeReview.title', 'Code review')
   const shortLabel = i18n.t('session.codeReview.shortLabel', 'Review')
@@ -86,7 +112,11 @@ function CodeReviewToolbarButton({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setOverrideEntries(null)
+          setOverrideMap(null)
+          setOpen(true)
+        }}
         className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-border/70 bg-secondary px-2 text-xs text-muted-foreground transition-colors hover:bg-secondary-hover hover:text-foreground focus-ring"
         title={title}
         aria-label={title}
@@ -102,9 +132,9 @@ function CodeReviewToolbarButton({
 
       <ToolCallReviewModal
         isOpen={open}
-        onClose={() => setOpen(false)}
-        entries={entries}
-        toolResultByCallId={toolResultByCallId}
+        onClose={handleClose}
+        entries={activeEntries}
+        toolResultByCallId={activeToolResultByCallId}
         loading={loading}
         error={error}
       />
