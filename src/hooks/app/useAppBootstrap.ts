@@ -121,6 +121,10 @@ export function useAppBootstrap({
       if (codeBlockTheme) {
         root.setAttribute("data-code-theme", codeBlockTheme);
       }
+      root.style.setProperty("--code-font-size", `${settings.appearance.codeFontSize ?? 13}px`);
+      root.style.setProperty("--code-font-weight", String(settings.appearance.codeFontWeight ?? 400));
+      const lig = settings.appearance.codeLigatures !== false ? '"calt", "liga", "dlig"' : 'none';
+      root.style.setProperty("--code-ligatures", lig);
       applyPiChatTheme(theme === "custom" ? customTheme : "app-default");
     }
 

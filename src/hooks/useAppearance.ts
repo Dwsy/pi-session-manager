@@ -49,7 +49,12 @@ export function useAppearance() {
     root.style.setProperty('--font-size-base', fontSizeMap[appearance.fontSize])
     root.style.setProperty('--font-family', appearance.fontFamily)
     root.style.setProperty('--font-family-mono', appearance.fontFamilyMono)
-  }, [appearance.fontSize, appearance.fontFamily, appearance.fontFamilyMono])
+    // Code-specific typography
+    root.style.setProperty('--code-font-size', `${appearance.codeFontSize ?? 13}px`)
+    root.style.setProperty('--code-font-weight', String(appearance.codeFontWeight ?? 400))
+    const lig = appearance.codeLigatures ? '"calt", "liga", "dlig"' : 'none'
+    root.style.setProperty('--code-ligatures', lig)
+  }, [appearance.fontSize, appearance.fontFamily, appearance.fontFamilyMono, appearance.codeFontSize, appearance.codeFontWeight, appearance.codeLigatures])
 
   useEffect(() => {
     const spacingMap = { compact: '8px', comfortable: '16px', spacious: '24px' }

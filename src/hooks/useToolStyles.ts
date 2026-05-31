@@ -8,6 +8,7 @@ import { useSettings } from './useSettings'
 export function useToolStyles() {
   const { settings } = useSettings()
   const disableSuccessStyle = settings.appearance.disableToolSuccessStyle
+  const disableToolCallStyle = settings.appearance.disableToolCallStyle
 
   useEffect(() => {
     const root = document.documentElement
@@ -21,11 +22,14 @@ export function useToolStyles() {
       root.style.removeProperty('--toolOutputExpandedMargin')
     }
 
+    root.classList.toggle('tool-call-style-disabled', disableToolCallStyle)
+
     // Cleanup on unmount or setting change
     return () => {
       root.style.removeProperty('--toolOutputExpandedMargin')
+      root.classList.remove('tool-call-style-disabled')
     }
-  }, [disableSuccessStyle])
+  }, [disableSuccessStyle, disableToolCallStyle])
 
-  return { disableSuccessStyle }
+  return { disableSuccessStyle, disableToolCallStyle }
 }
