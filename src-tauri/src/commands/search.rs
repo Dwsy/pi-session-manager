@@ -15,6 +15,9 @@ const SESSION_ID_PREFIX_SCORE: f32 = 999_000.0;
 const LABEL_MATCH_BASE_SCORE: f32 = 500_000.0;
 const SMART_PHRASE_MATCH_BOOST: f32 = 100_000.0;
 const SEARCH_TIMEOUT_SECS: u64 = 30;
+const SEARCH_RESULT_WINDOW_MULTIPLIER: usize = PER_SESSION_LIMIT + 1;
+const SEARCH_RESULT_WINDOW_FLOOR: usize = 32;
+const MESSAGE_SEARCH_CANDIDATE_MULTIPLIER: usize = PER_SESSION_LIMIT;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SourceFilter {
@@ -67,14 +70,6 @@ impl SortMode {
             "oldest" => Self::Oldest,
             "score" | "relevance" => Self::Relevance,
             _ => Self::Relevance,
-        }
-    }
-
-    fn global_order_sql(self) -> &'static str {
-        match self {
-            Self::Newest => "julianday(timestamp) DESC, score DESC, session_path ASC, entry_id ASC",
-            Self::Oldest => "julianday(timestamp) ASC, score DESC, session_path ASC, entry_id ASC",
-            Self::Relevance => "score DESC, julianday(timestamp) DESC, session_path ASC, entry_id ASC",
         }
     }
 
@@ -252,6 +247,8 @@ fn full_text_search_blocking(
     let sort_mode = SortMode::parse(sort_order.as_deref(), is_labels_browse_mode);
     let match_mode = MatchMode::parse(match_mode.as_deref());
     let time_scope = TimeScope::parse(from.as_deref(), to.as_deref())?;
+    let fetch_limit = search_fetch_limit(page, page_size);
+    let result_limit = search_result_limit(fetch_limit);
 
     if trimmed.is_empty() && !is_labels_browse_mode {
         return Ok(FullTextSearchResponse { hits: vec![], total_hits: 0, has_more: false });
@@ -272,18 +269,18 @@ fn full_text_search_blocking(
     let project_path_owned = project_path.as_ref().map(|value| value.trim().to_string()).filter(|value| !value.is_empty());
 
     let response = if is_labels_browse_mode {
-        let hits = browse_all_labels_hits(&conn, role_opt, like_pattern.as_ref(), project_path_owned.as_ref(), sort_mode, &time_scope, &config)?;
+        let hits = browse_all_labels_hits(&conn, role_opt, like_pattern.as_ref(), project_path_owned.as_ref(), sort_mode, &time_scope, &config, result_limit)?;
         paginate_hits(hits, page, page_size)
     } else {
-        let session_id_matches = if source_filter.includes_session_id() { search_session_id_matches(&conn, &trimmed, role_opt, like_pattern.as_ref(), project_path_owned.as_ref(), &time_scope, &config)? } else { Vec::new() };
+        let session_id_matches = if source_filter.includes_session_id() { search_session_id_matches(&conn, &trimmed, role_opt, like_pattern.as_ref(), project_path_owned.as_ref(), &time_scope, &config, result_limit)? } else { Vec::new() };
 
         let message_hits = if sort_mode.uses_recent_priority() {
-            search_message_hits_recent_first(&conn, &trimmed, role_opt, like_pattern.as_ref(), project_path_owned.as_ref(), match_mode, sort_mode, source_filter, &time_scope, &config)?
+            search_message_hits_recent_first(&conn, &trimmed, role_opt, like_pattern.as_ref(), project_path_owned.as_ref(), match_mode, sort_mode, source_filter, &time_scope, &config, result_limit)?
         } else {
-            search_message_hits(&conn, &trimmed, role_opt, like_pattern.as_ref(), project_path_owned.as_ref(), match_mode, sort_mode, source_filter, &time_scope, &config)?
+            search_message_hits(&conn, &trimmed, role_opt, like_pattern.as_ref(), project_path_owned.as_ref(), match_mode, sort_mode, source_filter, &time_scope, &config, result_limit)?
         };
 
-        let combined_hits = append_unique_hits(session_id_matches, message_hits);
+        let combined_hits = truncate_hits(append_unique_hits(session_id_matches, message_hits), result_limit);
         paginate_hits(combined_hits, page, page_size)
     };
 
@@ -293,6 +290,39 @@ fn full_text_search_blocking(
     metrics::add_search_results(response.hits.len());
 
     Ok(response)
+}
+
+fn search_fetch_limit(page: usize, page_size: usize) -> usize {
+    if page_size == 0 {
+        return 0;
+    }
+
+    page.saturating_mul(page_size).saturating_add(page_size).saturating_add(1)
+}
+
+fn search_result_limit(fetch_limit: usize) -> usize {
+    if fetch_limit == 0 {
+        return 0;
+    }
+
+    fetch_limit.saturating_mul(SEARCH_RESULT_WINDOW_MULTIPLIER).max(SEARCH_RESULT_WINDOW_FLOOR)
+}
+
+fn message_candidate_limit(result_limit: usize) -> usize {
+    if result_limit == 0 {
+        return 0;
+    }
+
+    result_limit.saturating_mul(MESSAGE_SEARCH_CANDIDATE_MULTIPLIER).max(SEARCH_RESULT_WINDOW_FLOOR)
+}
+
+fn truncate_hits(mut hits: Vec<FullTextSearchHit>, fetch_limit: usize) -> Vec<FullTextSearchHit> {
+    if fetch_limit == 0 {
+        hits.clear();
+    } else if hits.len() > fetch_limit {
+        hits.truncate(fetch_limit);
+    }
+    hits
 }
 
 fn paginate_hits(hits: Vec<FullTextSearchHit>, page: usize, page_size: usize) -> FullTextSearchResponse {
@@ -321,7 +351,7 @@ fn hit_identity_key(hit: &FullTextSearchHit) -> String {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn browse_all_labels_hits(conn: &rusqlite::Connection, role_opt: Option<&str>, like_pattern: Option<&String>, project_path: Option<&String>, sort_mode: SortMode, time_scope: &TimeScope, config: &crate::config::Config) -> Result<Vec<FullTextSearchHit>, String> {
+fn browse_all_labels_hits(conn: &rusqlite::Connection, role_opt: Option<&str>, like_pattern: Option<&String>, project_path: Option<&String>, sort_mode: SortMode, time_scope: &TimeScope, config: &crate::config::Config, fetch_limit: usize) -> Result<Vec<FullTextSearchHit>, String> {
     let role_condition = match role_opt {
         Some("user") => "m.role = 'user'",
         Some("assistant") => "m.role = 'assistant'",
@@ -358,7 +388,8 @@ fn browse_all_labels_hits(conn: &rusqlite::Connection, role_opt: Option<&str>, l
          FROM message_entries m
          JOIN sessions s ON s.path = m.session_path
          {where_clause}
-         ORDER BY {order_sql}"
+         ORDER BY {order_sql}
+         LIMIT {fetch_limit}"
     );
 
     let mut stmt = conn.prepare(&data_sql).map_err(|e| format!("Failed to prepare label browse query: {e}"))?;
@@ -378,7 +409,8 @@ fn browse_all_labels_hits(conn: &rusqlite::Connection, role_opt: Option<&str>, l
         .collect()
 }
 
-fn search_session_id_matches(conn: &rusqlite::Connection, trimmed: &str, role_opt: Option<&str>, like_pattern: Option<&String>, project_path: Option<&String>, time_scope: &TimeScope, config: &crate::config::Config) -> Result<Vec<FullTextSearchHit>, String> {
+#[allow(clippy::too_many_arguments)]
+fn search_session_id_matches(conn: &rusqlite::Connection, trimmed: &str, role_opt: Option<&str>, like_pattern: Option<&String>, project_path: Option<&String>, time_scope: &TimeScope, config: &crate::config::Config, fetch_limit: usize) -> Result<Vec<FullTextSearchHit>, String> {
     let exact_session_id_query = search::normalize_session_id_query(trimmed);
     let session_id_exact_only = search::session_id_query_is_exact(trimmed);
     let session_id_supports_prefix = !session_id_exact_only && exact_session_id_query.len() >= 3;
@@ -411,7 +443,8 @@ fn search_session_id_matches(conn: &rusqlite::Connection, trimmed: &str, role_op
             s.modified
          FROM sessions s
          {session_id_where_clause}
-         ORDER BY CASE WHEN lower(s.id) = ? THEN 0 ELSE 1 END, julianday(s.modified) DESC, s.path ASC"
+         ORDER BY CASE WHEN lower(s.id) = ? THEN 0 ELSE 1 END, julianday(s.modified) DESC, s.path ASC
+         LIMIT {fetch_limit}"
     );
     session_id_params.push(&session_id_order_query);
 
@@ -487,11 +520,25 @@ fn search_message_hits_recent_first(
     source_filter: SourceFilter,
     time_scope: &TimeScope,
     config: &crate::config::Config,
+    fetch_limit: usize,
 ) -> Result<Vec<FullTextSearchHit>, String> {
+    if fetch_limit == 0 {
+        return Ok(Vec::new());
+    }
+
     let mut hits = Vec::new();
     for window_scope in build_recent_priority_scopes(time_scope) {
-        let window_hits = search_message_hits(conn, trimmed, role_opt, like_pattern, project_path, match_mode, sort_mode, source_filter, &window_scope, config)?;
+        let remaining = fetch_limit.saturating_sub(hits.len());
+        if remaining == 0 {
+            break;
+        }
+
+        let window_hits = search_message_hits(conn, trimmed, role_opt, like_pattern, project_path, match_mode, sort_mode, source_filter, &window_scope, config, remaining)?;
         hits = append_unique_hits(hits, window_hits);
+        if hits.len() >= fetch_limit {
+            hits.truncate(fetch_limit);
+            break;
+        }
     }
     Ok(hits)
 }
@@ -508,35 +555,42 @@ fn search_message_hits(
     source_filter: SourceFilter,
     time_scope: &TimeScope,
     config: &crate::config::Config,
+    fetch_limit: usize,
 ) -> Result<Vec<FullTextSearchHit>, String> {
-    if trimmed.is_empty() {
+    if trimmed.is_empty() || fetch_limit == 0 {
         return Ok(Vec::new());
     }
 
     let contains_cjk_query = crate::utils::contains_cjk(trimmed);
 
     if match_mode == MatchMode::Smart && contains_cjk_query {
-        let mut phrase_hits = search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, MatchMode::Phrase, sort_mode, source_filter, time_scope, config)?;
+        let mut phrase_hits = search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, MatchMode::Phrase, sort_mode, source_filter, time_scope, config, fetch_limit)?;
         for hit in &mut phrase_hits {
             if hit.match_reason.as_deref() == Some("content") {
                 hit.score += SMART_PHRASE_MATCH_BOOST;
             }
         }
+        if phrase_hits.len() >= fetch_limit {
+            return Ok(truncate_hits(phrase_hits, fetch_limit));
+        }
 
-        let all_hits = search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, MatchMode::All, sort_mode, source_filter, time_scope, config)?;
-        return Ok(append_unique_hits(phrase_hits, all_hits));
+        let all_hits = search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, MatchMode::All, sort_mode, source_filter, time_scope, config, fetch_limit)?;
+        return Ok(truncate_hits(append_unique_hits(phrase_hits, all_hits), fetch_limit));
     }
 
     if match_mode == MatchMode::Smart && should_prioritize_phrase(trimmed) {
-        let mut phrase_hits = search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, MatchMode::Phrase, sort_mode, source_filter, time_scope, config)?;
+        let mut phrase_hits = search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, MatchMode::Phrase, sort_mode, source_filter, time_scope, config, fetch_limit)?;
         for hit in &mut phrase_hits {
             if hit.match_reason.as_deref() == Some("content") {
                 hit.score += SMART_PHRASE_MATCH_BOOST;
             }
         }
+        if phrase_hits.len() >= fetch_limit {
+            return Ok(truncate_hits(phrase_hits, fetch_limit));
+        }
 
-        let any_hits = search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, MatchMode::Any, sort_mode, source_filter, time_scope, config)?;
-        return Ok(append_unique_hits(phrase_hits, any_hits));
+        let any_hits = search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, MatchMode::Any, sort_mode, source_filter, time_scope, config, fetch_limit)?;
+        return Ok(truncate_hits(append_unique_hits(phrase_hits, any_hits), fetch_limit));
     }
 
     let concrete_mode = if match_mode == MatchMode::Smart {
@@ -549,7 +603,7 @@ fn search_message_hits(
         match_mode
     };
 
-    search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, concrete_mode, sort_mode, source_filter, time_scope, config)
+    search_message_hits_for_mode(conn, trimmed, role_opt, like_pattern, project_path, concrete_mode, sort_mode, source_filter, time_scope, config, fetch_limit)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -564,7 +618,12 @@ fn search_message_hits_for_mode(
     source_filter: SourceFilter,
     time_scope: &TimeScope,
     config: &crate::config::Config,
+    fetch_limit: usize,
 ) -> Result<Vec<FullTextSearchHit>, String> {
+    if fetch_limit == 0 {
+        return Ok(Vec::new());
+    }
+
     let role_condition = match role_opt {
         Some("user") => "m.role = 'user'",
         Some("assistant") => "m.role = 'assistant'",
@@ -588,14 +647,24 @@ fn search_message_hits_for_mode(
 
     append_time_scope_sql(&mut where_clause, &mut params, "m.timestamp", from_param.as_ref(), to_param.as_ref());
 
-    let source_precedence = "CASE m.source_type WHEN 'label' THEN 0 WHEN 'user' THEN 1 WHEN 'assistant' THEN 2 ELSE 3 END";
+    let candidate_source_precedence = "CASE source_type WHEN 'label' THEN 0 WHEN 'user' THEN 1 WHEN 'assistant' THEN 2 ELSE 3 END";
     let text_score_expr = "-message_fts.rank".to_string();
     let score_expr = format!("CASE WHEN m.source_type = 'label' THEN {LABEL_MATCH_BASE_SCORE} + ({text_score_expr}) ELSE ({text_score_expr}) END");
 
-    let global_order = sort_mode.global_order_sql();
+    let candidate_order = match sort_mode {
+        SortMode::Newest => "julianday(m.timestamp) DESC, score DESC, m.session_path ASC, m.entry_id ASC",
+        SortMode::Oldest => "julianday(m.timestamp) ASC, score DESC, m.session_path ASC, m.entry_id ASC",
+        SortMode::Relevance => "score DESC, julianday(m.timestamp) DESC, m.session_path ASC, m.entry_id ASC",
+    };
+    let final_order = match sort_mode {
+        SortMode::Newest => "julianday(d.timestamp) DESC, d.score DESC, d.session_path ASC, d.entry_id ASC",
+        SortMode::Oldest => "julianday(d.timestamp) ASC, d.score DESC, d.session_path ASC, d.entry_id ASC",
+        SortMode::Relevance => "d.score DESC, julianday(d.timestamp) DESC, d.session_path ASC, d.entry_id ASC",
+    };
     let per_session_order = sort_mode.per_session_order_sql();
+    let candidate_limit = message_candidate_limit(fetch_limit);
     let data_sql = format!(
-        "WITH ranked AS (
+        "WITH candidate_rows AS (
             SELECT
                 m.entry_id,
                 m.session_path,
@@ -603,13 +672,26 @@ fn search_message_hits_for_mode(
                 m.source_type,
                 m.content,
                 m.timestamp,
-                {score_expr} AS score,
-                ROW_NUMBER() OVER (
-                    PARTITION BY m.session_path, m.entry_id
-                    ORDER BY {source_precedence}, julianday(m.timestamp) DESC
-                ) AS rn_in_entry
+                {score_expr} AS score
             FROM message_entries m JOIN message_fts ON m.rowid = message_fts.rowid
             {where_clause}
+            ORDER BY {candidate_order}
+            LIMIT {candidate_limit}
+        ),
+        ranked AS (
+            SELECT
+                entry_id,
+                session_path,
+                role,
+                source_type,
+                content,
+                timestamp,
+                score,
+                ROW_NUMBER() OVER (
+                    PARTITION BY session_path, entry_id
+                    ORDER BY {candidate_source_precedence}, julianday(timestamp) DESC
+                ) AS rn_in_entry
+            FROM candidate_rows
         ),
         deduped AS (
             SELECT
@@ -640,7 +722,8 @@ fn search_message_hits_for_mode(
         FROM deduped d
         JOIN sessions s ON s.path = d.session_path
         WHERE d.rn_in_session <= {PER_SESSION_LIMIT}
-        ORDER BY {global_order}"
+        ORDER BY {final_order}
+        LIMIT {fetch_limit}"
     );
 
     let mut stmt = conn.prepare(&data_sql).map_err(|e| format!("Failed to prepare message search query: {e}"))?;
@@ -847,7 +930,7 @@ fn glob_to_like(pattern_str: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_fts_query, build_fts_terms_for_word, MatchMode};
+    use super::{build_fts_query, build_fts_terms_for_word, message_candidate_limit, search_fetch_limit, search_result_limit, MatchMode, SEARCH_RESULT_WINDOW_FLOOR};
 
     #[test]
     fn cjk_word_builds_character_terms() {
@@ -877,5 +960,20 @@ mod tests {
     fn punctuation_split_word_uses_phrase_query() {
         let query = build_fts_query("codex-alpha", MatchMode::Any);
         assert_eq!(query, "\"codex alpha\"");
+    }
+
+    #[test]
+    fn search_fetch_limit_reads_one_extra_row_for_has_more() {
+        assert_eq!(search_fetch_limit(0, 8), 9);
+        assert_eq!(search_fetch_limit(2, 8), 25);
+        assert_eq!(search_fetch_limit(0, 0), 0);
+    }
+
+    #[test]
+    fn message_candidate_limit_keeps_small_pages_bounded() {
+        assert_eq!(search_result_limit(0), 0);
+        assert_eq!(search_result_limit(9), SEARCH_RESULT_WINDOW_FLOOR.max(9 * 4));
+        assert_eq!(message_candidate_limit(0), 0);
+        assert_eq!(message_candidate_limit(64), 192);
     }
 }

@@ -383,6 +383,37 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::plugin_fs_stat(root_id, path).await?;
             Ok(to_val(result, "serialize plugin fs stat")?)
         }
+        "plugin_window_open" => {
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or_else(|| "plugin_window_open requires GUI app state".to_string())?;
+                let title = extract(payload, "title")?;
+                let html = extract_optional_string(payload, "html");
+                let url = extract_optional_string(payload, "url");
+                let width = payload.get("width").and_then(|value| value.as_f64());
+                let height = payload.get("height").and_then(|value| value.as_f64());
+                let floating = payload.get("floating").and_then(|value| value.as_bool());
+                let result = crate::plugin_window_open(state.app_handle.clone(), title, html, url, width, height, floating).await?;
+                Ok(to_val(result, "serialize plugin window handle")?)
+            }
+            #[cfg(not(feature = "gui"))]
+            {
+                Err("plugin_window_open is desktop-only".to_string())
+            }
+        }
+        "plugin_window_close" => {
+            #[cfg(feature = "gui")]
+            {
+                let state = app_state.as_ref().ok_or_else(|| "plugin_window_close requires GUI app state".to_string())?;
+                let id = extract(payload, "id")?;
+                crate::plugin_window_close(state.app_handle.clone(), id).await?;
+                Ok(Value::Null)
+            }
+            #[cfg(not(feature = "gui"))]
+            {
+                Err("plugin_window_close is desktop-only".to_string())
+            }
+        }
         "full_text_search" => {
             let query = extract(payload, "query")?;
             let role_filter = extract(payload, "role_filter").or_else(|_| extract(payload, "roleFilter")).map_err(|_| "Missing required field: role_filter or roleFilter")?;

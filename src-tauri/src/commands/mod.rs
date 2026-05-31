@@ -3,6 +3,8 @@ pub mod config_bundle;
 pub mod config_versions;
 mod datasets;
 mod favorites;
+#[cfg(feature = "gui")]
+mod fonts;
 mod model_config;
 mod models;
 #[cfg(feature = "gui")]
@@ -11,6 +13,8 @@ mod notification;
 mod pi_live;
 mod plugin_fs;
 mod plugin_records;
+#[cfg(feature = "gui")]
+mod plugin_windows;
 mod psm_plugins;
 pub mod search;
 mod session;
@@ -35,6 +39,8 @@ pub use config_bundle::*;
 pub use config_versions::*;
 pub use datasets::*;
 pub use favorites::*;
+#[cfg(feature = "gui")]
+pub use fonts::*;
 pub use model_config::*;
 pub use models::*;
 #[cfg(feature = "gui")]
@@ -43,6 +49,8 @@ pub use notification::*;
 pub use pi_live::*;
 pub use plugin_fs::*;
 pub use plugin_records::*;
+#[cfg(feature = "gui")]
+pub use plugin_windows::*;
 pub use psm_plugins::*;
 pub use search::*;
 pub use session::*;
