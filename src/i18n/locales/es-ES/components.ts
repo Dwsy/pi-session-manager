@@ -192,6 +192,7 @@ export const components = {
       avgPerSession: 'Media/Sesión',
       totalTokens: 'Tokens totales',
       totalCost: 'Coste total',
+      cacheUtilization: 'Utilización de caché',
     },
   },
   subagent: {

@@ -4,6 +4,10 @@ export const app = {
   projects: '项目',
   demoMode: '演示模式',
   demoModeDescription: '查看演示数据以探索所有功能',
+  sidebar: {
+    hideSidebar: '隐藏侧边栏',
+    showSidebar: '显示侧边栏',
+  },
   viewMode: {
     list: '列表视图',
     project: '项目视图',

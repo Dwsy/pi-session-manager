@@ -70,6 +70,12 @@ export const components = {
       task: 'Task',
       default: 'Tool',
     },
+    controls: {
+      splitView: 'Split view',
+      unifiedView: 'Unified view',
+      wrap: 'Wrap lines',
+      expandUnchanged: 'Expand context',
+    },
   },
   bashExecution: {
     command: 'Command',
@@ -275,6 +281,7 @@ export const components = {
       avgPerSession: 'Avg/Session',
       totalTokens: 'Total Tokens',
       totalCost: 'Total Cost',
+      cacheUtilization: 'Cache Utilization',
     },
   },
   subagent: {

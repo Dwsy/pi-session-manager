@@ -70,6 +70,12 @@ export const components = {
       task: '任务',
       default: '工具',
     },
+    controls: {
+      splitView: '并排视图',
+      unifiedView: '统一视图',
+      wrap: '自动换行',
+      expandUnchanged: '展开未变更行',
+    },
   },
   bashExecution: {
     command: '命令',
@@ -266,6 +272,7 @@ export const components = {
       avgPerSession: '平均/会话',
       totalTokens: '总 Tokens',
       totalCost: '总成本',
+      cacheUtilization: '缓存利用率',
     },
   },
   subagent: {

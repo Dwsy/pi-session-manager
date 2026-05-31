@@ -192,6 +192,7 @@ export const components = {
       avgPerSession: '平均/セッション',
       totalTokens: '総トークン数',
       totalCost: '総コスト',
+      cacheUtilization: 'キャッシュ利用率',
     },
   },
   subagent: {
