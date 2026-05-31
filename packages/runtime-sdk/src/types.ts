@@ -260,6 +260,20 @@ export interface PsmSessionReference {
   cwd?: string | null
 }
 
+export interface PsmSessionRevealOptions {
+  align?: 'auto' | 'center' | 'start' | 'end'
+  highlight?: boolean
+}
+
+export interface PsmSessionToolRevealOptions extends PsmSessionRevealOptions {
+  expand?: boolean
+}
+
+export interface PsmSessionViewerController {
+  revealEntry(entryId: string, options?: PsmSessionRevealOptions): void
+  revealToolCall(toolCallId: string, options?: PsmSessionToolRevealOptions): void
+}
+
 export interface PsmSessionUiRenderProps {
   session: PsmSessionReference
   activeEntryId?: string | null
@@ -271,6 +285,7 @@ export interface PsmSessionUiRenderProps {
   closeMainView?: () => void
   width?: number
   onWidthChange?: (width: number) => void
+  viewer?: PsmSessionViewerController
 }
 
 export interface PsmSessionJsonlEntry {

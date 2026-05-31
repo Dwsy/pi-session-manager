@@ -82,6 +82,7 @@ Dev Preview is the local development path: add a plugin project directory, build
 - `records.upsert` supports `indexValues`.
 - `sessions.readEntries(path, { limit })` is supported.
 - `agent` exposes host-managed Pi Agent sessions through `createSession`, `run`, `runStream`, `abort`, and `dispose`.
+- Session UI contributions receive an optional host-owned viewer controller on `PsmSessionUiRenderProps.viewer` for reveal flows.
 - UI contributions are first-class and host-rendered.
 
 ## What Is Intentionally Not Public
@@ -93,6 +94,37 @@ Dev Preview is the local development path: add a plugin project directory, build
 - API key administration
 - database maintenance commands
 - desktop-private app transport details
+
+## Session Viewer Control
+
+Session toolbar items, session panels, and session main views can optionally drive the current session viewer without reaching into host-private DOM structure.
+
+```ts
+ctx.ui.registerSessionPanel({
+  id: 'acme.widgets.panel',
+  title: 'Widgets',
+  render: (props) => {
+    return (
+      <button
+        type="button"
+        onClick={() => props.viewer?.revealToolCall('call-widget-1', {
+          expand: true,
+          align: 'center',
+        })}
+      >
+        Reveal widget
+      </button>
+    )
+  },
+})
+```
+
+Notes:
+
+- `viewer` is optional; guard calls with `?.`.
+- Use `revealEntry(...)` for generic message navigation.
+- Use `revealToolCall(...)` when you have the original tool call id and want host-managed widget/tool expansion.
+- Tree-style views still use `onNavigate(leafId, targetId)`; the viewer controller is for shared session UI props.
 
 ## Example Capability Use
 
