@@ -5,6 +5,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const panelRenderSpy = vi.fn()
 const mainViewRenderSpy = vi.fn()
+const mockViewerController = {
+  revealEntry: vi.fn(),
+  revealToolCall: vi.fn(),
+}
 
 vi.mock('@/hooks/useSettings', () => ({
   useSettings: () => ({
@@ -92,8 +96,9 @@ vi.mock('@/plugins/runtime-host', () => ({
 }))
 
 vi.mock('@/components/SessionViewer', () => ({
-  default: ({ slots, layoutSlots, mainViewSlot, onActiveEntryIdChange }: any) => {
+  default: ({ slots, layoutSlots, mainViewSlot, onActiveEntryIdChange, onViewerControllerChange }: any) => {
     onActiveEntryIdChange?.('entry-42')
+    onViewerControllerChange?.(mockViewerController)
     return (
       <div>
         {slots?.right}
@@ -144,6 +149,7 @@ describe('AppSessionViewerPane', () => {
       expect.objectContaining({
         activeEntryId: 'entry-42',
         panelOpen: true,
+        viewer: mockViewerController,
       }),
     )
   })
@@ -312,6 +318,7 @@ describe('AppSessionViewerPane', () => {
       expect.objectContaining({
         activeEntryId: 'entry-42',
         mainViewOpen: true,
+        viewer: mockViewerController,
       }),
     )
   })

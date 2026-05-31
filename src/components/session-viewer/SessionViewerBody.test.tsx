@@ -122,7 +122,7 @@ function renderBody(overrides: Partial<Parameters<typeof SessionViewerBody>[0]> 
 }
 
 describe('SessionViewerBody', () => {
-  it('renders the built-in desktop session tree as an overlay in the stable content stage', () => {
+  it('renders the built-in desktop session tree as an embedded panel in the stable content stage', () => {
     renderBody({
       layoutSlots: {
         left: <div data-testid="external-left-slot" />,
@@ -133,7 +133,7 @@ describe('SessionViewerBody', () => {
     const externalLeft = screen.getByTestId('external-left-slot')
 
     expect(builtinLeft.parentElement).toBe(externalLeft.parentElement)
-    expect(builtinLeft.getAttribute('data-placement')).toBe('overlay')
+    expect(builtinLeft.getAttribute('data-placement')).toBe('embedded')
   })
 
   it('keeps the mobile session tree using overlay placement', () => {

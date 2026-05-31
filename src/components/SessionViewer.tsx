@@ -26,10 +26,15 @@ import SessionViewerBody from "./session-viewer/SessionViewerBody";
 import type { SessionViewerMessagesRef } from "./session-viewer/SessionViewerMessages";
 import { getPlatformDefaults } from "./settings/types";
 import type { PsmSessionTreeViewRuntimeRegistration } from "@/plugins/runtime-host/types";
-import type { SessionInfo } from "@/types";
+import type { SessionEntry, SessionInfo } from "@/types";
 import type { TerminalType } from "./settings/types";
 import type { SessionViewerToolbarSlots, SessionViewerLayoutSlots } from "./session-viewer/SessionViewerToolbarTypes";
 import type { SessionPreviewVariant } from "./session-viewer/previewTypes";
+import type {
+  PsmSessionRevealOptions,
+  PsmSessionToolRevealOptions,
+  PsmSessionViewerController,
+} from "@pi-session-manager/plugin-sdk";
 
 interface SessionViewerProps {
   session: SessionInfo;
@@ -54,8 +59,33 @@ interface SessionViewerProps {
   mainViewSlot?: ReactNode;
   pluginTreeViews?: PsmSessionTreeViewRuntimeRegistration[];
   onActiveEntryIdChange?: (activeEntryId: string | null) => void;
+  onViewerControllerChange?: (controller: PsmSessionViewerController | null) => void;
 }
 
+interface SessionViewerRevealTarget {
+  rowEntryId: string;
+  targetEntryId: string;
+  expandTool: boolean;
+  highlight: boolean;
+  align: NonNullable<PsmSessionRevealOptions["align"]>;
+}
+
+function findToolCallRowEntryId(entries: SessionEntry[], toolCallId: string): string | null {
+  for (const entry of entries) {
+    if (entry.type !== "message" || entry.message?.role !== "assistant") {
+      continue;
+    }
+
+    const hasToolCall = entry.message.content?.some(
+      (item: any) => item.type === "toolCall" && (item.id === toolCallId || item.toolCallId === toolCallId),
+    );
+    if (hasToolCall) {
+      return entry.id;
+    }
+  }
+
+  return null;
+}
 
 function SessionViewerContent({
   session,
@@ -78,6 +108,7 @@ function SessionViewerContent({
   mainViewSlot,
   pluginTreeViews,
   onActiveEntryIdChange,
+  onViewerControllerChange,
 }: SessionViewerProps) {
   const { t } = useTranslation();
   const {
@@ -103,6 +134,7 @@ function SessionViewerContent({
   });
 
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [externalRevealTarget, setExternalRevealTarget] = useState<SessionViewerRevealTarget | null>(null);
   const {
     showSystemPromptDialog,
     openSystemPromptDialog,
@@ -112,6 +144,8 @@ function SessionViewerContent({
 
   const sessionDataIsAtBottomRef = useRef(true);
   const messagesRef = useRef<SessionViewerMessagesRef>(null);
+  const renderableEntriesRef = useRef<SessionEntry[]>([]);
+  const viewerControllerRef = useRef<PsmSessionViewerController | null>(null);
 
   const handleResume = useCallback(() => {
     if (onResumeSession) {
@@ -180,9 +214,54 @@ function SessionViewerContent({
     messageEntries,
   } = useSessionViewerDerivedData(entries, activeEntryId, isLive, previewMode);
 
+  renderableEntriesRef.current = renderableEntries;
+
+  if (!viewerControllerRef.current) {
+    viewerControllerRef.current = {
+      revealEntry: (entryId: string, options?: PsmSessionRevealOptions) => {
+        const align = options?.align ?? "center";
+        const highlight = options?.highlight !== false;
+        setActiveEntryId(entryId);
+        setScrollTargetId(entryId);
+        setExternalRevealTarget({
+          rowEntryId: entryId,
+          targetEntryId: entryId,
+          expandTool: false,
+          highlight,
+          align,
+        });
+      },
+      revealToolCall: (toolCallId: string, options?: PsmSessionToolRevealOptions) => {
+        const rowEntryId = findToolCallRowEntryId(renderableEntriesRef.current, toolCallId);
+        if (!rowEntryId) {
+          return;
+        }
+
+        const align = options?.align ?? "center";
+        const highlight = options?.highlight !== false;
+        setActiveEntryId(rowEntryId);
+        setScrollTargetId(rowEntryId);
+        setExternalRevealTarget({
+          rowEntryId,
+          targetEntryId: `tool-result-${toolCallId}`,
+          expandTool: options?.expand !== false,
+          highlight,
+          align,
+        });
+      },
+    };
+  }
+
   useEffect(() => {
     onActiveEntryIdChange?.(activeEntryId);
   }, [activeEntryId, onActiveEntryIdChange]);
+
+  useEffect(() => {
+    onViewerControllerChange?.(viewerControllerRef.current);
+    return () => {
+      onViewerControllerChange?.(null);
+    };
+  }, [onViewerControllerChange]);
 
   const {
     isSearchOpen,
@@ -353,6 +432,8 @@ function SessionViewerContent({
         sessionDataIsAtBottomRef,
         onReachBottom: handleReachBottom,
         toolResultByCallId,
+        externalRevealTarget,
+        onExternalRevealHandled: () => setExternalRevealTarget(null),
       }}
       scrollMarkers={{
         showScrollMarkers,

@@ -11,6 +11,8 @@ interface CommandPaletteProps {
   context: SearchContext
 }
 
+const COMMAND_SEARCH_PAGE_SIZE = 8
+
 export default function CommandPalette({ context }: CommandPaletteProps) {
   const { isOpen, open, close, query, setQuery, results, setResults, isSearching, setIsSearching } = useCommandMenu()
   const [shouldRender, setShouldRender] = useState(isOpen)
@@ -29,7 +31,7 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
     globPattern: undefined,
     sortMode: 'newest',
     page: 0,
-    pageSize: 20,
+    pageSize: COMMAND_SEARCH_PAGE_SIZE,
   })
 
   // Two-panel layout state: selected result for preview

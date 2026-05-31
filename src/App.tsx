@@ -336,6 +336,7 @@ function App() {
     }
   });
   const [showTerminal, setShowTerminal] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(true);
   const [activeTerminalScopeKey, setActiveTerminalScopeKey] = useState<string | null>(null);
   const [terminalScopes, setTerminalScopes] = useState<Record<string, TerminalScope>>({});
   const [terminalPendingCommands, setTerminalPendingCommands] = useState<Record<string, string | null>>({});
@@ -920,6 +921,7 @@ function App() {
         navigateToProjects();
       },
       ...appViewShortcuts,
+      "cmd+b": () => setSidebarVisible((prev) => !prev),
       "cmd+,": () => setShowSettings(true),
       "cmd+`": toggleCurrentTerminalScope,
       "cmd+shift+i": async () => {
@@ -1701,6 +1703,7 @@ function App() {
       <div
         className="app-shell flex flex-col h-screen-safe bg-background text-foreground"
         data-runtime={appRuntime}
+        data-sidebar-collapsed={!sidebarVisible}
       >
         <ConnectionBanner />
 
@@ -1720,26 +1723,30 @@ function App() {
         )}
 
         <div className="flex flex-1 min-h-0">
-          <AppDesktopSidebar
-            isTauriRuntime={isTauriRuntime}
-            startDragging={startDragging}
-            sidebarMode={sidebarMode}
-            showFavorites={showFavorites}
-            showDashboardButton={!standaloneDatasetRuntime}
-            terminalEnabled={false}
-            showTerminal={showTerminal}
-            onShowDashboard={handleSidebarShowDashboard}
-            onSelectListView={handleSidebarSelectListView}
-            onSelectProjectView={handleSidebarSelectProjectView}
-            appViewItems={appViewItems}
-            onToggleFavorites={handleSidebarToggleFavorites}
-            onOpenCommandPalette={handleSidebarOpenCommandPalette}
-            onToggleTerminal={handleSidebarToggleTerminal}
-            onOpenSettings={handleSidebarOpenSettings}
-            searchBar={desktopSearchBar}
-            content={desktopSidebarContent}
-            listScrollRef={listScrollRef}
-          />
+          {sidebarVisible && (
+            <AppDesktopSidebar
+              isTauriRuntime={isTauriRuntime}
+              startDragging={startDragging}
+              sidebarMode={sidebarMode}
+              showFavorites={showFavorites}
+              sidebarVisible={sidebarVisible}
+              showDashboardButton={!standaloneDatasetRuntime}
+              terminalEnabled={false}
+              showTerminal={showTerminal}
+              onShowDashboard={handleSidebarShowDashboard}
+              onSelectListView={handleSidebarSelectListView}
+              onSelectProjectView={handleSidebarSelectProjectView}
+              appViewItems={appViewItems}
+              onToggleFavorites={handleSidebarToggleFavorites}
+              onOpenCommandPalette={handleSidebarOpenCommandPalette}
+              onToggleTerminal={handleSidebarToggleTerminal}
+              onOpenSettings={handleSidebarOpenSettings}
+              onToggleSidebar={() => setSidebarVisible((prev) => !prev)}
+              searchBar={desktopSearchBar}
+              content={desktopSidebarContent}
+              listScrollRef={listScrollRef}
+            />
+          )}
 
           <AppDesktopContent
             isTauriRuntime={isTauriRuntime}
@@ -1747,6 +1754,9 @@ function App() {
             terminalMaximized={terminalMaximized}
             mainContent={desktopMainContent}
             terminalPanel={desktopTerminalPanel}
+            sidebarVisible={sidebarVisible}
+            onToggleSidebar={() => setSidebarVisible((prev) => !prev)}
+            toggleSidebarTitle={sidebarVisible ? t("app.sidebar.hideSidebar", "Hide sidebar") : t("app.sidebar.showSidebar", "Show sidebar")}
           />
 
           {renderOverlays()}

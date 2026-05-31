@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { FolderOpen, LayoutDashboard, List, MoreHorizontal, Search, Settings, Star, Terminal } from "lucide-react";
+import { FolderOpen, LayoutDashboard, List, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Star, Terminal } from "lucide-react";
 
 import KbdTooltip from "@/components/ui/KbdTooltip";
 import AppViewIcon from "./AppViewIcon";
@@ -22,6 +22,7 @@ export interface AppDesktopSidebarProps {
   startDragging: () => void;
   sidebarMode: AppDesktopSidebarMode;
   showFavorites: boolean;
+  sidebarVisible?: boolean;
   showDashboardButton?: boolean;
   terminalEnabled: boolean;
   showTerminal: boolean;
@@ -33,6 +34,7 @@ export interface AppDesktopSidebarProps {
   onOpenCommandPalette: () => void;
   onToggleTerminal: () => void;
   onOpenSettings: () => void;
+  onToggleSidebar?: () => void;
   settingsLabel?: string;
   settingsIcon?: ReactNode;
   searchBar?: ReactNode;
@@ -45,6 +47,7 @@ function AppDesktopSidebar({
   startDragging,
   sidebarMode,
   showFavorites,
+  sidebarVisible = true,
   showDashboardButton = true,
   terminalEnabled,
   showTerminal,
@@ -56,6 +59,7 @@ function AppDesktopSidebar({
   onOpenCommandPalette,
   onToggleTerminal,
   onOpenSettings,
+  onToggleSidebar,
   settingsLabel,
   settingsIcon,
   searchBar,
@@ -101,16 +105,37 @@ function AppDesktopSidebar({
       aria-label={t("app.sidebar.label", "Primary navigation")}
     >
       <div
-        className={`app-desktop-sidebar__chrome ${isTauriRuntime ? "h-8" : ""} border-b border-border flex items-center px-3 ${isTauriRuntime ? "py-0" : "py-1.5"} select-none`}
+        className={`app-desktop-sidebar__chrome ${isTauriRuntime ? "h-10" : ""} border-b border-border flex items-center px-3 ${isTauriRuntime ? "py-0" : "py-1.5"} select-none`}
         {...(isTauriRuntime
           ? { "data-tauri-drag-region": true, onMouseDown: startDragging }
           : {})}
       >
+
         <div
           className="relative flex min-w-0 items-center gap-0.5 ml-auto no-drag"
           role="toolbar"
           aria-label={t("app.sidebar.toolbar", "App controls")}
         >
+          {/* Sidebar toggle button - leftmost */}
+          {onToggleSidebar && (
+              <div className="no-drag mr-auto">
+                <KbdTooltip shortcut="Cmd+B" label={sidebarVisible ? t("app.sidebar.hideSidebar", "Hide sidebar") : t("app.sidebar.showSidebar", "Show sidebar")}>
+                  <button
+                      type="button"
+                      onClick={onToggleSidebar}
+                      aria-label={sidebarVisible ? t("app.sidebar.hideSidebar", "Hide sidebar") : t("app.sidebar.showSidebar", "Show sidebar")}
+                      className="p-1 rounded motion-color motion-press focus-ring text-muted-foreground hover:text-foreground hover:bg-secondary"
+                      title={sidebarVisible ? t("app.sidebar.hideSidebar", "Hide sidebar") : t("app.sidebar.showSidebar", "Show sidebar")}
+                  >
+                    {sidebarVisible ? (
+                        <PanelLeftClose className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                        <PanelLeftOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                  </button>
+                </KbdTooltip>
+              </div>
+          )}
           {showDashboardButton && (
             <button
               type="button"

@@ -13,6 +13,7 @@ import ChatInput from "@/components/pi-live/PiLiveChatInput";
 import type { SessionTreeRef } from "@/components/session-tree/SessionTree";
 import SessionViewerMessages, {
   type SessionViewerMessagesRef,
+  type SessionViewerRevealTarget,
 } from "@/components/session-viewer/SessionViewerMessages";
 import SessionViewerSearchBar, {
   type SessionViewerSearchBarProps,
@@ -64,6 +65,8 @@ export interface SessionViewerBodyMessagesProps {
   sessionDataIsAtBottomRef: MutableRefObject<boolean>;
   onReachBottom: () => void;
   toolResultByCallId: Map<string, SessionEntry>;
+  externalRevealTarget: SessionViewerRevealTarget | null;
+  onExternalRevealHandled: () => void;
 }
 
 export interface SessionViewerBodyScrollMarkersProps {
@@ -131,7 +134,7 @@ export default function SessionViewerBody({
       showSidebar={shouldMountSidebar}
       open={shouldShowSidebar}
       isMobile={isMobile}
-      placement="overlay"
+      placement={isMobile ? "overlay" : "embedded"}
       sidebarWidth={sidebar.sidebarWidth}
       isResizing={sidebar.isResizing}
       entries={entries}
@@ -200,6 +203,8 @@ export default function SessionViewerBody({
                   isAtBottomRef={messages.sessionDataIsAtBottomRef}
                   onReachBottom={messages.onReachBottom}
                   toolResultByCallId={messages.toolResultByCallId}
+                  externalRevealTarget={messages.externalRevealTarget}
+                  onExternalRevealHandled={messages.onExternalRevealHandled}
                   showScrollMarkers={previewMode ? false : scrollMarkers.showScrollMarkers}
                   isMobile={isMobile}
                   scrollMarkers={scrollMarkers.scrollMarkers}

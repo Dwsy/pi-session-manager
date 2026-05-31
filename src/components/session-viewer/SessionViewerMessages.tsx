@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useEffect,
   useImperativeHandle,
   type Dispatch,
   type MutableRefObject,
@@ -37,6 +38,14 @@ export interface SessionViewerMessagesRef {
   scrollToBottom: () => void;
 }
 
+export interface SessionViewerRevealTarget {
+  rowEntryId: string;
+  targetEntryId: string;
+  expandTool: boolean;
+  highlight: boolean;
+  align: "auto" | "center" | "start" | "end";
+}
+
 export interface SessionViewerMessagesProps {
   loading: boolean;
   showLoading: boolean;
@@ -58,6 +67,8 @@ export interface SessionViewerMessagesProps {
   isAtBottomRef: MutableRefObject<boolean>;
   onReachBottom?: () => void;
   toolResultByCallId: Map<string, SessionEntry>;
+  externalRevealTarget: SessionViewerRevealTarget | null;
+  onExternalRevealHandled: () => void;
   showScrollMarkers: boolean;
   isMobile: boolean;
   scrollMarkers: ScrollMarker[];
@@ -97,6 +108,8 @@ const SessionViewerMessages = forwardRef<
   isAtBottomRef,
   onReachBottom,
   toolResultByCallId,
+  externalRevealTarget,
+  onExternalRevealHandled,
   showScrollMarkers,
   isMobile,
   scrollMarkers,
@@ -147,6 +160,89 @@ const SessionViewerMessages = forwardRef<
     scrollToEntryId,
     ensureToolExpandedForSearch,
   });
+
+  useEffect(() => {
+    if (!externalRevealTarget || !messagesContainerRef.current) {
+      return;
+    }
+
+    const {
+      rowEntryId,
+      targetEntryId,
+      expandTool,
+      highlight,
+      align,
+    } = externalRevealTarget;
+
+    setScrollTargetId(rowEntryId);
+    if (expandTool && targetEntryId !== rowEntryId) {
+      ensureToolExpandedForSearch(targetEntryId);
+    }
+
+    let animationFrameId = 0;
+    let retryTimeoutId: number | null = null;
+    let retryCount = 0;
+    const maxRetries = 8;
+
+    const clearHighlight = (element: HTMLElement) => {
+      window.setTimeout(() => {
+        element.classList.remove("highlight");
+      }, 2000);
+    };
+
+    const tryRevealTarget = () => {
+      const container = messagesContainerRef.current;
+      if (!container) {
+        return;
+      }
+
+      if (previewVariant !== "conversation") {
+        scrollToEntryId(rowEntryId, align);
+      }
+
+      const selector = `#entry-${CSS.escape(targetEntryId)}, [data-entry-id="${CSS.escape(targetEntryId)}"]`;
+      const fallbackSelector = `#entry-${CSS.escape(rowEntryId)}, [data-entry-id="${CSS.escape(rowEntryId)}"]`;
+      const target = container.querySelector<HTMLElement>(selector)
+        ?? container.querySelector<HTMLElement>(fallbackSelector);
+
+      if (target) {
+        const block = align === "auto" ? "nearest" : align;
+        target.scrollIntoView({ block, inline: "nearest" });
+        if (highlight) {
+          target.classList.add("highlight");
+          clearHighlight(target);
+        }
+        onExternalRevealHandled();
+        return;
+      }
+
+      if (retryCount >= maxRetries) {
+        onExternalRevealHandled();
+        return;
+      }
+
+      retryCount += 1;
+      retryTimeoutId = window.setTimeout(() => {
+        animationFrameId = requestAnimationFrame(tryRevealTarget);
+      }, 50);
+    };
+
+    animationFrameId = requestAnimationFrame(tryRevealTarget);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      if (retryTimeoutId) {
+        window.clearTimeout(retryTimeoutId);
+      }
+    };
+  }, [
+    ensureToolExpandedForSearch,
+    externalRevealTarget,
+    onExternalRevealHandled,
+    previewVariant,
+    scrollToEntryId,
+    setScrollTargetId,
+  ]);
 
   // Expose methods
   useImperativeHandle(ref, () => ({

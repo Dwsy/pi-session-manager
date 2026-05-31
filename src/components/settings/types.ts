@@ -80,6 +80,7 @@ export interface AppSettings {
     codeLigatures: boolean;
     messageSpacing: "compact" | "comfortable" | "spacious";
     disableToolSuccessStyle: boolean;
+    disableToolCallStyle: boolean;
   };
   language: {
     locale: string;
@@ -171,6 +172,7 @@ export const defaultSettings: AppSettings = {
     codeLigatures: true,
     messageSpacing: "comfortable",
     disableToolSuccessStyle: true,
+    disableToolCallStyle: true,
   },
   language: {
     locale: getDefaultLocale(),

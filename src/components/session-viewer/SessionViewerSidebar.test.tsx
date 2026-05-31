@@ -153,6 +153,17 @@ describe('SessionViewerSidebar', () => {
     expect((resizeHandle as HTMLElement | null)?.style.left).toBe('');
   });
 
+  it('collapses desktop embedded placement while closing', () => {
+    mockGetRuntimeSessionLabels.mockResolvedValue({});
+
+    const rendered = renderSidebar({ placement: 'embedded', open: false });
+    const sidebar = rendered.container.querySelector('aside.session-sidebar') as HTMLElement | null;
+
+    expect(sidebar?.style.width).toBe('0px');
+    expect(sidebar?.style.borderRightWidth).toBe('0px');
+    expect(sidebar?.getAttribute('aria-hidden')).toBe('true');
+  });
+
   it('does not reuse labels from the previous session while switching paths', async () => {
     const firstFetch = deferred<Record<string, string>>();
     const secondFetch = deferred<Record<string, string>>();

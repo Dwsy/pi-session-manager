@@ -24,20 +24,20 @@ export default function SettingsCard({
 }: SettingsCardProps) {
   return (
     <div
-      className={`rounded-2xl border border-border/70 bg-background/45 overflow-hidden shadow-sm ${className}`}
+      className={`rounded-[10px] border border-border/50 bg-card/30 overflow-hidden ${className}`}
       {...(searchKey ? { 'data-settings-search': searchKey } : {})}
     >
       {(title || description) && (
-        <div className="px-4 py-3 border-b border-border/60 bg-surface/35">
+        <div className="px-4 py-2.5 border-b border-border/40">
           <div className="flex items-start gap-2.5">
             {icon && (
-              <span className="mt-0.5 rounded-lg bg-secondary/70 p-1.5 text-muted-foreground [&>svg]:h-4 [&>svg]:w-4">
+              <span className="mt-0.5 rounded-md bg-secondary/50 p-1 text-muted-foreground [&>svg]:h-3.5 [&>svg]:w-3.5">
                 {icon}
               </span>
             )}
             <div className="min-w-0">
               {title && (
-                <h4 className="text-sm font-semibold text-foreground">{title}</h4>
+                <h4 className="text-sm font-medium text-foreground">{title}</h4>
               )}
               {description && (
                 <p className="text-xs text-muted-foreground mt-0.5">

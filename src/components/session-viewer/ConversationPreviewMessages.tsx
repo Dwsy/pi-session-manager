@@ -3,12 +3,14 @@ import {
   ChevronDown,
   ChevronRight,
   Code2,
+  ListFilter,
   Terminal,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SessionEntry } from "@/types";
+import { requestToolReview } from "@/contexts/toolReviewBus";
 import SessionEntryRenderer from "./SessionEntryRenderer";
 
 interface ConversationPreviewTurn {
@@ -239,12 +241,25 @@ function CollapsedProcessSummary({
   entries,
   expanded,
   onToggle,
+  toolResultByCallId,
 }: {
   entries: SessionEntry[];
   expanded: boolean;
   onToggle: () => void;
+  toolResultByCallId: Map<string, SessionEntry>;
 }) {
   const { t } = useTranslation();
+
+  const handleReview = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      requestToolReview({
+        entries,
+        toolResultByCallId,
+      });
+    },
+    [entries, toolResultByCallId],
+  );
 
   if (entries.length === 0) return null;
 
@@ -286,6 +301,18 @@ function CollapsedProcessSummary({
           ))}
         </span>
       </button>
+      <button
+        type="button"
+        onClick={handleReview}
+        className="inline-flex h-full flex-shrink-0 items-center gap-1.5 border-l border-border/55 px-2.5 text-[11px] font-medium text-muted-foreground motion-color focus-ring hover:bg-surface/60 hover:text-foreground"
+        aria-label={t("session.preview.review", "Review tool calls")}
+        title={t("session.preview.review", "Review tool calls")}
+      >
+        <ListFilter className="h-3.5 w-3.5" aria-hidden="true" />
+        <span className="hidden sm:inline">
+          {t("session.preview.reviewShort", "Review")}
+        </span>
+      </button>
     </div>
   );
 }
@@ -321,6 +348,7 @@ function ConversationPreviewTurnView({
           entries={turn.processEntries}
           expanded={expanded}
           onToggle={onToggle}
+          toolResultByCallId={toolResultByCallId}
         />
       )}
 
@@ -331,6 +359,7 @@ function ConversationPreviewTurnView({
               entries={turn.processEntries}
               expanded={expanded}
               onToggle={onToggle}
+              toolResultByCallId={toolResultByCallId}
             />
           </div>
           {turn.processEntries.map((entry, index) => (

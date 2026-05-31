@@ -114,7 +114,7 @@ export default function SessionViewerToolbar({
   return (
     <>
       <div
-        className={`border-b border-border relative z-20 ${isMobile ? "px-2.5 py-2" : "px-3 py-1.5"}`}
+        className={`border-b border-border relative z-20 ${isMobile ? "px-2.5 py-2" : "px-3 py-1.5 min-h-10 flex flex-col justify-center"}`}
         data-session-toolbar
         data-tauri-drag-region
         onMouseDown={handleToolbarMouseDown}

@@ -112,7 +112,12 @@ export default function SessionViewerSidebar({
     borderRight: "1px solid rgba(var(--color-border), 0.85)",
   };
 
-  const desktopSidebarStyle: CSSProperties = { width: `${sidebarWidth}px` };
+  const desktopSidebarStyle: CSSProperties = isEmbedded
+    ? {
+        width: open ? `${sidebarWidth}px` : 0,
+        borderRightWidth: open ? undefined : 0,
+      }
+    : { width: `${sidebarWidth}px` };
 
   return (
     <>

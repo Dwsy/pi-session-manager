@@ -145,6 +145,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     extraKeys: ["settings.appearance.disableToolSuccessStyleDesc"],
     keywords: ["tool", "success", "style", "green", "background", "border"],
   },
+  {
+    id: "appearance-disableToolCallStyle",
+    section: "appearance",
+    labelKey: "settings.appearance.disableToolCallStyle",
+    fallbackLabel: "Disable Tool Call Style",
+    extraKeys: ["settings.appearance.disableToolCallStyleDesc"],
+    keywords: ["tool", "call", "execution", "style", "background", "border", "shadow"],
+  },
 
   // ── Language ──
   {

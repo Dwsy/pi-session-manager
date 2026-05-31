@@ -8,6 +8,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { useDeferredPresence } from "@/hooks/useDeferredPresence";
 import { PluginContributionBoundary, PluginContributionSlot, usePsmPluginSessionUi } from "@/plugins/runtime-host";
 import type { PsmSessionToolbarItemRuntimeRegistration } from "@/plugins/runtime-host/types";
+import type { PsmSessionViewerController } from "@pi-session-manager/plugin-sdk";
 
 const PANEL_ANIMATION_MS = 180;
 const SESSION_PANEL_ITEM_LIMIT = 5;
@@ -75,6 +76,7 @@ function AppSessionViewerPane({
   const [renderedBottomPanelId, setRenderedBottomPanelId] = useState<string | null>(null);
   const [activeMainViewId, setActiveMainViewId] = useState<string | null>(null);
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  const [viewerController, setViewerController] = useState<PsmSessionViewerController | null>(null);
   const [rightFeaturePickerOpen, setRightFeaturePickerOpen] = useState(false);
   const [bottomFeatureTrayOpen, setBottomFeatureTrayOpen] = useState(false);
   const [panelWidths, setPanelWidths] = useState<Record<string, number>>({});
@@ -326,6 +328,7 @@ function AppSessionViewerPane({
               : undefined,
             mainViewOpen: mainViewId ? activeMainViewId === mainViewId : undefined,
             toggleMainView: mainViewId ? () => toggleMainView(mainViewId) : undefined,
+            viewer: viewerController ?? undefined,
           })} />
         </PluginContributionBoundary>
       </Fragment>
@@ -341,6 +344,7 @@ function AppSessionViewerPane({
     toggleBottomPanel,
     toggleMainView,
     togglePanel,
+    viewerController,
   ]);
 
   const featureToggleClass = "p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors";
@@ -515,6 +519,7 @@ function AppSessionViewerPane({
             closePanel: () => closePanel(renderedPanel.id),
             width: panelWidths[renderedPanel.id] ?? 380,
             onWidthChange: (width) => setPanelWidth(renderedPanel.id, width),
+            viewer: viewerController ?? undefined,
           })} />
         </PluginContributionBoundary>
       </div>
@@ -531,6 +536,7 @@ function AppSessionViewerPane({
     session,
     setPanelWidth,
     t,
+    viewerController,
   ]);
 
   const bottomPanelSlot = useMemo(() => (bottomPanelPresent && renderedBottomPanel ? (
@@ -569,6 +575,7 @@ function AppSessionViewerPane({
             activeEntryId,
             panelOpen: Boolean(activeBottomPanel),
             closePanel: () => closeBottomPanel(renderedBottomPanel.id),
+            viewer: viewerController ?? undefined,
           })} />
         </PluginContributionBoundary>
       </div>
@@ -581,6 +588,7 @@ function AppSessionViewerPane({
     closeBottomPanel,
     renderedBottomPanel,
     session,
+    viewerController,
   ]);
 
   const mainViewSlot = useMemo(() => (activeMainView ? (
@@ -590,9 +598,10 @@ function AppSessionViewerPane({
         activeEntryId,
         mainViewOpen: true,
         closeMainView: () => closeMainView(activeMainView.id),
+        viewer: viewerController ?? undefined,
       })} />
     </PluginContributionBoundary>
-  ) : null), [activeEntryId, activeMainView, closeMainView, session]);
+  ) : null), [activeEntryId, activeMainView, closeMainView, session, viewerController]);
   const mergedSlots = useMemo(
     () => ({ ...slots, right: sessionToolbarSlot }),
     [sessionToolbarSlot, slots],
@@ -626,6 +635,7 @@ function AppSessionViewerPane({
       mainViewSlot={mainViewSlot}
       pluginTreeViews={treeViews}
       onActiveEntryIdChange={setActiveEntryId}
+      onViewerControllerChange={setViewerController}
     />
   );
 }

@@ -132,19 +132,16 @@ export default function SettingsSidebar({
   };
 
   return (
-    <div className="w-64 bg-background/95 border-r border-border flex flex-col overflow-y-auto">
-      <div className="px-5 py-4 border-b border-border/80 flex-shrink-0">
+    <div className="w-64 bg-background/95 border-r border-border/70 flex flex-col overflow-y-auto">
+      <div className="px-5 py-4 flex-shrink-0">
         <h2 className="text-base font-semibold text-foreground tracking-tight">
           {t("settings.title", "Settings")}
         </h2>
-        <p className="text-[11px] text-muted-foreground mt-1">
-          {t("settings.subtitle", "Customize your experience")}
-        </p>
       </div>
 
-      <div className="px-3 pt-2.5 pb-1 flex-shrink-0">
+      <div className="px-3 pb-1 flex-shrink-0">
         <div
-          className="mb-2 grid gap-1 rounded-lg bg-surface p-1"
+          className="mb-2 grid gap-1 rounded-md bg-surface/60 p-1"
           style={{
             gridTemplateColumns: `repeat(${Math.max(settingsAreas.length, 1)}, minmax(0, 1fr))`,
           }}
@@ -153,9 +150,9 @@ export default function SettingsSidebar({
             <button
               key={area.id}
               onClick={() => onAreaChange(area.id)}
-              className={`min-h-[32px] truncate rounded-md px-2 text-xs font-medium motion-color motion-press focus-ring ${
+              className={`min-h-[28px] truncate rounded px-2 text-xs font-medium motion-color focus-ring ${
                 activeArea === area.id
-                  ? "bg-info text-white shadow-sm"
+                  ? "settings-accent-bg-strong"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -170,7 +167,7 @@ export default function SettingsSidebar({
             value={searchQuery}
             onChange={onSearchChange}
             placeholder={t("settings.searchPlaceholder", "Search settings...")}
-            className="w-full pl-8 pr-3 py-1.5 text-sm bg-surface/60 border border-border/60 rounded-lg text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-info/50 focus:ring-1 focus:ring-info/20 transition-colors"
+            className="w-full pl-8 pr-3 py-1 text-sm bg-surface/40 border border-border/50 rounded-md text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-transparent focus:settings-accent-ring transition-colors"
           />
           {searchQuery && (
             <button
@@ -187,7 +184,7 @@ export default function SettingsSidebar({
         {/* Search results from index */}
         {trimmedQuery && searchResults.length > 0 && (
           <div className="space-y-1">
-            <div className="px-2 pb-1 text-[10px] font-semibold text-muted-foreground/80 uppercase tracking-[0.14em]">
+            <div className="settings-section-label px-2 pb-1">
               {t("settings.searchResults", "Settings")} ({searchResults.length})
             </div>
             {searchResults.map((result) => (
@@ -225,7 +222,7 @@ export default function SettingsSidebar({
         {!trimmedQuery &&
           navGroups.map((group) => (
             <section key={group.id} className="space-y-1">
-              <div className="px-2 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              <div className="settings-section-label px-2">
                 {t(group.labelKey, group.fallbackLabel)}
               </div>
               <div className="space-y-0.5">
@@ -239,18 +236,18 @@ export default function SettingsSidebar({
                       <div key={item.id} className="space-y-0.5">
                         <button
                           onClick={() => onSectionChange(item.id)}
-                          className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm motion-surface motion-color motion-press focus-ring ${
+                          className={`w-full flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm motion-surface motion-color focus-ring ${
                             activeSection === item.id
-                              ? "bg-info/15 text-foreground ring-1 ring-info/30"
+                              ? "settings-accent-bg-soft text-foreground"
                               : isActive
                                 ? "text-foreground bg-surface/55"
-                                : "text-muted-foreground hover:text-foreground hover:bg-surface/80"
+                                : "text-muted-foreground hover:text-foreground hover:bg-surface/60"
                           }`}
                         >
                           <span
                             className={
                               activeSection === item.id || isActive
-                                ? "text-info"
+                                ? "settings-accent-fg"
                                 : ""
                             }
                           >
@@ -295,15 +292,15 @@ export default function SettingsSidebar({
                               <button
                                 key={child.id}
                                 onClick={() => onSectionChange(child.id)}
-                                className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs motion-surface motion-color motion-press focus-ring ${
+                                className={`w-full flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs motion-surface motion-color focus-ring ${
                                   activeSection === child.id
-                                    ? "bg-info/15 text-foreground ring-1 ring-info/30"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-surface/80"
+                                    ? "settings-accent-bg-soft text-foreground"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-surface/60"
                                 }`}
                               >
                                 <span
                                   className={
-                                    activeSection === child.id ? "text-info" : ""
+                                    activeSection === child.id ? "settings-accent-fg" : ""
                                   }
                                 >
                                   {child.icon}
@@ -323,22 +320,27 @@ export default function SettingsSidebar({
           ))}
       </nav>
 
-      <div className="p-2.5 border-t border-border/80 flex-shrink-0 space-y-1.5">
-        {canOpenConfigFolder && (
+      <div className="px-3 py-2 border-t border-border/60 flex-shrink-0 flex items-center justify-between gap-1">
+        {canOpenConfigFolder ? (
           <button
             onClick={onOpenConfigFolder}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
+            aria-label={t("settings.openConfigFolder", "Open Config Folder")}
+            title={t("settings.openConfigFolder", "Open Config Folder")}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded motion-color focus-ring"
           >
-            <FolderOpen className="h-4 w-4" />
-            {t("settings.openConfigFolder", "Open Config Folder")}
+            <FolderOpen className="h-3.5 w-3.5" />
+            <span>{t("settings.openConfigFolder", "Open Config Folder")}</span>
           </button>
+        ) : (
+          <span />
         )}
         <button
           onClick={onReset}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-surface/80 rounded-lg motion-color motion-press focus-ring"
+          aria-label={t("settings.reset", "Reset Settings")}
+          title={t("settings.reset", "Reset Settings")}
+          className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded motion-color focus-ring"
         >
-          <RefreshCw className="h-4 w-4" />
-          {t("settings.reset", "Reset Settings")}
+          <RefreshCw className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>

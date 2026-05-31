@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react'
 import { getLanguageFromPath, renderCodeHtml } from '@/utils/markdown'
 import { highlightSearchInHTML } from '@/utils/search'
+import { useResolvedCodeTheme } from '@/hooks/useResolvedCodeTheme'
 
 interface CodeBlockProps {
   code: string
@@ -26,12 +27,15 @@ function CodeBlock({
     [filename, language],
   )
 
+  // Subscribe to theme changes so Shiki re-highlights on dark/light toggle
+  const resolvedTheme = useResolvedCodeTheme()
+
   const highlightedCode = useMemo(() => {
     const highlighted = renderCodeHtml(code, resolvedLanguage)
     return searchQuery
       ? highlightSearchInHTML(highlighted, searchQuery)
       : highlighted
-  }, [code, resolvedLanguage, searchQuery])
+  }, [code, resolvedLanguage, searchQuery, resolvedTheme])
 
   const lineCount = useMemo(() => code.split('\n').length, [code])
   const lineNumbers = useMemo(() => {

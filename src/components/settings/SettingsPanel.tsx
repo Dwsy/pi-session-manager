@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useTranslation } from "react-i18next";
+import { ask as askNative } from "@tauri-apps/plugin-dialog";
 import type {
   AppSettings,
   SettingsArea,
@@ -196,6 +197,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   const settingsRef = useRef(settings);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const hasLoadedRef = useRef(false);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (closeTimerRef.current) {
@@ -226,8 +229,47 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     settingsRef.current = settings;
   }, [settings]);
 
+  // Auto-save: native settings panes commit on change. Debounce so that
+  // typing into text fields does not hit disk on every keystroke.
+  useEffect(() => {
+    if (!isOpen || loading || !hasLoadedRef.current) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      void saveSettings();
+    }, 400);
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  }, [settings, isOpen, loading]);
+
+  // Flush a pending autosave on unmount so a quick close after an edit
+  // never drops the change. saveSettings reads from settingsRef.current
+  // so it always sees the latest state.
+  useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+        void saveSettings();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When the panel is dismissed, flush any pending autosave immediately.
+  const wasOpenRef = useRef(isOpen);
+  useEffect(() => {
+    if (wasOpenRef.current && !isOpen && autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = undefined;
+      void saveSettings();
+    }
+    wasOpenRef.current = isOpen;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
   const loadSettingsInternal = async () => {
     setLoading(true);
+    hasLoadedRef.current = false;
     try {
       const next = await loadAppSettings();
       setSettings(next);
@@ -235,14 +277,20 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       console.error("Failed to load settings:", error);
     } finally {
       setLoading(false);
+      // Allow a frame for state to settle before enabling autosave so the
+      // initial load does not trigger a redundant save.
+      requestAnimationFrame(() => {
+        hasLoadedRef.current = true;
+      });
     }
   };
 
   const saveSettings = async () => {
+    const current = settingsRef.current;
     setSaving(true);
     try {
-      await saveAppSettings(settings);
-      i18n.changeLanguage(settings.language.locale);
+      await saveAppSettings(current);
+      i18n.changeLanguage(current.language.locale);
 
       const root = document.documentElement;
       const {
@@ -254,7 +302,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         fontSize,
         messageSpacing,
         codeBlockTheme,
-      } = settings.appearance;
+      } = current.appearance;
       root.classList.remove("theme-dark", "theme-light");
       if (theme === "dark") {
         root.classList.add("theme-dark");
@@ -315,14 +363,24 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   };
 
   const resetSettings = async () => {
-    if (
-      !confirm(
-        t(
-          "settings.confirmReset",
-          "Are you sure you want to reset all settings?",
-        ),
-      )
-    ) {
+    const message = t(
+      "settings.confirmReset",
+      "Are you sure you want to reset all settings?",
+    );
+    let confirmed = false;
+    if (standaloneDatasetRuntime) {
+      confirmed = window.confirm(message);
+    } else {
+      try {
+        confirmed = await askNative(message, {
+          title: t("settings.reset", "Reset Settings"),
+          kind: "warning",
+        });
+      } catch {
+        confirmed = window.confirm(message);
+      }
+    }
+    if (!confirmed) {
       return;
     }
     try {
@@ -355,23 +413,29 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   if (!shouldRender) return null;
 
+  // On the native (Tauri) desktop runtime the panel IS the active window;
+  // a heavy black/blur backdrop and outer shadow telegraph "web modal".
+  // In the standalone web runtime the panel sits inside a normal browser
+  // tab, so we keep the dimmed overlay to anchor it.
+  const heavyOverlay = standaloneDatasetRuntime || isMobile;
+
   return (
     <div
-      className={`settings-modal-no-press fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm motion-overlay-backdrop ${
-        visible ? "opacity-100" : "opacity-0"
-      }`}
+      className={`settings-modal-no-press fixed inset-0 z-50 flex items-center justify-center motion-overlay-backdrop ${
+        heavyOverlay ? "bg-black/50 backdrop-blur-sm" : "bg-background/60"
+      } ${visible ? "opacity-100" : "opacity-0"}`}
     >
       <div
         className={`${
           isMobile
             ? "w-full h-full rounded-none"
-            : "w-[95vw] h-[95vh] rounded-xl"
-        } bg-surface-dark border border-border shadow-2xl flex ${
+            : heavyOverlay
+              ? "w-[95vw] h-[95vh] rounded-xl shadow-2xl"
+              : "w-[96vw] h-[94vh] rounded-[10px]"
+        } bg-surface-dark border border-border/70 flex ${
           isMobile ? "flex-col" : ""
         } overflow-hidden motion-overlay-surface ${
-          visible
-            ? "translate-y-0 scale-100 opacity-100"
-            : "translate-y-2 scale-[0.985] opacity-0"
+          visible ? "opacity-100" : "opacity-0"
         }`}
       >
         {isMobile ? (

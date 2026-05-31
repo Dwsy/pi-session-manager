@@ -36,9 +36,13 @@ export default function Toggle({
           disabled={disabled}
           className="sr-only peer"
         />
-        <div className="absolute inset-0 rounded-full bg-secondary peer-checked:bg-info peer-checked:shadow-[0_0_12px_rgba(var(--info-rgb),0.35)] motion-color pointer-events-none" />
         <div
-          className={`absolute w-4 h-4 rounded-full bg-white shadow-md motion-transform pointer-events-none ${
+          className={`absolute inset-0 rounded-full motion-color pointer-events-none ${
+            checked ? 'settings-accent-bg-strong' : 'bg-secondary'
+          }`}
+        />
+        <div
+          className={`absolute w-4 h-4 rounded-full bg-white motion-transform pointer-events-none ${
             isSmall
               ? 'top-0.5 left-0.5 peer-checked:translate-x-5'
               : 'top-1 left-1 peer-checked:translate-x-4'
