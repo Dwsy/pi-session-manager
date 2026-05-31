@@ -29,11 +29,21 @@ import typescript from '@shikijs/langs/typescript'
 import vue from '@shikijs/langs/vue'
 import xml from '@shikijs/langs/xml'
 import yaml from '@shikijs/langs/yaml'
+import catppuccinLatte from '@shikijs/themes/catppuccin-latte'
+import catppuccinMocha from '@shikijs/themes/catppuccin-mocha'
 import dracula from '@shikijs/themes/dracula'
 import githubDark from '@shikijs/themes/github-dark'
 import githubLight from '@shikijs/themes/github-light'
 import monokai from '@shikijs/themes/monokai'
+import nightOwl from '@shikijs/themes/night-owl'
+import nord from '@shikijs/themes/nord'
 import oneDarkPro from '@shikijs/themes/one-dark-pro'
+import oneLight from '@shikijs/themes/one-light'
+import rosePine from '@shikijs/themes/rose-pine'
+import solarizedDark from '@shikijs/themes/solarized-dark'
+import solarizedLight from '@shikijs/themes/solarized-light'
+import tokyoNight from '@shikijs/themes/tokyo-night'
+import { resolveShikiTheme } from './codeThemes'
 import { classifyMarkdownLink, getMarkdownLinkConfirmationMessage } from './markdownLinkPolicy'
 
 type ShikiLanguage =
@@ -66,10 +76,28 @@ type ShikiLanguage =
   | 'vue'
   | 'svelte'
 
-type ShikiTheme = 'one-dark-pro' | 'monokai' | 'dracula' | 'github-dark' | 'github-light'
+type ShikiTheme =
+  | 'one-dark-pro'
+  | 'monokai'
+  | 'dracula'
+  | 'github-dark'
+  | 'github-light'
+  | 'catppuccin-mocha'
+  | 'catppuccin-latte'
+  | 'tokyo-night'
+  | 'night-owl'
+  | 'nord'
+  | 'solarized-dark'
+  | 'solarized-light'
+  | 'rose-pine'
+  | 'one-light'
 
 const shikiHighlighter = createHighlighterCoreSync({
-  themes: [oneDarkPro, monokai, dracula, githubDark, githubLight],
+  themes: [
+    oneDarkPro, monokai, dracula, githubDark, githubLight,
+    catppuccinMocha, catppuccinLatte, tokyoNight, nightOwl, nord,
+    solarizedDark, solarizedLight, rosePine, oneLight,
+  ],
   langs: [
     typescript,
     tsx,
@@ -145,15 +173,8 @@ function getCurrentShikiTheme(): ShikiTheme {
   if (typeof document === 'undefined') {
     return 'one-dark-pro'
   }
-
-  const codeTheme = document.documentElement.getAttribute('data-code-theme')
-  if (codeTheme === 'monokai' || codeTheme === 'dracula') {
-    return codeTheme
-  }
-  if (codeTheme === 'one-dark') {
-    return 'one-dark-pro'
-  }
-  return document.documentElement.classList.contains('theme-light') ? 'github-light' : 'github-dark'
+  const codeTheme = document.documentElement.getAttribute('data-code-theme') || 'github'
+  return resolveShikiTheme(codeTheme) as ShikiTheme
 }
 
 function stripShikiPreCode(html: string): string {
@@ -161,7 +182,7 @@ function stripShikiPreCode(html: string): string {
   return match ? match[1] : html
 }
 
-function renderShikiCodeHtml(code: string, language?: string): string {
+function renderShikiCodeHtml(code: string, language?: string, themeOverride?: ShikiTheme): string {
   const lang = normalizeShikiLanguage(language)
   if (!lang) {
     return escapeHtml(code)
@@ -170,7 +191,7 @@ function renderShikiCodeHtml(code: string, language?: string): string {
   try {
     return stripShikiPreCode(shikiHighlighter.codeToHtml(code, {
       lang,
-      theme: getCurrentShikiTheme(),
+      theme: themeOverride ?? getCurrentShikiTheme(),
     }))
   } catch {
     return escapeHtml(code)
@@ -369,6 +390,10 @@ export function highlightCode(code: string, language?: string): string {
 
 export function renderCodeHtml(code: string, language?: string): string {
   return renderShikiCodeHtml(code, language)
+}
+
+export function renderCodeHtmlWithTheme(code: string, language: string | undefined, themeId: string): string {
+  return renderShikiCodeHtml(code, language, resolveShikiTheme(themeId) as ShikiTheme)
 }
 
 export function getLanguageFromPath(filePath: string): string | undefined {
