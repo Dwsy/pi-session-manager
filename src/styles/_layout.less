@@ -50,6 +50,12 @@
   opacity: 1;
   pointer-events: auto;
   contain: none;
+  overflow: hidden;
+}
+
+.session-sidebar--embedded.session-sidebar--closed {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .session-viewer-stage {
@@ -406,6 +412,17 @@
 // App shell packages
 .app-shell {
   background: var(--body-bg);
+  // Horizontal space reserved for the macOS overlay traffic-light cluster.
+  --macos-traffic-clearance: 72px;
+}
+
+// When the primary sidebar is collapsed (Cmd+B) under the Tauri/macOS overlay
+// title bar, the content pane slides under the traffic lights. Indent only the
+// session toolbar's leading content so it clears the traffic lights and the
+// reveal button placed right after them, keeping the cluster compact (the body
+// below stays full-width / left-aligned, VS Code style).
+[data-runtime="tauri"][data-sidebar-collapsed="true"] [data-session-toolbar] {
+  padding-left: calc(var(--macos-traffic-clearance) + 1.75rem);
 }
 
 .app-desktop-sidebar {

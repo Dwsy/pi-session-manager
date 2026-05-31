@@ -148,7 +148,7 @@
 
 .code-line-number {
   padding: 0 12px;
-  font-size: 11px;
+  font-size: var(--code-font-size, 13px);
   line-height: var(--line-height);
   color: rgb(var(--color-muted-foreground));
   font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
@@ -160,12 +160,18 @@
   padding: 12px;
   background: transparent;
   overflow-x: auto;
-  font-size: 11px;
+  font-size: var(--code-font-size, 13px);
+  font-weight: var(--code-font-weight, 400);
+  font-variant-ligatures: var(--code-ligatures, "calt", "liga", "dlig");
+  font-feature-settings: var(--code-ligatures, "calt", "liga", "dlig");
   line-height: var(--line-height);
 }
 
 .code-block code {
   font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
+  font-weight: inherit;
+  font-variant-ligatures: inherit;
+  font-feature-settings: inherit;
 }
 
 // Scrollbar for code blocks
