@@ -121,6 +121,8 @@ pub fn run() {
             plugin_fs_list,
             plugin_fs_read,
             plugin_fs_stat,
+            plugin_window_open,
+            plugin_window_close,
             load_psm_plugin_config,
             set_psm_plugin_enabled,
             set_psm_plugin_settings,
