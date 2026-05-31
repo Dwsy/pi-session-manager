@@ -629,6 +629,9 @@ export class PsmPluginHost {
     if (!manifest.permissions?.includes(permission)) {
       throw new Error(`Plugin permission denied: ${manifest.id} did not declare ${permission}`)
     }
+    if (permission !== 'fs:read') {
+      throw new Error(`Plugin permission denied: ${manifest.id} missing ${permission}`)
+    }
 
     const allowed = await this.services.requestPermission({
       pluginId: manifest.id,

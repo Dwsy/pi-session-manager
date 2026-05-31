@@ -273,6 +273,97 @@ describe('PsmPluginHost', () => {
     expect(appInvoke).not.toHaveBeenCalledWith('plugin_fs_read', expect.anything())
   })
 
+  it('allows declared popup windows by default without prompting', async () => {
+    const requestPermission = vi.fn(async () => false)
+    const host = new PsmPluginHost({
+      builtinEntries: [{
+        source: 'builtin',
+        sourceId: 'extensions/window-plugin',
+        async load() {
+          return {
+            manifest: {
+              manifestVersion: 1,
+              id: 'window-plugin',
+              name: 'Window Plugin',
+              version: '1.0.0',
+              permissions: ['windows:open'],
+            },
+            activate(ctx: any) {
+              ctx.registerCommand('window.open', async () => ctx.psm.windows.open({ title: 'Preview', html: '<div>Preview</div>' }))
+            },
+          }
+        },
+      }],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+        listPathEntries: async () => [],
+        listDevEntries: async () => [],
+        requestPermission,
+      },
+    })
+
+    await host.reload()
+    vi.mocked(appInvoke).mockResolvedValueOnce({ id: 'plugin-window-1' })
+
+    await expect(host.executeCommand('window.open')).resolves.toMatchObject({ id: 'plugin-window-1' })
+    expect(requestPermission).not.toHaveBeenCalled()
+    expect(appInvoke).toHaveBeenCalledWith('plugin_window_open', {
+      title: 'Preview',
+      html: '<div>Preview</div>',
+      url: undefined,
+      width: undefined,
+      height: undefined,
+      floating: undefined,
+      __psm: {
+        pluginId: 'window-plugin',
+        permissions: ['windows:open'],
+      },
+    })
+  })
+
+  it('respects revoked popup window permission without prompting again', async () => {
+    const requestPermission = vi.fn(async () => true)
+    const host = new PsmPluginHost({
+      builtinEntries: [{
+        source: 'builtin',
+        sourceId: 'extensions/window-revoked',
+        async load() {
+          return {
+            manifest: {
+              manifestVersion: 1,
+              id: 'window-revoked',
+              name: 'Window Revoked',
+              version: '1.0.0',
+              permissions: ['windows:open'],
+            },
+            activate(ctx: any) {
+              ctx.registerCommand('window.revoked', async () => ctx.psm.windows.open({ title: 'Preview', html: '<div>Preview</div>' }))
+            },
+          }
+        },
+      }],
+      services: {
+        loadConfig: async () => config({
+          'window-revoked': {
+            enabled: true,
+            permissionOverrides: { 'windows:open': false },
+          },
+        }),
+        listNpmEntries: async () => [],
+        listPathEntries: async () => [],
+        listDevEntries: async () => [],
+        requestPermission,
+      },
+    })
+
+    await host.reload()
+
+    await expect(host.executeCommand('window.revoked')).rejects.toThrow('missing windows:open')
+    expect(requestPermission).not.toHaveBeenCalled()
+    expect(appInvoke).not.toHaveBeenCalledWith('plugin_window_open', expect.anything())
+  })
+
   it('activates enabled plugins and exposes commands/tools', async () => {
     const host = new PsmPluginHost({
       builtinEntries: [entry('builtin.test')],

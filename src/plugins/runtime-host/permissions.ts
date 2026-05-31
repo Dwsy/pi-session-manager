@@ -70,6 +70,9 @@ export function requiredRuntimeRequestPermissions(command: string): PsmPermissio
     case 'plugin_fs_read':
     case 'plugin_fs_stat':
       return ['fs:read']
+    case 'plugin_window_open':
+    case 'plugin_window_close':
+      return ['windows:open']
     default:
       return []
   }
