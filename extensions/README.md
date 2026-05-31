@@ -122,7 +122,17 @@ The legacy `refresh_session_intelligence_record` backend command remains availab
 
 `extensions/psm-code-review` registers the session toolbar review entry and owns the Tool Call Review modal, tree model, and operation extraction. It reads session entries through `ctx.psm.sessions.readEntries(...)` instead of being hard-coded into the conversation preview renderer.
 
-The app shell renders these through runtime-host UI contributions; it no longer hard-codes sidechat, summary, or code-review UI in `AppSessionViewerPane` / conversation preview components.
+`extensions/psm-generative-ui-renderer` now does two things:
+
+- renders `show_widget` / `browse_widgets` tool calls inline through a tool renderer
+- registers a session toolbar button plus right-side Widgets panel that lists every widget used in the current session
+
+That Widgets panel is the reference example for the new `PsmSessionUiRenderProps.viewer` controller. It uses:
+
+- `viewer?.revealToolCall(toolCallId, { expand: true, align: 'center' })` to locate and expand the in-session widget block
+- `ctx.psm.windows.open(...)` to open the saved or inline widget HTML in a separate popup window
+
+The app shell renders these through runtime-host UI contributions; it no longer hard-codes sidechat, summary, code-review, or generative-ui widgets UI in `AppSessionViewerPane` / conversation preview components.
 
 `extensions/psm-kanban-board` registers both the app-level `/kanban` view and its matching app sidebar view. Workspace state is plugin-owned JSON config via `ctx.psm.config`, while the app shell only provides generic app-surface data to registered app UI contributions.
 

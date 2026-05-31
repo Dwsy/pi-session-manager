@@ -305,6 +305,73 @@ Use command and tool registrations for plugin behavior that should appear in the
 
 App views can be bound to sidebars with `appViewId`. Tool renderers can match by exact name, regular expression, or predicate.
 
+### Session viewer controller
+
+Session toolbar items, session panels, and session main views receive `PsmSessionUiRenderProps`.
+That shared props object now includes an optional host-owned viewer controller:
+
+```ts
+export interface PsmSessionRevealOptions {
+  align?: 'auto' | 'center' | 'start' | 'end'
+  highlight?: boolean
+}
+
+export interface PsmSessionToolRevealOptions extends PsmSessionRevealOptions {
+  expand?: boolean
+}
+
+export interface PsmSessionViewerController {
+  revealEntry(entryId: string, options?: PsmSessionRevealOptions): void
+  revealToolCall(toolCallId: string, options?: PsmSessionToolRevealOptions): void
+}
+
+export interface PsmSessionUiRenderProps {
+  session: PsmSessionReference
+  activeEntryId?: string | null
+  panelOpen?: boolean
+  togglePanel?: () => void
+  closePanel?: () => void
+  mainViewOpen?: boolean
+  toggleMainView?: () => void
+  closeMainView?: () => void
+  width?: number
+  onWidthChange?: (width: number) => void
+  viewer?: PsmSessionViewerController
+}
+```
+
+Use this controller when a plugin needs to reveal content inside the current session viewer without depending on host-private DOM ids or React state.
+
+Rules:
+
+- `viewer` is optional. Guard every call with `props.viewer?.…`.
+- `revealEntry(...)` is the generic path for message-level navigation.
+- `revealToolCall(...)` is the preferred path for tool/widget reveal flows; pass the original tool call id from session content.
+- The host owns scrolling, turn expansion, highlight timing, and tool-card expansion details.
+- Tree views keep using `onNavigate(leafId, targetId)`; do not reuse tree-only semantics in panels.
+
+Example:
+
+```ts
+ctx.ui.registerSessionPanel({
+  id: 'acme.widgets.panel',
+  title: 'Widgets',
+  render: (props) => {
+    return (
+      <button
+        type="button"
+        onClick={() => props.viewer?.revealToolCall('call-widget-1', {
+          expand: true,
+          align: 'center',
+        })}
+      >
+        Reveal widget
+      </button>
+    )
+  },
+})
+```
+
 ```ts
 ctx.ui.registerToolRenderer({
   id: 'acme-log-renderer',

@@ -28,6 +28,7 @@ It exposes:
 | Host context | `manifest`, `psm`, `permissions`, `settings`, `i18n`, `events`, `ui`, `registerCommand`, `registerTool` |
 | Capability client | `createPluginCapabilityClient(options)` |
 | UI contributions | app view, app sidebar view bound by `appViewId`, session toolbar item, session main view, session right panel, session tree view |
+| Session viewer control | `PsmSessionUiRenderProps.viewer?.revealEntry(...)`, `viewer?.revealToolCall(...)` |
 | Settings/config | `manifest.configuration`, `ctx.settings.get(...)`, `ctx.settings.all()`, plugin-scoped JSON config |
 | I18n | `manifest.i18n`, `ctx.i18n.t(...)`, `ctx.i18n.language` |
 
@@ -66,6 +67,23 @@ Keep these grouped as host-owned or privileged surfaces in the docs:
 | Settings/config | app and server settings writes | host-internal except plugin-scoped JSON config |
 | File/session mutation | `delete_sessions`, `rename_session`, `fork_session`, `export_session` | privileged or host-internal |
 | Plugin management | `install_psm_plugin`, `uninstall_psm_plugin` | host-internal |
+
+## Session viewer control notes
+
+The new session viewer controller closes an important SDK gap for session panels and toolbar-driven plugin UI.
+
+| Surface | Public contract | Notes |
+| --- | --- | --- |
+| `viewer?.revealEntry(entryId, options)` | reveal a concrete session entry already known to the plugin | generic message-level navigation path |
+| `viewer?.revealToolCall(toolCallId, options)` | reveal a rendered tool/widget block by tool call id | preferred path for widget and review plugins |
+| `PsmSessionTreeViewRenderProps.onNavigate(...)` | tree-specific navigation callback | unchanged; still the right surface for tree projections |
+
+Important limits:
+
+- `viewer` is available only on `PsmSessionUiRenderProps`, not on the capability client.
+- `viewer` remains optional for compatibility with older host/runtime combinations.
+- The host owns DOM lookup, scroll timing, conversation-turn expansion, and tool-card expansion.
+- Plugins should pass stable ids from session content, not fabricate host-private render ids such as `tool-result-*`.
 
 ## Remaining Documentation Gaps
 
