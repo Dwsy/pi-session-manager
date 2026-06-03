@@ -1,8 +1,12 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react'
-import type { SearchPluginResult, SearchContext } from '@/plugins/types'
+import type { SearchPluginResult, SearchContext, SearchPlugin } from '@/plugins/types'
 import type { PluginRegistry } from '@/plugins/registry'
 import { parseLeadingSourceFilterToken } from '@/utils/search'
-import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearchPlugin'
+import type {
+  MessageSearchPageResult,
+  MessageSearchPagination,
+  MessageSearchPluginOptions,
+} from '@/plugins/message/MessageSearchPlugin'
 import type { FullTextSearchSourceFilter } from '@/types'
 
 interface UseCommandSearchParams {
@@ -20,6 +24,45 @@ interface UseCommandSearchParams {
   setResults: (results: SearchPluginResult[]) => void
   setIsSearching: (isSearching: boolean) => void
   context: SearchContext
+}
+
+type MessageSearchPluginWithOptions = SearchPlugin & {
+  setFTSOptions(options: MessageSearchPluginOptions): void
+}
+
+type PaginatedMessageSearchPlugin = SearchPlugin & {
+  searchPage(
+    query: string,
+    context: SearchContext,
+    options: MessageSearchPluginOptions,
+  ): Promise<MessageSearchPageResult>
+}
+
+const EMPTY_PAGINATION: MessageSearchPagination = {
+  totalHits: 0,
+  hasMore: false,
+}
+
+function hasMessageSearchOptions(
+  plugin: SearchPlugin | undefined,
+): plugin is MessageSearchPluginWithOptions {
+  if (!plugin) return false
+
+  const candidate = plugin as Partial<MessageSearchPluginWithOptions>
+  return typeof candidate.setFTSOptions === 'function'
+}
+
+function isPaginatedMessageSearchPlugin(
+  plugin: SearchPlugin | undefined,
+): plugin is PaginatedMessageSearchPlugin {
+  if (!plugin) return false
+
+  const candidate = plugin as Partial<PaginatedMessageSearchPlugin>
+  return typeof candidate.searchPage === 'function'
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Search failed'
 }
 
 export function useCommandSearch({
@@ -42,6 +85,16 @@ export function useCommandSearch({
   const resultsRef = useRef(results)
   const contextRef = useRef(context)
   const [searchError, setSearchError] = useState<string | undefined>()
+  const [hasMore, setHasMore] = useState(false)
+  const [totalHits, setTotalHits] = useState(0)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState<string | undefined>()
+  const [loadMoreRetryKey, setLoadMoreRetryKey] = useState(0)
+  const sourceFilterPaginationEnabledRef = useRef(false)
+  const hasMoreRef = useRef(false)
+  const isLoadingMoreRef = useRef(false)
+  const isInitialSearchingRef = useRef(false)
+  const loadMoreErrorRef = useRef<string | undefined>()
 
   ftsOptionsRef.current = ftsOptions
   resultsRef.current = results
@@ -61,6 +114,14 @@ export function useCommandSearch({
   const effectiveSourceFilter: FullTextSearchSourceFilter = supportsMessageFilters
     ? parsedSourceToken.sourceFilter || ftsOptions.sourceFilter || 'all'
     : 'all'
+
+  const sourceFilterPaginationEnabled =
+    supportsMessageFilters && effectiveSourceFilter !== 'all'
+
+  sourceFilterPaginationEnabledRef.current = sourceFilterPaginationEnabled
+  hasMoreRef.current = hasMore
+  isLoadingMoreRef.current = isLoadingMore
+  loadMoreErrorRef.current = loadMoreError
 
   const isLabelsBrowseMode =
     supportsMessageFilters &&
@@ -87,7 +148,33 @@ export function useCommandSearch({
     return pluginId ? [pluginId] : undefined
   }, [activeTab, effectiveSourceFilter])
 
+  const resetPagination = useCallback(() => {
+    setHasMore(false)
+    setTotalHits(0)
+    setIsLoadingMore(false)
+    setLoadMoreError(undefined)
+    hasMoreRef.current = false
+    isLoadingMoreRef.current = false
+    loadMoreErrorRef.current = undefined
+  }, [])
+
   const loadMore = useCallback(() => {
+    if (!sourceFilterPaginationEnabledRef.current) return
+    if (!hasMoreRef.current) return
+    if (isInitialSearchingRef.current) return
+    if (isLoadingMoreRef.current) return
+
+    const shouldRetryCurrentPage = !!loadMoreErrorRef.current
+    isLoadingMoreRef.current = true
+    setIsLoadingMore(true)
+    setLoadMoreError(undefined)
+    loadMoreErrorRef.current = undefined
+
+    if (shouldRetryCurrentPage) {
+      setLoadMoreRetryKey((key) => key + 1)
+      return
+    }
+
     setFtsOptions({
       ...ftsOptionsRef.current,
       page: (ftsOptionsRef.current.page || 0) + 1,
@@ -152,16 +239,22 @@ export function useCommandSearch({
     if (abortControllerRef.current) abortControllerRef.current.abort()
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
+    const requestPage = sourceFilterPaginationEnabled ? (ftsOptions.page || 0) : 0
+    const isLoadMore = sourceFilterPaginationEnabled && requestPage > 0
+
     if (!normalizedQuery.trim() && !isLabelsBrowseMode) {
       setResults([])
       setIsSearching(false)
+      isInitialSearchingRef.current = false
+      resetPagination()
       setSearchError(undefined)
       return
     }
 
-    const isLoadMore = (ftsOptionsRef.current.page || 0) > 0
     if (!isLoadMore) {
+      resetPagination()
       setIsSearching(true)
+      isInitialSearchingRef.current = true
       setSearchError(undefined)
     }
 
@@ -178,33 +271,60 @@ export function useCommandSearch({
         })
 
         const messagePlugin = registry.get('message-search')
-        if (messagePlugin && 'setFTSOptions' in messagePlugin) {
-          ;(messagePlugin as any).setFTSOptions({
+        let pageResults: SearchPluginResult[] = []
+        let pagination = EMPTY_PAGINATION
+
+        if (sourceFilterPaginationEnabled) {
+          if (!isPaginatedMessageSearchPlugin(messagePlugin)) {
+            throw new Error('Message search plugin does not support paginated source-filtered search')
+          }
+          if (messagePlugin.isEnabled?.(contextRef.current) === false) {
+            throw new Error('Message search is unavailable in the current context')
+          }
+
+          const messageSearchOptions: MessageSearchPluginOptions = {
             ftsMode: true,
             roleFilter: ftsOptions.roleFilter,
             sourceFilter: effectiveSourceFilter,
             globPattern: ftsOptions.globPattern,
             sortMode: effectiveSortMode,
-            page: ftsOptions.page || 0,
+            page: requestPage,
             pageSize: ftsOptions.pageSize || 20,
-          })
+          }
+
+          const queryForPlugin = isLabelsBrowseMode ? '' : normalizedQuery
+          const page = await Promise.race([
+            messagePlugin.searchPage(queryForPlugin, contextRef.current, messageSearchOptions),
+            timeoutPromise,
+          ])
+          pageResults = page.results
+          pagination = page.pagination
+        } else {
+          if (hasMessageSearchOptions(messagePlugin)) {
+            messagePlugin.setFTSOptions({
+              ftsMode: true,
+              roleFilter: ftsOptions.roleFilter,
+              sourceFilter: effectiveSourceFilter,
+              globPattern: ftsOptions.globPattern,
+              sortMode: effectiveSortMode,
+              page: requestPage,
+              pageSize: ftsOptions.pageSize || 20,
+            })
+          }
+
+          const parts: string[] = [activeTab]
+          if (ftsOptions.roleFilter !== 'all') parts.push(ftsOptions.roleFilter!)
+          if (effectiveSourceFilter !== 'all') parts.push(effectiveSourceFilter)
+          if (effectiveSortMode !== 'newest') parts.push(effectiveSortMode)
+
+          pageResults = await Promise.race([
+            search(normalizedQuery, {
+              pluginIds: scopedPluginIds,
+              cacheKeyParts: parts,
+            }),
+            timeoutPromise,
+          ])
         }
-
-        const parts: string[] = [activeTab]
-        if (ftsOptions.roleFilter !== 'all') parts.push(ftsOptions.roleFilter!)
-        if (effectiveSourceFilter !== 'all') parts.push(effectiveSourceFilter)
-        if (effectiveSortMode !== 'newest') parts.push(effectiveSortMode)
-        if (ftsOptions.page) parts.push(String(ftsOptions.page))
-
-        const searchPromise =
-          isLabelsBrowseMode && messagePlugin
-            ? messagePlugin.search('', contextRef.current)
-            : search(normalizedQuery, {
-                pluginIds: scopedPluginIds,
-                cacheKeyParts: parts,
-              })
-
-        const pageResults = await Promise.race([searchPromise, timeoutPromise])
 
         if (
           controller.signal.aborted ||
@@ -212,13 +332,22 @@ export function useCommandSearch({
         )
           return
 
-        const currentPage = ftsOptionsRef.current.page || 0
-        if (currentPage > 0) {
+        if (sourceFilterPaginationEnabled) {
+          setHasMore(pagination.hasMore)
+          setTotalHits(pagination.totalHits)
+        }
+
+        if (isLoadMore) {
           setResults([...resultsRef.current, ...pageResults])
+          setLoadMoreError(undefined)
+          loadMoreErrorRef.current = undefined
+          setIsLoadingMore(false)
+          isLoadingMoreRef.current = false
         } else {
           setResults(pageResults)
+          setIsSearching(false)
+          isInitialSearchingRef.current = false
         }
-        setIsSearching(false)
       } catch (error) {
         if (
           controller.signal.aborted ||
@@ -226,11 +355,22 @@ export function useCommandSearch({
         )
           return
         console.error('[CommandMenu] Search error:', error)
+        if (isLoadMore) {
+          const message = getErrorMessage(error)
+          setLoadMoreError(message)
+          loadMoreErrorRef.current = message
+          setIsLoadingMore(false)
+          isLoadingMoreRef.current = false
+          return
+        }
+
         if (error instanceof Error && error.name !== 'AbortError') {
-          setSearchError(error.message)
+          setSearchError(getErrorMessage(error))
           setResults([])
         }
+        resetPagination()
         setIsSearching(false)
+        isInitialSearchingRef.current = false
       }
     }, 220)
 
@@ -240,6 +380,7 @@ export function useCommandSearch({
   }, [
     normalizedQuery,
     isLabelsBrowseMode,
+    sourceFilterPaginationEnabled,
     effectiveSourceFilter,
     effectiveSortMode,
     search,
@@ -248,9 +389,12 @@ export function useCommandSearch({
     activeTab,
     scopedPluginIds,
     registry,
+    resetPagination,
     ftsOptions.roleFilter,
     ftsOptions.page,
+    ftsOptions.pageSize,
     ftsOptions.globPattern,
+    loadMoreRetryKey,
   ])
 
   return {
@@ -258,6 +402,11 @@ export function useCommandSearch({
     effectiveSourceFilter,
     effectiveSortMode,
     isLabelsBrowseMode,
+    sourceFilterPaginationEnabled,
+    hasMore,
+    totalHits,
+    isLoadingMore,
+    loadMoreError,
     scopedPluginIds,
     supportsMessageFilters,
     parsedSourceToken,

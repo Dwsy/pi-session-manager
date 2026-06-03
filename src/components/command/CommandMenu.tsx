@@ -96,6 +96,11 @@ export default memo(function CommandMenu({
     isLabelsBrowseMode,
     supportsMessageFilters,
     searchError,
+    sourceFilterPaginationEnabled,
+    hasMore,
+    totalHits,
+    isLoadingMore,
+    loadMoreError,
     loadMore,
     handleQueryChange,
     handleSourceFilterChange,
@@ -220,6 +225,11 @@ export default memo(function CommandMenu({
   const selectedPlugin = selectedResult
     ? registry.get(selectedResult.pluginId)
     : null;
+
+  const handleActiveTabChange = useCallback((nextTab: TabType) => {
+    setActiveTab(nextTab);
+    setFtsOptions({ ...ftsOptions, page: 0 });
+  }, [ftsOptions, setActiveTab, setFtsOptions]);
 
   const handleSelect = useCallback(() => {
     if (!selectedResult || !selectedPlugin) return;
@@ -353,7 +363,7 @@ export default memo(function CommandMenu({
           mode={mode}
           setMode={setMode}
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={handleActiveTabChange}
           tabCounts={tabCounts}
           supportsMessageFilters={supportsMessageFilters}
           ftsOptions={ftsOptions}
@@ -389,6 +399,11 @@ export default memo(function CommandMenu({
               selectedResult={selectedResult}
               setSelectedResult={setSelectedResult}
               registry={registry}
+              sourceFilterPaginationEnabled={sourceFilterPaginationEnabled}
+              hasMore={hasMore}
+              totalHits={totalHits}
+              isLoadingMore={isLoadingMore}
+              loadMoreError={loadMoreError}
               loadMore={loadMore}
             />
           )}

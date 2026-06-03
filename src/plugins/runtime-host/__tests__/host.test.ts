@@ -1,4 +1,7 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/transport', () => ({
@@ -1190,36 +1193,61 @@ describe('PsmPluginHost', () => {
   })
 
   it('loads built word-cloud dev plugin module source', async () => {
-    ;(globalThis as Record<string, unknown>).__PSM_HOST_REACT__ = await import('react')
-    const source = readFileSync(new URL('../../../../extensions/psm-word-cloud/dist/index.mjs', import.meta.url), 'utf8')
-    const host = new PsmPluginHost({
-      builtinEntries: [],
-      services: {
-        loadConfig: async () => config(),
-        listNpmEntries: async () => [],
-        listPathEntries: async () => [],
-        listDevEntries: async () => [
-          {
-            projectPath: '/Users/dengwenyu/Dev/AI/pi-session-manager/extensions/psm-word-cloud',
-            packageName: '@local/psm-word-cloud',
-            packageVersion: '0.1.0',
-            entryPath: '/Users/dengwenyu/Dev/AI/pi-session-manager/extensions/psm-word-cloud/dist/index.mjs',
-            exportPath: './dist/index.mjs',
-          },
-        ],
-        readDevModuleSource: async () => source,
-      },
-    })
+    const hostGlobals = globalThis as Record<string, unknown>
+    const previousHostReact = hostGlobals.__PSM_HOST_REACT__
+    const { build } = await import('vite')
+    const projectPath = fileURLToPath(new URL('../../../../extensions/psm-word-cloud', import.meta.url))
+    const buildRoot = mkdtempSync(join(tmpdir(), 'psm-word-cloud-'))
+    const outDir = join(buildRoot, 'dist')
+    const entryPath = join(outDir, 'index.mjs')
 
-    const plugins = await host.reload()
+    try {
+      hostGlobals.__PSM_HOST_REACT__ = await import('react')
+      await build({
+        configFile: join(projectPath, 'vite.config.ts'),
+        build: {
+          outDir,
+          emptyOutDir: true,
+        },
+        logLevel: 'silent',
+      })
+      const source = readFileSync(entryPath, 'utf8')
+      const host = new PsmPluginHost({
+        builtinEntries: [],
+        services: {
+          loadConfig: async () => config(),
+          listNpmEntries: async () => [],
+          listPathEntries: async () => [],
+          listDevEntries: async () => [
+            {
+              projectPath,
+              packageName: '@local/psm-word-cloud',
+              packageVersion: '0.1.0',
+              entryPath,
+              exportPath: './dist/index.mjs',
+            },
+          ],
+          readDevModuleSource: async () => source,
+        },
+      })
 
-    expect(plugins[0]).toMatchObject({
-      id: 'builtin.word-cloud',
-      source: 'dev',
-      packageName: '@local/psm-word-cloud',
-      state: 'active',
-      appViews: ['builtin.word-cloud.view'],
-    })
+      const plugins = await host.reload()
+
+      expect(plugins[0]).toMatchObject({
+        id: 'builtin.word-cloud',
+        source: 'dev',
+        packageName: '@local/psm-word-cloud',
+        state: 'active',
+        appViews: ['builtin.word-cloud.view'],
+      })
+    } finally {
+      if (previousHostReact === undefined) {
+        delete hostGlobals.__PSM_HOST_REACT__
+      } else {
+        hostGlobals.__PSM_HOST_REACT__ = previousHostReact
+      }
+      rmSync(buildRoot, { recursive: true, force: true })
+    }
   })
 
   it('reports duplicate plugin ids without replacing the first loaded plugin', async () => {

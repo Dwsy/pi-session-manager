@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Tag } from 'lucide-react'
+import { AlertCircle, Loader2, Tag } from 'lucide-react'
 import type { SearchPluginResult } from '@/plugins/types'
 import type { PluginRegistry } from '@/plugins/registry'
 import CommandLoading from './CommandLoading'
@@ -20,6 +20,11 @@ interface CommandResultListProps {
   selectedResult: SearchPluginResult | null
   setSelectedResult: (result: SearchPluginResult | null) => void
   registry: PluginRegistry
+  sourceFilterPaginationEnabled: boolean
+  hasMore: boolean
+  totalHits: number
+  isLoadingMore: boolean
+  loadMoreError: string | undefined
   loadMore: () => void
 }
 
@@ -33,9 +38,15 @@ export default function CommandResultList({
   selectedResult,
   setSelectedResult,
   registry,
+  sourceFilterPaginationEnabled,
+  hasMore,
+  totalHits,
+  isLoadingMore,
+  loadMoreError,
   loadMore,
 }: CommandResultListProps) {
   const { t } = useTranslation()
+  const wrapperRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
 
   const groupedResults = useMemo(() => {
@@ -49,30 +60,67 @@ export default function CommandResultList({
     )
   }, [results])
 
-  // Infinite scroll
   useEffect(() => {
-    const wrapper = document.getElementById('search-results-wrapper')
-    if (!wrapper) return
-    const handleScroll = () => {
-      if (isSearching) return
-      if (
-        wrapper.scrollTop + wrapper.clientHeight >=
-        wrapper.scrollHeight - 150
-      ) {
-        loadMore()
-      }
-    }
-    wrapper.addEventListener('scroll', handleScroll, { passive: true })
-    return () => wrapper.removeEventListener('scroll', handleScroll)
-  }, [isSearching, loadMore])
+    const wrapper = wrapperRef.current
+    const sentinel = sentinelRef.current
+    if (!wrapper || !sentinel || !sourceFilterPaginationEnabled || !hasMore || loadMoreError) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (
+          entry?.isIntersecting &&
+          sourceFilterPaginationEnabled &&
+          hasMore &&
+          !isSearching &&
+          !isLoadingMore &&
+          !loadMoreError
+        ) {
+          loadMore()
+        }
+      },
+      {
+        root: wrapper,
+        rootMargin: '150px 0px',
+      },
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, isSearching, loadMore, loadMoreError, sourceFilterPaginationEnabled])
 
   const hasQuery = !!normalizedQuery.trim() || isLabelsBrowseMode
+  const showPagination = sourceFilterPaginationEnabled
+  const showLoadedCount = showPagination && hasQuery && totalHits > 0
+  const remaining = Math.max(0, totalHits - results.length)
+  const showLoadMore = showPagination && hasMore && !searchError && results.length > 0
+  const showAutoLoadMoreSentinel = showLoadMore && !loadMoreError
+  const loadMoreLabel = loadMoreError
+    ? t('search.fullText.retryLoadMore', 'Retry load more')
+    : remaining > 0
+      ? t('search.fullText.loadMoreRemaining', 'Load more ({{count}} remaining)', {
+          count: remaining,
+        })
+      : t('search.fullText.loadMore', 'Load more')
 
   return (
     <div
       id="search-results-wrapper"
+      ref={wrapperRef}
       className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4"
+      aria-busy={isSearching || isLoadingMore}
     >
+      {showLoadedCount && (
+        <div
+          className="px-2 pb-3 text-[11px] text-muted-foreground/75 tabular-nums"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {t('search.fullText.showingResults', 'Showing {{shown}} of {{total}}', {
+            shown: results.length,
+            total: totalHits,
+          })}
+        </div>
+      )}
       {isSearching && results.length === 0 && <CommandLoading />}
       {!isSearching && searchError && <CommandError error={searchError} />}
       {!isSearching &&
@@ -122,8 +170,30 @@ export default function CommandResultList({
             </section>
           )
         })}
-      {results.length > 0 && !isSearching && (
+      {showAutoLoadMoreSentinel && (
         <div ref={sentinelRef} className="h-1" aria-hidden="true" />
+      )}
+      {showLoadMore && (
+        <div className="flex flex-col items-center gap-2 pt-3">
+          {loadMoreError && (
+            <div
+              role="alert"
+              className="inline-flex max-w-full items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive"
+            >
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{loadMoreError}</span>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={isLoadingMore}
+            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-surface/40 px-4 py-2 text-[12px] font-medium text-muted-foreground motion-surface motion-color hover:bg-surface/60 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isLoadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            <span>{loadMoreLabel}</span>
+          </button>
+        </div>
       )}
     </div>
   )
