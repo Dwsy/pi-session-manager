@@ -27,7 +27,7 @@ pub async fn list_system_fonts() -> Result<Vec<SystemFont>, String> {
         }
     }
 
-    result.sort_by(|a, b| a.family.to_lowercase().cmp(&b.family.to_lowercase()));
+    result.sort_by_key(|a| a.family.to_lowercase());
     Ok(result)
 }
 
@@ -59,6 +59,6 @@ pub async fn list_monospace_fonts() -> Result<Vec<SystemFont>, String> {
         }
     }
 
-    result.sort_by(|a, b| a.family.to_lowercase().cmp(&b.family.to_lowercase()));
+    result.sort_by_key(|a| a.family.to_lowercase());
     Ok(result)
 }
