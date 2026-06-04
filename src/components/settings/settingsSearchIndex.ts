@@ -1,4 +1,5 @@
 import { psmPluginHost } from "@/plugins/runtime-host";
+import { formatShortcutText } from "@/utils/platformShortcuts";
 import { psmPluginSectionId } from "./settingsRegistry";
 import type { SettingsSection } from "./types";
 
@@ -582,9 +583,9 @@ function buildSearchText(
   t: (key: string, fallback: string) => string,
 ): string {
   const parts = [
-    t(item.labelKey, item.fallbackLabel),
-    item.fallbackLabel,
-    ...(item.extraKeys?.map((k) => t(k, "")) || []),
+    formatShortcutText(t(item.labelKey, item.fallbackLabel)),
+    formatShortcutText(item.fallbackLabel),
+    ...(item.extraKeys?.map((k) => formatShortcutText(t(k, ""))) || []),
     ...(item.keywords || []),
   ];
   return parts.join(" ").toLowerCase();
@@ -619,7 +620,7 @@ export function searchSettings(
       results.push({
         item,
         sectionLabel: sectionLabels[item.section] || item.section,
-        settingLabel: t(item.labelKey, item.fallbackLabel),
+        settingLabel: formatShortcutText(t(item.labelKey, item.fallbackLabel)),
       });
     }
   }

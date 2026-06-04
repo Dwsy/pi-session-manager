@@ -23,6 +23,7 @@ import {
 
 import KbdTooltip from "@/components/ui/KbdTooltip";
 import { isTauri } from "@/transport";
+import { appendShortcutLabel, shouldUseTauriDragRegion, stripShortcutSuffix } from "@/utils/platformShortcuts";
 import type { SessionViewerToolbarProps } from "./SessionViewerToolbarTypes";
 import SessionViewerOnlineStatusBar from "./SessionViewerOnlineStatusBar";
 import SessionViewerModelControls from "./SessionViewerModelControls";
@@ -62,12 +63,16 @@ export default function SessionViewerToolbar({
   const sidebarToggleLabel = showSidebar
     ? t("session.hideSidebar")
     : t("session.showSidebar");
-  const thinkingToggleLabel = showThinking
-    ? t("session.toolbar.hideThinking", "Collapse thinking")
-    : t("session.toolbar.showThinking", "Expand thinking");
-  const toolsToggleLabel = toolsExpanded
-    ? t("session.toolbar.collapseTools", "Collapse tools")
-    : t("session.toolbar.expandTools", "Expand tools");
+  const thinkingToggleLabel = stripShortcutSuffix(
+    showThinking
+      ? t("session.toolbar.hideThinking", "Collapse thinking")
+      : t("session.toolbar.showThinking", "Expand thinking"),
+  );
+  const toolsToggleLabel = stripShortcutSuffix(
+    toolsExpanded
+      ? t("session.toolbar.collapseTools", "Collapse tools")
+      : t("session.toolbar.expandTools", "Expand tools"),
+  );
   const searchToggleLabel = t(
     "session.toolbar.searchMessages",
     "Search messages",
@@ -89,13 +94,14 @@ export default function SessionViewerToolbar({
     "border-border/70 bg-background text-foreground hover:bg-secondary active:bg-secondary";
   const mobileSheetItemClass =
     "flex items-center gap-3 w-full px-3 py-3 text-sm text-foreground hover:bg-secondary rounded-xl transition-colors touch-manipulation";
+  const enableWindowDrag = shouldUseTauriDragRegion();
 
   const closeMobileMenu = () => {
     onMobileMenuOpenChange(false);
   };
 
   const handleToolbarMouseDown = (event: MouseEvent<HTMLDivElement>) => {
-    if (isMobile || !isTauri()) {
+    if (isMobile || !isTauri() || !enableWindowDrag) {
       return;
     }
 
@@ -116,7 +122,7 @@ export default function SessionViewerToolbar({
       <div
         className={`border-b border-border relative z-20 ${isMobile ? "px-2.5 py-2" : "px-3 py-1.5 min-h-10 flex flex-col justify-center"}`}
         data-session-toolbar
-        data-tauri-drag-region
+        {...(enableWindowDrag ? { "data-tauri-drag-region": true } : {})}
         onMouseDown={handleToolbarMouseDown}
       >
         <div className="flex items-center justify-between gap-2">
@@ -178,7 +184,7 @@ export default function SessionViewerToolbar({
                 <button
                   onClick={onOpenSearch}
                   className={`p-1.5 text-xs ${toggleButtonBase} ${isSearchOpen ? toggleButtonActive : toggleButtonInactive}`}
-                  title={`${searchToggleLabel} (⌘F)`}
+                  title={appendShortcutLabel(searchToggleLabel, "Cmd+F", { symbolic: true })}
                   aria-label={searchToggleLabel}
                   aria-pressed={isSearchOpen}
                 >
@@ -191,7 +197,7 @@ export default function SessionViewerToolbar({
                     <button
                       onClick={onToggleThinking}
                       className={`p-1.5 text-xs ${toggleButtonBase} ${showThinking ? toggleButtonActive : toggleButtonInactive}`}
-                      title={`${thinkingToggleLabel} (⌘T)`}
+                      title={appendShortcutLabel(thinkingToggleLabel, "Cmd+T", { symbolic: true })}
                       aria-label={thinkingToggleLabel}
                       aria-pressed={showThinking}
                     >
@@ -206,7 +212,7 @@ export default function SessionViewerToolbar({
                     <button
                       onClick={onToggleToolsExpanded}
                       className={`p-1.5 text-xs ${toggleButtonBase} ${toolsExpanded ? toggleButtonActive : toggleButtonInactive}`}
-                      title={`${toolsToggleLabel} (⌘O)`}
+                      title={appendShortcutLabel(toolsToggleLabel, "Cmd+O", { symbolic: true })}
                       aria-label={toolsToggleLabel}
                       aria-pressed={toolsExpanded}
                     >

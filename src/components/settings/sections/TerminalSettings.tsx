@@ -17,6 +17,7 @@ import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
 import SettingsVisualSliderField from "@/components/settings/SettingsVisualSliderField";
 import { detectPlatform } from "@/components/settings/types";
 import type { TerminalSettingsProps } from "@/components/settings/types";
+import { formatShortcutDisplay } from "@/utils/platformShortcuts";
 
 const platform = detectPlatform();
 
@@ -394,7 +395,7 @@ export default function TerminalSettings({
               <div className="ml-auto flex items-center gap-1.5 px-2 py-1 rounded-md bg-secondary/50">
                 <Keyboard className="h-3 w-3 text-muted-foreground" />
                 <span className="text-[10px] text-muted-foreground font-mono">
-                  ⌘R
+                  {formatShortcutDisplay("Cmd+R", { symbolic: true })}
                 </span>
               </div>
             </div>
@@ -653,7 +654,7 @@ export default function TerminalSettings({
                 )}
               </span>
               <kbd className="px-2 py-0.5 rounded bg-secondary text-[11px] font-mono text-foreground">
-                ⌘R
+                {formatShortcutDisplay("Cmd+R", { symbolic: true })}
               </kbd>
             </div>
             <div className="flex items-center justify-between py-1.5">
@@ -664,7 +665,7 @@ export default function TerminalSettings({
                 )}
               </span>
               <kbd className="px-2 py-0.5 rounded bg-secondary text-[11px] font-mono text-foreground">
-                ⌘`
+                {formatShortcutDisplay("Cmd+`", { symbolic: true })}
               </kbd>
             </div>
           </div>

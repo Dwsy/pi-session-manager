@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
-const isMac =
-  navigator.platform.toUpperCase().includes("MAC") ||
-  navigator.userAgent.includes("Macintosh");
+import { isMacPlatform } from "@/utils/platformShortcuts";
 
 interface KbdTooltipProps {
   shortcut: string;
@@ -27,6 +25,7 @@ export default function KbdTooltip({
   className = "relative inline-flex",
 }: KbdTooltipProps) {
   const isMobile = useIsMobile();
+  const isMac = isMacPlatform();
   const [visible, setVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
   const ref = useRef<HTMLDivElement>(null);

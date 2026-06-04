@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { FolderOpen, LayoutDashboard, List, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Star, Terminal } from "lucide-react";
 
 import KbdTooltip from "@/components/ui/KbdTooltip";
+import { appendShortcutLabel, shouldUseTauriDragRegion, stripShortcutSuffix } from "@/utils/platformShortcuts";
 import AppViewIcon from "./AppViewIcon";
 
 export type AppDesktopSidebarMode = "list" | "project" | "app" | "pi-live";
@@ -98,6 +99,11 @@ function AppDesktopSidebar({
     };
   }, [appMenuOpen]);
 
+  const enableWindowDrag = isTauriRuntime && shouldUseTauriDragRegion();
+  const searchAllLabel = stripShortcutSuffix(
+    t("app.shortcuts.searchAll", "Search all sessions"),
+  );
+
   return (
     <div
       className="app-desktop-sidebar w-80 border-r border-border flex flex-col"
@@ -106,7 +112,7 @@ function AppDesktopSidebar({
     >
       <div
         className={`app-desktop-sidebar__chrome ${isTauriRuntime ? "h-10" : ""} border-b border-border flex items-center px-3 ${isTauriRuntime ? "py-0" : "py-1.5"} select-none`}
-        {...(isTauriRuntime
+        {...(enableWindowDrag
           ? { "data-tauri-drag-region": true, onMouseDown: startDragging }
           : {})}
       >
@@ -274,9 +280,9 @@ function AppDesktopSidebar({
             <button
               type="button"
               onClick={onOpenCommandPalette}
-              aria-label={t("app.shortcuts.searchAll", "Search all sessions")}
+              aria-label={searchAllLabel}
               className="p-1 rounded motion-color motion-press focus-ring ml-0.5 text-muted-foreground hover:text-foreground hover:bg-secondary group relative"
-              title={t("app.shortcuts.searchAll", "Search all sessions") + " (Cmd+K)"}
+              title={appendShortcutLabel(searchAllLabel, "Cmd+K", { symbolic: true })}
             >
               <Search className="h-3.5 w-3.5" aria-hidden="true" />
             </button>

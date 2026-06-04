@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useMemo } from 'react'
 import { usePsmPluginUi } from '@/plugins/runtime-host'
+import { formatShortcutDisplay, stripShortcutSuffix } from '@/utils/platformShortcuts'
 
 interface ShortcutItem {
   keys: string
@@ -140,19 +141,22 @@ export default function ShortcutSettings() {
             {t(group.label.key, group.label.fallback)}
           </h4>
           <div className="bg-surface rounded-lg divide-y divide-border">
-            {group.items.map((item) => (
-              <div
-                key={item.keys}
-                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 px-4 py-3 min-h-[44px]"
-              >
-                <span className="text-sm text-foreground min-w-0">
-                  {item.labelKey ? t(item.labelKey, item.fallback) : item.fallback}
-                </span>
-                <kbd className="inline-flex items-center gap-1 px-2 py-1 bg-surface-dark border border-border-hover rounded text-xs font-mono text-foreground shadow-sm flex-shrink-0 w-fit">
-                  {item.keys}
-                </kbd>
-              </div>
-            ))}
+            {group.items.map((item) => {
+              const label = stripShortcutSuffix(item.labelKey ? t(item.labelKey, item.fallback) : item.fallback)
+              return (
+                <div
+                  key={item.keys}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 px-4 py-3 min-h-[44px]"
+                >
+                  <span className="text-sm text-foreground min-w-0">
+                    {label}
+                  </span>
+                  <kbd className="inline-flex items-center gap-1 px-2 py-1 bg-surface-dark border border-border-hover rounded text-xs font-mono text-foreground shadow-sm flex-shrink-0 w-fit">
+                    {formatShortcutDisplay(item.keys)}
+                  </kbd>
+                </div>
+              )
+            })}
           </div>
         </div>
       ))}

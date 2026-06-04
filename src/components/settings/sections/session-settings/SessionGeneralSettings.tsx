@@ -5,6 +5,7 @@ import SettingsField from "@/components/settings/SettingsField";
 import SettingsRadioCardGroup from "@/components/settings/SettingsRadioCardGroup";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
 import type { SessionSettingsProps } from "@/components/settings/types";
+import { formatShortcutText } from "@/utils/platformShortcuts";
 
 export default function SessionGeneralSettings({ settings, onUpdate }: SessionSettingsProps) {
   const { t } = useTranslation();
@@ -237,10 +238,14 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
             </SettingsField>
 
             <SettingsField
-              label={t("settings.session.cmdFBehavior", "Cmd+F behavior")}
-              description={t(
-                "settings.session.cmdFBehaviorHelp",
-                "Choose Cmd+F shortcut function",
+              label={formatShortcutText(
+                t("settings.session.cmdFBehavior", "Cmd+F behavior"),
+              )}
+              description={formatShortcutText(
+                t(
+                  "settings.session.cmdFBehaviorHelp",
+                  "Choose Cmd+F shortcut function",
+                ),
               )}
               searchKey="session-cmdFBehavior"
             >
@@ -262,13 +267,17 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
                 }
                 getDescription={(value) =>
                   value === "inSessionSearch"
-                    ? t(
-                        "settings.session.cmdFBehaviorHint.search",
-                        "Cmd+Shift+F toggles session tree",
+                    ? formatShortcutText(
+                        t(
+                          "settings.session.cmdFBehaviorHint.search",
+                          "Cmd+Shift+F toggles session tree",
+                        ),
                       )
-                    : t(
-                        "settings.session.cmdFBehaviorHint.sidebar",
-                        "Cmd+Shift+F opens in-session search",
+                    : formatShortcutText(
+                        t(
+                          "settings.session.cmdFBehaviorHint.sidebar",
+                          "Cmd+Shift+F opens in-session search",
+                        ),
                       )
                 }
               />

@@ -4,6 +4,7 @@ import { isTauri } from '@/transport'
 import { Terminal, Loader2 } from 'lucide-react'
 import type { SessionInfo } from '@/types'
 import type { TerminalType } from './settings/types'
+import { formatShortcutDisplay } from '@/utils/platformShortcuts'
 import { openSessionInTerminalDirect } from '@/utils/sessionResume'
 
 interface OpenInTerminalButtonProps {
@@ -144,7 +145,7 @@ export default function OpenInTerminalButton({
           )}
           {showShortcut && (
             <kbd className="ml-1 px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 text-[9px] font-mono">
-              ⌘R
+              {formatShortcutDisplay('Cmd+R', { symbolic: true })}
             </kbd>
           )}
         </>

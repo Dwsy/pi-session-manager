@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Menu } from "lucide-react";
 
+import { shouldUseTauriDragRegion } from "@/utils/platformShortcuts";
+
 export interface AppDesktopContentProps {
   isTauriRuntime: boolean;
   showTerminal: boolean;
@@ -23,6 +25,7 @@ function AppDesktopContent({
   toggleSidebarTitle = "Show sidebar",
 }: AppDesktopContentProps) {
   const hideMainContent = showTerminal && terminalMaximized;
+  const enableWindowDrag = isTauriRuntime && shouldUseTauriDragRegion();
 
   return (
     <div
@@ -30,7 +33,7 @@ function AppDesktopContent({
       role="main"
       aria-label="Main workspace"
     >
-      {isTauriRuntime && !hideMainContent && (
+      {enableWindowDrag && !hideMainContent && (
         <div
           className="absolute top-0 left-0 right-0 h-8 z-10"
           data-tauri-drag-region
@@ -44,7 +47,7 @@ function AppDesktopContent({
           aria-label={toggleSidebarTitle}
           title={toggleSidebarTitle}
           className={`absolute z-30 p-1 rounded motion-color motion-press focus-ring text-muted-foreground hover:text-foreground hover:bg-secondary no-drag ${
-            isTauriRuntime
+            enableWindowDrag
               ? "top-2 left-[var(--macos-traffic-clearance)]"
               : "top-1 left-1"
           }`}
