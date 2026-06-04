@@ -508,22 +508,22 @@ function ReviewStatusStrip({
         : t("components.toolCallReview.noImpact", "No line impact");
 
   return (
-    <div className="grid grid-cols-2 gap-2 border-y border-border/40 bg-[rgb(var(--color-surface-dark)/0.36)] px-2.5 py-2 sm:flex sm:items-stretch">
-      <div className={`min-w-0 rounded-[5px] border px-3 py-2 sm:min-w-[140px] ${status.className}`}>
-        <div className="text-[8px] uppercase tracking-[0.14em] opacity-75">
+    <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-1.5 text-[10px]">
+      <div
+        className={`inline-flex min-w-0 items-center gap-1.5 rounded-[4px] border px-1.5 py-0.5 ${status.className}`}
+      >
+        <span className="font-medium uppercase tracking-[0.1em] opacity-75">
           {t("components.toolCallReview.statusLabel", "Status")}
-        </div>
-        <div className="mt-1 truncate text-xs font-semibold">
+        </span>
+        <span className="truncate font-semibold">
           {t(status.labelKey, status.fallbackLabel)}
-        </div>
+        </span>
       </div>
-      <div className="min-w-0 rounded-[5px] border border-border/40 bg-background/45 px-3 py-2 sm:min-w-[140px]">
-        <div className="text-[8px] uppercase tracking-[0.14em] text-muted-foreground">
+      <div className="inline-flex min-w-0 items-center gap-1.5 rounded-[4px] border border-border/40 bg-background/45 px-1.5 py-0.5 text-foreground">
+        <span className="font-medium uppercase tracking-[0.1em] text-muted-foreground">
           {t("components.toolCallReview.impact", "Impact")}
-        </div>
-        <div className="mt-1 truncate font-mono text-xs font-semibold text-foreground">
-          {impact}
-        </div>
+        </span>
+        <span className="truncate font-mono font-semibold">{impact}</span>
       </div>
     </div>
   );
@@ -892,7 +892,7 @@ function DetailPanel({
           </div>
         </div>
 
-        {!contentExpanded && (
+        {false && !contentExpanded && (
           <aside className="hidden min-h-0 w-72 flex-shrink-0 flex-col border-l border-border/55 bg-[rgb(var(--color-surface-dark)/0.46)] xl:flex">
             <div className="flex min-h-[40px] items-center gap-2 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.64)] px-3 py-2 text-[12px] font-semibold text-foreground">
               <Braces
