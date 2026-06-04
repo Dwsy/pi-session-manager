@@ -2,8 +2,8 @@ import type { Content } from '@/types'
 import { useTranslation } from 'react-i18next'
 import MarkdownContent from '@/components/ui/MarkdownContent'
 import { formatDate } from '@/utils/format'
-import { Copy, Check } from 'lucide-react'
-import { memo, useMemo, useState } from 'react'
+import { Copy, Check, Maximize2, X } from 'lucide-react'
+import { memo, useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { useClipboard } from '@/hooks/useClipboard'
 
 interface UserMessageProps {
@@ -14,9 +14,13 @@ interface UserMessageProps {
   searchQuery?: string
 }
 
+const HEIGHT_THRESHOLD = 200
+
 function UserMessage({ id, timestamp, content, className = '', searchQuery = '' }: UserMessageProps) {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [shouldShowExpand, setShouldShowExpand] = useState(false)
   const { copyText } = useClipboard()
 
   const images = useMemo(
@@ -34,7 +38,28 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
     [textItems],
   )
 
-  const handleCopy = async () => {
+  // Measure content height to decide whether to show expand button
+  useEffect(() => {
+    if (!contentRef.current) return
+
+    const measureHeight = () => {
+      if (contentRef.current) {
+        const height = contentRef.current.scrollHeight
+        setShouldShowExpand(height > HEIGHT_THRESHOLD)
+      }
+    }
+
+    measureHeight()
+
+    const observer = new ResizeObserver(() => {
+      measureHeight()
+    })
+
+    observer.observe(contentRef.current)
+    return () => observer.disconnect()
+  }, [text])
+
+  const handleCopy = useCallback(async () => {
     try {
       await copyText(text)
       setCopied(true)
@@ -42,7 +67,7 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
     } catch (err) {
       console.error('Failed to copy message text:', err)
     }
-  }
+  }, [copyText, text])
 
   return (
     <div className={`user-message ${className}`} id={`entry-${id}`}>
@@ -51,28 +76,38 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
           <span className="user-message-role">{t('components.userMessage.you')}</span>
           {timestamp && <span className="message-timestamp">{formatDate(timestamp)}</span>}
         </div>
-        {text.trim() && (
-          <button
-            onClick={() => {
-              void handleCopy()
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
+        <div className="flex items-center gap-1">
+          {text.trim() && (
+            <button
+              onClick={() => {
                 void handleCopy()
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  void handleCopy()
+                }
+              }}
+              className="tool-copy-button user-message-copy-button"
+              aria-label={
+                copied
+                  ? t('components.userMessage.copied') || 'Copied'
+                  : t('components.userMessage.copyText') || 'Copy text'
               }
-            }}
-            className="tool-copy-button user-message-copy-button"
-            aria-label={copied ? (t('components.userMessage.copied') || 'Copied') : (t('components.userMessage.copyText') || 'Copy text')}
-            title={copied ? t('components.userMessage.copied') || 'Copied!' : t('components.userMessage.copyText') || 'Copy text'}
-          >
-            {copied ? (
-              <Check className="w-4 h-4" />
-            ) : (
-              <Copy className="w-4 h-4" />
-            )}
-          </button>
-        )}
+              title={copied ? t('components.userMessage.copied') || 'Copied!' : t('components.userMessage.copyText') || 'Copy text'}
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            </button>
+          )}
+          {shouldShowExpand && (
+            <ExpandButton
+              text={text}
+              images={images}
+              timestamp={timestamp}
+              searchQuery={searchQuery}
+            />
+          )}
+        </div>
       </div>
 
       {images.length > 0 && (
@@ -89,10 +124,121 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
       )}
 
       {text.trim() && (
-        <>
+        <div ref={contentRef} className="user-message-body-truncated">
           <MarkdownContent content={text} className="user-message-body" searchQuery={searchQuery} />
-        </>
+        </div>
       )}
+    </div>
+  )
+}
+
+// Expand button opens the modal - separated to isolate hooks
+function ExpandButton({ text, images, timestamp, searchQuery }: {
+  text: string
+  images: { type: string; data?: string; mimeType?: string }[]
+  timestamp?: string
+  searchQuery?: string
+}) {
+  const { t } = useTranslation()
+  const [isOpen, setIsOpen] = useState(false)
+
+  const handleOpen = useCallback(() => setIsOpen(true), [])
+  const handleClose = useCallback(() => setIsOpen(false), [])
+
+  return (
+    <>
+      <button
+        onClick={handleOpen}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            handleOpen()
+          }
+        }}
+        className="tool-copy-button user-message-copy-button"
+        aria-label={t('components.userMessage.expand') || 'Expand message'}
+        title={t('components.userMessage.expand') || 'Expand message'}
+      >
+        <Maximize2 className="w-4 h-4" />
+      </button>
+
+      {isOpen && (
+        <UserMessageModal
+          text={text}
+          images={images}
+          timestamp={timestamp}
+          searchQuery={searchQuery}
+          onClose={handleClose}
+        />
+      )}
+    </>
+  )
+}
+
+// Modal component - isolated to prevent hook order issues
+function UserMessageModal({ text, images, timestamp, searchQuery, onClose }: {
+  text: string
+  images: { type: string; data?: string; mimeType?: string }[]
+  timestamp?: string
+  searchQuery?: string
+  onClose: () => void
+}) {
+  const { t } = useTranslation()
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation()
+      onClose()
+    }
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+      onKeyDown={handleKeyDown}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="user-message-modal-title"
+    >
+      <div className="flex h-[85vh] w-full max-w-4xl flex-col rounded-xl border border-border/70 bg-background shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
+          <div>
+            <h3 id="user-message-modal-title" className="text-base font-semibold text-foreground">
+              {t('components.userMessage.fullMessage') || 'Full Message'}
+            </h3>
+            {timestamp && (
+              <p className="mt-1 text-sm text-muted-foreground">{formatDate(timestamp)}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-muted-foreground hover:bg-surface hover:text-foreground"
+            title={t('components.userMessage.close') || 'Close'}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {images.length > 0 && (
+            <div className="message-images mb-4">
+              {images.map((img, idx) => (
+                <img
+                  key={idx}
+                  src={`data:${img.mimeType};base64,${img.data}`}
+                  className="message-image"
+                  alt={t('components.userMessage.imageAlt')}
+                />
+              ))}
+            </div>
+          )}
+          <MarkdownContent content={text} className="user-message-body" searchQuery={searchQuery} />
+        </div>
+      </div>
     </div>
   )
 }
