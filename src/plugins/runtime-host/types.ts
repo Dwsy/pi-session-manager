@@ -115,7 +115,15 @@ export interface PsmPluginLoadEntry {
 
 export interface PsmPluginDiagnostic {
   level: PsmPluginDiagnosticLevel
+  phase?: 'discovery' | 'module-load' | 'manifest-validation' | 'activation' | 'command' | 'tool' | 'event-handler' | 'ui-render' | 'cleanup'
   message: string
+  pluginId?: string
+  sourceId?: string
+  contributionId?: string
+  stack?: string
+  firstSeenAt?: string
+  lastSeenAt?: string
+  count?: number
 }
 
 export interface PsmPluginPermissionStatus {
