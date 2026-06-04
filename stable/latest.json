@@ -1,0 +1,51 @@
+{
+  "version": "0.6.4",
+  "notes": "",
+  "pub_date": "2026-06-04T04:25:40.258Z",
+  "platforms": {
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRY1Fldjk1TTNVUVcyc2xaUGp0UmlWN3dIempqRVdJTm5HQzJpV0ZCb0N6eVZFS0F2Y0FKODlkVVZoQlIyWDYzOHZ6czB0eEN3VmdJYkh6NE54MXdjOEpLS2pJTWNwTndVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNTQ2NjE5CWZpbGU6UGkgU2Vzc2lvbiBNYW5hZ2VyLmFwcC50YXIuZ3oKVDdOOXFnUFVWSkc4TjNYQ3ltUFJ4cVBZaFpZemRxbUNvNmlJekwyaE0vQTlRemJac1RWbFUrQUdOTGEvaWptbFJ1UTZWdkQ5VUh5eXJHSVF3Y3RjQUE9PQo=",
+      "url": "https://github.com/Dwsy/pi-session-manager/releases/download/v0.6.4/Pi.Session.Manager_x64.app.tar.gz"
+    },
+    "darwin-x86_64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRY1Fldjk1TTNVUVcyc2xaUGp0UmlWN3dIempqRVdJTm5HQzJpV0ZCb0N6eVZFS0F2Y0FKODlkVVZoQlIyWDYzOHZ6czB0eEN3VmdJYkh6NE54MXdjOEpLS2pJTWNwTndVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNTQ2NjE5CWZpbGU6UGkgU2Vzc2lvbiBNYW5hZ2VyLmFwcC50YXIuZ3oKVDdOOXFnUFVWSkc4TjNYQ3ltUFJ4cVBZaFpZemRxbUNvNmlJekwyaE0vQTlRemJac1RWbFUrQUdOTGEvaWptbFJ1UTZWdkQ5VUh5eXJHSVF3Y3RjQUE9PQo=",
+      "url": "https://github.com/Dwsy/pi-session-manager/releases/download/v0.6.4/Pi.Session.Manager_x64.app.tar.gz"
+    },
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRY1Fldjk1TTNVUWNRY3UvcTgxT3VtU24vMVluMC8vMDZpZG9oYUVlZ04vSm9kVVdHT2w2YTdqRmt5VjZRL3JOcDVFOVo5UDYyWUxvNlVJVUdLNWIwUE5SNFhxOUVUc1FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNTQ2OTc4CWZpbGU6UGkgU2Vzc2lvbiBNYW5hZ2VyLmFwcC50YXIuZ3oKWktTZS82b254djdXVUhqREw0ZjNjQ2l6bzdaMDNKdTFQOE4zblFKMG00VTRKNThtZTV3SkdIM1NrWUVHL0RMbjh1YnQ3ZzBxUFloSzhZZ2lsL2NOREE9PQo=",
+      "url": "https://github.com/Dwsy/pi-session-manager/releases/download/v0.6.4/Pi.Session.Manager_aarch64.app.tar.gz"
+    },
+    "darwin-aarch64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRY1Fldjk1TTNVUWNRY3UvcTgxT3VtU24vMVluMC8vMDZpZG9oYUVlZ04vSm9kVVdHT2w2YTdqRmt5VjZRL3JOcDVFOVo5UDYyWUxvNlVJVUdLNWIwUE5SNFhxOUVUc1FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNTQ2OTc4CWZpbGU6UGkgU2Vzc2lvbiBNYW5hZ2VyLmFwcC50YXIuZ3oKWktTZS82b254djdXVUhqREw0ZjNjQ2l6bzdaMDNKdTFQOE4zblFKMG00VTRKNThtZTV3SkdIM1NrWUVHL0RMbjh1YnQ3ZzBxUFloSzhZZ2lsL2NOREE9PQo=",
+      "url": "https://github.com/Dwsy/pi-session-manager/releases/download/v0.6.4/Pi.Session.Manager_aarch64.app.tar.gz"
+    },
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRY1Fldjk1TTNVUVZsQnQxUy9WSGxKNklPUHVPSENCRTRLTDNxMjhXQzJnTzk4dXZqTW8rcFVPbTZoN3Baa1JMWmRqZlpuNmpBS0RaVW01VlhFSmsxMEh4c0JYTmY1OVEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNTQ3MTIzCWZpbGU6UGkgU2Vzc2lvbiBNYW5hZ2VyXzAuNi40X2FtZDY0LkFwcEltYWdlClMzTG1yRU1DSGVvbTA0U3FQd2N2NytNbUQ5SDI0YXZGREZ1cURNVldQWmNsOWV1VUl2TjIra00rSTZoMy9RNTVReXNmRjdyRUFiM2tFaHpuK3FKU0F3PT0K",
+      "url": "https://github.com/Dwsy/pi-session-manager/releases/download/v0.6.4/Pi.Session.Manager_0.6.4_amd64.AppImage"
+    },
+    "linux-x86_64-appimage": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRY1Fldjk1TTNVUVZsQnQxUy9WSGxKNklPUHVPSENCRTRLTDNxMjhXQzJnTzk4dXZqTW8rcFVPbTZoN3Baa1JMWmRqZlpuNmpBS0RaVW01VlhFSmsxMEh4c0JYTmY1OVEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNTQ3MTIzCWZpbGU6UGkgU2Vzc2lvbiBNYW5hZ2VyXzAuNi40X2FtZDY0LkFwcEltYWdlClMzTG1yRU1DSGVvbTA0U3FQd2N2NytNbUQ5SDI0YXZGREZ1cURNVldQWmNsOWV1VUl2TjIra00rSTZoMy9RNTVReXNmRjdyRUFiM2tFaHpuK3FKU0F3PT0K",
+      "url": "https://github.com/Dwsy/pi-session-manager/releases/download/v0.6.4/Pi.Session.Manager_0.6.4_amd64.AppImage"
+    },
+    "linux-x86_64-deb": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRY1Fldjk1TTNVUWU5Q3g0eGZ3ZWpnYXdtdks3bEtGVjRCVzMxYTM2WlM3NjlPTUlHNlBOY2k2d1NxblozdzM4dVoxTElRTTJ0Z2h5Y0gwUFZlMkZsWVhxLy9FNTN4blE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNTQ3MTIzCWZpbGU6UGkgU2Vzc2lvbiBNYW5hZ2VyXzAuNi40X2FtZDY0LmRlYgpEMEkyU0ZUVG01OVJlQk1YRFRRSFBXcFp0eXJaTktkRkRDUGFEWER0cnFWd2d3SVBpV0k1MTNWMTJaZ2ZOVG9yOHQ3US9FdldzVzZpclhxdE9EOTZEZz09Cg==",
+      "url": "https://github.com/Dwsy/pi-session-manager/releases/download/v0.6.4/Pi.Session.Manager_0.6.4_amd64.deb"
+    },
+    "linux-x86_64-rpm": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRY1Fldjk1TTNVUWZBVDdIUGhWMnorRklBRFgxMVlwR3Y0NnZkbVFKQnNNdThSTFcxMFI5dHg2SG0wUm42NUUycGJUWGVQVDJKMStvc3JzSzUvcU1NMjVQOUw1bFBwWVFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNTQ3MTIzCWZpbGU6UGkgU2Vzc2lvbiBNYW5hZ2VyLTAuNi40LTEueDg2XzY0LnJwbQpMdVJqdjFsMmdER0JzR2p4Mkx0WnNlNmh3dXVyUmpFN3dsWHdSdEZtRUdnTVYvNDZDV0FIYzdWMTBzb3RRYlVvYWMyMEdiY2JWMjdlcTJTUGtLVW1EZz09Cg==",
+      "url": "https://github.com/Dwsy/pi-session-manager/releases/download/v0.6.4/Pi.Session.Manager-0.6.4-1.x86_64.rpm"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRY1Fldjk1TTNVUVI2NFZWdlY4YmtDMEF5VVZaVUZDZ3NBZVgwVmRSRHV3QURZb0ZmOWhxamhkTGtlMytxQXlRd042cnNDTzZkb2Z4Q2lUNjhmcklHVHFKZmZqekRwOGdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNTQ3MTM1CWZpbGU6UGkgU2Vzc2lvbiBNYW5hZ2VyXzAuNi40X3g2NF9lbi1VUy5tc2kKc2M5UjlGN0IzdUw0TTMxdTN1Qk5iQVJGMmFZU09wT0FETE1UL1lkcWJqVjA4TmNpUUlTWVViMFB6bzU1ZlB6VDJ1akg4cXV4VitNWDZzUTY1N3hUQ0E9PQo=",
+      "url": "https://github.com/Dwsy/pi-session-manager/releases/download/v0.6.4/Pi.Session.Manager_0.6.4_x64_en-US.msi"
+    },
+    "windows-x86_64-msi": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRY1Fldjk1TTNVUVI2NFZWdlY4YmtDMEF5VVZaVUZDZ3NBZVgwVmRSRHV3QURZb0ZmOWhxamhkTGtlMytxQXlRd042cnNDTzZkb2Z4Q2lUNjhmcklHVHFKZmZqekRwOGdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNTQ3MTM1CWZpbGU6UGkgU2Vzc2lvbiBNYW5hZ2VyXzAuNi40X3g2NF9lbi1VUy5tc2kKc2M5UjlGN0IzdUw0TTMxdTN1Qk5iQVJGMmFZU09wT0FETE1UL1lkcWJqVjA4TmNpUUlTWVViMFB6bzU1ZlB6VDJ1akg4cXV4VitNWDZzUTY1N3hUQ0E9PQo=",
+      "url": "https://github.com/Dwsy/pi-session-manager/releases/download/v0.6.4/Pi.Session.Manager_0.6.4_x64_en-US.msi"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRY1Fldjk1TTNVUVU0QVcyeDlSMzZyakVaUDRCYS9aTVd3N29YRnFTWHhEV1lBQkY1bDNGSWRjVW1TaWZhWTdIWFFuSjJZZ3pBNGRQRkc4Z2Z6TWJWdWdWU1JuK2hjUndFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNTQ3MTM1CWZpbGU6UGkgU2Vzc2lvbiBNYW5hZ2VyXzAuNi40X3g2NC1zZXR1cC5leGUKR0RhKzc0SDZ2YUhuWVg5Vjh5Q0RPSG1VYjF1LzhsMzYxaWprWjJ4Qm84QzUzV3dNK0hJVkp1eDVzeFVBbjEwQ3N6WDRRU3p2MWIraHRObEpzaG9ERGc9PQo=",
+      "url": "https://github.com/Dwsy/pi-session-manager/releases/download/v0.6.4/Pi.Session.Manager_0.6.4_x64-setup.exe"
+    }
+  }
+}
