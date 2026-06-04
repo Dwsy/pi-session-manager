@@ -24,6 +24,7 @@ export interface BuiltInBase46Theme {
   label: string
   scheme: Base46Scheme
   base16: Base46Palette
+  base30?: Record<string, string>
 }
 
 export interface Base46PiThemeFile {

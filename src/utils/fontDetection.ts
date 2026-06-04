@@ -51,6 +51,28 @@ const REFERENCE_FONTS = 'monospace'
 const CANVAS_FONT_SIZE = 72
 
 let canvasCtx: CanvasRenderingContext2D | null = null
+const fontListCache = new Map<string, Promise<DetectedFont[]> | DetectedFont[]>()
+
+function cachedFontList(key: string, load: () => Promise<DetectedFont[]>): Promise<DetectedFont[]> {
+  const cached = fontListCache.get(key)
+  if (cached) return Promise.resolve(cached)
+
+  const request = load()
+    .then((fonts) => {
+      fontListCache.set(key, fonts)
+      return fonts
+    })
+    .catch((error) => {
+      if (fontListCache.get(key) === request) {
+        fontListCache.delete(key)
+      }
+      throw error
+    })
+
+  fontListCache.set(key, request)
+  return request
+}
+
 function getCtx(): CanvasRenderingContext2D {
   if (!canvasCtx) {
     const canvas = document.createElement('canvas')
@@ -175,28 +197,32 @@ async function listFontsViaCanvas(monospaceOnly: boolean): Promise<DetectedFont[
  * Falls back to canvas detection when Tauri is unavailable.
  */
 export async function listSystemMonospaceFonts(): Promise<DetectedFont[]> {
-  try {
-    if (isTauriEnv()) {
-      return await listFontsViaTauri(true)
+  return cachedFontList('monospace', async () => {
+    try {
+      if (isTauriEnv()) {
+        return await listFontsViaTauri(true)
+      }
+    } catch {
+      // Tauri invoke failed, fall through to canvas
     }
-  } catch {
-    // Tauri invoke failed, fall through to canvas
-  }
-  return listFontsViaCanvas(true)
+    return listFontsViaCanvas(true)
+  })
 }
 
 /**
  * List all installed fonts (monospace + proportional).
  */
 export async function listAllSystemFonts(): Promise<DetectedFont[]> {
-  try {
-    if (isTauriEnv()) {
-      return await listFontsViaTauri(false)
+  return cachedFontList('all', async () => {
+    try {
+      if (isTauriEnv()) {
+        return await listFontsViaTauri(false)
+      }
+    } catch {
+      // Fall through
     }
-  } catch {
-    // Fall through
-  }
-  return listFontsViaCanvas(false)
+    return listFontsViaCanvas(false)
+  })
 }
 
 /**
