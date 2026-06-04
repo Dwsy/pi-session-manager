@@ -1495,6 +1495,23 @@ function App() {
     navigateToProject,
   });
 
+  const terminalScopeList = useMemo(
+    () => Object.values(terminalScopes),
+    [terminalScopes],
+  );
+  const closeDesktopTerminal = useCallback(() => {
+    setShowTerminal(false);
+    setTerminalMaximized(false);
+  }, []);
+  const clearTerminalPendingCommand = useCallback((scopeKey: string) => {
+    setTerminalPendingCommands((prev) => {
+      if (prev[scopeKey] == null) {
+        return prev;
+      }
+      return { ...prev, [scopeKey]: null };
+    });
+  }, []);
+
   // ═══════════════════════════════════
   // Mobile layout: full-screen pages + bottom nav
   // ═══════════════════════════════════
@@ -1619,22 +1636,6 @@ function App() {
         renderDashboard,
       });
 
-  const terminalScopeList = useMemo(
-    () => Object.values(terminalScopes),
-    [terminalScopes],
-  );
-  const closeDesktopTerminal = useCallback(() => {
-    setShowTerminal(false);
-    setTerminalMaximized(false);
-  }, []);
-  const clearTerminalPendingCommand = useCallback((scopeKey: string) => {
-    setTerminalPendingCommands((prev) => {
-      if (prev[scopeKey] == null) {
-        return prev;
-      }
-      return { ...prev, [scopeKey]: null };
-    });
-  }, []);
   const desktopTerminalPanel = standaloneDatasetRuntime ? null : (
     <>
       {terminalScopeList.map((scope) => (
