@@ -17,7 +17,7 @@ import {
   toBase46Selection,
 } from '@/utils/piTheme'
 import { CODE_THEMES, MONOSPACE_FONTS } from '@/utils/codeThemes'
-import { listSystemMonospaceFonts, type DetectedFont } from '@/utils/fontDetection'
+import { listAllSystemFonts, listSystemMonospaceFonts, type DetectedFont } from '@/utils/fontDetection'
 import { renderCodeHtmlWithTheme } from '@/utils/markdown'
 import { useResolvedCodeTheme } from '@/hooks/useResolvedCodeTheme'
 import type { AppearanceSettingsProps } from '@/components/settings/types'
@@ -70,13 +70,72 @@ type FontChoice = {
   source: 'system' | 'preset' | 'custom'
 }
 
+const UI_FONT_PRESETS: Array<Pick<FontChoice, 'label' | 'value'>> = [
+  {
+    label: 'System UI',
+    value:
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Helvetica Neue", Arial, sans-serif',
+  },
+  { label: 'Inter', value: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  { label: 'SF Pro', value: '"SF Pro Text", -apple-system, BlinkMacSystemFont, sans-serif' },
+  { label: 'PingFang SC', value: '"PingFang SC", "Microsoft YaHei", sans-serif' },
+  { label: 'Segoe UI', value: '"Segoe UI", Arial, sans-serif' },
+  { label: 'Helvetica Neue', value: '"Helvetica Neue", Arial, sans-serif' },
+]
+
 function extractPrimaryFontName(fontFamily: string): string {
   const match = fontFamily.match(/^\s*["']?([^"',]+)/)
-  return match?.[1]?.trim() || fontFamily.trim() || 'Monospace'
+  return match?.[1]?.trim() || fontFamily.trim() || 'Font'
 }
 
-function buildSystemFontValue(family: string): string {
+function buildUiFontValue(family: string): string {
+  return `"${family}", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`
+}
+
+function buildMonoFontValue(family: string): string {
   return `"${family}", ui-monospace, monospace`
+}
+
+function buildFontChoices(
+  detected: DetectedFont[],
+  presets: Array<Pick<FontChoice, 'label' | 'value'>>,
+  currentValue: string,
+  buildSystemValue: (family: string) => string,
+): FontChoice[] {
+  const seen = new Set<string>()
+  const choices: FontChoice[] = []
+
+  for (const font of detected) {
+    const key = font.family.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    choices.push({
+      label: font.family,
+      value: buildSystemValue(font.family),
+      source: 'system',
+    })
+  }
+
+  for (const preset of presets) {
+    const key = preset.label.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    choices.push({ ...preset, source: 'preset' })
+  }
+
+  if (currentValue.trim()) {
+    const customLabel = extractPrimaryFontName(currentValue)
+    const key = customLabel.toLowerCase()
+    if (!seen.has(key)) {
+      choices.unshift({
+        label: customLabel,
+        value: currentValue,
+        source: 'custom',
+      })
+    }
+  }
+
+  return choices
 }
 
 /** Tiny window thumbnail: title bar with an accent dot + two content lines. */
@@ -177,7 +236,7 @@ function FontSizeOptionCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex flex-col items-center justify-center gap-1 rounded-[10px] border py-2.5 motion-color focus-ring ${
+      className={`flex h-12 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 motion-color focus-ring ${
         selected ? SELECTED_CARD : UNSELECTED_CARD
       }`}
     >
@@ -187,7 +246,7 @@ function FontSizeOptionCard({
       >
         Aa
       </span>
-      <span className={`text-xs ${selected ? 'text-foreground' : 'text-muted-foreground'}`}>{label}</span>
+      <span className={`text-[11px] ${selected ? 'text-foreground' : 'text-muted-foreground'}`}>{label}</span>
     </button>
   )
 }
@@ -210,7 +269,18 @@ function PickerDialog({
   children: React.ReactNode
 }) {
   return (
-    <div className="fixed inset-0 z-[95] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-[95] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          event.stopPropagation()
+          onClose()
+        }
+      }}
+    >
       <div className="w-[min(720px,calc(100vw-32px))] max-h-[80vh] rounded-2xl border border-border/70 bg-popover shadow-2xl overflow-hidden">
         <div className="border-b border-border/70 px-5 py-4">
           <div className="flex items-start justify-between gap-4">
@@ -250,12 +320,17 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
   const { t } = useTranslation()
   const [piThemes, setPiThemes] = useState<string[]>([])
   const [systemFonts, setSystemFonts] = useState<DetectedFont[]>([])
-  const [fontsLoading, setFontsLoading] = useState(true)
+  const [systemMonoFonts, setSystemMonoFonts] = useState<DetectedFont[]>([])
+  const [uiFontsLoading, setUiFontsLoading] = useState(true)
+  const [monoFontsLoading, setMonoFontsLoading] = useState(true)
   const [themePickerOpen, setThemePickerOpen] = useState(false)
+  const [uiFontPickerOpen, setUiFontPickerOpen] = useState(false)
   const [fontPickerOpen, setFontPickerOpen] = useState(false)
   const [themeQuery, setThemeQuery] = useState('')
+  const [uiFontQuery, setUiFontQuery] = useState('')
   const [fontQuery, setFontQuery] = useState('')
   const deferredThemeQuery = useDeferredValue(themeQuery)
+  const deferredUiFontQuery = useDeferredValue(uiFontQuery)
   const deferredFontQuery = useDeferredValue(fontQuery)
   const builtInThemes = useMemo(() => getBuiltInBase46Themes(), [])
   const selectedPreview = useMemo(
@@ -264,6 +339,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
   )
 
   const currentCodeTheme = settings.appearance.codeBlockTheme || 'github'
+  const currentUiFont = settings.appearance.fontFamily || ''
   const currentMonoFont = settings.appearance.fontFamilyMono || ''
   const resolvedCodeTheme = useResolvedCodeTheme()
   const currentCodeThemeMeta = useMemo(() => {
@@ -295,47 +371,18 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
     }
   }, [selectedPreview])
 
-  const fontChoices = useMemo<FontChoice[]>(() => {
-    const seen = new Set<string>()
-    const choices: FontChoice[] = []
+  const uiFontChoices = useMemo<FontChoice[]>(
+    () => buildFontChoices(systemFonts, UI_FONT_PRESETS, currentUiFont, buildUiFontValue),
+    [currentUiFont, systemFonts],
+  )
 
-    for (const font of systemFonts) {
-      const key = font.family.toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
-      choices.push({
-        label: font.family,
-        value: buildSystemFontValue(font.family),
-        source: 'system',
-      })
-    }
+  const monoFontChoices = useMemo<FontChoice[]>(
+    () => buildFontChoices(systemMonoFonts, MONOSPACE_FONTS, currentMonoFont, buildMonoFontValue),
+    [currentMonoFont, systemMonoFonts],
+  )
 
-    for (const preset of MONOSPACE_FONTS) {
-      const label = preset.label
-      const key = label.toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
-      choices.push({
-        label,
-        value: preset.value,
-        source: 'preset',
-      })
-    }
-
-    if (currentMonoFont.trim()) {
-      const customLabel = extractPrimaryFontName(currentMonoFont)
-      const key = customLabel.toLowerCase()
-      if (!seen.has(key)) {
-        choices.unshift({
-          label: customLabel,
-          value: currentMonoFont,
-          source: 'custom',
-        })
-      }
-    }
-
-    return choices
-  }, [currentMonoFont, systemFonts])
+  const currentUiFontLabel = uiFontChoices.find((font) => font.value === currentUiFont)?.label ?? extractPrimaryFontName(currentUiFont)
+  const currentMonoFontLabel = monoFontChoices.find((font) => font.value === currentMonoFont)?.label ?? currentFontLabel
 
   const filteredThemes = useMemo(() => {
     const q = deferredThemeQuery.trim().toLowerCase()
@@ -346,14 +393,23 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
     })
   }, [deferredThemeQuery])
 
-  const filteredFonts = useMemo(() => {
-    const q = deferredFontQuery.trim().toLowerCase()
-    if (!q) return fontChoices
-    return fontChoices.filter((font) => {
+  const filteredUiFonts = useMemo(() => {
+    const q = deferredUiFontQuery.trim().toLowerCase()
+    if (!q) return uiFontChoices
+    return uiFontChoices.filter((font) => {
       const haystack = `${font.label} ${font.source} ${font.value}`.toLowerCase()
       return haystack.includes(q)
     })
-  }, [deferredFontQuery, fontChoices])
+  }, [deferredUiFontQuery, uiFontChoices])
+
+  const filteredMonoFonts = useMemo(() => {
+    const q = deferredFontQuery.trim().toLowerCase()
+    if (!q) return monoFontChoices
+    return monoFontChoices.filter((font) => {
+      const haystack = `${font.label} ${font.source} ${font.value}`.toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [deferredFontQuery, monoFontChoices])
 
   const handleThemeSelect = (theme: 'dark' | 'light' | 'system' | 'custom') => {
     onUpdate('appearance', 'theme', theme)
@@ -375,15 +431,26 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
       if (active) setPiThemes(themes)
     })
 
-    listSystemMonospaceFonts()
+    listAllSystemFonts()
       .then((fonts) => {
         if (active) {
           setSystemFonts(fonts)
-          setFontsLoading(false)
+          setUiFontsLoading(false)
         }
       })
       .catch(() => {
-        if (active) setFontsLoading(false)
+        if (active) setUiFontsLoading(false)
+      })
+
+    listSystemMonospaceFonts()
+      .then((fonts) => {
+        if (active) {
+          setSystemMonoFonts(fonts)
+          setMonoFontsLoading(false)
+        }
+      })
+      .catch(() => {
+        if (active) setMonoFontsLoading(false)
       })
 
     return () => {
@@ -396,6 +463,12 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
       setThemeQuery('')
     }
   }, [themePickerOpen])
+
+  useEffect(() => {
+    if (!uiFontPickerOpen) {
+      setUiFontQuery('')
+    }
+  }, [uiFontPickerOpen])
 
   useEffect(() => {
     if (!fontPickerOpen) {
@@ -527,8 +600,8 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
           )}
         </SettingsCard>
 
-        <SettingsCard contentClassName="p-3.5 space-y-4">
-          <SettingsField label={t('settings.appearance.fontSize', 'Font size')} searchKey="appearance-fontSize">
+        <SettingsCard contentClassName="p-3.5 space-y-3">
+          <SettingsField label={t('settings.appearance.fontSize', 'Font size')} searchKey="appearance-fontSize" className="space-y-2">
             <div className="grid grid-cols-3 gap-2.5">
               {(['small', 'medium', 'large'] as const).map((size) => (
                 <FontSizeOptionCard
@@ -542,13 +615,39 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
             </div>
           </SettingsField>
 
-          <SettingsField label={t('settings.appearance.fontFamily', 'Font Family')} searchKey="appearance-fontFamily">
-            <SettingsInput
-              type="text"
-              value={settings.appearance.fontFamily}
-              onChange={(e) => onUpdate('appearance', 'fontFamily', e.target.value)}
-              placeholder='-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-            />
+          <SettingsField label={t('settings.appearance.fontFamily', 'Font Family')} searchKey="appearance-fontFamily" className="space-y-2">
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={() => setUiFontPickerOpen(true)}
+                className="w-full rounded-[10px] border border-border/70 bg-background/35 px-4 py-3 text-left hover:border-border-hover motion-color"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-foreground">{currentUiFontLabel}</div>
+                    <div className="mt-1 text-xs text-foreground/60">
+                      {uiFontsLoading
+                        ? t('settings.appearance.detecting', 'Detecting fonts...')
+                        : t('settings.appearance.searchFontsHint', 'Open searchable list with local installed fonts')}
+                    </div>
+                  </div>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-foreground/55" />
+                </div>
+                <div
+                  className="mt-3 rounded-lg border border-border/50 bg-surface-dark/45 px-3 py-2 text-sm text-foreground"
+                  style={{ fontFamily: currentUiFont || undefined }}
+                >
+                  The quick brown fox 0123 中文
+                </div>
+              </button>
+
+              <SettingsInput
+                type="text"
+                value={currentUiFont}
+                onChange={(e) => onUpdate('appearance', 'fontFamily', e.target.value)}
+                placeholder='-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+              />
+            </div>
           </SettingsField>
 
           <SettingsField label={t('settings.appearance.messageSpacing', 'Message spacing')} searchKey="appearance-messageSpacing">
@@ -558,7 +657,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
               onChange={(spacing) => onUpdate('appearance', 'messageSpacing', spacing)}
               renderLabel={(spacing) => t(`settings.appearance.spacing.${spacing}`)}
               containerClassName="grid grid-cols-3 gap-3"
-              optionClassName="rounded-[10px] py-2.5"
+              optionClassName="h-10 rounded-lg py-0"
             />
           </SettingsField>
         </SettingsCard>
@@ -616,9 +715,9 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-foreground truncate">{currentFontLabel}</div>
+                      <div className="text-sm font-semibold text-foreground truncate">{currentMonoFontLabel}</div>
                       <div className="mt-1 text-xs text-foreground/60">
-                        {fontsLoading
+                        {monoFontsLoading
                           ? t('settings.appearance.detecting', 'Detecting fonts...')
                           : t('settings.appearance.searchFontsHint', 'Open searchable list with local installed fonts')}
                       </div>
@@ -649,7 +748,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
                 {t('settings.appearance.preview', 'Preview')}
               </div>
               <div className="text-[11px] text-foreground/50">
-                {currentCodeThemeMeta.label} · {currentFontLabel}
+                {currentCodeThemeMeta.label} · {currentMonoFontLabel}
               </div>
             </div>
             <div className="grid gap-3 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-start">
@@ -914,6 +1013,67 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         </PickerDialog>
       )}
 
+      {uiFontPickerOpen && (
+        <PickerDialog
+          title={t('settings.appearance.fontFamily', 'Font Family')}
+          subtitle={t('settings.appearance.uiFontPickerHint', 'Installed UI fonts first, then curated readable presets')}
+          query={uiFontQuery}
+          onQueryChange={setUiFontQuery}
+          onClose={() => setUiFontPickerOpen(false)}
+          placeholder={t('settings.appearance.searchFonts', 'Search fonts')}
+        >
+          <div className="space-y-3">
+            {filteredUiFonts.map((font) => {
+              const isSelected = currentUiFont === font.value
+              return (
+                <button
+                  key={`${font.source}-${font.label}`}
+                  type="button"
+                  onClick={() => {
+                    onUpdate('appearance', 'fontFamily', font.value)
+                    setUiFontPickerOpen(false)
+                  }}
+                  className={`w-full rounded-[10px] border px-4 py-3 text-left motion-color ${
+                    isSelected
+                      ? SELECTED_CARD
+                      : 'border-border/70 bg-background/35 hover:border-border-hover hover:bg-surface/70'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-foreground">{font.label}</div>
+                      <div className="mt-1 text-xs text-foreground/55">
+                        {font.source === 'system'
+                          ? t('settings.appearance.systemFonts', 'System fonts')
+                          : font.source === 'preset'
+                            ? t('settings.appearance.popularUiFonts', 'Popular UI fonts')
+                            : t('settings.appearance.custom', 'Custom')}
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full settings-accent-bg-strong">
+                        <Check className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className="mt-3 rounded-lg border border-border/50 bg-surface-dark/45 px-3 py-2 text-sm text-foreground"
+                    style={{ fontFamily: font.value }}
+                  >
+                    The quick brown fox 0123 中文
+                  </div>
+                </button>
+              )
+            })}
+            {filteredUiFonts.length === 0 && (
+              <div className="rounded-[10px] border border-dashed border-border/70 px-4 py-8 text-center text-sm text-foreground/55">
+                {t('settings.searchEmpty', 'No matching settings')}
+              </div>
+            )}
+          </div>
+        </PickerDialog>
+      )}
+
       {fontPickerOpen && (
         <PickerDialog
           title={t('settings.appearance.fontFamilyMono', 'Code Font')}
@@ -924,7 +1084,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
           placeholder={t('settings.appearance.searchFonts', 'Search fonts')}
         >
           <div className="space-y-3">
-            {filteredFonts.map((font) => {
+            {filteredMonoFonts.map((font) => {
               const isSelected = currentMonoFont === font.value
               return (
                 <button
@@ -966,7 +1126,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
                 </button>
               )
             })}
-            {filteredFonts.length === 0 && (
+            {filteredMonoFonts.length === 0 && (
               <div className="rounded-[10px] border border-dashed border-border/70 px-4 py-8 text-center text-sm text-foreground/55">
                 {t('settings.searchEmpty', 'No matching settings')}
               </div>

@@ -81,6 +81,18 @@ export interface AppSettings {
     messageSpacing: "compact" | "comfortable" | "spacious";
     disableToolSuccessStyle: boolean;
     disableToolCallStyle: boolean;
+    /** Diff view style: split (side-by-side) or unified */
+    diffView: "split" | "unified";
+    /** Wrap lines in diff views */
+    diffWrap: boolean;
+    /** Show line numbers in diff views */
+    diffLineNumbers: boolean;
+    /** Line diff type: full, words, chars */
+    diffLineDiffType: "full" | "words" | "chars";
+    /** Show indicators in diff views */
+    diffIndicators: boolean;
+    /** Expand unchanged lines in diff views */
+    diffExpandUnchanged: boolean;
   };
   language: {
     locale: string;
@@ -173,6 +185,12 @@ export const defaultSettings: AppSettings = {
     messageSpacing: "comfortable",
     disableToolSuccessStyle: true,
     disableToolCallStyle: true,
+    diffView: "split",
+    diffWrap: false,
+    diffLineNumbers: true,
+    diffLineDiffType: "words",
+    diffIndicators: true,
+    diffExpandUnchanged: true,
   },
   language: {
     locale: getDefaultLocale(),
