@@ -130,6 +130,11 @@ export const components = {
   userMessage: {
     you: '你',
     imageAlt: '消息图片',
+    copied: '已复制',
+    copyText: '复制文本',
+    expand: '展开消息',
+    fullMessage: '完整消息',
+    close: '关闭',
   },
   sessionHeader: {
     createdAt: '创建于',

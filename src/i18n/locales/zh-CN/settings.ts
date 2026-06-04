@@ -312,8 +312,10 @@ export const settings = {
     searchFonts: "搜索字体",
     themePickerHint: "搜索主题并对比色条后再应用",
     fontPickerHint: "优先展示已安装的等宽字体，其后是精选热门字体",
+    uiFontPickerHint: "优先展示已安装的界面字体，其后是精选可读字体",
     systemFonts: "系统字体",
     popularFonts: "热门等宽字体",
+    popularUiFonts: "热门界面字体",
     custom: "自定义",
   },
   language: {

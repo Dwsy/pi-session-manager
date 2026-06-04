@@ -337,8 +337,11 @@ export const settings = {
     themePickerHint: "Search themes and compare color strips before applying",
     fontPickerHint:
       "Installed monospace fonts first, then curated popular choices",
+    uiFontPickerHint:
+      "Installed UI fonts first, then curated readable presets",
     systemFonts: "System fonts",
     popularFonts: "Popular monospace fonts",
+    popularUiFonts: "Popular UI fonts",
     custom: "Custom",
   },
   language: {

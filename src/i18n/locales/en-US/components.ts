@@ -132,6 +132,9 @@ export const components = {
     imageAlt: 'Message image',
     copied: 'Copied',
     copyText: 'Copy text',
+    expand: 'Expand message',
+    fullMessage: 'Full Message',
+    close: 'Close',
   },
   sessionHeader: {
     createdAt: 'Created at',
