@@ -53,6 +53,16 @@ export interface MessageSearchPluginOptions {
   pageSize?: number;
 }
 
+export interface MessageSearchPagination {
+  totalHits: number;
+  hasMore: boolean;
+}
+
+export interface MessageSearchPageResult {
+  results: SearchPluginResult[];
+  pagination: MessageSearchPagination;
+}
+
 const MAX_RESULTS = 24;
 const MAX_HITS_TO_FETCH = 40;
 const MAX_SESSION_PREFETCH = 12;
@@ -401,14 +411,102 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
     this.highlightCache.clear();
   }
 
+  async searchPage(
+    query: string,
+    context: SearchContext,
+    options: MessageSearchPluginOptions,
+  ): Promise<MessageSearchPageResult> {
+    this.setContext(context);
+    this.warmSessionCache(context.sessions);
+
+    const ftsOptions: MessageSearchPluginOptions = {
+      ftsMode: options.ftsMode ?? false,
+      roleFilter: options.roleFilter ?? "all",
+      globPattern: options.globPattern ?? undefined,
+      sourceFilter: options.sourceFilter ?? "all",
+      sortMode: options.sortMode ?? "score",
+      page: options.page ?? 0,
+      pageSize: options.pageSize ?? MAX_HITS_TO_FETCH,
+    };
+
+    // Clear highlight cache when query changes
+    if (this.lastQuery !== query) {
+      this.clearHighlightCache();
+      this.lastQuery = query;
+    }
+
+    const response = await fullTextSearchRuntime({
+      query,
+      roleFilter: ftsOptions.roleFilter || "all",
+      sourceFilter: ftsOptions.sourceFilter || "all",
+      globPattern: ftsOptions.globPattern || undefined,
+      projectPath: context.searchCurrentProjectOnly
+        ? context.selectedProject
+        : null,
+      page: ftsOptions.page || 0,
+      pageSize: ftsOptions.pageSize || MAX_HITS_TO_FETCH,
+      matchMode: "smart",
+      sortOrder: ftsOptions.sortMode || "newest",
+    });
+
+    const pagination: MessageSearchPagination = {
+      totalHits: response.total_hits,
+      hasMore: response.has_more,
+    };
+
+    const hits = response.hits.slice(
+      0,
+      ftsOptions.pageSize || MAX_HITS_TO_FETCH,
+    );
+    if (!hits.length) {
+      return { results: [], pagination };
+    }
+
+    const missingPaths = hits
+      .map((hit) => hit.session_path)
+      .filter((path) => !this.sessionCache.has(path));
+    await this.prefetchSessionsByPath(
+      missingPaths.slice(0, MAX_SESSION_PREFETCH),
+    );
+
+    const queryTerms = this.getHighlightTerms(query);
+    const results: SearchPluginResult[] = [];
+
+    for (const hit of hits) {
+      const session = this.sessionCache.get(hit.session_path);
+
+      const snippet = this.buildSnippet(hit.content, queryTerms);
+      const metadata: MessageResultMetadata = {
+        sessionId: hit.session_id,
+        sessionPath: hit.session_path,
+        session,
+        sessionName: hit.session_name,
+        entryId: hit.entry_id,
+        snippetLines: snippet.lines,
+        queryTerms,
+        truncatedHead: snippet.truncatedHead,
+        truncatedTail: snippet.truncatedTail,
+        role: hit.role,
+        timestamp: hit.timestamp,
+        score: hit.score,
+        sortMode: ftsOptions.sortMode,
+        matchReason: hit.match_reason,
+      };
+
+      results.push(this.createSearchResult(hit, metadata, ftsOptions));
+    }
+
+    return {
+      results,
+      pagination,
+    };
+  }
+
   async search(
     query: string,
     context: SearchContext,
     options?: MessageSearchPluginOptions,
   ): Promise<SearchPluginResult[]> {
-    this.setContext(context);
-    this.warmSessionCache(context.sessions);
-
     // Merge options: explicit params > instance options > defaults
     const ftsOptions: MessageSearchPluginOptions = {
       ftsMode: options?.ftsMode ?? this.ftsOptions.ftsMode ?? false,
@@ -422,69 +520,8 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
         options?.pageSize ?? this.ftsOptions.pageSize ?? MAX_HITS_TO_FETCH,
     };
 
-    // Clear highlight cache when query changes
-    if (this.lastQuery !== query) {
-      this.clearHighlightCache();
-      this.lastQuery = query;
-    }
-
     try {
-      const response = await fullTextSearchRuntime({
-        query,
-        roleFilter: ftsOptions.roleFilter || "all",
-        sourceFilter: ftsOptions.sourceFilter || "all",
-        globPattern: ftsOptions.globPattern || undefined,
-        projectPath: context.searchCurrentProjectOnly
-          ? context.selectedProject
-          : null,
-        page: ftsOptions.page || 0,
-        pageSize: ftsOptions.pageSize || MAX_HITS_TO_FETCH,
-        matchMode: "smart",
-        sortOrder: ftsOptions.sortMode || "newest",
-      });
-
-      const hits = response.hits.slice(
-        0,
-        ftsOptions.pageSize || MAX_HITS_TO_FETCH,
-      );
-      if (!hits.length) {
-        return [];
-      }
-
-      const missingPaths = hits
-        .map((hit) => hit.session_path)
-        .filter((path) => !this.sessionCache.has(path));
-      await this.prefetchSessionsByPath(
-        missingPaths.slice(0, MAX_SESSION_PREFETCH),
-      );
-
-      const queryTerms = this.getHighlightTerms(query);
-      const results: SearchPluginResult[] = [];
-
-      for (const hit of hits) {
-        const session = this.sessionCache.get(hit.session_path);
-
-        const snippet = this.buildSnippet(hit.content, queryTerms);
-        const metadata: MessageResultMetadata = {
-          sessionId: hit.session_id,
-          sessionPath: hit.session_path,
-          session,
-          sessionName: hit.session_name,
-          entryId: hit.entry_id,
-          snippetLines: snippet.lines,
-          queryTerms,
-          truncatedHead: snippet.truncatedHead,
-          truncatedTail: snippet.truncatedTail,
-          role: hit.role,
-          timestamp: hit.timestamp,
-          score: hit.score,
-          sortMode: ftsOptions.sortMode,
-          matchReason: hit.match_reason,
-        };
-
-        results.push(this.createSearchResult(hit, metadata, ftsOptions));
-      }
-
+      const { results } = await this.searchPage(query, context, ftsOptions);
       return results.slice(0, MAX_RESULTS);
     } catch (error) {
       console.error('[MessageSearchPlugin] full_text_search failed:', error);

@@ -53,9 +53,10 @@ describe('MessageSearchPlugin', () => {
     })
   })
 
-  it('passes sourceFilter through to full text search and preserves matchReason metadata', async () => {
+  it('passes sourceFilter through to full text search and returns pagination metadata atomically', async () => {
     const plugin = new MessageSearchPlugin()
-    plugin.setFTSOptions({
+
+    const { results, pagination } = await plugin.searchPage('', createContext(), {
       roleFilter: 'all',
       sourceFilter: 'labels_only',
       sortMode: 'newest',
@@ -63,13 +64,39 @@ describe('MessageSearchPlugin', () => {
       pageSize: 20,
     })
 
-    const results = await plugin.search('', createContext())
-
     expect(mockFullTextSearchRuntime).toHaveBeenCalledWith(expect.objectContaining({
       query: '',
       sourceFilter: 'labels_only',
     }))
     expect(results).toHaveLength(1)
+    expect(pagination).toEqual({
+      totalHits: 1,
+      hasMore: false,
+    })
     expect((results[0].metadata as { matchReason?: string }).matchReason).toBe('label')
+  })
+
+  it('records pagination metadata for an empty result page', async () => {
+    mockFullTextSearchRuntime.mockResolvedValueOnce({
+      hits: [],
+      total_hits: 3,
+      has_more: false,
+    })
+
+    const plugin = new MessageSearchPlugin()
+
+    const { results, pagination } = await plugin.searchPage('', createContext(), {
+      roleFilter: 'all',
+      sourceFilter: 'labels_only',
+      sortMode: 'newest',
+      page: 1,
+      pageSize: 20,
+    })
+
+    expect(results).toEqual([])
+    expect(pagination).toEqual({
+      totalHits: 3,
+      hasMore: false,
+    })
   })
 })
