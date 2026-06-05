@@ -250,7 +250,10 @@ const SessionViewerMessages = forwardRef<
     scrollToBottom,
   }));
 
-  if (loading && !showLoading) {
+  // Only render the spinner after the 300ms anti-flicker grace period
+  // (see useSessionViewerData.loadingTimerRef). Fast loads (cache hits)
+  // complete before the timer fires, so the spinner never appears.
+  if (loading && showLoading) {
     return <SessionMessagesLoadingState />;
   }
 
