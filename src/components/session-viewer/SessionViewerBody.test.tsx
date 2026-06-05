@@ -78,7 +78,6 @@ function createBodyProps(overrides: Partial<Parameters<typeof SessionViewerBody>
     messages: {
       messagesRef: createRef(),
       loading: false,
-      showLoading: false,
       error: null,
       hasNewMessages: false,
       headerEntry: undefined,

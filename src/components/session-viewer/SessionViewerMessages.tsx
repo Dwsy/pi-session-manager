@@ -29,7 +29,6 @@ import NewMessagesButton from "./NewMessagesButton";
 import {
   SessionMessagesEmptyState,
   SessionMessagesErrorState,
-  SessionMessagesLoadingState,
 } from "./SessionMessagesStates";
 
 
@@ -48,7 +47,6 @@ export interface SessionViewerRevealTarget {
 
 export interface SessionViewerMessagesProps {
   loading: boolean;
-  showLoading: boolean;
   error: string | null;
   hasNewMessages: boolean;
   sessionId: string;
@@ -89,7 +87,6 @@ const SessionViewerMessages = forwardRef<
   SessionViewerMessagesProps
 >(function SessionViewerMessages({
   loading,
-  showLoading,
   error,
   hasNewMessages,
   sessionId,
@@ -250,18 +247,16 @@ const SessionViewerMessages = forwardRef<
     scrollToBottom,
   }));
 
-  // Loading state with a 300ms anti-flicker grace period
-  // (see useSessionViewerData.loadingTimerRef):
-  //   0-300ms   → empty flex-1 placeholder (no spinner, no empty state)
-  //   300ms+    → centered spinner
-  //   done      → fall through to messages / empty state
-  // Hiding the messages area during loading prevents the "no messages"
-  // empty state from flashing for sessions that have content.
-  if (loading && !showLoading) {
-    return <div className="flex-1" aria-hidden="true" />;
-  }
+  // While loading, hold an empty flex-1 placeholder so:
+  //   - the spinner never appears (no animation when switching sessions)
+  //   - the "no messages" empty state cannot leak through before the new
+  //     entries arrive
+  //   - layout is preserved (the placeholder fills the same flex slot as
+  //     the messages container)
+  // On load completion, fall through to render the real messages list or
+  // the empty state (only when the session truly has no messages).
   if (loading) {
-    return <SessionMessagesLoadingState />;
+    return <div className="flex-1" aria-hidden="true" />;
   }
 
   if (error) {

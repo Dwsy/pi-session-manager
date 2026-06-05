@@ -162,7 +162,6 @@ export interface UseSessionViewerDataOptions {
 export interface UseSessionViewerDataResult {
   entries: SessionEntry[];
   loading: boolean;
-  showLoading: boolean;
   error: string | null;
   activeEntryId: string | null;
   setActiveEntryId: Dispatch<SetStateAction<string | null>>;
@@ -186,7 +185,6 @@ export function useSessionViewerData({
 }: UseSessionViewerDataOptions): UseSessionViewerDataResult {
   const [entries, setEntries] = useState<SessionEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showLoading, setShowLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lineCount, setLineCount] = useState(0);
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
@@ -197,7 +195,6 @@ export function useSessionViewerData({
   const [datasetRefreshVersion, setDatasetRefreshVersion] = useState(0);
 
   const pendingScrollToBottomRef = useRef(false);
-  const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lineCountRef = useRef(0);
   const loadErrorMessageRef = useRef(loadErrorMessage);
   const nextOffsetRef = useRef(0);
@@ -321,11 +318,6 @@ export function useSessionViewerData({
   useEffect(() => {
     let cancelled = false;
 
-    if (loadingTimerRef.current) {
-      clearTimeout(loadingTimerRef.current);
-      loadingTimerRef.current = null;
-    }
-
     setLineCount(0);
     setEntries([]);
     setActiveEntryId(null);
@@ -339,7 +331,6 @@ export function useSessionViewerData({
 
     if (!sessionPath) {
       setLoading(false);
-      setShowLoading(false);
       setError(null);
       return () => {
         cancelled = true;
@@ -349,7 +340,6 @@ export function useSessionViewerData({
     const doLoad = async () => {
       try {
         setLoading(true);
-        setShowLoading(false);
         setError(null);
 
         // Preview mode: read directly from SQLite DB.
@@ -375,7 +365,6 @@ export function useSessionViewerData({
           }
           if (dbEntries) {
             setLoading(false);
-            setShowLoading(false);
             return;
           }
           // DB read failed — fall through to JSONL path
@@ -404,12 +393,6 @@ export function useSessionViewerData({
           }
         }
 
-        loadingTimerRef.current = setTimeout(() => {
-          if (!cancelled) {
-            setShowLoading(true);
-          }
-        }, 300);
-
         if (isLiveRef.current) {
           try {
             const liveEntries = await invoke<any[]>("get_pi_agent_entries", {
@@ -421,7 +404,6 @@ export function useSessionViewerData({
               setEntries(liveEntries);
               setLineCount(liveEntries.length);
               setLoading(false);
-              setShowLoading(false);
               return;
             }
           } catch (e) {
@@ -500,12 +482,7 @@ export function useSessionViewerData({
         }
       } finally {
         if (!cancelled) {
-          if (loadingTimerRef.current) {
-            clearTimeout(loadingTimerRef.current);
-            loadingTimerRef.current = null;
-          }
           setLoading(false);
-          setShowLoading(false);
         }
       }
     };
@@ -514,10 +491,6 @@ export function useSessionViewerData({
 
     return () => {
       cancelled = true;
-      if (loadingTimerRef.current) {
-        clearTimeout(loadingTimerRef.current);
-        loadingTimerRef.current = null;
-      }
     };
   }, [
     datasetRefreshVersion,
@@ -955,7 +928,6 @@ export function useSessionViewerData({
   return {
     entries,
     loading,
-    showLoading,
     error,
     activeEntryId,
     setActiveEntryId,

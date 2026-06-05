@@ -163,7 +163,6 @@ function SessionViewerContent({
   const {
     entries,
     loading,
-    showLoading,
     error,
     activeEntryId,
     setActiveEntryId,
@@ -415,7 +414,6 @@ function SessionViewerContent({
       messages={{
         messagesRef,
         loading,
-        showLoading,
         error,
         hasNewMessages,
         headerEntry,

@@ -48,7 +48,6 @@ export interface SessionViewerBodySidebarProps {
 export interface SessionViewerBodyMessagesProps {
   messagesRef: RefObject<SessionViewerMessagesRef>;
   loading: boolean;
-  showLoading: boolean;
   error: string | null;
   hasNewMessages: boolean;
   headerEntry: SessionEntry | undefined;
@@ -184,7 +183,6 @@ export default function SessionViewerBody({
                 <SessionViewerMessages
                   ref={messages.messagesRef}
                   loading={messages.loading}
-                  showLoading={messages.showLoading}
                   error={messages.error}
                   hasNewMessages={messages.hasNewMessages}
                   sessionId={messages.headerEntry?.id || session.id}
