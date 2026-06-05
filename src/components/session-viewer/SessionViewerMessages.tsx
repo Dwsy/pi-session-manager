@@ -250,10 +250,17 @@ const SessionViewerMessages = forwardRef<
     scrollToBottom,
   }));
 
-  // Only render the spinner after the 300ms anti-flicker grace period
-  // (see useSessionViewerData.loadingTimerRef). Fast loads (cache hits)
-  // complete before the timer fires, so the spinner never appears.
-  if (loading && showLoading) {
+  // Loading state with a 300ms anti-flicker grace period
+  // (see useSessionViewerData.loadingTimerRef):
+  //   0-300ms   → empty flex-1 placeholder (no spinner, no empty state)
+  //   300ms+    → centered spinner
+  //   done      → fall through to messages / empty state
+  // Hiding the messages area during loading prevents the "no messages"
+  // empty state from flashing for sessions that have content.
+  if (loading && !showLoading) {
+    return <div className="flex-1" aria-hidden="true" />;
+  }
+  if (loading) {
     return <SessionMessagesLoadingState />;
   }
 
