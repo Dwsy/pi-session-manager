@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import MarkdownContent from '@/components/ui/MarkdownContent'
 import { formatDate } from '@/utils/format'
 import { Copy, Check, Maximize2, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { memo, useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { useClipboard } from '@/hooks/useClipboard'
 
@@ -176,6 +177,8 @@ function ExpandButton({ text, images, timestamp, searchQuery }: {
 }
 
 // Modal component - isolated to prevent hook order issues
+// Rendered via portal at document.body so ancestors with `backdrop-filter` /
+// `transform` / `contain: paint` don't trap the fixed-positioned overlay.
 function UserMessageModal({ text, images, timestamp, searchQuery, onClose }: {
   text: string
   images: { type: string; data?: string; mimeType?: string }[]
@@ -184,53 +187,79 @@ function UserMessageModal({ text, images, timestamp, searchQuery, onClose }: {
   onClose: () => void
 }) {
   const { t } = useTranslation()
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation()
-      onClose()
+  // Global ESC handler — focus may not always be inside the dialog.
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+      }
     }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
   }, [onClose])
 
-  return (
+  // Lock body scroll while modal is open and restore on close.
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    const previousPaddingRight = document.body.style.paddingRight
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+    document.body.style.overflow = 'hidden'
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`
+    }
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.body.style.paddingRight = previousPaddingRight
+    }
+  }, [])
+
+  // Auto-focus close button for keyboard users.
+  useEffect(() => {
+    closeButtonRef.current?.focus()
+  }, [])
+
+  const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md motion-overlay-enter"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
-      onKeyDown={handleKeyDown}
-      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="user-message-modal-title"
     >
-      <div className="flex h-[85vh] w-full max-w-4xl flex-col rounded-xl border border-border/70 bg-background shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
-          <div>
-            <h3 id="user-message-modal-title" className="text-base font-semibold text-foreground">
+      <div className="flex h-[80vh] w-[80vw] max-w-5xl flex-col overflow-hidden rounded-xl border border-border/70 bg-surface-dark/95 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl motion-overlay-surface-enter">
+        <div className="flex items-start justify-between gap-4 border-b border-border/60 bg-surface-dark/55 px-6 py-4">
+          <div className="min-w-0">
+            <h3 id="user-message-modal-title" className="truncate text-base font-semibold text-foreground">
               {t('components.userMessage.fullMessage') || 'Full Message'}
             </h3>
             {timestamp && (
-              <p className="mt-1 text-sm text-muted-foreground">{formatDate(timestamp)}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(timestamp)}</p>
             )}
           </div>
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-muted-foreground hover:bg-surface hover:text-foreground"
+            className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
             title={t('components.userMessage.close') || 'Close'}
+            aria-label={t('components.userMessage.close') || 'Close'}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5">
           {images.length > 0 && (
-            <div className="message-images mb-4">
+            <div className="message-images mb-4 flex flex-wrap gap-3">
               {images.map((img, idx) => (
                 <img
                   key={idx}
                   src={`data:${img.mimeType};base64,${img.data}`}
-                  className="message-image"
+                  className="message-image max-h-72 rounded-lg border border-border/60"
                   alt={t('components.userMessage.imageAlt')}
                 />
               ))}
@@ -241,6 +270,9 @@ function UserMessageModal({ text, images, timestamp, searchQuery, onClose }: {
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') return null
+  return createPortal(modal, document.body)
 }
 
 export default memo(UserMessage)
