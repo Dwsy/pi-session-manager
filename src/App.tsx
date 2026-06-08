@@ -87,6 +87,7 @@ import {
   getActiveDatasetId,
   isStandaloneDatasetRuntime,
 } from "./browser-dataset";
+import { requestToolReview } from "./contexts/toolReviewBus";
 import {
   DEFAULT_SESSION_SORT_BY,
   DEFAULT_SESSION_SORT_ORDER,
@@ -113,6 +114,8 @@ const GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY = [
   "cmd+`",
   "cmd+shift+f",
   "cmd+shift+i",
+  "cmd+shift+r",
+  "cmd+alt+b",
   "f12",
 ];
 
@@ -502,6 +505,11 @@ function App() {
     if (!isMobile || sidebarMode !== "app" || !activeAppViewId) return;
     setMobileTab(appViewMobileTabId(activeAppViewId));
   }, [activeAppViewId, isMobile, sidebarMode]);
+  const primaryAppViewShortcutHandler = useMemo(() => {
+    const kanbanView = appViewItems.find((item) => item.id === 'builtin.kanban-board.view');
+    return kanbanView?.onSelect ?? appViewItems[0]?.onSelect ?? null;
+  }, [appViewItems]);
+
   const appViewShortcuts = useMemo(
     () => Object.fromEntries(
       appViewItems
@@ -675,8 +683,8 @@ function App() {
     removeFavorite,
     toggleFavorite,
   } = useFavorites({ enabled: isInitialized });
-  const { updateInfo, closeUpdateNotice, openUpdateReleasePage } =
-    useUpdateChecker();
+  const { updateInfo, closeUpdateNotice, openUpdateSettings } =
+    useUpdateChecker({ setShowSettings });
   useAppUiEffects({
     isMobile,
     showExportDialog,
@@ -906,6 +914,20 @@ function App() {
               void handleDeleteSession(selectedSession);
             },
           }),
+      "cmd+1": () => {
+        setSidebarMode("list");
+        setActiveAppViewId(null);
+        setSelectedProject(null);
+        setShowFavorites(false);
+        navigateToSessions();
+      },
+      "cmd+2": () => {
+        setSidebarMode("project");
+        setActiveAppViewId(null);
+        setSelectedProject(null);
+        setShowFavorites(false);
+        navigateToProjects();
+      },
       "cmd+l": () => {
         setSidebarMode("list");
         setActiveAppViewId(null);
@@ -920,14 +942,25 @@ function App() {
         setShowFavorites(false);
         navigateToProjects();
       },
+      ...(primaryAppViewShortcutHandler
+        ? { "cmd+3": primaryAppViewShortcutHandler }
+        : {}),
       ...appViewShortcuts,
       "cmd+b": () => setSidebarVisible((prev) => !prev),
+      "cmd+alt+b": () => {
+        // Toggle right panel - handled by session viewer
+        window.dispatchEvent(new CustomEvent("psm:toggle-right-panel"));
+      },
       "cmd+,": () => setShowSettings(true),
       "cmd+`": toggleCurrentTerminalScope,
       "cmd+shift+i": async () => {
         if (isTauri()) {
           await invoke("toggle_devtools");
         }
+      },
+      "cmd+shift+r": () => {
+        if (isBlockingShortcutOverlayOpen) return;
+        requestToolReview({ sessionPath: selectedSession?.path });
       },
       "f12": async () => {
         if (isTauri()) {
@@ -986,6 +1019,8 @@ function App() {
       navigateToProjects,
       handleSelectProject,
       appViewShortcuts,
+      primaryAppViewShortcutHandler,
+      requestToolReview,
     ],
   );
 
@@ -1067,6 +1102,10 @@ function App() {
     },
     onResumeSession: requestResumeSession,
     onCopyResumeSession: requestCopyResumeCommand,
+    onForkSession: (session) => {
+      setSelectedSession(session);
+      setShowForkDialog(true);
+    },
     getBadgeType,
     terminal,
     piPath,
@@ -1544,7 +1583,7 @@ function App() {
         <UpdateNoticeToast
           update={updateInfo}
           onClose={closeUpdateNotice}
-          onOpenRelease={openUpdateReleasePage}
+          onOpenRelease={openUpdateSettings}
         />
       </AppPluginSurfaceDataProvider>
     );
@@ -1775,7 +1814,7 @@ function App() {
         <UpdateNoticeToast
           update={updateInfo}
           onClose={closeUpdateNotice}
-          onOpenRelease={openUpdateReleasePage}
+          onOpenRelease={openUpdateSettings}
         />
       </div>
     </AppPluginSurfaceDataProvider>

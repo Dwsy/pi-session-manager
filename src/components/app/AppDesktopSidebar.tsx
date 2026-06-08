@@ -158,7 +158,7 @@ function AppDesktopSidebar({
             role="radiogroup"
             aria-label={t("app.viewMode.label", "View mode")}
           >
-            <KbdTooltip shortcut="Cmd+L" label={t("app.viewMode.list")}>
+            <KbdTooltip shortcut="Cmd+1" label={t("app.viewMode.list")}>
               <button
                 type="button"
                 onClick={onSelectListView}
@@ -171,7 +171,7 @@ function AppDesktopSidebar({
                 <List className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </KbdTooltip>
-            <KbdTooltip shortcut="Cmd+P" label={t("app.viewMode.project")}>
+            <KbdTooltip shortcut="Cmd+2" label={t("app.viewMode.project")}>
               <button
                 type="button"
                 onClick={onSelectProjectView}

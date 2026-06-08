@@ -163,6 +163,15 @@ function AppSessionViewerPane({
     });
   }, []);
 
+  // Listen for global shortcut to toggle right panel
+  useEffect(() => {
+    const handleToggleRightPanel = () => {
+      toggleRightFeaturePanel();
+    };
+    window.addEventListener("psm:toggle-right-panel", handleToggleRightPanel);
+    return () => window.removeEventListener("psm:toggle-right-panel", handleToggleRightPanel);
+  }, [toggleRightFeaturePanel]);
+
   const toggleBottomFeatureTray = useCallback(() => {
     setBottomFeatureTrayOpen((prev) => {
       const next = !prev;
@@ -431,8 +440,13 @@ function AppSessionViewerPane({
             key={item.id}
             type="button"
             onClick={() => {
+              const isClosingCurrentPanel = item.panelId && activePanelId === item.panelId;
               item.onSelect();
-              setRightFeaturePickerOpen(false);
+              // 关闭当前面板时手动关闭 picker；打开新面板时由 useEffect 统一关闭
+              // 避免重复的状态更新导致闪烁
+              if (isClosingCurrentPanel) {
+                setRightFeaturePickerOpen(false);
+              }
             }}
             className={`psm-session-feature-card psm-session-feature-card--side ${item.active ? "psm-session-feature-card--active" : ""}`}
             aria-pressed={item.active}

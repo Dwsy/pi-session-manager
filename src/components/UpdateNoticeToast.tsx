@@ -67,8 +67,9 @@ export default function UpdateNoticeToast({
                 <button
                   onClick={onClose}
                   className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-surface motion-color motion-press focus-ring"
+                  title={t('settings.update.toast.ignoreTooltip', 'Will not remind again until a newer version is released')}
                 >
-                  {t('settings.update.toast.later', 'Later')}
+                  {t('settings.update.toast.ignoreVersion', 'Ignore this version')}
                 </button>
               </div>
             </div>
