@@ -38,6 +38,7 @@ export interface UseSidebarSessionsOptions {
   onConvertSession: (session: SessionInfo) => void | Promise<void>;
   onResumeSession: (session: SessionInfo) => void | Promise<void>;
   onCopyResumeSession: (session: SessionInfo) => void | Promise<void>;
+  onForkSession?: (session: SessionInfo) => void | Promise<void>;
   getBadgeType: (sessionId: string) => "new" | "updated" | null;
   terminal: TerminalType;
   piPath: string;
@@ -99,6 +100,7 @@ export function useSidebarSessions({
   onConvertSession,
   onResumeSession,
   onCopyResumeSession,
+  onForkSession,
   getBadgeType,
   terminal,
   piPath,
@@ -265,6 +267,7 @@ export function useSidebarSessions({
       onConvertSession,
       onResumeSession,
       onCopyResumeSession,
+      onForkSession,
       loading,
       getBadgeType,
       terminal,

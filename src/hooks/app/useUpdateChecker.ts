@@ -4,26 +4,31 @@ import {
   checkForUpdates,
   dismissUpdateVersion,
   getDismissedUpdateVersion,
-  shouldRunDailyUpdateCheck,
   type AvailableUpdateInfo,
 } from '@/utils/updateChecker'
 import { normalizeUpdateChannel } from '@/utils/updateChannel'
+import { SETTINGS_NAVIGATE_EVENT } from '@/components/settings/navigation'
+
+export interface UseUpdateCheckerOptions {
+  setShowSettings?: (show: boolean) => void
+}
 
 interface UseUpdateCheckerResult {
   updateInfo: AvailableUpdateInfo | null
   closeUpdateNotice: () => void
-  openUpdateReleasePage: () => void
+  openUpdateSettings: () => void
 }
 
-export function useUpdateChecker(): UseUpdateCheckerResult {
+export function useUpdateChecker(options?: UseUpdateCheckerOptions): UseUpdateCheckerResult {
   const { settings, loading } = useSettings()
   const [updateInfo, setUpdateInfo] = useState<AvailableUpdateInfo | null>(null)
+  const setShowSettings = options?.setShowSettings
 
   useEffect(() => {
     if (loading) return
 
     const channel = normalizeUpdateChannel(settings.update.channel)
-    if (!settings.update.autoCheck || !shouldRunDailyUpdateCheck(channel)) {
+    if (!settings.update.autoCheck) {
       return
     }
 
@@ -52,18 +57,30 @@ export function useUpdateChecker(): UseUpdateCheckerResult {
     })
   }, [])
 
-  const openUpdateReleasePage = useCallback(() => {
-    setUpdateInfo((previous) => {
-      if (!previous) return null
-      dismissUpdateVersion(previous.channel, previous.latestVersion)
-      window.open(previous.releaseUrl, '_blank', 'noopener,noreferrer')
-      return null
-    })
-  }, [])
+  const openUpdateSettings = useCallback(() => {
+    const updateToOpen = updateInfo
+    if (!updateToOpen) return
+
+    // Dismiss the notice and close it
+    dismissUpdateVersion(updateToOpen.channel, updateToOpen.latestVersion)
+    setUpdateInfo(null)
+
+    // Open settings panel and navigate to update section
+    if (setShowSettings) {
+      setShowSettings(true)
+    }
+    
+    // Dispatch navigation event to switch to app-behavior section (contains UpdateSettings)
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(SETTINGS_NAVIGATE_EVENT, {
+        detail: { section: 'app-behavior' },
+      }))
+    }, 50)
+  }, [updateInfo, setShowSettings])
 
   return {
     updateInfo,
     closeUpdateNotice,
-    openUpdateReleasePage,
+    openUpdateSettings,
   }
 }

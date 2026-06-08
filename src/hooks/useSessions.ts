@@ -387,6 +387,60 @@ export function useSessions(): UseSessionsReturn {
         return;
       }
 
+      // 如果 skipPopover 为 true，直接执行删除而不显示弹窗
+      if (options?.skipPopover) {
+        const capability = getRuntimeSessionOperationCapability("delete");
+        if (!capability.supported) {
+          console.warn("Delete is not supported in this runtime mode");
+          alert(
+            t("app.errors.deleteSession", {
+              defaultValue: capability.fallbackMessage,
+            }),
+          );
+          return;
+        }
+
+        const result = (await deleteRuntimeSessionItems(
+          nextTargets.map((session) => session.path),
+        )) as DeleteSessionsResult;
+
+        const failedPaths = new Set(result.failed.map((item) => item.path));
+        const deletedSessionIds = new Set(
+          nextTargets
+            .filter((session) => !failedPaths.has(session.path))
+            .map((session) => session.id),
+        );
+
+        if (deletedSessionIds.size > 0) {
+          setSessions((prev) => {
+            const next = prev.filter(
+              (session) => !deletedSessionIds.has(session.id),
+            );
+            sessionsRef.current = next;
+            return next;
+          });
+        }
+
+        if (result.failed.length > 0) {
+          console.error("Failed to delete some sessions:", result.failed);
+          alert(
+            t("app.errors.deleteSessionPartial", {
+              count: result.failed.length,
+              defaultValue:
+                "{{count}} sessions failed to delete. Check the console for details.",
+            }),
+          );
+        }
+
+        if (
+          selectedSessionRef.current?.id &&
+          deletedSessionIds.has(selectedSessionRef.current.id)
+        ) {
+          setSelectedSession(null);
+        }
+        return;
+      }
+
       setPendingDeleteSession({
         sessions: nextTargets,
         requestedAt: Date.now(),
@@ -394,7 +448,7 @@ export function useSessions(): UseSessionsReturn {
         anchorPoint: options?.anchorPoint ?? null,
       });
     },
-    [],
+    [t],
   );
 
   const handleDeleteSession = useCallback(

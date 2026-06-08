@@ -1,8 +1,9 @@
 import type { SessionEntry } from "@/types";
 
 export interface ToolReviewRequest {
-  entries: SessionEntry[];
-  toolResultByCallId: Map<string, SessionEntry>;
+  entries?: SessionEntry[];
+  toolResultByCallId?: Map<string, SessionEntry>;
+  sessionPath?: string;
   scopeLabel?: string;
 }
 
@@ -17,7 +18,8 @@ export function subscribeToolReview(listener: Listener): () => void {
   };
 }
 
-export function requestToolReview(request: ToolReviewRequest): boolean {
+export function requestToolReview(request?: ToolReviewRequest): boolean {
+  if (!request) return false;
   if (listeners.size === 0) return false;
   for (const listener of listeners) {
     try {
