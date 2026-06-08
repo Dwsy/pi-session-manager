@@ -49,10 +49,12 @@ function resolveSessionPath(args: Record<string, unknown>, context?: PsmPluginCo
 function CodeReviewToolbarButton({
   client,
   i18n,
+  settings,
   session,
 }: {
   client: PsmCapabilityClient
   i18n: PsmPluginI18nClient
+  settings: { get<T>(key: string, fallback: T): T }
   session: PsmSessionReference
 }) {
   const [open, setOpen] = useState(false)
@@ -90,12 +92,18 @@ function CodeReviewToolbarButton({
   }, [open, overrideEntries, refresh])
 
   useEffect(() => {
-    return subscribeToolReview(({ entries: nextEntries, toolResultByCallId }) => {
-      setOverrideEntries(nextEntries)
-      setOverrideMap(toolResultByCallId)
-      setError(null)
-      setLoading(false)
-      setOpen(true)
+    return subscribeToolReview((request) => {
+      if (request.entries && request.toolResultByCallId) {
+        setOverrideEntries(request.entries)
+        setOverrideMap(request.toolResultByCallId)
+        setError(null)
+        setLoading(false)
+        setOpen(true)
+      } else if (request.sessionPath) {
+        setOverrideEntries(null)
+        setOverrideMap(null)
+        setOpen(true)
+      }
     })
   }, [])
 
@@ -137,6 +145,14 @@ function CodeReviewToolbarButton({
         toolResultByCallId={activeToolResultByCallId}
         loading={loading}
         error={error}
+        diffConfig={{
+          splitView: settings.get('diffView', 'split') === 'split',
+          wrap: settings.get('diffWrap', false),
+          expandUnchanged: settings.get('diffExpandUnchanged', false),
+          lineNumbers: settings.get('diffLineNumbers', true),
+          lineDiffType: settings.get('diffLineDiffType', 'words'),
+          indicators: settings.get('diffIndicators', true),
+        }}
       />
     </>
   )
@@ -174,6 +190,7 @@ export default function activate(ctx: PsmPluginHostContext) {
       <CodeReviewToolbarButton
         client={ctx.psm}
         i18n={ctx.i18n}
+        settings={ctx.settings}
         session={props.session}
       />
     ),

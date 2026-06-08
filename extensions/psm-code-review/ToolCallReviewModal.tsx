@@ -51,6 +51,15 @@ import {
   normalizeReviewPath,
 } from "./tool-review/viewModel";
 
+interface DiffConfig {
+  splitView: boolean;
+  wrap: boolean;
+  expandUnchanged: boolean;
+  lineNumbers: boolean;
+  lineDiffType: 'full' | 'words' | 'chars';
+  indicators: boolean;
+}
+
 interface ToolCallReviewModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -58,6 +67,7 @@ interface ToolCallReviewModalProps {
   toolResultByCallId: Map<string, SessionEntry>;
   loading?: boolean;
   error?: string | null;
+  diffConfig?: DiffConfig;
 }
 
 const TOOL_CONFIG: Record<
@@ -766,7 +776,7 @@ function DetailPanel({
           style={{ scrollbarGutter: "stable" }}
         >
           <div
-            className={`min-h-0 bg-[rgb(var(--color-surface-dark)/0.24)] p-2.5 ${
+            className={`min-h-0 bg-[rgb(var(--color-surface-dark)/0.24)] ${
               usesCodeView ? "flex h-full flex-col gap-2" : "space-y-2"
             }`}
           >
@@ -796,8 +806,9 @@ function DetailPanel({
                     overflow: controls.wrap ? "wrap" : "scroll",
                     stickyHeaders: true,
                     hunkSeparators: "line-info",
-                    diffIndicators: "bars",
-                    lineDiffType: "word",
+                    diffIndicators: diffConfig?.indicators ?? true ? "bars" : "none",
+                    lineDiffType: diffConfig?.lineDiffType ?? "words",
+                    disableLineNumbers: !(diffConfig?.lineNumbers ?? true),
                     expandUnchanged: controls.expandUnchanged,
                     lineHoverHighlight: true,
                     enableLineSelection: true,
@@ -963,6 +974,7 @@ export default function ToolCallReviewModal({
   toolResultByCallId,
   loading = false,
   error = null,
+  diffConfig,
 }: ToolCallReviewModalProps) {
   const { t } = useTranslation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -970,9 +982,11 @@ export default function ToolCallReviewModal({
   const [activeMode, setActiveMode] = useState<ReviewMode>("files");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [contentExpanded, setContentExpanded] = useState(false);
-  const [splitView, setSplitView] = useState(true);
-  const [wrap, setWrap] = useState(false);
-  const [expandUnchanged, setExpandUnchanged] = useState(false);
+
+  // Initialize from plugin settings config if provided, otherwise use defaults
+  const [splitView, setSplitView] = useState(diffConfig?.splitView ?? true);
+  const [wrap, setWrap] = useState(diffConfig?.wrap ?? false);
+  const [expandUnchanged, setExpandUnchanged] = useState(diffConfig?.expandUnchanged ?? false);
 
   const codeViewControls = useMemo<CodeViewControls>(
     () => ({
@@ -1166,14 +1180,14 @@ export default function ToolCallReviewModal({
       }}
     >
       <div
-        className="relative flex h-[calc(100dvh_-_16px)] w-[calc(100vw_-_16px)] flex-col overflow-hidden rounded-[10px] border border-border/70 bg-background text-foreground shadow-[0_24px_80px_-36px_rgba(var(--shadow-rgb),0.72),0_0_0_1px_rgba(var(--highlight-rgb),0.04)] ui-enter-fade ui-enter-zoom sm:h-[min(1120px,calc(100dvh_-_24px))] sm:w-[min(1960px,calc(100vw_-_24px))]"
+        className="relative flex h-[calc(100dvh_-_16px_-_40px)] w-[calc(100vw_-_16px_-_40px)] flex-col overflow-hidden rounded-[10px] border border-border/70 bg-background text-foreground shadow-[0_24px_80px_-36px_rgba(var(--shadow-rgb),0.72),0_0_0_1px_rgba(var(--highlight-rgb),0.04)] ui-enter-fade ui-enter-zoom sm:h-[min(1120px,calc(100dvh_-_24px_-_40px))] sm:w-[min(1960px,calc(100vw_-_24px_-_40px))]"
         role="dialog"
         data-tool-call-review-modal="true"
         aria-modal="true"
         aria-labelledby="tool-call-review-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="relative flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.66)] px-4 py-2">
+        <div className="relative flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.66)] pl-4 pr-4 py-2 sm:pl-10 lg:pl-12">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <Wrench

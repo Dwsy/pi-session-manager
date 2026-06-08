@@ -115,7 +115,7 @@ export default function activate(ctx: PsmPluginHostContext) {
     title: ctx.i18n.t('plugins.kanbanBoard.title', 'Kanban Board'),
     route: '/kanban',
     icon: 'columns3',
-    shortcut: 'Cmd+B',
+    shortcut: 'Cmd+3',
     render: (props) => createElement(KanbanAppView, {
       ...(props as PsmAppViewRenderProps<KanbanViewData>),
       workspaceStore,
