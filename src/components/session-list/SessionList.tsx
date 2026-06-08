@@ -71,6 +71,7 @@ interface SessionListProps {
   onConvertSession?: (session: SessionInfo) => void;
   onResumeSession?: (session: SessionInfo) => void | Promise<void>;
   onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>;
+  onForkSession?: (session: SessionInfo) => void | Promise<void>;
   loading: boolean;
   hasMore?: boolean;
   loadingMore?: boolean;
@@ -107,6 +108,7 @@ export default function SessionList({
   onConvertSession,
   onResumeSession,
   onCopyResumeSession,
+  onForkSession,
   loading,
   hasMore = false,
   loadingMore = false,
@@ -749,7 +751,7 @@ export default function SessionList({
                 }}
               >
                 <div
-                  className="grid px-2 py-1.5 gap-2.5"
+                  className="grid cursor-pointer px-2 py-1.5 gap-2.5"
                   style={{
                     gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
                   }}
@@ -1180,13 +1182,20 @@ export default function SessionList({
                 }
               : undefined
           }
+          onFork={
+            onForkSession
+              ? () => {
+                  onForkSession(contextMenuSession);
+                }
+              : undefined
+          }
           isFavorite={favoriteSessionIds.has(contextMenuSession.id)}
           onDeleteDirect={
             onDeleteSession
               ? () => {
                   onDeleteSession(
                     contextMenuSession,
-                    undefined,
+                    { skipPopover: true },
                   );
                 }
               : undefined

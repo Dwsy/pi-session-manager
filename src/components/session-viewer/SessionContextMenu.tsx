@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Terminal, Globe, Star, Trash2, Check, Copy, ArrowRightLeft, X } from 'lucide-react'
+import { Terminal, Globe, Star, Trash2, Check, Copy, ArrowRightLeft, X, GitBranch } from 'lucide-react'
 import type { Tag } from '@/types'
-import type { DeleteSessionAnchorPoint } from '@/components/dialogs/deleteSessionTypes'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
 
 const CONFIRM_TIMEOUT_MS = 3000
+
+
 
 interface SessionContextMenuProps {
   x: number
@@ -19,7 +20,8 @@ interface SessionContextMenuProps {
   onConvert?: () => void
   onToggleFavorite?: () => void
   onCopyResume?: () => void
-  onDelete?: (anchorPoint: DeleteSessionAnchorPoint) => void
+  onFork?: () => void
+  onDelete?: () => void
   onDeleteDirect?: () => void
   isFavorite?: boolean
   onClose: () => void
@@ -28,7 +30,7 @@ interface SessionContextMenuProps {
 export default function SessionContextMenu({
   x, y, tags, sessionTagIds,
   onToggleTag, onOpenTerminal, onOpenBrowser,
-  onConvert, onToggleFavorite, onCopyResume, onDelete, onDeleteDirect, isFavorite, onClose,
+  onConvert, onToggleFavorite, onCopyResume, onFork, onDelete, onDeleteDirect, isFavorite, onClose,
 }: SessionContextMenuProps) {
   const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
@@ -60,12 +62,18 @@ export default function SessionContextMenu({
       setIsDeleteConfirming(false)
       onDeleteDirect()
       onClose()
+    } else if (isDeleteConfirming && onDelete) {
+      // Second click for popover mode - execute delete directly without popover
+      clearConfirmTimeout()
+      setIsDeleteConfirming(false)
+      onDelete()
+      onClose()
     } else {
       // First click - show confirm
       setIsDeleteConfirming(true)
       startConfirmTimeout()
     }
-  }, [isDeleteConfirming, onDeleteDirect, clearConfirmTimeout, startConfirmTimeout, onClose])
+  }, [isDeleteConfirming, onDeleteDirect, onDelete, clearConfirmTimeout, startConfirmTimeout, onClose])
 
   useEffect(() => {
     const handler = (e: MouseEvent | TouchEvent) => {
@@ -152,6 +160,12 @@ export default function SessionContextMenu({
           <span className="text-xs text-foreground">{t('tags.contextMenu.copyResume')}</span>
         </button>
       )}
+      {onFork && (
+        <button onClick={() => { onFork(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
+          <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs text-foreground">{t('tags.contextMenu.fork')}</span>
+        </button>
+      )}
 
       {(onDelete || onDeleteDirect) && (
         <>
@@ -180,18 +194,7 @@ export default function SessionContextMenu({
             </div>
           ) : (
             <button
-              onClick={(event) => {
-                if (onDeleteDirect) {
-                  handleDeleteClick()
-                } else if (onDelete) {
-                  const rect = event.currentTarget.getBoundingClientRect()
-                  onDelete({
-                    x: rect.left + rect.width / 2,
-                    y: rect.bottom,
-                  })
-                  onClose()
-                }
-              }}
+              onClick={handleDeleteClick}
               className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-red-500/10 motion-color motion-press focus-ring"
             >
               <Trash2 className="h-3.5 w-3.5 text-red-500" />
