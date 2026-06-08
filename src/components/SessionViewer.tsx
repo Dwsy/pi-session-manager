@@ -130,6 +130,7 @@ function SessionViewerContent({
 
   const { liveSession, isLive } = useSessionViewerLiveState({
     sessionId: session.id,
+    sessionPath: session.path,
     previewMode,
   });
 

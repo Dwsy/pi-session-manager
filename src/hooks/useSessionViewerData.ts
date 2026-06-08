@@ -11,7 +11,7 @@ import type {
 } from "@/types/pi-live";
 import { trimMarkdownCacheOnSessionSwitch } from "@/utils/markdown";
 import { getCachedSettings } from "@/utils/settingsApi";
-import { parseSessionEntriesWithLineCount } from "@/utils/session";
+import { getSessionSourceSlug, parseSessionEntriesWithLineCount } from "@/utils/session";
 import {
   BROWSER_DATASET_REFRESHED_EVENT,
   isBrowserDatasetModeEnabled,
@@ -393,7 +393,11 @@ export function useSessionViewerData({
           }
         }
 
-        if (isLiveRef.current) {
+        // Only Pi sessions support Pi Live; skip for other agent types (ClaudeCode, Codex, etc.)
+        const sourceSlug = getSessionSourceSlug(sessionPath);
+        const isPiSession = sourceSlug === "pi";
+
+        if (isLiveRef.current && isPiSession) {
           try {
             const liveEntries = await invoke<any[]>("get_pi_agent_entries", {
               sessionId:
@@ -407,14 +411,14 @@ export function useSessionViewerData({
               return;
             }
           } catch (e) {
-            console.warn(
-              "[useSessionViewerData] Failed to fetch live entries, falling back to disk:",
-              e,
+            // Silently ignore Pi Live fetch failures - fallback to disk is expected for non-Pi sessions
+            console.debug(
+              "[useSessionViewerData] Pi Live fetch skipped or failed, using disk fallback"
             );
           }
         }
 
-        let chunk = await readRuntimeSessionChunk(sessionPath, 0, 384 * 1024);
+        const chunk = await readRuntimeSessionChunk(sessionPath, 0, 384 * 1024);
 
         let { entries: allEntries, lineCount: totalLineCount } =
           parseSessionEntriesWithLineCount(chunk.content);
@@ -422,26 +426,48 @@ export function useSessionViewerData({
         const fileSize = chunk.file_size;
         let hasMore = chunk.has_more;
 
-        if (openPosition === "top") {
-          while (hasMore) {
-            const nextChunk = await readRuntimeSessionChunk(
-              sessionPath,
-              nextOffset,
-              384 * 1024,
-            );
+        nextOffsetRef.current = nextOffset;
+        fileSizeRef.current = fileSize;
+        lineCountRef.current = totalLineCount;
 
-            const { entries: chunkEntries, lineCount: chunkLineCount } =
-              parseSessionEntriesWithLineCount(nextChunk.content);
+        pendingScrollToBottomRef.current =
+          !initialEntryId && openPosition === "bottom";
 
-            allEntries = mergeEntriesWithUniqueIds(allEntries, chunkEntries);
-            totalLineCount += chunkLineCount;
-            nextOffset = nextChunk.next_offset;
-            hasMore = nextChunk.has_more;
-            chunk = nextChunk;
+        setEntries(allEntries);
+        setLineCount(totalLineCount);
+        updateHasMoreHistory(hasMore);
+        setActiveEntryId(getDefaultActiveEntryId(allEntries));
 
-            if (cancelled) {
-              return;
+        if (cancelled) {
+          return;
+        }
+
+        if (hasMore) {
+          setLoading(false);
+          loadingMoreRef.current = true;
+
+          try {
+            while (hasMore) {
+              const nextChunk = await readRuntimeSessionChunk(
+                sessionPath,
+                nextOffset,
+                384 * 1024,
+              );
+
+              const { entries: chunkEntries, lineCount: chunkLineCount } =
+                parseSessionEntriesWithLineCount(nextChunk.content);
+
+              allEntries = mergeEntriesWithUniqueIds(allEntries, chunkEntries);
+              totalLineCount += chunkLineCount;
+              nextOffset = nextChunk.next_offset;
+              hasMore = nextChunk.has_more;
+
+              if (cancelled) {
+                return;
+              }
             }
+          } finally {
+            loadingMoreRef.current = false;
           }
         }
 
@@ -461,13 +487,13 @@ export function useSessionViewerData({
         fileSizeRef.current = fileSize;
         lineCountRef.current = totalLineCount;
 
+        pendingScrollToBottomRef.current =
+          !initialEntryId && openPosition === "bottom";
+
         setEntries(allEntries);
         setLineCount(totalLineCount);
         updateHasMoreHistory(hasMore);
         setActiveEntryId(getDefaultActiveEntryId(allEntries));
-
-        pendingScrollToBottomRef.current =
-          !initialEntryId && openPosition === "bottom";
       } catch (loadError) {
         if (!cancelled) {
           console.error(
