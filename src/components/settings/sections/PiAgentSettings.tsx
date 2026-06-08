@@ -1,14 +1,24 @@
 import { useTranslation } from "react-i18next";
 
 import SettingsCard from "@/components/settings/SettingsCard";
-import type { PiLiveSettingsProps } from "@/components/settings/types";
+import type { AppSettings } from "@/components/settings/types";
 import PiConfigSettings from "./PiConfigSettings";
 import PiLiveSettings from "./PiLiveSettings";
+import SubagentCompatibilitySettings from "./SubagentCompatibilitySettings";
+
+interface PiAgentSettingsProps {
+  settings: AppSettings;
+  onUpdate: <K extends keyof AppSettings>(
+    section: K,
+    key: keyof AppSettings[K],
+    value: AppSettings[K][keyof AppSettings[K]],
+  ) => void;
+}
 
 export default function PiAgentSettings({
   settings,
   onUpdate,
-}: PiLiveSettingsProps) {
+}: PiAgentSettingsProps) {
   const { t } = useTranslation();
 
   return (
@@ -22,6 +32,8 @@ export default function PiAgentSettings({
       >
         <PiConfigSettings />
       </SettingsCard>
+
+      <SubagentCompatibilitySettings settings={settings} onUpdate={onUpdate} />
 
       <PiLiveSettings settings={settings.piLive} onUpdate={onUpdate} />
     </div>

@@ -186,6 +186,32 @@ export const settings = {
     resourcesTitle: "Pi 资源与运行时设置",
     resourcesDescription: "管理 Pi skills、prompts、extensions、themes 与 Pi settings.json。",
   },
+  subagents: {
+    title: "子代理兼容模式",
+    description:
+      "选择 PSM 如何解释多种子代理扩展的 payload。智能模式会根据 JSON 结构自动推断协议。",
+    modeLabel: "兼容模式",
+    modeSmart: "智能模式（推荐）",
+    modeForced: "强制模式",
+    modeSmartHelp:
+      "根据 session JSON、tool/custom message 结构自动推断当前子代理协议。",
+    modeForcedHelp:
+      "优先按指定协议解释歧义条目，必要时再安全回退。",
+    providerLabel: "强制 provider",
+    showProviderBadge: "显示 provider 标识",
+    showProviderBadgeHelp:
+      "在可识别时，于结果卡片上显示子代理扩展来源。",
+    enableAsyncProbe: "启用异步状态探测",
+    enableAsyncProbeHelp:
+      "允许适配器检查 session 文件或异步状态目录，以展示更丰富的进度信息。",
+    detected: {
+      title: "从 ~/.pi/agent/settings.json 检测到",
+      enabled: "已启用：{{providers}}",
+      disabled: "已安装但未启用：{{providers}}",
+      none: "未从 Pi 配置中检测到已知子代理扩展。",
+      recommended: "推荐 provider：{{provider}}",
+    },
+  },
   terminal: {
     // Resume Mode
     resumeMode: "恢复模式",

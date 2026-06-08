@@ -222,4 +222,30 @@ describe('saveAppSettings', () => {
       datasetIds: ['owner/a'],
     })
   })
+
+  it('merges default subagent compatibility settings when backend settings omit them', async () => {
+    const { loadAppSettings } = await import('./settingsApi')
+
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'load_app_settings') {
+        return {
+          session: {
+            sourceMode: 'local',
+            activeDatasetId: '',
+            activeDatasetIds: [],
+          },
+        }
+      }
+      return undefined
+    })
+
+    const settings = await loadAppSettings()
+
+    expect(settings.subagents).toMatchObject({
+      mode: 'smart',
+      showProviderBadge: true,
+      enableAsyncStatusProbe: true,
+    })
+    expect(settings.subagents.forcedProvider).toBeUndefined()
+  })
 })

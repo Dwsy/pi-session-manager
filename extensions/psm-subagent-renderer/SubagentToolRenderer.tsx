@@ -9,7 +9,12 @@ import type {
 } from '@pi-session-manager/plugin-sdk'
 import { escapeHtml } from '@/utils/markdown'
 import { highlightSearchInHTML } from '@/utils/search'
-import SubagentModal from './SubagentModal'
+import { getCachedSettings } from '@/utils/settingsApi'
+import SubagentModal from '@/components/subagent/SubagentModal'
+import {
+  type SubagentArgs,
+  resolveSubagentToolState,
+} from './toolAdapter'
 
 /** Maximum length for error preview text */
 const SUBAGENT_ERROR_PREVIEW_LIMIT = 80
@@ -17,12 +22,6 @@ const SUBAGENT_ERROR_PREVIEW_LIMIT = 80
 /** Maximum length for task preview text */
 const SUBAGENT_TASK_PREVIEW_LIMIT = 120
 
-type SubagentArgs = {
-  action?: string
-  agent?: string
-  task?: string
-  tasks?: Array<{ agent?: string; task?: string }>
-}
 
 /**
  * Format duration in milliseconds to human readable string
@@ -62,10 +61,6 @@ function isResultOk(r: SubagentResult): boolean {
  * Type guard: check if details is @tintinweb format (single agent)
  * @tintinweb format has 'status' and 'displayName', our format has 'mode' and 'results'
  */
-function isTintinwebDetails(details?: SubagentDetails | TintinwebAgentDetails): details is TintinwebAgentDetails {
-  if (!details) return false
-  return 'status' in details && 'displayName' in details && !('mode' in details)
-}
 
 /**
  * Get highlighted HTML for plain text (escapes and highlights)
@@ -74,6 +69,7 @@ function getHighlightedPlainTextHtml(text: string, searchQuery: string): string 
   const escapedText = escapeHtml(text)
   return searchQuery ? highlightSearchInHTML(escapedText, searchQuery) : escapedText
 }
+
 
 /**
  * Card component for @tintinweb format subagent results
@@ -240,10 +236,63 @@ function SubagentToolCall({
   const { args, result, output, entryId } = resolvedData
   const subagentArgs = args as SubagentArgs
   const resultMessage = result?.message as { details?: SubagentDetails | TintinwebAgentDetails } | undefined
-  const details = resultMessage?.details
+  const toolState = resolveSubagentToolState({
+    settings: getCachedSettings().subagents,
+    details: resultMessage?.details,
+    args: subagentArgs,
+    output,
+  })
 
-  // @tintinweb format: single agent with status
-  if (isTintinwebDetails(details)) {
+  if (toolState.kind === 'hazat-started') {
+    return (
+      <div className="subagent-tool-call subagent-pending" id={entryId ? `entry-${entryId}` : undefined}>
+        <div className="subagent-header">
+          <div className="subagent-title">
+            <Loader2 size={16} className="subagent-icon spinning" />
+            <span className="subagent-label">{toolState.details.name}</span>
+            {toolState.details.agent && <span className="subagent-mode-badge">{toolState.details.agent}</span>}
+            {toolState.providerBadge && <span className="subagent-mode-badge">{toolState.providerBadge}</span>}
+          </div>
+        </div>
+        <div className="subagent-task-preview" style={{ padding: '0 0 4px' }}>
+          {toolState.details.task.length > 200 ? toolState.details.task.slice(0, 200) + '…' : toolState.details.task}
+        </div>
+        <div className="subagent-management-output whitespace-pre-wrap">{toolState.details.sessionFile}</div>
+      </div>
+    )
+  }
+
+  if (toolState.kind === 'nicobailon-started') {
+    const modeLabel = toolState.details.mode === 'parallel' ? 'Parallel' : toolState.details.mode === 'chain' ? 'Chain' : 'Single'
+
+    return (
+      <div className="subagent-tool-call subagent-pending" id={entryId ? `entry-${entryId}` : undefined}>
+        <div className="subagent-header">
+          <div className="subagent-title">
+            <Loader2 size={16} className="subagent-icon spinning" />
+            <span className="subagent-label">Subagent</span>
+            <span className="subagent-mode-badge">{modeLabel}</span>
+            {toolState.providerBadge && <span className="subagent-mode-badge">{toolState.providerBadge}</span>}
+          </div>
+        </div>
+        {toolState.taskText && (
+          <div className="subagent-task-preview" style={{ padding: '0 0 4px' }}>
+            {toolState.taskText.length > 200 ? toolState.taskText.slice(0, 200) + '…' : toolState.taskText}
+          </div>
+        )}
+        {(toolState.details.asyncId || toolState.details.asyncDir) && (
+          <div className="subagent-management-output whitespace-pre-wrap">
+            {[toolState.details.asyncId ? `asyncId: ${toolState.details.asyncId}` : '', toolState.details.asyncDir ? `asyncDir: ${toolState.details.asyncDir}` : '']
+              .filter(Boolean)
+              .join('\n')}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (toolState.kind === 'tintinweb') {
+    const details = toolState.details
     const resultForModal: SubagentResult = {
       agent: details.subagentType,
       task: details.description,
@@ -281,6 +330,7 @@ function SubagentToolCall({
               }
               <span className="subagent-label">{details.displayName}</span>
               <span className="subagent-mode-badge">{details.subagentType}</span>
+              {toolState.providerBadge && <span className="subagent-mode-badge">{toolState.providerBadge}</span>}
             </div>
           </div>
 
@@ -303,40 +353,35 @@ function SubagentToolCall({
     )
   }
 
-  // Management mode or pending state (no results yet)
-  if (!details || details.mode === 'management' || !details.results?.length) {
-    const agentName = subagentArgs.agent || subagentArgs.tasks?.[0]?.agent
-    const taskText = subagentArgs.task || subagentArgs.tasks?.[0]?.task || ''
-    const isPending = !details && !output && agentName
-
+  if (toolState.kind === 'pending') {
     return (
       <div
-        className={`subagent-tool-call ${isPending ? 'subagent-pending' : ''}`}
+        className={`subagent-tool-call ${toolState.isPending ? 'subagent-pending' : ''}`}
         id={entryId ? `entry-${entryId}` : undefined}
       >
         <div className="subagent-header">
           <div className="subagent-title">
-            {isPending ? <Loader2 size={16} className="subagent-icon spinning" /> : <Bot size={16} />}
+            {toolState.isPending ? <Loader2 size={16} className="subagent-icon spinning" /> : <Bot size={16} />}
             <span className="subagent-label">Subagent</span>
-            {subagentArgs.action && <span className="subagent-mode-badge">{subagentArgs.action}</span>}
-            {agentName && !subagentArgs.action && <span className="subagent-mode-badge">{agentName}</span>}
+            {toolState.action && <span className="subagent-mode-badge">{toolState.action}</span>}
+            {toolState.agentName && !toolState.action && <span className="subagent-mode-badge">{toolState.agentName}</span>}
+            {toolState.providerBadge && <span className="subagent-mode-badge">{toolState.providerBadge}</span>}
           </div>
         </div>
-        {isPending && taskText && (
+        {toolState.isPending && toolState.taskText && (
           <div className="subagent-task-preview" style={{ padding: '0 0 4px' }}>
-            {taskText.length > 200 ? taskText.slice(0, 200) + '…' : taskText}
+            {toolState.taskText.length > 200 ? toolState.taskText.slice(0, 200) + '…' : toolState.taskText}
           </div>
         )}
-        {output && (
-          <div className="subagent-management-output whitespace-pre-wrap">{output}</div>
+        {toolState.output && (
+          <div className="subagent-management-output whitespace-pre-wrap">{toolState.output}</div>
         )}
       </div>
     )
   }
 
-  // Our format: multiple agents with mode (single/parallel/chain)
-  const results = details.results
-  const mode = details.mode
+  const results = toolState.details.results
+  const mode = toolState.details.mode
   const modeLabel = mode === 'parallel' ? 'Parallel' : mode === 'chain' ? 'Chain' : 'Single'
   const allOk = results.every(isResultOk)
 
@@ -356,6 +401,7 @@ function SubagentToolCall({
               {modeLabel}
               {results.length > 1 && ` × ${results.length}`}
             </span>
+            {toolState.providerBadge && <span className="subagent-mode-badge">{toolState.providerBadge}</span>}
           </div>
         </div>
 
@@ -364,7 +410,10 @@ function SubagentToolCall({
             <ResultCard
               key={`${result.agent}-${i}`}
               result={result}
-              onClick={() => setModalResult(result)}
+              onClick={() => {
+                setModalResult(result)
+                setModalOpen(true)
+              }}
               searchQuery={searchQuery || ''}
             />
           ))}

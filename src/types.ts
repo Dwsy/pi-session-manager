@@ -153,6 +153,7 @@ export interface SessionEntry {
   summary?: string
   display?: boolean
   customType?: string
+  details?: unknown
   content?: any
   name?: string
   label?: string

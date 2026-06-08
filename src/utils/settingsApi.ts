@@ -4,6 +4,7 @@ import { defaultSettings } from "@/components/settings/types";
 import type { SessionConvertTarget } from "@/types";
 import { isStandaloneDatasetRuntime } from "@/browser-dataset";
 import { saveSessionSource } from "@/utils/datasetApi";
+import { normalizeSubagentCompatibilitySettings } from "@/utils/subagentCompatibility";
 
 const CACHE_KEY = "pi-session-manager-settings";
 const BROWSER_DATASET_REFRESHED_EVENT = "browser-dataset:refreshed";
@@ -194,6 +195,7 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
     search: { ...defaultSettings.search, ...raw.search },
     export: { ...defaultSettings.export, ...raw.export },
     update,
+    subagents: normalizeSubagentCompatibilitySettings(raw.subagents),
     advanced,
   };
 }

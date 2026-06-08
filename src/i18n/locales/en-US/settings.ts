@@ -188,6 +188,32 @@ export const settings = {
     resourcesDescription:
       "Manage Pi skills, prompts, extensions, themes and Pi settings.json.",
   },
+  subagents: {
+    title: "Subagent Compatibility",
+    description:
+      "Choose how PSM interprets multiple subagent extension payloads. Smart mode infers the protocol from JSON structure.",
+    modeLabel: "Compatibility mode",
+    modeSmart: "Smart (Recommended)",
+    modeForced: "Forced",
+    modeSmartHelp:
+      "Automatically infer the active subagent protocol from session JSON and tool/custom message structure.",
+    modeForcedHelp:
+      "Prefer one known protocol when rendering ambiguous subagent entries, then safely fall back.",
+    providerLabel: "Forced provider",
+    showProviderBadge: "Show provider badge",
+    showProviderBadgeHelp:
+      "Display the detected subagent extension on result cards when available.",
+    enableAsyncProbe: "Enable async status probing",
+    enableAsyncProbeHelp:
+      "Allow adapters to inspect session files or async status directories for richer progress details.",
+    detected: {
+      title: "Detected from ~/.pi/agent/settings.json",
+      enabled: "Enabled: {{providers}}",
+      disabled: "Installed but disabled: {{providers}}",
+      none: "No known subagent extension was detected from Pi settings.",
+      recommended: "Recommended provider: {{provider}}",
+    },
+  },
   terminal: {
     // Resume Mode
     resumeMode: "Resume Mode",

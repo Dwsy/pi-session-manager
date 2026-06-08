@@ -52,6 +52,20 @@ export function getPlatformDefaults(): {
 import { defaultPiLiveSettings, type PiLiveSettings } from "@/types/pi-live";
 import type { SessionConvertTarget } from "@/types";
 
+export type SubagentCompatibilityMode = "smart" | "forced";
+export type ForcedSubagentProvider =
+  | "nicobailon/pi-subagents"
+  | "HazAT/pi-interactive-subagents"
+  | "@tintinweb/pi-subagents"
+  | "none";
+
+export interface AppSubagentSettings {
+  mode: SubagentCompatibilityMode;
+  forcedProvider?: ForcedSubagentProvider;
+  showProviderBadge: boolean;
+  enableAsyncStatusProbe: boolean;
+}
+
 export interface AppSettings {
   piLive: PiLiveSettings;
   terminal: {
@@ -141,6 +155,7 @@ export interface AppSettings {
     autoCheck: boolean;
     channel: "stable" | "beta";
   };
+  subagents: AppSubagentSettings;
   advanced: {
     sessionDirs: string[];
     includeDefaultPiSessionDir: boolean;
@@ -235,6 +250,11 @@ export const defaultSettings: AppSettings = {
     autoCheck: true,
     channel: "stable",
   },
+  subagents: {
+    mode: "smart",
+    showProviderBadge: true,
+    enableAsyncStatusProbe: true,
+  },
   advanced: {
     sessionDirs: ["~/.pi/agent/sessions"],
     includeDefaultPiSessionDir: true,
@@ -286,6 +306,7 @@ export interface SessionSettingsProps extends SettingsProps<"session"> {}
 export interface SearchSettingsProps extends SettingsProps<"search"> {}
 export interface ExportSettingsProps extends SettingsProps<"export"> {}
 export interface UpdateSettingsProps extends SettingsProps<"update"> {}
+export interface SubagentSettingsProps extends SettingsProps<"subagents"> {}
 export interface AdvancedSettingsProps extends SettingsProps<"advanced"> {}
 export interface PiLiveSettingsProps extends SettingsProps<"piLive"> {}
 

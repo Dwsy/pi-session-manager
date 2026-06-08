@@ -1,15 +1,30 @@
 import { formatDate } from '@/utils/format'
 import { useTranslation } from 'react-i18next'
 import MarkdownContent from '@/components/ui/MarkdownContent'
+import SubagentCustomMessage from './SubagentCustomMessage'
+import { resolveCustomMessageRendererKind } from './customMessageAdapters'
 
 interface CustomMessageProps {
   customType?: string
   content?: any
+  details?: unknown
   timestamp?: string
 }
 
-export default function CustomMessage({ customType, content, timestamp }: CustomMessageProps) {
+export default function CustomMessage({ customType, content, details, timestamp }: CustomMessageProps) {
   const { t } = useTranslation()
+
+  if (resolveCustomMessageRendererKind(customType) === 'subagent') {
+    return (
+      <SubagentCustomMessage
+        customType={customType}
+        content={content}
+        details={details}
+        timestamp={timestamp}
+      />
+    )
+  }
+
   const contentText = typeof content === 'string' ? content : JSON.stringify(content)
 
   return (

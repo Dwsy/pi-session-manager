@@ -78,6 +78,7 @@ export function renderSessionEntry(
             key={entry.id}
             customType={role}
             content={contentToText(entry.message.content)}
+            details={entry.message.details}
             timestamp={entry.timestamp}
           />
         );
@@ -147,6 +148,7 @@ export function renderSessionEntry(
           key={entry.id}
           customType={entry.customType}
           content={entry.content}
+          details={entry.details}
           timestamp={entry.timestamp}
         />
       );

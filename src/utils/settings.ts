@@ -65,6 +65,7 @@ export function mergeSettings(base: AppSettings, override: Partial<AppSettings>)
     search: { ...base.search, ...override.search },
     export: { ...base.export, ...override.export },
     update: { ...base.update, ...override.update },
+    subagents: { ...base.subagents, ...override.subagents },
     advanced: { ...base.advanced, ...override.advanced },
   }
 }

@@ -10,9 +10,13 @@ import {
   X,
   Sparkles,
   Server,
+  Bot,
 } from 'lucide-react'
 import { invoke } from '@/transport'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import type { AppSubagentSettings, ForcedSubagentProvider } from '@/components/settings/types'
+import type { PiSettingsFull } from '@/types'
+import { detectConfiguredSubagentProviders } from '@/utils/subagentCompatibility'
 
 interface OnboardingProps {
   onComplete: () => void
@@ -23,7 +27,7 @@ interface StepConfig {
   titleKey: string
   descriptionKey: string
   hintKey?: string
-  interactive?: boolean
+  interactiveKind?: 'services' | 'subagents'
 }
 
 interface ServerSettings {
@@ -37,6 +41,12 @@ interface ServerSettings {
 
 type OpenPosition = 'top' | 'bottom'
 
+const FORCED_PROVIDER_OPTIONS: Array<Exclude<ForcedSubagentProvider, 'none'>> = [
+  'nicobailon/pi-subagents',
+  'HazAT/pi-interactive-subagents',
+  '@tintinweb/pi-subagents',
+]
+
 export default function Onboarding({ onComplete }: OnboardingProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -49,6 +59,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   })
   const [terminalEnabled, setTerminalEnabled] = useState(true)
   const [openPosition, setOpenPosition] = useState<OpenPosition>('top')
+  const [subagentSettings, setSubagentSettings] = useState<AppSubagentSettings>({
+    mode: 'smart',
+    showProviderBadge: true,
+    enableAsyncStatusProbe: true,
+  })
+  const [recommendedProvider, setRecommendedProvider] = useState<Exclude<ForcedSubagentProvider, 'none'>>('nicobailon/pi-subagents')
+  const [detectedSubagentText, setDetectedSubagentText] = useState('')
 
   useEffect(() => {
     invoke<ServerSettings>('load_server_settings').then(setServerSettings).catch(() => {})
@@ -63,8 +80,44 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       ) {
         setOpenPosition((s.session as Record<string, unknown>).openPosition as OpenPosition)
       }
+      const rawSubagents = (s?.subagents as Record<string, unknown> | undefined) || {}
+      setSubagentSettings({
+        mode: rawSubagents.mode === 'forced' ? 'forced' : 'smart',
+        forcedProvider:
+          rawSubagents.mode === 'forced' && typeof rawSubagents.forcedProvider === 'string'
+            ? rawSubagents.forcedProvider as ForcedSubagentProvider
+            : undefined,
+        showProviderBadge: rawSubagents.showProviderBadge !== false,
+        enableAsyncStatusProbe: rawSubagents.enableAsyncStatusProbe !== false,
+      })
     }).catch(() => {})
-  }, [])
+
+    invoke<PiSettingsFull>('load_pi_settings_full').then((piSettings) => {
+      const summary = detectConfiguredSubagentProviders(piSettings)
+      setRecommendedProvider(summary.recommendedProvider)
+      const segments: string[] = []
+      if (summary.enabledProviders.length > 0) {
+        segments.push(t('onboarding.steps.subagents.enabledDetected', {
+          defaultValue: 'Enabled: {{providers}}',
+          providers: summary.enabledProviders.join(', '),
+        }))
+      }
+      if (summary.disabledProviders.length > 0) {
+        segments.push(t('onboarding.steps.subagents.disabledDetected', {
+          defaultValue: 'Installed but disabled: {{providers}}',
+          providers: summary.disabledProviders.join(', '),
+        }))
+      }
+      setDetectedSubagentText(
+        segments.join(' · ') || t('onboarding.steps.subagents.noDetection', 'No known subagent extension detected from Pi settings.'),
+      )
+      setSubagentSettings((prev) => (
+        prev.mode === 'forced' && !prev.forcedProvider
+          ? { ...prev, forcedProvider: summary.recommendedProvider }
+          : prev
+      ))
+    }).catch(() => {})
+  }, [t])
 
   const steps: StepConfig[] = [
     {
@@ -94,7 +147,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       icon: <Server className="h-12 w-12 text-orange-400" />,
       titleKey: 'onboarding.steps.services.title',
       descriptionKey: 'onboarding.steps.services.description',
-      interactive: true,
+      interactiveKind: 'services',
+    },
+    {
+      icon: <Bot className="h-12 w-12 text-cyan-400" />,
+      titleKey: 'onboarding.steps.subagents.title',
+      descriptionKey: 'onboarding.steps.subagents.description',
+      interactiveKind: 'subagents',
     },
     {
       icon: <Settings className="h-12 w-12 text-amber-400" />,
@@ -122,13 +181,18 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           ...((appSettings as Record<string, unknown>)?.session as Record<string, unknown> || {}),
           openPosition,
         },
+        subagents: {
+          ...((appSettings as Record<string, unknown>)?.subagents as Record<string, unknown> || {}),
+          ...subagentSettings,
+          forcedProvider: subagentSettings.mode === 'forced' ? subagentSettings.forcedProvider : undefined,
+        },
       }
       await invoke('save_app_settings', { settings: merged })
     } catch (e) {
       console.error('Failed to save onboarding settings:', e)
     }
     onComplete()
-  }, [serverSettings, terminalEnabled, openPosition, onComplete])
+  }, [serverSettings, terminalEnabled, openPosition, subagentSettings, onComplete])
 
   const handleNext = useCallback(() => {
     if (isLast) {
@@ -185,8 +249,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             </div>
           )}
 
-          {/* Services interactive step */}
-          {step.interactive && (
+          {step.interactiveKind === 'services' && (
             <div className="mt-4 space-y-3 text-left max-w-xs mx-auto">
               <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
                 <div className="flex items-center justify-between">
@@ -245,6 +308,71 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                   })}
                 </p>
               )}
+            </div>
+          )}
+
+          {step.interactiveKind === 'subagents' && (
+            <div className="mt-4 space-y-3 text-left max-w-sm mx-auto">
+              <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
+                <div className="text-sm text-foreground font-medium">
+                  {t('onboarding.steps.subagents.modeLabel', 'Compatibility mode')}
+                </div>
+                <select
+                  value={subagentSettings.mode}
+                  onChange={(e) => {
+                    const nextMode = e.target.value === 'forced' ? 'forced' : 'smart'
+                    setSubagentSettings((prev) => ({
+                      ...prev,
+                      mode: nextMode,
+                      forcedProvider: nextMode === 'forced'
+                        ? prev.forcedProvider || recommendedProvider
+                        : undefined,
+                    }))
+                  }}
+                  className="mt-2 w-full px-2 py-1 bg-background border border-border rounded text-xs text-foreground"
+                >
+                  <option value="smart">{t('onboarding.steps.subagents.smartMode', 'Smart (Recommended)')}</option>
+                  <option value="forced">{t('onboarding.steps.subagents.forcedMode', 'Forced')}</option>
+                </select>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  {subagentSettings.mode === 'smart'
+                    ? t('onboarding.steps.subagents.smartHint', 'Infer the subagent protocol from JSON structure and session entries.')
+                    : t('onboarding.steps.subagents.forcedHint', 'Prefer one known subagent protocol, then safely fall back when needed.')}
+                </p>
+              </div>
+
+              {subagentSettings.mode === 'forced' && (
+                <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
+                  <div className="text-sm text-foreground font-medium">
+                    {t('onboarding.steps.subagents.providerLabel', 'Forced provider')}
+                  </div>
+                  <select
+                    value={subagentSettings.forcedProvider || recommendedProvider}
+                    onChange={(e) => setSubagentSettings((prev) => ({
+                      ...prev,
+                      forcedProvider: e.target.value as ForcedSubagentProvider,
+                    }))}
+                    className="mt-2 w-full px-2 py-1 bg-background border border-border rounded text-xs text-foreground"
+                  >
+                    {FORCED_PROVIDER_OPTIONS.map((provider) => (
+                      <option key={provider} value={provider}>{provider}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
+                <div className="text-sm text-foreground font-medium">
+                  {t('onboarding.steps.subagents.detectedTitle', 'Detected from Pi settings')}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">{detectedSubagentText}</p>
+                <p className="text-[11px] text-info mt-1">
+                  {t('onboarding.steps.subagents.recommended', {
+                    defaultValue: 'Recommended provider: {{provider}}',
+                    provider: recommendedProvider,
+                  })}
+                </p>
+              </div>
             </div>
           )}
         </div>
