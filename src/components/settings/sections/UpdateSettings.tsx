@@ -464,7 +464,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
         <div className="space-y-5">
           <SettingsToggleRow
             title={t('settings.update.autoCheck', 'Auto Check Updates')}
-            description={t('settings.update.autoCheckHelp', 'Automatically check once per day')}
+            description={t('settings.update.autoCheckHelp', 'Automatically check for updates on app startup')}
             checked={settings.update.autoCheck !== false}
             onChange={(enabled) => onUpdate('update', 'autoCheck', enabled)}
             searchKey="update-auto-check"

@@ -522,7 +522,7 @@ export const settings = {
     title: "更新",
     description: "管理来自发布通道清单的应用更新",
     autoCheck: "自动检查更新",
-    autoCheckHelp: "默认每天自动检查一次",
+    autoCheckHelp: "每次启动时自动检查更新",
     checkNow: "立即检查更新",
     checking: "正在检查更新...",
     lastCheckedAt: "最近检测时间",
@@ -552,6 +552,8 @@ export const settings = {
       noNotes: "该版本未提供更新说明。",
       download: "去下载",
       later: "稍后",
+      ignoreVersion: "忽略此版本",
+      ignoreTooltip: "下次有新版本时才会提醒",
       close: "关闭更新提示",
     },
     channel: {
@@ -564,6 +566,12 @@ export const settings = {
     },
   },
   advanced: {
+    tabs: {
+      server: "服务",
+      auth: "认证",
+      remote: "远程",
+      storage: "存储",
+    },
     serverSection: "服务设置",
     serverSectionDesc: "WebSocket、HTTP API 及认证配置",
     generalTitle: "常规选项",
@@ -626,6 +634,29 @@ export const settings = {
     cacheClearFailed: "清除缓存失败",
     showOnboarding: "重新显示新手引导",
     onboardingReset: "下次打开应用时将显示引导",
+    remoteTitle: "远程连接",
+    remoteDesc: "连接到远程 PSM 服务器，而非本地后端",
+    remoteEnabled: "远程模式",
+    remoteEnabledHelp:
+      "开启后，应用将通过 WebSocket/HTTP 连接远程服务器，而非使用本地后端",
+    remoteServerUrl: "服务器地址",
+    remoteServerUrlHelp:
+      "远程 PSM 服务器地址（例如 192.168.1.100:52131 或 https://psm.example.com）",
+    remoteToken: "API 令牌",
+    remoteTokenHelp:
+      "远程服务器的认证令牌（如未启用认证可不填）",
+    remoteTokenPlaceholder: "可选的认证令牌",
+    remoteTransport: "传输方式",
+    remoteTransportHelp: "与远程服务器的通信方式",
+    remoteTransportAuto: "自动（推荐）",
+    remoteTransportAutoDesc: "自动选择最佳传输方式",
+    remoteTransportWsDesc: "持久双向连接，支持自动重连",
+    remoteTransportHttpDesc: "无状态请求/响应 + 事件 WebSocket",
+    remoteApply: "应用并重载",
+    remoteApplyHelp: "应用将重新加载以切换传输层",
+    remoteTest: "测试连接",
+    remoteTesting: "测试中...",
+    remoteActive: "当前已连接到远程服务器",
   },
   piConfig: {
     tabs: {

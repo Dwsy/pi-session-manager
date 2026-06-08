@@ -948,6 +948,184 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
             </label>
           </SettingsField>
         </SettingsCard>
+
+        <SettingsCard
+          title={t('settings.appearance.diffView', 'Diff View')}
+          description={t('settings.appearance.diffViewDesc', 'Configure how code diffs are displayed in tool execution and review panels')}
+          contentClassName="p-3.5 space-y-4"
+        >
+          <SettingsField
+            label={t('settings.appearance.diffViewStyle', 'View Style')}
+            description={t('settings.appearance.diffViewStyleDesc', 'Side-by-side split view or unified inline view')}
+            searchKey="appearance-diffView"
+          >
+            <SettingsOptionGroup
+              options={['split', 'unified'] as const}
+              value={settings.appearance.diffView ?? 'split'}
+              onChange={(value) => onUpdate('appearance', 'diffView', value)}
+              renderLabel={(value) =>
+                value === 'split'
+                  ? t('settings.appearance.diffViewSplit', 'Split')
+                  : t('settings.appearance.diffViewUnified', 'Unified')
+              }
+              containerClassName="grid grid-cols-2 gap-3"
+              optionClassName="h-10 rounded-lg py-0"
+            />
+          </SettingsField>
+
+          <SettingsField
+            label={t('settings.appearance.diffLineDiffType', 'Line Diff Type')}
+            description={t('settings.appearance.diffLineDiffTypeDesc', 'Granularity of diff highlighting: full lines, words, or characters')}
+            searchKey="appearance-diffLineDiffType"
+          >
+            <SettingsOptionGroup
+              options={['full', 'words', 'chars'] as const}
+              value={settings.appearance.diffLineDiffType ?? 'words'}
+              onChange={(value) => onUpdate('appearance', 'diffLineDiffType', value)}
+              renderLabel={(value) =>
+                value === 'full'
+                  ? t('settings.appearance.diffLineDiffFull', 'Full Lines')
+                  : value === 'words'
+                    ? t('settings.appearance.diffLineDiffWords', 'Words')
+                    : t('settings.appearance.diffLineDiffChars', 'Chars')
+              }
+              containerClassName="grid grid-cols-3 gap-3"
+              optionClassName="h-10 rounded-lg py-0"
+            />
+          </SettingsField>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <SettingsField
+              label={t('settings.appearance.diffLineNumbers', 'Show Line Numbers')}
+              description={t('settings.appearance.diffLineNumbersDesc', 'Display line numbers in diff views')}
+              searchKey="appearance-diffLineNumbers"
+            >
+              <label className="flex items-center gap-3 cursor-pointer rounded-[10px] border border-border/70 bg-background/35 px-3 py-3">
+                <span className="relative h-5 w-9 flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={settings.appearance.diffLineNumbers ?? true}
+                    onChange={(e) => onUpdate('appearance', 'diffLineNumbers', e.target.checked)}
+                    className="sr-only"
+                  />
+                  <span
+                    className={`absolute inset-0 rounded-full motion-color ${
+                      (settings.appearance.diffLineNumbers ?? true) ? 'settings-accent-bg-strong' : 'bg-secondary'
+                    }`}
+                  />
+                  <span
+                    className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white motion-transform ${
+                      (settings.appearance.diffLineNumbers ?? true) ? 'translate-x-4' : ''
+                    }`}
+                  />
+                </span>
+                <div className="text-sm font-medium text-foreground">
+                  {(settings.appearance.diffLineNumbers ?? true)
+                    ? t('settings.appearance.enabled', 'Enabled')
+                    : t('settings.appearance.disabled', 'Disabled')}
+                </div>
+              </label>
+            </SettingsField>
+
+            <SettingsField
+              label={t('settings.appearance.diffWrap', 'Wrap Long Lines')}
+              description={t('settings.appearance.diffWrapDesc', 'Wrap long lines instead of horizontal scrolling')}
+              searchKey="appearance-diffWrap"
+            >
+              <label className="flex items-center gap-3 cursor-pointer rounded-[10px] border border-border/70 bg-background/35 px-3 py-3">
+                <span className="relative h-5 w-9 flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={settings.appearance.diffWrap ?? false}
+                    onChange={(e) => onUpdate('appearance', 'diffWrap', e.target.checked)}
+                    className="sr-only"
+                  />
+                  <span
+                    className={`absolute inset-0 rounded-full motion-color ${
+                      (settings.appearance.diffWrap ?? false) ? 'settings-accent-bg-strong' : 'bg-secondary'
+                    }`}
+                  />
+                  <span
+                    className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white motion-transform ${
+                      (settings.appearance.diffWrap ?? false) ? 'translate-x-4' : ''
+                    }`}
+                  />
+                </span>
+                <div className="text-sm font-medium text-foreground">
+                  {(settings.appearance.diffWrap ?? false)
+                    ? t('settings.appearance.enabled', 'Enabled')
+                    : t('settings.appearance.disabled', 'Disabled')}
+                </div>
+              </label>
+            </SettingsField>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <SettingsField
+              label={t('settings.appearance.diffIndicators', 'Show Diff Indicators')}
+              description={t('settings.appearance.diffIndicatorsDesc', 'Show +/− indicators for added and removed lines')}
+              searchKey="appearance-diffIndicators"
+            >
+              <label className="flex items-center gap-3 cursor-pointer rounded-[10px] border border-border/70 bg-background/35 px-3 py-3">
+                <span className="relative h-5 w-9 flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={settings.appearance.diffIndicators ?? true}
+                    onChange={(e) => onUpdate('appearance', 'diffIndicators', e.target.checked)}
+                    className="sr-only"
+                  />
+                  <span
+                    className={`absolute inset-0 rounded-full motion-color ${
+                      (settings.appearance.diffIndicators ?? true) ? 'settings-accent-bg-strong' : 'bg-secondary'
+                    }`}
+                  />
+                  <span
+                    className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white motion-transform ${
+                      (settings.appearance.diffIndicators ?? true) ? 'translate-x-4' : ''
+                    }`}
+                  />
+                </span>
+                <div className="text-sm font-medium text-foreground">
+                  {(settings.appearance.diffIndicators ?? true)
+                    ? t('settings.appearance.enabled', 'Enabled')
+                    : t('settings.appearance.disabled', 'Disabled')}
+                </div>
+              </label>
+            </SettingsField>
+
+            <SettingsField
+              label={t('settings.appearance.diffExpandUnchanged', 'Expand Unchanged Lines')}
+              description={t('settings.appearance.diffExpandUnchangedDesc', 'Expand unchanged regions in diff views')}
+              searchKey="appearance-diffExpandUnchanged"
+            >
+              <label className="flex items-center gap-3 cursor-pointer rounded-[10px] border border-border/70 bg-background/35 px-3 py-3">
+                <span className="relative h-5 w-9 flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={settings.appearance.diffExpandUnchanged ?? true}
+                    onChange={(e) => onUpdate('appearance', 'diffExpandUnchanged', e.target.checked)}
+                    className="sr-only"
+                  />
+                  <span
+                    className={`absolute inset-0 rounded-full motion-color ${
+                      (settings.appearance.diffExpandUnchanged ?? true) ? 'settings-accent-bg-strong' : 'bg-secondary'
+                    }`}
+                  />
+                  <span
+                    className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white motion-transform ${
+                      (settings.appearance.diffExpandUnchanged ?? true) ? 'translate-x-4' : ''
+                    }`}
+                  />
+                </span>
+                <div className="text-sm font-medium text-foreground">
+                  {(settings.appearance.diffExpandUnchanged ?? true)
+                    ? t('settings.appearance.enabled', 'Enabled')
+                    : t('settings.appearance.disabled', 'Disabled')}
+                </div>
+              </label>
+            </SettingsField>
+          </div>
+        </SettingsCard>
       </div>
 
       {themePickerOpen && (

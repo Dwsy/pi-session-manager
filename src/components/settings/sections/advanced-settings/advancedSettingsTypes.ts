@@ -15,4 +15,4 @@ export interface TokenInfo {
 }
 
 export type AdvancedSettingsMode = "all" | "server-access";
-export type AdvancedTab = "server" | "auth" | "storage";
+export type AdvancedTab = "server" | "auth" | "remote" | "storage";

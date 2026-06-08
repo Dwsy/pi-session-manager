@@ -8,11 +8,13 @@ import {
   Key,
   Server,
   FolderOpen,
+  Wifi,
 } from "lucide-react";
-import { invoke } from "@/transport";
+import { invoke, isTauri } from "@/transport";
 import SettingsTabs from "@/components/settings/SettingsTabs";
 import ApiKeysSettingsTab from "./advanced-settings/ApiKeysSettingsTab";
 import ServerAccessSettingsTab from "./advanced-settings/ServerAccessSettingsTab";
+import RemoteConnectionTab from "./advanced-settings/RemoteConnectionTab";
 import StorageSettingsTab from "./advanced-settings/StorageSettingsTab";
 import type { AdvancedSettingsMode, AdvancedTab, ServerSettings, TokenInfo } from "./advanced-settings/advancedSettingsTypes";
 import type { AdvancedSettingsProps } from "@/components/settings/types";
@@ -50,6 +52,15 @@ export default function AdvancedSettings({
             label: t("settings.advanced.tabs.auth", "Auth"),
             icon: <Key className="h-3.5 w-3.5" />,
           },
+          ...(isTauri()
+            ? [
+                {
+                  id: "remote" as const,
+                  label: t("settings.advanced.tabs.remote", "Remote"),
+                  icon: <Wifi className="h-3.5 w-3.5" />,
+                },
+              ]
+            : []),
         ]
       : [
           {
@@ -62,6 +73,15 @@ export default function AdvancedSettings({
             label: t("settings.advanced.tabs.auth", "Auth"),
             icon: <Key className="h-3.5 w-3.5" />,
           },
+          ...(isTauri()
+            ? [
+                {
+                  id: "remote" as const,
+                  label: t("settings.advanced.tabs.remote", "Remote"),
+                  icon: <Wifi className="h-3.5 w-3.5" />,
+                },
+              ]
+            : []),
           {
             id: "storage",
             label: t("settings.advanced.tabs.storage", "Storage"),
@@ -275,6 +295,10 @@ export default function AdvancedSettings({
           onManualValueChange={setManualValue}
           onCreateKey={handleCreateKey}
         />
+      )}
+
+      {activeTab === "remote" && (
+        <RemoteConnectionTab />
       )}
 
       {activeTab === "storage" && (

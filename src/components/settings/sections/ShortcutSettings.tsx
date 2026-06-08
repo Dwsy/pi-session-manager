@@ -36,13 +36,13 @@ const shortcuts: ShortcutItem[] = [
     category: 'search',
   },
   {
-    keys: 'Cmd+L',
+    keys: 'Cmd+1',
     labelKey: 'app.viewMode.list',
     fallback: 'List view',
     category: 'navigation',
   },
   {
-    keys: 'Cmd+P',
+    keys: 'Cmd+2',
     labelKey: 'app.shortcuts.projectView',
     fallback: 'Project view',
     category: 'navigation',
