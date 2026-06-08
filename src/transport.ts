@@ -101,10 +101,10 @@ function readRemoteConfig(): RemoteConfig {
   }
 
   return {
-    wsUrl: toWsUrl(localStorage.getItem('psm.wsUrl') || import.meta.env.VITE_WS_URL || defaultWs),
-    httpBaseUrl: normalizeHttpBase(localStorage.getItem('psm.httpBaseUrl') || import.meta.env.VITE_HTTP_BASE_URL || defaultHttp),
-    token: localStorage.getItem('psm.apiToken') || import.meta.env.VITE_API_TOKEN || undefined,
-    transport: (localStorage.getItem('psm.transport') as TransportPreference | null)
+    wsUrl: toWsUrl(localStorage.getItem('psm.wsUrl') || localStorage.getItem('psm.remoteServerUrl') || import.meta.env.VITE_WS_URL || defaultWs),
+    httpBaseUrl: normalizeHttpBase(localStorage.getItem('psm.httpBaseUrl') || localStorage.getItem('psm.remoteServerUrl') || import.meta.env.VITE_HTTP_BASE_URL || defaultHttp),
+    token: localStorage.getItem('psm.apiToken') || localStorage.getItem('psm.remoteApiToken') || import.meta.env.VITE_API_TOKEN || undefined,
+    transport: (localStorage.getItem('psm.transport') || localStorage.getItem('psm.remoteTransport') as TransportPreference | null)
       || (import.meta.env.VITE_TRANSPORT as TransportPreference | undefined)
       || 'auto',
   }
@@ -648,8 +648,14 @@ function detectMobileWeb(): boolean {
     || (navigator.maxTouchPoints > 1 && window.innerWidth < 1024)
 }
 
+function isTauriRemoteMode(): boolean {
+  if (typeof window === 'undefined') return false
+  if (!(window as { __TAURI__?: unknown }).__TAURI__) return false
+  return localStorage.getItem('psm.remoteMode') === 'true'
+}
+
 export function createTransport(enableCompression = false): Transport {
-  if (typeof window !== 'undefined' && (window as { __TAURI__?: unknown }).__TAURI__) {
+  if (typeof window !== 'undefined' && (window as { __TAURI__?: unknown }).__TAURI__ && !isTauriRemoteMode()) {
     return new TauriTransport()
   }
 
@@ -688,4 +694,17 @@ export async function listen<T>(
 
 export function isTauri(): boolean {
   return typeof window !== 'undefined' && !!(window as { __TAURI__?: unknown }).__TAURI__
+}
+
+export function isRemoteMode(): boolean {
+  return isTauri() && isTauriRemoteMode()
+}
+
+export function resetTransport(): void {
+  if (_transport) {
+    if ('disconnect' in _transport && typeof (_transport as WebSocketTransport).disconnect === 'function') {
+      (_transport as WebSocketTransport).disconnect()
+    }
+    _transport = null
+  }
 }
