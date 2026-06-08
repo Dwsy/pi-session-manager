@@ -94,7 +94,7 @@ fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        builder = builder.decorations(true);
+        builder = builder.decorations(false);
     }
 
     let window = builder.visible(false).build().map_err(|e| format!("Build window: {e}"))?;

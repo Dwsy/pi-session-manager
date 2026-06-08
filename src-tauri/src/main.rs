@@ -365,7 +365,7 @@ fn main() {
                 let builder = builder.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
 
                 #[cfg(not(target_os = "macos"))]
-                let builder = builder.decorations(true);
+                let builder = builder.decorations(false);
 
                 let window = builder.visible(false).build()?;
 
