@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use colored::*;
 use reqwest::Client;
 use serde_json::{json, Value};
+use std::io::Write;
 use std::time::Duration;
 
 #[derive(Parser)]
@@ -73,6 +74,11 @@ enum Commands {
     Config {
         #[command(subcommand)]
         command: ConfigCommands,
+    },
+    /// Update related commands
+    Update {
+        #[command(subcommand)]
+        command: UpdateCommands,
     },
     /// Search sessions
     Search { query: String },
@@ -275,6 +281,28 @@ enum ConfigCommands {
     Save {
         #[arg(short, long)]
         content: String,
+    },
+}
+
+#[derive(Subcommand)]
+#[command(
+    after_help = "EXAMPLES:\n  pi-session-cli update check\n  pi-session-cli update install --channel beta"
+)]
+enum UpdateCommands {
+    /// Check for updates
+    Check {
+        /// Update channel (stable or beta)
+        #[arg(short, long, default_value = "stable")]
+        channel: String,
+    },
+    /// Download and install update (manual download mode for CLI)
+    Install {
+        /// Update channel (stable or beta)
+        #[arg(short, long, default_value = "stable")]
+        channel: String,
+        /// Skip confirmation prompt
+        #[arg(long)]
+        yes: bool,
     },
 }
 
@@ -611,6 +639,14 @@ pub async fn run() -> Result<()> {
                 println!("{}", "Config saved".green());
             }
         },
+        Some(Commands::Update { command }) => match command {
+            UpdateCommands::Check { channel } => {
+                handle_update_check(&client, &base_url, &channel).await?;
+            }
+            UpdateCommands::Install { channel, yes } => {
+                handle_update_install(&client, &base_url, &channel, yes).await?;
+            }
+        },
         Some(Commands::Search { query }) => {
             let data = request_command(
                 &client,
@@ -625,6 +661,120 @@ pub async fn run() -> Result<()> {
             clap::Command::new("pi-session-cli").print_help()?;
         }
     }
+
+    Ok(())
+}
+
+/// Handle update check command
+async fn handle_update_check(
+    client: &Client,
+    base_url: &str,
+    channel: &str,
+) -> Result<()> {
+    println!("{} Checking for updates (channel: {})...", "→".cyan(), channel.yellow());
+    
+    let data = request_command(
+        client,
+        base_url,
+        "check_app_update",
+        json!({ "channel": channel }),
+    )
+    .await?;
+
+    if data.is_null() || data.as_null().is_some() {
+        println!("{}", "✓ No updates available. You are running the latest version.".green());
+        return Ok(());
+    }
+
+    let current_version = data["currentVersion"].as_str().unwrap_or("unknown");
+    let new_version = data["version"].as_str().unwrap_or("unknown");
+    let body = data["body"].as_str().unwrap_or("");
+
+    println!("{}", format!("⚠ Update available!").yellow().bold());
+    println!("  Current version: {}", current_version.cyan());
+    println!("  Latest version:  {}", new_version.green().bold());
+    
+    if !body.is_empty() {
+        println!("\n{}", "Release notes:".dimmed());
+        for line in body.lines().take(10) {
+            println!("  {}", line.dimmed());
+        }
+        if body.lines().count() > 10 {
+            println!("  {}", "...".dimmed());
+        }
+    }
+
+    println!("\nTo install, run: {}", format!("pi-session-cli update install --channel {}", channel).cyan());
+    
+    Ok(())
+}
+
+/// Handle update install command
+async fn handle_update_install(
+    client: &Client,
+    base_url: &str,
+    channel: &str,
+    skip_confirm: bool,
+) -> Result<()> {
+    // First check if update is available
+    let data = request_command(
+        client,
+        base_url,
+        "check_app_update",
+        json!({ "channel": channel }),
+    )
+    .await?;
+
+    if data.is_null() || data.as_null().is_some() {
+        println!("{}", "✓ No updates available. You are running the latest version.".green());
+        return Ok(());
+    }
+
+    let current_version = data["currentVersion"].as_str().unwrap_or("unknown");
+    let new_version = data["version"].as_str().unwrap_or("unknown");
+
+    println!("{}", format!("⚠ Update found:").yellow().bold());
+    println!("  {} → {}", current_version.cyan(), new_version.green().bold());
+
+    // CLI mode: provide download URL and instructions
+    let update_channels_json = include_str!("../../src/runtime-data/update-channels.json");
+    let config: Value = serde_json::from_str(update_channels_json)?;
+    let owner = config["owner"].as_str().unwrap_or("Dwsy");
+    let repo = config["repo"].as_str().unwrap_or("pi-session-manager");
+    
+    let release_url = format!("https://github.com/{}/{}/releases/tag/v{}", owner, repo, new_version);
+    
+    println!("\n{}", "Note: CLI self-update requires manual download.".dimmed());
+    println!("{}", "Download the new version from:".dimmed());
+    println!("  {}", release_url.cyan().underline());
+    
+    if !skip_confirm {
+        print!("\n{} Open browser to download page? [y/N] ", "?".yellow());
+        std::io::stdout().flush()?;
+        
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input)?;
+        
+        if input.trim().to_lowercase() != "y" {
+            println!("{}", "Cancelled.".dimmed());
+            return Ok(());
+        }
+    }
+
+    // Try to open browser
+    #[cfg(target_os = "macos")]
+    let open_cmd = "open";
+    #[cfg(target_os = "linux")]
+    let open_cmd = "xdg-open";
+    #[cfg(target_os = "windows")]
+    let open_cmd = "start";
+    
+    let _ = std::process::Command::new(open_cmd)
+        .arg(&release_url)
+        .spawn();
+    
+    println!("{}", "Opening browser...".green());
+    println!("\n{}", "After downloading, replace the binary with the new version.".dimmed());
 
     Ok(())
 }
