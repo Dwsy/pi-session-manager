@@ -7,6 +7,8 @@ export const app = {
   sidebar: {
     hideSidebar: '隐藏侧边栏',
     showSidebar: '显示侧边栏',
+    remote: '远程',
+    remoteMode: '远程服务器',
   },
   viewMode: {
     list: '列表视图',

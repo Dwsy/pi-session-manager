@@ -104,7 +104,7 @@ function readRemoteConfig(): RemoteConfig {
     wsUrl: toWsUrl(localStorage.getItem('psm.wsUrl') || localStorage.getItem('psm.remoteServerUrl') || import.meta.env.VITE_WS_URL || defaultWs),
     httpBaseUrl: normalizeHttpBase(localStorage.getItem('psm.httpBaseUrl') || localStorage.getItem('psm.remoteServerUrl') || import.meta.env.VITE_HTTP_BASE_URL || defaultHttp),
     token: localStorage.getItem('psm.apiToken') || localStorage.getItem('psm.remoteApiToken') || import.meta.env.VITE_API_TOKEN || undefined,
-    transport: (localStorage.getItem('psm.transport') || localStorage.getItem('psm.remoteTransport') as TransportPreference | null)
+    transport: ((localStorage.getItem('psm.transport') || localStorage.getItem('psm.remoteTransport')) as TransportPreference | null)
       || (import.meta.env.VITE_TRANSPORT as TransportPreference | undefined)
       || 'auto',
   }

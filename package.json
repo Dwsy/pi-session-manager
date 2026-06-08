@@ -16,6 +16,7 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
+    "cli:dev": "node scripts/dev-cli.mjs",
     "tauri:build:local-signed": "node scripts/tauri-build-local-env.mjs",
     "tauri:build:local-test": "tauri build -c src-tauri/tauri.local-test.conf.json",
     "build:cli": "node scripts/build-cli.mjs",

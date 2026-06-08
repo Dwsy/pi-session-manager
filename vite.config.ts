@@ -18,21 +18,25 @@ function resolveBuildVersion(): string {
 }
 
 function getPsmPort(): number {
+  // CLI dev mode: use env var from dev-cli.mjs
+  if (process.env.CLI_SERVER_PORT) {
+    return parseInt(process.env.CLI_SERVER_PORT, 10) || 52131
+  }
+
   try {
     const configPath = path.join(
       process.env.HOME || '',
-      '.pi',
-      'pi-session-manager',
-      'config.json'
+      '.config',
+      'pi-session-manager.json'
     )
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-      return config.server?.http_port || 5002
+      return config.server?.http_port || 52131
     }
   } catch {
     // ignore
   }
-  return 5002
+  return 52131
 }
 
 const buildVersion = resolveBuildVersion()
@@ -41,6 +45,7 @@ const psmPort = getPsmPort()
 export default defineConfig(({ mode }) => {
   const isDemoBuild = mode === 'demo'
   const isDatasetBuild = mode === 'dataset'
+  const isCliDev = mode === 'cli-dev'
 
   return {
     define: {
@@ -145,32 +150,52 @@ export default defineConfig(({ mode }) => {
       },
     },
     clearScreen: false,
-    server: {
-      port: 1420,
-      strictPort: true,
-      allowedHosts: true,
-      proxy: {
-        '/api': {
-          target: `http://127.0.0.1:${psmPort}`,
-          changeOrigin: true,
+    server: isCliDev
+      ? {
+          // CLI dev mode: use same port as Tauri dev (1420), proxy to CLI server
+          port: 1420,
+          strictPort: true,
+          allowedHosts: true,
+          proxy: {
+            '/api': {
+              target: `http://127.0.0.1:${getPsmPort()}`,
+              changeOrigin: true,
+            },
+            '/ws': {
+              target: `ws://127.0.0.1:${getPsmPort()}`,
+              ws: true,
+            },
+          },
+          hmr: {
+            overlay: false,
+          },
+        }
+      : {
+          port: 1420,
+          strictPort: true,
+          allowedHosts: true,
+          proxy: {
+            '/api': {
+              target: `http://127.0.0.1:${psmPort}`,
+              changeOrigin: true,
+            },
+            '/ws': {
+              target: `ws://127.0.0.1:${psmPort}`,
+              ws: true,
+            },
+          },
+          watch: {
+            ignored: [
+              '**/src-tauri/**',
+              '**/target/**',
+              '**/*.rs',
+              '**/Cargo.toml',
+              '**/Cargo.lock',
+            ],
+          },
+          hmr: {
+            overlay: false,
+          },
         },
-        '/ws': {
-          target: `ws://127.0.0.1:${psmPort}`,
-          ws: true,
-        },
-      },
-      watch: {
-        ignored: [
-          '**/src-tauri/**',
-          '**/target/**',
-          '**/*.rs',
-          '**/Cargo.toml',
-          '**/Cargo.lock',
-        ],
-      },
-      hmr: {
-        overlay: false,
-      },
-    },
   }
 })

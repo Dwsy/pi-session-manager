@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { FolderOpen, LayoutDashboard, List, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Star, Terminal } from "lucide-react";
+import { FolderOpen, LayoutDashboard, List, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Star, Terminal, Wifi } from "lucide-react";
 
 import KbdTooltip from "@/components/ui/KbdTooltip";
 import { appendShortcutLabel, shouldUseTauriDragRegion, stripShortcutSuffix } from "@/utils/platformShortcuts";
+import { isRemoteMode } from "@/transport";
 import AppViewIcon from "./AppViewIcon";
 
 export type AppDesktopSidebarMode = "list" | "project" | "app" | "pi-live";
@@ -312,6 +313,15 @@ function AppDesktopSidebar({
                 <Terminal className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </KbdTooltip>
+          )}
+          {isRemoteMode() && (
+            <span
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-info/15 text-info border border-info/20 ml-0.5"
+              title={t("app.sidebar.remoteMode", "Remote server")}
+            >
+              <Wifi className="h-3 w-3" aria-hidden="true" />
+              {t("app.sidebar.remote", "Remote")}
+            </span>
           )}
           <KbdTooltip shortcut="Cmd+,">
             <button
