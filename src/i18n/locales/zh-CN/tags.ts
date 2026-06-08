@@ -26,6 +26,7 @@ export const tags = {
     openBrowser: '在浏览器打开',
     favorite: '收藏',
     copyResume: '复制恢复命令',
+    fork: '复制会话',
     delete: '删除',
   },
   filter: {

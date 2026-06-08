@@ -26,6 +26,7 @@ export const tags = {
     openBrowser: 'Open in Browser',
     favorite: 'Favorite',
     copyResume: 'Copy Resume Command',
+    fork: 'Duplicate Session',
     delete: 'Delete',
   },
   filter: {

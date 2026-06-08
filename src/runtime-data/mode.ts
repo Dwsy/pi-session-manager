@@ -10,5 +10,8 @@ export function shouldBypassAuthGate(): boolean {
 }
 
 export function shouldShowConnectionBanner(): boolean {
-  return getRuntimeMode() === "backend";
+  if (getRuntimeMode() === "backend") return true
+  if (typeof window === "undefined") return false
+  const isTauri = !!(window as { __TAURI__?: unknown }).__TAURI__
+  return isTauri && localStorage.getItem("psm.remoteMode") === "true"
 }

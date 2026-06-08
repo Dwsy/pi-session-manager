@@ -9,6 +9,9 @@ interface TestHarnessProps {
   onDelete: () => void
   onSearchAll: () => void
   onSettings: () => void
+  onListView?: () => void
+  onProjectView?: () => void
+  onKanbanView?: () => void
 }
 
 function TestHarness({
@@ -16,12 +19,18 @@ function TestHarness({
   onDelete,
   onSearchAll,
   onSettings,
+  onListView = () => {},
+  onProjectView = () => {},
+  onKanbanView = () => {},
 }: TestHarnessProps) {
   useKeyboardShortcuts(
     {
       'cmd+,': onSettings,
       'cmd+shift+f': onSearchAll,
       'cmd+backspace': onDelete,
+      'cmd+1': onListView,
+      'cmd+2': onProjectView,
+      'cmd+3': onKanbanView,
     },
     { allowInTextEntry },
   )
@@ -38,6 +47,9 @@ function renderHarness(allowInTextEntry: string[] = []) {
   const onSettings = vi.fn()
   const onSearchAll = vi.fn()
   const onDelete = vi.fn()
+  const onListView = vi.fn()
+  const onProjectView = vi.fn()
+  const onKanbanView = vi.fn()
 
   render(
     <TestHarness
@@ -45,6 +57,9 @@ function renderHarness(allowInTextEntry: string[] = []) {
       onDelete={onDelete}
       onSearchAll={onSearchAll}
       onSettings={onSettings}
+      onListView={onListView}
+      onProjectView={onProjectView}
+      onKanbanView={onKanbanView}
     />,
   )
 
@@ -54,6 +69,9 @@ function renderHarness(allowInTextEntry: string[] = []) {
     onDelete,
     onSearchAll,
     onSettings,
+    onListView,
+    onProjectView,
+    onKanbanView,
   }
 }
 
@@ -99,5 +117,18 @@ describe('useKeyboardShortcuts', () => {
     fireEvent.keyDown(outsideButton, { key: 'Backspace', metaKey: true })
 
     expect(onDelete).toHaveBeenCalledTimes(1)
+  })
+
+  it('handles numeric app-view shortcuts outside text inputs', () => {
+    const { outsideButton, onListView, onProjectView, onKanbanView } = renderHarness()
+
+    outsideButton.focus()
+    fireEvent.keyDown(outsideButton, { key: '1', metaKey: true })
+    fireEvent.keyDown(outsideButton, { key: '2', metaKey: true })
+    fireEvent.keyDown(outsideButton, { key: '3', metaKey: true })
+
+    expect(onListView).toHaveBeenCalledTimes(1)
+    expect(onProjectView).toHaveBeenCalledTimes(1)
+    expect(onKanbanView).toHaveBeenCalledTimes(1)
   })
 })
