@@ -1,8 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import type { FullTextSearchSourceFilter } from '@/types'
-import { Search, MessageSquare, FileText, FolderOpen } from 'lucide-react'
+import { Search, MessageSquare, FileText, FolderOpen, Tag } from 'lucide-react'
 
-export type TabType = 'all' | 'message' | 'session' | 'project'
+export type TabType = 'all' | 'labels' | 'message' | 'session' | 'project'
 
 export const TABS: {
   id: TabType
@@ -11,6 +11,12 @@ export const TABS: {
   Icon: typeof Search
 }[] = [
   { id: 'all', key: 'tabs.all', Icon: Search },
+  {
+    id: 'labels',
+    key: 'tabs.labels',
+    pluginId: 'message-search',
+    Icon: Tag,
+  },
   {
     id: 'message',
     key: 'tabs.message',
@@ -29,12 +35,6 @@ export const TABS: {
     pluginId: 'project-search',
     Icon: FolderOpen,
   },
-]
-
-export const SOURCE_FILTERS: FullTextSearchSourceFilter[] = [
-  'all',
-  'labels_only',
-  'content_only',
 ]
 
 export function getTabLabel(t: ReturnType<typeof useTranslation>['t'], tab: { key: string }) {

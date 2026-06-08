@@ -12,7 +12,7 @@ import type { FullTextSearchSourceFilter } from '@/types'
 interface UseCommandSearchParams {
   query: string
   setQuery: (query: string) => void
-  activeTab: 'all' | 'message' | 'session' | 'project'
+  activeTab: 'all' | 'labels' | 'message' | 'session' | 'project'
   ftsOptions: MessageSearchPluginOptions
   setFtsOptions: (options: MessageSearchPluginOptions) => void
   search: (
@@ -100,7 +100,7 @@ export function useCommandSearch({
   resultsRef.current = results
   contextRef.current = context
 
-  const supportsMessageFilters = activeTab === 'all' || activeTab === 'message'
+  const supportsMessageFilters = activeTab === 'all' || activeTab === 'labels' || activeTab === 'message'
   const parsedSourceToken = useMemo(
     () => parseLeadingSourceFilterToken(query),
     [query],
@@ -111,8 +111,15 @@ export function useCommandSearch({
       ? parsedSourceToken.normalizedQuery
       : query
 
+  const tabSourceFilter: FullTextSearchSourceFilter | undefined =
+    activeTab === 'labels'
+      ? 'labels_only'
+      : activeTab === 'message'
+        ? 'content_only'
+        : undefined
+
   const effectiveSourceFilter: FullTextSearchSourceFilter = supportsMessageFilters
-    ? parsedSourceToken.sourceFilter || ftsOptions.sourceFilter || 'all'
+    ? parsedSourceToken.sourceFilter || tabSourceFilter || ftsOptions.sourceFilter || 'all'
     : 'all'
 
   const sourceFilterPaginationEnabled =
@@ -140,6 +147,7 @@ export function useCommandSearch({
 
     const tabMap: Record<string, string | undefined> = {
       all: undefined,
+      labels: 'message-search',
       message: 'message-search',
       session: 'session-search',
       project: 'project-search',

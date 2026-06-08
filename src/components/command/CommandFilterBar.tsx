@@ -3,21 +3,16 @@ import {
   Search,
   User,
   Bot,
-  Tag,
-  FileText,
   ArrowUpDown,
   Star,
   Command,
   Wrench,
 } from 'lucide-react'
 import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearchPlugin'
-import type { FullTextSearchSourceFilter } from '@/types'
 import {
   TABS,
-  SOURCE_FILTERS,
   getTabLabel,
   getRoleFilterLabel,
-  getSourceFilterLabel,
   getSortLabel,
 } from './utils'
 import type { CommandPaletteMode } from './commandActions'
@@ -25,14 +20,12 @@ import type { CommandPaletteMode } from './commandActions'
 interface CommandFilterBarProps {
   mode: CommandPaletteMode
   setMode: (mode: CommandPaletteMode) => void
-  activeTab: 'all' | 'message' | 'session' | 'project'
-  setActiveTab: (tab: 'all' | 'message' | 'session' | 'project') => void
-  tabCounts: Record<'all' | 'message' | 'session' | 'project', number>
+  activeTab: 'all' | 'labels' | 'message' | 'session' | 'project'
+  setActiveTab: (tab: 'all' | 'labels' | 'message' | 'session' | 'project') => void
+  tabCounts: Record<'all' | 'labels' | 'message' | 'session' | 'project', number>
   supportsMessageFilters: boolean
   ftsOptions: MessageSearchPluginOptions
   setFtsOptions: (options: MessageSearchPluginOptions) => void
-  effectiveSourceFilter: FullTextSearchSourceFilter
-  onSourceFilterChange: (filter: FullTextSearchSourceFilter) => void
   effectiveSortMode: 'newest' | 'oldest' | 'score'
 }
 
@@ -45,8 +38,6 @@ export default function CommandFilterBar({
   supportsMessageFilters,
   ftsOptions,
   setFtsOptions,
-  effectiveSourceFilter,
-  onSourceFilterChange,
   effectiveSortMode,
 }: CommandFilterBarProps) {
   const { t } = useTranslation()
@@ -140,23 +131,6 @@ export default function CommandFilterBar({
                   {value === 'user' && <User className="w-3 h-3" />}
                   {value === 'assistant' && <Bot className="w-3 h-3" />}
                   <span>{getRoleFilterLabel(value)}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className={segmentedGroup}>
-              {SOURCE_FILTERS.map((value) => (
-                <button
-                  key={value}
-                  onClick={() => onSourceFilterChange(value)}
-                  className={`${segmentBase} ${effectiveSourceFilter === value ? segmentActive : segmentInactive}`}
-                >
-                  {value === 'labels_only' && <Tag className="w-3 h-3" />}
-                  {value === 'content_only' && (
-                    <FileText className="w-3 h-3" />
-                  )}
-                  {value === 'all' && <Search className="w-3 h-3" />}
-                  <span>{getSourceFilterLabel(t, value)}</span>
                 </button>
               ))}
             </div>

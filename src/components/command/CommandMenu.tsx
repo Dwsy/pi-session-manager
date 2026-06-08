@@ -91,7 +91,6 @@ export default memo(function CommandMenu({
 
   const {
     normalizedQuery,
-    effectiveSourceFilter,
     effectiveSortMode,
     isLabelsBrowseMode,
     supportsMessageFilters,
@@ -103,7 +102,6 @@ export default memo(function CommandMenu({
     loadMoreError,
     loadMore,
     handleQueryChange,
-    handleSourceFilterChange,
     applySuggestedSourceFilter,
   } = useCommandSearch({
     query,
@@ -125,11 +123,7 @@ export default memo(function CommandMenu({
     }
 
     const prefix = query.toLowerCase();
-    const filters: FullTextSearchSourceFilter[] = [
-      "all",
-      "labels_only",
-      "content_only",
-    ];
+    const filters: FullTextSearchSourceFilter[] = ["labels_only"];
     return filters.filter(
       (value) =>
         formatSourceFilterToken(value).startsWith(prefix) &&
@@ -213,6 +207,14 @@ export default memo(function CommandMenu({
   const tabCounts = useMemo(() => {
     return TABS.reduce(
       (acc: Record<TabType, number>, tab) => {
+        if (tab.id === 'labels') {
+          acc[tab.id] = activeTab === 'labels' ? results.length : 0;
+          return acc;
+        }
+        if (tab.id === 'message') {
+          acc[tab.id] = activeTab === 'labels' ? 0 : groupedResults[tab.pluginId!]?.length || 0;
+          return acc;
+        }
         acc[tab.id] = tab.pluginId
           ? groupedResults[tab.pluginId]?.length || 0
           : results.length;
@@ -220,15 +222,21 @@ export default memo(function CommandMenu({
       },
       {} as Record<TabType, number>,
     );
-  }, [groupedResults, results.length]);
+  }, [activeTab, groupedResults, results.length]);
 
   const selectedPlugin = selectedResult
     ? registry.get(selectedResult.pluginId)
     : null;
 
   const handleActiveTabChange = useCallback((nextTab: TabType) => {
+    const sourceFilter: FullTextSearchSourceFilter =
+      nextTab === 'labels'
+        ? 'labels_only'
+        : nextTab === 'message'
+          ? 'content_only'
+          : 'all';
     setActiveTab(nextTab);
-    setFtsOptions({ ...ftsOptions, page: 0 });
+    setFtsOptions({ ...ftsOptions, sourceFilter, page: 0 });
   }, [ftsOptions, setActiveTab, setFtsOptions]);
 
   const handleSelect = useCallback(() => {
@@ -258,8 +266,10 @@ export default memo(function CommandMenu({
       ? t("command.commands.placeholder", "Search plugin commands...")
       : mode === 'dev'
       ? t("command.dev.placeholder", "Inspect dev plugins...")
-      : effectiveSourceFilter === "labels_only"
+      : isLabelsBrowseMode
       ? t("search.fullText.labelsPlaceholder", "Browse all labels...")
+      : activeTab === 'message'
+      ? t("search.fullText.messagesPlaceholder", "Search messages...")
       : t("command.placeholder", "Search sessions, projects, messages...");
 
   const cycleMode = useCallback((direction: 1 | -1 = 1) => {
@@ -368,8 +378,6 @@ export default memo(function CommandMenu({
           supportsMessageFilters={supportsMessageFilters}
           ftsOptions={ftsOptions}
           setFtsOptions={setFtsOptions}
-          effectiveSourceFilter={effectiveSourceFilter}
-          onSourceFilterChange={handleSourceFilterChange}
           effectiveSortMode={effectiveSortMode}
         />
       </div>

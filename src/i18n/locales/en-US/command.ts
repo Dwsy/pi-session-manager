@@ -71,6 +71,7 @@ export const command = {
   },
   tabs: {
     all: 'All',
+    labels: 'Labels',
     message: 'Messages',
     session: 'Sessions',
     project: 'Projects',

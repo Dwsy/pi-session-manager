@@ -71,6 +71,7 @@ export const command = {
   },
   tabs: {
     all: '全部',
+    labels: '标签',
     message: '消息',
     session: '会话',
     project: '项目',

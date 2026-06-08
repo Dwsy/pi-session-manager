@@ -11,7 +11,7 @@ interface CommandPaletteProps {
   context: SearchContext
 }
 
-const COMMAND_SEARCH_PAGE_SIZE = 8
+const COMMAND_SEARCH_PAGE_SIZE = 20
 
 export default function CommandPalette({ context }: CommandPaletteProps) {
   const { isOpen, open, close, query, setQuery, results, setResults, isSearching, setIsSearching } = useCommandMenu()
@@ -128,17 +128,19 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
     }
   }, [isOpen])
 
-  // Reset selection when results change
+  // Preserve the current preview when pagination appends results.
   useEffect(() => {
-    setSelectedResult(null)
+    setSelectedResult((current) => {
+      if (results.length === 0) return null
+      if (current) {
+        const retained = results.find(
+          (result) => result.id === current.id && result.pluginId === current.pluginId,
+        )
+        if (retained) return retained
+      }
+      return results[0]
+    })
   }, [results])
-
-  // Select first result when results arrive
-  useEffect(() => {
-    if (results.length > 0 && !selectedResult) {
-      setSelectedResult(results[0])
-    }
-  }, [results, selectedResult])
 
   // Navigate to selected session
   const handleNavigate = useCallback(() => {

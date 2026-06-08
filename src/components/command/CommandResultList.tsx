@@ -16,7 +16,7 @@ interface CommandResultListProps {
   searchError: string | undefined
   normalizedQuery: string
   isLabelsBrowseMode: boolean
-  activeTab: 'all' | 'message' | 'session' | 'project'
+  activeTab: 'all' | 'labels' | 'message' | 'session' | 'project'
   selectedResult: SearchPluginResult | null
   setSelectedResult: (result: SearchPluginResult | null) => void
   registry: PluginRegistry
@@ -65,22 +65,25 @@ export default function CommandResultList({
     const sentinel = sentinelRef.current
     if (!wrapper || !sentinel || !sourceFilterPaginationEnabled || !hasMore || loadMoreError) return
 
+    const canLoadMore = () => {
+      return (
+        sourceFilterPaginationEnabled &&
+        hasMore &&
+        !isSearching &&
+        !isLoadingMore &&
+        !loadMoreError
+      )
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (
-          entry?.isIntersecting &&
-          sourceFilterPaginationEnabled &&
-          hasMore &&
-          !isSearching &&
-          !isLoadingMore &&
-          !loadMoreError
-        ) {
+        if (entry?.isIntersecting && canLoadMore()) {
           loadMore()
         }
       },
       {
         root: wrapper,
-        rootMargin: '150px 0px',
+        rootMargin: '96px 0px',
       },
     )
 
@@ -90,17 +93,20 @@ export default function CommandResultList({
 
   const hasQuery = !!normalizedQuery.trim() || isLabelsBrowseMode
   const showPagination = sourceFilterPaginationEnabled
-  const showLoadedCount = showPagination && hasQuery && totalHits > 0
   const remaining = Math.max(0, totalHits - results.length)
   const showLoadMore = showPagination && hasMore && !searchError && results.length > 0
+  const showLoadedCount = showPagination && hasQuery && totalHits > 0 && !showLoadMore
   const showAutoLoadMoreSentinel = showLoadMore && !loadMoreError
+  const resultCountLabel = t('search.fullText.showingResults', 'Showing {{shown}} of {{total}}', {
+    shown: results.length,
+    total: totalHits,
+  })
+  const remainingLabel = t('search.fullText.loadMoreRemaining', 'Load more ({{count}} remaining)', {
+    count: remaining,
+  })
   const loadMoreLabel = loadMoreError
     ? t('search.fullText.retryLoadMore', 'Retry load more')
-    : remaining > 0
-      ? t('search.fullText.loadMoreRemaining', 'Load more ({{count}} remaining)', {
-          count: remaining,
-        })
-      : t('search.fullText.loadMore', 'Load more')
+    : t('search.fullText.loadMore', 'Load more')
 
   return (
     <div
@@ -115,10 +121,7 @@ export default function CommandResultList({
           aria-live="polite"
           aria-atomic="true"
         >
-          {t('search.fullText.showingResults', 'Showing {{shown}} of {{total}}', {
-            shown: results.length,
-            total: totalHits,
-          })}
+          {resultCountLabel}
         </div>
       )}
       {isSearching && results.length === 0 && <CommandLoading />}
@@ -141,11 +144,8 @@ export default function CommandResultList({
       {!isSearching &&
         !searchError &&
         Object.entries(groupedResults).map(([pluginId, pluginResults]) => {
-          if (
-            activeTab !== 'all' &&
-            activeTab !== TABS.find((tab) => tab.pluginId === pluginId)?.id
-          )
-            return null
+          const activeTabPluginId = TABS.find((tab) => tab.id === activeTab)?.pluginId
+          if (activeTab !== 'all' && activeTabPluginId !== pluginId) return null
           const plugin = registry.get(pluginId)
           if (!plugin) return null
 
@@ -174,25 +174,33 @@ export default function CommandResultList({
         <div ref={sentinelRef} className="h-1" aria-hidden="true" />
       )}
       {showLoadMore && (
-        <div className="flex flex-col items-center gap-2 pt-3">
+        <div className="mt-4 border-t border-border/45 pt-3">
+          <div className="flex min-h-9 items-center justify-between gap-3 px-2">
+            <div className="min-w-0 text-[11px] text-muted-foreground/75 tabular-nums" aria-live="polite">
+              <span className="block truncate">{resultCountLabel}</span>
+              {!loadMoreError && remaining > 0 && (
+                <span className="block truncate text-muted-foreground/55">{remainingLabel}</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={isLoadingMore}
+              className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border/70 bg-surface/45 px-2.5 text-[11px] font-medium text-muted-foreground hover:bg-surface/65 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLoadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              <span>{loadMoreLabel}</span>
+            </button>
+          </div>
           {loadMoreError && (
             <div
               role="alert"
-              className="inline-flex max-w-full items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive"
+              className="mt-2 flex min-w-0 items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-[11px] text-destructive"
             >
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{loadMoreError}</span>
             </div>
           )}
-          <button
-            type="button"
-            onClick={loadMore}
-            disabled={isLoadingMore}
-            className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-surface/40 px-4 py-2 text-[12px] font-medium text-muted-foreground motion-surface motion-color hover:bg-surface/60 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isLoadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            <span>{loadMoreLabel}</span>
-          </button>
         </div>
       )}
     </div>

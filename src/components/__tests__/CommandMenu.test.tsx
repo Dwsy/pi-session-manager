@@ -377,7 +377,8 @@ describe('CommandMenu source filter wiring', () => {
     await flushSearchDebounce()
 
     expect(screen.getByText('Showing 2 of 5')).not.toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Load more (3 remaining)' }))
+    expect(screen.getByText('Load more (3 remaining)')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
 
     await flushSearchDebounce()
 
@@ -394,6 +395,49 @@ describe('CommandMenu source filter wiring', () => {
     expect(screen.getByText('Showing 4 of 5')).not.toBeNull()
     expect(screen.getByText('Label hit 1')).not.toBeNull()
     expect(screen.getByText('Label hit 4')).not.toBeNull()
+  })
+
+  it('loads more when the intersection sentinel is reached', async () => {
+    let requestIndex = 0
+    mockPluginSearchPage.mockImplementation(async () => {
+      requestIndex += 1
+      if (requestIndex === 1) {
+        return createPageResult([
+          createMessageResult({ id: 'label-result-1', title: 'Label hit 1' }),
+          createMessageResult({ id: 'label-result-2', title: 'Label hit 2' }),
+        ], 4, true)
+      }
+
+      return createPageResult([
+        createMessageResult({ id: 'label-result-3', title: 'Label hit 3' }),
+        createMessageResult({ id: 'label-result-4', title: 'Label hit 4' }),
+      ], 4, false)
+    })
+
+    render(<CommandMenuHarness />)
+
+    fireEvent.change(screen.getAllByRole('textbox')[0], {
+      target: { value: '#labels important' },
+    })
+
+    await flushSearchDebounce()
+
+    for (const observer of mockIntersectionObservers.filter((observer) => observer.active)) {
+      observer.callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver)
+    }
+    await flushSearchDebounce()
+
+    expect(mockPluginSearchPage).toHaveBeenLastCalledWith(
+      'important',
+      expect.objectContaining({
+        searchCurrentProjectOnly: false,
+      }),
+      expect.objectContaining({
+        sourceFilter: 'labels_only',
+        page: 1,
+      }),
+    )
+    expect(screen.getByText('Showing 4 of 4')).not.toBeNull()
   })
 
   it('does not auto-retry load more failures from the intersection sentinel', async () => {
@@ -422,7 +466,8 @@ describe('CommandMenu source filter wiring', () => {
 
     await flushSearchDebounce()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Load more (2 remaining)' }))
+    expect(screen.getByText('Load more (2 remaining)')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
     await flushSearchDebounce()
 
     expect(screen.getByText('Backend unavailable')).not.toBeNull()
@@ -468,7 +513,8 @@ describe('CommandMenu source filter wiring', () => {
 
     await flushSearchDebounce()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Load more (2 remaining)' }))
+    expect(screen.getByText('Load more (2 remaining)')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
     await flushSearchDebounce()
 
     expect(screen.getByText('Label hit 1')).not.toBeNull()
