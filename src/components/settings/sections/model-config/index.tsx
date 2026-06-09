@@ -210,7 +210,7 @@ export default function ModelConfigCenter() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="grid grid-cols-3 gap-3">
               <StatTile
                 label={t(
                   "settings.modelConfigCenter.summary.providers",
@@ -221,13 +221,6 @@ export default function ModelConfigCenter() {
               <StatTile
                 label={t("settings.modelConfigCenter.summary.models", "Models")}
                 value={totalModels}
-              />
-              <StatTile
-                label={t(
-                  "settings.modelConfigCenter.summary.backups",
-                  "Backups",
-                )}
-                value={backups.length}
               />
               <StatTile
                 label={t(

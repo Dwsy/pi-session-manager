@@ -93,7 +93,7 @@ export default function SettingsContent({
             <Loader2 className="h-6 w-6 animate-spin settings-accent-fg" />
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-5xl space-y-6">
+          <div className="mx-auto w-full max-w-7xl space-y-6">
             {renderSettingsSection(activeSection, settings, onUpdate)}
           </div>
         )}

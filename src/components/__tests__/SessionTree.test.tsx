@@ -207,6 +207,13 @@ describe('SessionTree', () => {
     expect(screen.getByText('1 / 1')).not.toBeNull();
   });
 
+  it('does not show branch disclosure controls for a linear chain', () => {
+    renderSessionTree();
+
+    expect(screen.queryByRole('button', { name: /Collapse branch/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Expand branch/ })).toBeNull();
+  });
+
   it('recomputes the tree when resolved labels change after render', () => {
     const { rerender } = render(
       <I18nextProvider i18n={i18n}>
@@ -347,6 +354,6 @@ describe('SessionTree', () => {
     renderSessionTree({ filter: 'all' });
 
     expect(screen.getAllByText('Label: Raw label').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Assistant').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Assistant').length).toBeGreaterThan(0);
   });
 });

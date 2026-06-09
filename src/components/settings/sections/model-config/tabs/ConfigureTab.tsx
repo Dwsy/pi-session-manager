@@ -67,99 +67,175 @@ export function ConfigureTab({
   const { t } = useTranslation();
 
   return (
-<div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+<div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_220px_minmax(0,1fr)]">
+  {/* Column 1: Provider list */}
   <SettingsCard
-    icon={<FileJson className="h-5 w-5" />}
+    icon={<Server className="h-5 w-5" />}
     title={t(
-      "settings.modelConfigCenter.sections.navigatorTitle",
-      "Provider / Model Navigation",
-    )}
-    description={t(
-      "settings.modelConfigCenter.sections.navigatorDesc",
-      "Locate Provider first, then focus on current model details.",
+      "settings.modelConfigCenter.summary.providers",
+      "Providers",
     )}
   >
-    <div className="max-h-[740px] space-y-5 overflow-y-auto pr-1">
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-              {t(
-                "settings.modelConfigCenter.summary.providers",
-                "Providers",
-              )}
-            </div>
-            <div className="mt-1 text-sm font-medium text-foreground">
-              {providerNames.length}
-            </div>
+    <div className="max-h-[740px] space-y-3 overflow-y-auto pr-1">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-medium text-foreground">
+          {providerNames.length}
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowAddProviderModal(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface motion-color motion-press focus-ring"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {t(
+            "settings.modelConfigCenter.actions.addProvider",
+            "Add Provider",
+          )}
+        </button>
+      </div>
+
+      {providerNames.length > 0 ? (
+        <div className="space-y-2">
+          {providerNames.map((providerName) => {
+            const provider = config.providers[providerName];
+            const isActive = providerName === selectedProvider;
+            return (
+              <div
+                key={providerName}
+                className={`group flex items-start gap-2 rounded-xl border px-3 py-3 motion-color motion-surface ${
+                  isActive
+                    ? "border-info/50 bg-info/10 shadow-sm"
+                    : "border-border/70 bg-background/35 hover:border-border-hover hover:bg-background/45"
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedProvider(providerName);
+                    setConfigDetailTab("provider");
+                  }}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <div className="truncate text-sm font-medium text-foreground">
+                    {providerName}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {provider.api ?? "openai-completions"}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    requestDeleteProvider(providerName);
+                  }}
+                  className="rounded-lg p-2 text-muted-foreground hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-300 motion-color motion-press focus-ring"
+                  title={t(
+                    "settings.modelConfigCenter.actions.delete",
+                    "Delete",
+                  )}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
+          <div className="text-sm font-medium text-foreground">
+            {t(
+              "settings.modelConfigCenter.empty.noProvidersTitle",
+              "No providers yet",
+            )}
           </div>
           <button
             type="button"
             onClick={() => setShowAddProviderModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface motion-color motion-press focus-ring"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-info px-3 py-2 text-sm text-white hover:bg-info/90 motion-color motion-press focus-ring"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-4 w-4" />
             {t(
-              "settings.modelConfigCenter.actions.addProvider",
-              "Add Provider",
+              "settings.modelConfigCenter.actions.createProvider",
+              "Create Provider",
             )}
           </button>
         </div>
+      )}
+    </div>
+  </SettingsCard>
 
-        {providerNames.length > 0 ? (
+  {/* Column 2: Model list */}
+  <SettingsCard
+    icon={<FileJson className="h-5 w-5" />}
+    title={t(
+      "settings.modelConfigCenter.summary.models",
+      "Models",
+    )}
+  >
+    <div className="max-h-[740px] space-y-3 overflow-y-auto pr-1">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-medium text-foreground">
+          {selectedProvider
+            ? `${selectedProviderModels.length} / ${selectedProvider}`
+            : "—"}
+        </div>
+        <button
+          type="button"
+          onClick={addModel}
+          disabled={!selectedProvider}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface motion-color motion-press focus-ring disabled:opacity-50"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {t(
+            "settings.modelConfigCenter.actions.addModel",
+            "Add Model",
+          )}
+        </button>
+      </div>
+
+      {selectedProvider ? (
+        selectedProviderModels.length > 0 ? (
           <div className="space-y-2">
-            {providerNames.map((providerName) => {
-              const provider = config.providers[providerName];
-              const isActive = providerName === selectedProvider;
+            {selectedProviderModels.map((model, index) => {
+              const isActive =
+                selectedModel === modelSelectionValue(index);
+              const label =
+                model.name?.trim() ||
+                model.id?.trim() ||
+                t(
+                  "settings.modelConfigCenter.status.unnamedModel",
+                  "Unnamed Model",
+                );
               return (
-                <div
-                  key={providerName}
-                  className={`group flex items-start gap-2 rounded-xl border px-3 py-3 motion-color motion-surface ${
+                <button
+                  key={`${selectedProvider}-${index}`}
+                  type="button"
+                  onClick={() => {
+                    setSelectedModel(modelSelectionValue(index));
+                    setConfigDetailTab("model");
+                  }}
+                  className={`w-full rounded-xl border px-3 py-3 text-left motion-color motion-surface focus-ring ${
                     isActive
                       ? "border-info/50 bg-info/10 shadow-sm"
                       : "border-border/70 bg-background/35 hover:border-border-hover hover:bg-background/45"
                   }`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedProvider(providerName);
-                      setConfigDetailTab("provider");
-                    }}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <div className="truncate text-sm font-medium text-foreground">
-                      {providerName}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span>
-                        {provider.api ?? "openai-completions"}
-                      </span>
-                      <span>·</span>
-                      <span>
-                        {(provider.models ?? []).length}{" "}
+                  <div className="truncate text-sm font-medium text-foreground">
+                    {label}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    {model.reasoning && (
+                      <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-300">
                         {t(
-                          "settings.modelConfigCenter.summary.models",
-                          "Models",
+                          "settings.modelConfigCenter.fields.reasoning",
+                          "Inference",
                         )}
                       </span>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      requestDeleteProvider(providerName);
-                    }}
-                    className="rounded-lg p-2 text-muted-foreground hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-300 motion-color motion-press focus-ring"
-                    title={t(
-                      "settings.modelConfigCenter.actions.delete",
-                      "Delete",
                     )}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+                    <span>{model.contextWindow ?? 128000}</span>
+                  </div>
+                </button>
               );
             })}
           </div>
@@ -167,154 +243,35 @@ export function ConfigureTab({
           <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
             <div className="text-sm font-medium text-foreground">
               {t(
-                "settings.modelConfigCenter.empty.noProvidersTitle",
-                "No providers yet",
+                "settings.modelConfigCenter.empty.noModelsTitle",
+                "Current provider has no models yet",
               )}
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t(
-                "settings.modelConfigCenter.empty.noProvidersDesc",
-                "Create a Provider first, then the corresponding connection and model configuration will appear on the right.",
-              )}
-            </p>
             <button
               type="button"
-              onClick={() => setShowAddProviderModal(true)}
-              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-info px-3 py-2 text-sm text-white hover:bg-info/90 motion-color motion-press focus-ring"
+              onClick={addModel}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-info px-3 py-2 text-sm text-white hover:bg-info/90 motion-color motion-press focus-ring"
             >
               <Plus className="h-4 w-4" />
               {t(
-                "settings.modelConfigCenter.actions.createProvider",
-                "Create Provider",
+                "settings.modelConfigCenter.actions.addModel",
+                "Add Model",
               )}
             </button>
           </div>
-        )}
-      </section>
-
-      <section className="space-y-3 border-t border-border/60 pt-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-              {t(
-                "settings.modelConfigCenter.summary.models",
-                "Models",
-              )}
-            </div>
-            <div className="mt-1 text-sm font-medium text-foreground">
-              {selectedProvider
-                ? `${selectedProviderModels.length} / ${selectedProvider}`
-                : t(
-                    "settings.modelConfigCenter.sections.testSelection",
-                    "Select a provider to continue",
-                  )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={addModel}
-            disabled={!selectedProvider}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-surface motion-color motion-press focus-ring disabled:opacity-50"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {t(
-              "settings.modelConfigCenter.actions.addModel",
-              "Add Model",
-            )}
-          </button>
+        )
+      ) : (
+        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+          {t(
+            "settings.modelConfigCenter.sections.testSelection",
+            "Select a provider to continue",
+          )}
         </div>
-
-        {selectedProvider ? (
-          selectedProviderModels.length > 0 ? (
-            <div className="space-y-2">
-              {selectedProviderModels.map((model, index) => {
-                const isActive =
-                  selectedModel === modelSelectionValue(index);
-                const label =
-                  model.name?.trim() ||
-                  model.id?.trim() ||
-                  t(
-                    "settings.modelConfigCenter.status.unnamedModel",
-                    "Unnamed Model",
-                  );
-                return (
-                  <button
-                    key={`${selectedProvider}-${index}`}
-                    type="button"
-                    onClick={() => {
-                      setSelectedModel(modelSelectionValue(index));
-                      setConfigDetailTab("model");
-                    }}
-                    className={`w-full rounded-xl border px-3 py-3 text-left motion-color motion-surface focus-ring ${
-                      isActive
-                        ? "border-info/50 bg-info/10 shadow-sm"
-                        : "border-border/70 bg-background/35 hover:border-border-hover hover:bg-background/45"
-                    }`}
-                  >
-                    <div className="truncate text-sm font-medium text-foreground">
-                      {label}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span>
-                        {model.id?.trim() ||
-                          t(
-                            "settings.modelConfigCenter.status.unnamedModel",
-                            "Unnamed Model",
-                          )}
-                      </span>
-                      {model.reasoning && (
-                        <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-amber-700 dark:text-amber-300">
-                          {t(
-                            "settings.modelConfigCenter.fields.reasoning",
-                            "Inference",
-                          )}
-                        </span>
-                      )}
-                      <span>{model.contextWindow ?? 128000}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
-              <div className="text-sm font-medium text-foreground">
-                {t(
-                  "settings.modelConfigCenter.empty.noModelsTitle",
-                  "Current provider has no models yet",
-                )}
-              </div>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {t(
-                  "settings.modelConfigCenter.empty.noModelsDesc",
-                  "Create a model first, then fill in ID, capabilities and cost info on the right.",
-                )}
-              </p>
-              <button
-                type="button"
-                onClick={addModel}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-info px-3 py-2 text-sm text-white hover:bg-info/90 motion-color motion-press focus-ring"
-              >
-                <Plus className="h-4 w-4" />
-                {t(
-                  "settings.modelConfigCenter.actions.addModel",
-                  "Add Model",
-                )}
-              </button>
-            </div>
-          )
-        ) : (
-          <div className="rounded-xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
-            {t(
-              "settings.modelConfigCenter.sections.testSelection",
-              "Select a provider to continue",
-            )}
-          </div>
-        )}
-      </section>
+      )}
     </div>
   </SettingsCard>
 
+  {/* Column 3: Details */}
   <div className="space-y-4">
     <SettingsTabs
       items={[

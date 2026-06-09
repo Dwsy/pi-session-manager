@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Brain,
   CheckCircle2,
@@ -147,6 +147,11 @@ export default function SessionIntelligenceToolbarPanel({
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelLoadFailed, setModelLoadFailed] = useState(false);
   const [requestedModels, setRequestedModels] = useState(Boolean(cachedModelOptions));
+  const [modelRetryCount, setModelRetryCount] = useState(0);
+  const modelsLoadingRef = useRef(modelsLoading);
+  modelsLoadingRef.current = modelsLoading;
+  const requestedModelsRef = useRef(requestedModels);
+  requestedModelsRef.current = requestedModels;
   const [selectedProvider, setSelectedProvider] = useState(settings.provider);
   const [selectedModel, setSelectedModel] = useState(settings.model);
 
@@ -167,7 +172,10 @@ export default function SessionIntelligenceToolbarPanel({
   }, [open, session.path, settings.model, settings.provider]);
 
   useEffect(() => {
-    if (!open || models.length > 0 || modelsLoading || requestedModels) return;
+    // Use refs to check current values without including them as deps — otherwise
+    // setModelsLoading(true) would trigger a dep change, fire the cleanup (cancelled=true),
+    // and the timeout handler would never be able to clear the loading state.
+    if (!open || models.length > 0 || modelsLoadingRef.current || requestedModelsRef.current) return;
 
     let cancelled = false;
     setRequestedModels(true);
@@ -185,13 +193,16 @@ export default function SessionIntelligenceToolbarPanel({
         console.error("[SessionIntelligenceToolbarPanel] Failed to load model options:", err);
       })
       .finally(() => {
-        if (!cancelled) setModelsLoading(false);
+        if (cancelled) return;
+        setModelsLoading(false);
       });
 
     return () => {
       cancelled = true;
+      setModelsLoading(false);
+      setRequestedModels(Boolean(cachedModelOptions));
     };
-  }, [client, models.length, modelsLoading, open, requestedModels]);
+  }, [client, models.length, open, modelRetryCount]);
 
   useEffect(() => {
     if (!open) return;
@@ -274,15 +285,15 @@ export default function SessionIntelligenceToolbarPanel({
 
   const modelStatus = modelsLoading ? (
     <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-      <Loader2 className="h-3 w-3 animate-spin" />
+      <Loader2 className="block h-3 w-3 shrink-0 animate-spin [transform-box:fill-box] origin-center" />
       {t("session.intelligence.loadingModelsShort", "Loading")}
     </span>
   ) : modelLoadFailed ? (
     <button
       type="button"
       onClick={() => {
-        setRequestedModels(false);
         setModelLoadFailed(false);
+        setModelRetryCount((c) => c + 1);
       }}
       className="text-[11px] text-warning hover:text-foreground"
     >

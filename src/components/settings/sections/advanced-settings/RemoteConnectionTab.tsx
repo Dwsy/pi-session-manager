@@ -116,7 +116,7 @@ async function testConnection(
 
 export default function RemoteConnectionTab() {
   const { t } = useTranslation();
-  const initial = readCurrentRemoteConfig();
+  const [initial] = useState(readCurrentRemoteConfig);
 
   const [enabled, setEnabled] = useState(initial.enabled);
   const [serverUrl, setServerUrl] = useState(initial.serverUrl);
@@ -127,24 +127,47 @@ export default function RemoteConnectionTab() {
 
   const dirty =
     enabled !== initial.enabled ||
-    serverUrl !== initial.serverUrl ||
-    apiToken !== initial.apiToken ||
-    transport !== initial.transport;
+    (enabled &&
+      (serverUrl !== initial.serverUrl ||
+        apiToken !== initial.apiToken ||
+        transport !== initial.transport));
+
+  const clearRemoteConfig = useCallback(() => {
+    localStorage.removeItem("psm.remoteMode");
+    localStorage.removeItem("psm.remoteServerUrl");
+    localStorage.removeItem("psm.remoteApiToken");
+    localStorage.removeItem("psm.remoteTransport");
+  }, []);
+
+  const writeRemoteConfig = useCallback(() => {
+    const trimmedServerUrl = serverUrl.trim();
+    if (!trimmedServerUrl) return;
+    localStorage.setItem("psm.remoteMode", "true");
+    localStorage.setItem("psm.remoteServerUrl", trimmedServerUrl);
+    localStorage.setItem("psm.remoteApiToken", apiToken.trim());
+    localStorage.setItem("psm.remoteTransport", transport);
+  }, [serverUrl, apiToken, transport]);
+
+  const handleEnabledChange = useCallback(
+    (checked: boolean) => {
+      setEnabled(checked);
+      if (checked) {
+        writeRemoteConfig();
+      } else {
+        clearRemoteConfig();
+      }
+    },
+    [clearRemoteConfig, writeRemoteConfig],
+  );
 
   const handleApply = useCallback(() => {
     if (enabled) {
-      localStorage.setItem("psm.remoteMode", "true");
-      localStorage.setItem("psm.remoteServerUrl", serverUrl.trim());
-      localStorage.setItem("psm.remoteApiToken", apiToken.trim());
-      localStorage.setItem("psm.remoteTransport", transport);
+      writeRemoteConfig();
     } else {
-      localStorage.removeItem("psm.remoteMode");
-      localStorage.removeItem("psm.remoteServerUrl");
-      localStorage.removeItem("psm.remoteApiToken");
-      localStorage.removeItem("psm.remoteTransport");
+      clearRemoteConfig();
     }
     window.location.reload();
-  }, [enabled, serverUrl, apiToken, transport]);
+  }, [enabled, writeRemoteConfig, clearRemoteConfig]);
 
   const handleTest = useCallback(async () => {
     if (!serverUrl.trim()) return;
@@ -174,7 +197,7 @@ export default function RemoteConnectionTab() {
             "When enabled, the app connects to a remote server via WebSocket/HTTP instead of the local backend",
           )}
           checked={enabled}
-          onChange={setEnabled}
+          onChange={handleEnabledChange}
           searchKey="advanced-remoteEnabled"
         />
 
@@ -280,25 +303,6 @@ export default function RemoteConnectionTab() {
               )}
             </div>
 
-            {dirty && (
-              <div className="flex items-center gap-3 pt-2 border-t border-border/40">
-                <button
-                  onClick={handleApply}
-                  disabled={enabled && !serverUrl.trim()}
-                  className="px-4 py-2 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {t("settings.advanced.remoteApply", "Apply & Reload")}
-                </button>
-                <span className="flex items-center gap-1.5 text-xs text-amber-400">
-                  <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-                  {t(
-                    "settings.advanced.remoteApplyHelp",
-                    "The app will reload to switch transport layer",
-                  )}
-                </span>
-              </div>
-            )}
-
             {enabled && initial.enabled && (
               <p className="text-xs text-muted-foreground/70 flex items-center gap-1.5">
                 <Wifi className="h-3 w-3" />
@@ -308,6 +312,25 @@ export default function RemoteConnectionTab() {
                 )}
               </p>
             )}
+          </div>
+        )}
+
+        {dirty && (
+          <div className="flex items-center gap-3 pt-2 border-t border-border/40">
+            <button
+              onClick={handleApply}
+              disabled={enabled && !serverUrl.trim()}
+              className="px-4 py-2 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {t("settings.advanced.remoteApply", "Apply & Reload")}
+            </button>
+            <span className="flex items-center gap-1.5 text-xs text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+              {t(
+                "settings.advanced.remoteApplyHelp",
+                "The app will reload to switch transport layer",
+              )}
+            </span>
           </div>
         )}
       </div>

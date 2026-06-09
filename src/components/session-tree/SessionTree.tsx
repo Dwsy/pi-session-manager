@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Bot, ChevronDown, ChevronRight, Circle, UserRound, Wrench } from "lucide-react";
 
 import { useSessionTreeLookup } from "@/hooks/useSessionTreeLookup";
 import type { SessionEntry } from "@/types";
@@ -66,6 +66,24 @@ function getEntryKind(entry: SessionEntry): string {
 function getEntryKindLabel(entry: SessionEntry): string {
   const kind = getEntryKind(entry);
   return kind.charAt(0).toUpperCase() + kind.slice(1);
+}
+
+function EntryKindIcon({ entry }: { entry: SessionEntry }) {
+  const kind = getEntryKind(entry);
+  const label = getEntryKindLabel(entry);
+  const Icon = kind === "user"
+    ? UserRound
+    : kind === "assistant"
+      ? Bot
+      : kind === "tool"
+        ? Wrench
+        : Circle;
+
+  return (
+    <span className={`tree-kind tree-kind-${kind}`} title={label} aria-label={label}>
+      <Icon className="tree-kind-icon" aria-hidden="true" />
+    </span>
+  );
 }
 
 function getEntryDetailText(entry: SessionEntry, label?: string): string {
@@ -558,7 +576,7 @@ const SessionTree = memo(
                 isSearchMatch && currentSearchResultId === entry.id;
               const isUserMessage =
                 entry.type === "message" && entry.message?.role === "user";
-              const isCollapsible = flatNode.node.children.length > 0;
+              const isCollapsible = flatNode.node.children.length > 1;
               const isCollapsed = collapsedNodeIds.has(entry.id);
               const disclosureLabel = `${isCollapsed ? "Expand" : "Collapse"} branch ${displayText}`;
 
@@ -605,7 +623,7 @@ const SessionTree = memo(
                       ) : null}
                       <span className="tree-node-text">{displayText}</span>
                     </span>
-                    <span className="tree-kind">{getEntryKindLabel(entry)}</span>
+                    <EntryKindIcon entry={entry} />
                   </div>
                 </div>
               );
