@@ -67,6 +67,8 @@ export const session = {
     rightPanelButtons: 'Right panel buttons',
     dragRightPanelButtons: 'Drag to the right edge to unpin',
     dragRightPanelButtonsToToolbar: 'Drag to the toolbar to pin',
+    pinToToolbar: 'Pin to toolbar',
+    unpinFromToolbar: 'Unpin from toolbar',
     sessionFeatures: 'Session features',
     openPanel: 'Open panel',
   },

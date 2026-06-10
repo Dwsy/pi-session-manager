@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSettings } from '@/hooks/useSettings'
+import { listen } from '@/transport'
 import {
   checkForUpdates,
   dismissUpdateVersion,
@@ -17,12 +18,17 @@ interface UseUpdateCheckerResult {
   updateInfo: AvailableUpdateInfo | null
   closeUpdateNotice: () => void
   openUpdateSettings: () => void
+  checkUpdate: () => void
 }
 
 export function useUpdateChecker(options?: UseUpdateCheckerOptions): UseUpdateCheckerResult {
   const { settings, loading } = useSettings()
   const [updateInfo, setUpdateInfo] = useState<AvailableUpdateInfo | null>(null)
   const setShowSettings = options?.setShowSettings
+  const setShowSettingsRef = useRef(setShowSettings)
+  useEffect(() => {
+    setShowSettingsRef.current = setShowSettings
+  }, [setShowSettings])
 
   useEffect(() => {
     if (loading) return
@@ -57,6 +63,19 @@ export function useUpdateChecker(options?: UseUpdateCheckerOptions): UseUpdateCh
     })
   }, [])
 
+  // Shared helper to open settings and navigate to update section
+  const openUpdateSection = useCallback(() => {
+    const currentSetShowSettings = setShowSettingsRef.current
+    if (currentSetShowSettings) {
+      currentSetShowSettings(true)
+    }
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(SETTINGS_NAVIGATE_EVENT, {
+        detail: { section: 'app-behavior' },
+      }))
+    }, 50)
+  }, [])
+
   const openUpdateSettings = useCallback(() => {
     const updateToOpen = updateInfo
     if (!updateToOpen) return
@@ -65,22 +84,37 @@ export function useUpdateChecker(options?: UseUpdateCheckerOptions): UseUpdateCh
     dismissUpdateVersion(updateToOpen.channel, updateToOpen.latestVersion)
     setUpdateInfo(null)
 
-    // Open settings panel and navigate to update section
-    if (setShowSettings) {
-      setShowSettings(true)
-    }
+    openUpdateSection()
+  }, [updateInfo, openUpdateSection])
+
+  // Listen for native menu "Check for Updates" event from macOS app menu
+  useEffect(() => {
+    let unlistenFn: (() => void) | undefined
     
-    // Dispatch navigation event to switch to app-behavior section (contains UpdateSettings)
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent(SETTINGS_NAVIGATE_EVENT, {
-        detail: { section: 'app-behavior' },
-      }))
-    }, 50)
-  }, [updateInfo, setShowSettings])
+    listen<void>('menu-check-update', () => {
+      openUpdateSection()
+    }).then((fn) => {
+      unlistenFn = fn
+    }).catch((err) => {
+      // Only ignore expected errors in non-Tauri environments
+      const isNonTauri = !(window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+      if (!isNonTauri) {
+        console.warn('Failed to listen for menu-check-update event:', err)
+      }
+    })
+
+    return () => {
+      unlistenFn?.()
+    }
+  }, [openUpdateSection])
+
+  // Manual check update from menu (exposed for external use)
+  const checkUpdate = openUpdateSection
 
   return {
     updateInfo,
     closeUpdateNotice,
     openUpdateSettings,
+    checkUpdate,
   }
 }

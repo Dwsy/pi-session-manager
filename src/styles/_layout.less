@@ -213,6 +213,118 @@
   font-size: 11px;
 }
 
+// Feature card wrapper for picker grid items
+.psm-session-feature-card-wrapper {
+  position: relative;
+  display: flex;
+
+  &:hover .psm-session-feature-card__pin-button {
+    opacity: 1;
+  }
+}
+
+// Pin button on feature cards in picker
+.psm-session-feature-card__pin-button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  background: rgba(var(--color-background-rgb), 0.85);
+  color: rgb(var(--color-muted-foreground));
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-standard),
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    color var(--motion-duration-fast) var(--motion-ease-standard),
+    transform var(--motion-duration-fast) var(--motion-ease-standard);
+
+  &:hover {
+    background: rgb(var(--color-secondary));
+    color: rgb(var(--color-foreground));
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
+}
+
+// Show pin button when hovering wrapper or when focused
+.psm-session-feature-card-wrapper:hover .psm-session-feature-card__pin-button,
+.psm-session-feature-card__pin-button:focus {
+  opacity: 1;
+}
+
+// Dragging state for sortable items
+[data-dragging="true"] {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+// Pinned toolbar button wrapper
+.psm-session-pinned-button-wrapper {
+  position: relative;
+  display: inline-flex;
+
+  .psm-session-pinned-button__unpin {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(var(--border-rgb), 0.6);
+    border-radius: 50%;
+    background: rgb(var(--color-background));
+    color: rgb(var(--color-muted-foreground));
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--motion-duration-fast) var(--motion-ease-standard),
+      background-color var(--motion-duration-fast) var(--motion-ease-standard),
+      color var(--motion-duration-fast) var(--motion-ease-standard),
+      transform var(--motion-duration-fast) var(--motion-ease-standard);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+
+    &:hover {
+      background: rgb(var(--color-destructive) / 0.1);
+      color: rgb(var(--color-destructive));
+      border-color: rgb(var(--color-destructive) / 0.3);
+    }
+
+    &:active {
+      transform: scale(0.9);
+    }
+  }
+
+  .psm-session-pinned-button__drag-indicator {
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 2px;
+    border-radius: 1px;
+    background: rgba(var(--muted-foreground-rgb), 0.3);
+    opacity: 0;
+    transition: opacity var(--motion-duration-fast) var(--motion-ease-standard);
+  }
+
+  &:hover {
+    .psm-session-pinned-button__unpin,
+    .psm-session-pinned-button__drag-indicator {
+      opacity: 1;
+    }
+  }
+}
+
 .psm-session-bottom-panel {
   position: relative;
   z-index: 26;

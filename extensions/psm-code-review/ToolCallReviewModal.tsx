@@ -9,6 +9,7 @@ import {
   Code2,
   Columns2,
   Copy,
+  Eye,
   FileEdit,
   FilePlus,
   FileText,
@@ -28,6 +29,7 @@ import { CodeView, type CodeViewHandle, type CodeViewItem } from "@pierre/diffs/
 
 import type { SessionEntry } from "@/types";
 import CodeBlock from "@/components/ui/CodeBlock";
+import MarkdownContent from "@/components/ui/MarkdownContent";
 import { useTheme } from "@/hooks/useAppearance";
 import {
   DEFAULT_REVIEW_FILTER,
@@ -44,6 +46,7 @@ import {
   type ReviewFilter,
 } from "./tool-review/model";
 import ReviewFileTree from "./tool-review/ReviewFileTree";
+import ReviewShellList from "./tool-review/ReviewShellList";
 import {
   buildCodeViewItems,
   buildReviewTreeModel,
@@ -532,6 +535,7 @@ function InspectorPopover({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const isShell = operation.toolName === "bash";
 
   return (
     <div className="absolute right-0 top-[calc(100%+8px)] z-30 w-[min(420px,calc(100vw-32px))] overflow-hidden rounded-[10px] border border-border/60 bg-background shadow-[0_18px_48px_-24px_rgba(var(--shadow-rgb),0.58)]">
@@ -552,7 +556,7 @@ function InspectorPopover({
           <X className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
       </div>
-      <div className="grid grid-cols-2 border-b border-border/40 bg-background/35">
+      <div className={`grid ${isShell ? 'grid-cols-2' : 'grid-cols-2'} border-b border-border/40 bg-background/35`}>
         <DetailMetric
           label="components.toolCallReview.sequence"
           fallbackLabel="Sequence"
@@ -563,18 +567,22 @@ function InspectorPopover({
           fallbackLabel="Size"
           value={formatBytes(operation.metrics.bytes)}
         />
-        <DetailMetric
-          label="components.toolCallReview.additions"
-          fallbackLabel="Additions"
-          value={`+${operation.metrics.additions}`}
-          className="text-success"
-        />
-        <DetailMetric
-          label="components.toolCallReview.deletions"
-          fallbackLabel="Deletions"
-          value={`-${operation.metrics.deletions}`}
-          className="text-destructive"
-        />
+        {!isShell && (
+          <>
+            <DetailMetric
+              label="components.toolCallReview.additions"
+              fallbackLabel="Additions"
+              value={`+${operation.metrics.additions}`}
+              className="text-success"
+            />
+            <DetailMetric
+              label="components.toolCallReview.deletions"
+              fallbackLabel="Deletions"
+              value={`-${operation.metrics.deletions}`}
+              className="text-destructive"
+            />
+          </>
+        )}
       </div>
       <InspectorRow
         label="components.toolCallReview.entry"
@@ -615,8 +623,10 @@ function ReviewStatusStrip({
 }) {
   const { t } = useTranslation();
   const status = getReviewStatus(operation, hasPatch, hasPrimaryOutput);
-  const impact =
-    operation.metrics.additions + operation.metrics.deletions > 0
+  const isShell = operation.toolName === "bash";
+  const impact = isShell
+    ? null
+    : operation.metrics.additions + operation.metrics.deletions > 0
       ? `+${operation.metrics.additions} / -${operation.metrics.deletions}`
       : operation.metrics.lines > 0
         ? t("components.toolCallReview.lineCount", "{{count}} lines", {
@@ -636,12 +646,14 @@ function ReviewStatusStrip({
           {t(status.labelKey, status.fallbackLabel)}
         </span>
       </div>
-      <div className="inline-flex min-w-0 items-center gap-1.5 rounded-[4px] border border-border/40 bg-background/45 px-1.5 py-0.5 text-foreground">
-        <span className="font-medium uppercase tracking-[0.1em] text-muted-foreground">
-          {t("components.toolCallReview.impact", "Impact")}
-        </span>
-        <span className="truncate font-mono font-semibold">{impact}</span>
-      </div>
+      {impact && (
+        <div className="inline-flex min-w-0 items-center gap-1.5 rounded-[4px] border border-border/40 bg-background/45 px-1.5 py-0.5 text-foreground">
+          <span className="font-medium uppercase tracking-[0.1em] text-muted-foreground">
+            {t("components.toolCallReview.impact", "Impact")}
+          </span>
+          <span className="truncate font-mono font-semibold">{impact}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -751,6 +763,7 @@ function DetailPanel({
   const { t } = useTranslation();
   const { theme } = useTheme();
   const codeViewRef = useRef<CodeViewHandle<undefined>>(null);
+  const [markdownPreview, setMarkdownPreview] = useState(false);
 
   useEffect(() => {
     if (!selectedOperationId || codeViewItems.length === 0) return;
@@ -1018,13 +1031,37 @@ function DetailPanel({
                   <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
                     <div className="flex items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.52)] px-3 py-2 text-xs font-medium text-foreground">
                       <FileText className="h-3.5 w-3.5" aria-hidden="true" />
-                      {displayPath}
+                      <span className="flex-1 truncate">{displayPath}</span>
+                      {displayPath.toLowerCase().endsWith('.md') && (
+                        <button
+                          type="button"
+                          onClick={() => setMarkdownPreview((v) => !v)}
+                          className={`inline-flex h-6 items-center gap-1 rounded-[4px] border px-2 text-[11px] motion-surface focus-ring ${
+                            markdownPreview
+                              ? 'border-border-hover bg-surface text-foreground'
+                              : 'border-border/45 bg-background/60 text-muted-foreground hover:border-border-hover hover:bg-surface hover:text-foreground'
+                          }`}
+                          title={markdownPreview ? t('components.toolCallReview.previewMode.code', 'View code') : t('components.toolCallReview.previewMode.preview', 'Preview markdown')}
+                        >
+                          <Eye className="h-3 w-3" aria-hidden="true" />
+                          <span>{markdownPreview ? t('components.toolCallReview.code', 'Code') : t('components.toolCallReview.preview', 'Preview')}</span>
+                        </button>
+                      )}
                     </div>
-                    <CodeBlock
-                      code={operation.content || operation.output || ''}
-                      language={language}
-                      showLineNumbers
-                    />
+                    {markdownPreview && displayPath.toLowerCase().endsWith('.md') ? (
+                      <div className="max-h-[60vh] overflow-auto p-4">
+                        <MarkdownContent
+                          content={operation.content || operation.output || ''}
+                          className="text-sm"
+                        />
+                      </div>
+                    ) : (
+                      <CodeBlock
+                        code={operation.content || operation.output || ''}
+                        language={language}
+                        showLineNumbers
+                      />
+                    )}
                   </div>
                 ) : (
                   <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
@@ -1475,6 +1512,16 @@ export default function ToolCallReviewModal({
                         </div>
                       </div>
                     </div>
+                  ) : resolvedMode === "shell" ? (
+                    <ReviewShellList
+                      operations={filteredOperations}
+                      selectedId={selectedId}
+                      onSelect={setSelectedId}
+                      ariaLabel={t(
+                        "components.toolCallReview.operationList",
+                        "Reviewable operations",
+                      )}
+                    />
                   ) : (
                     <ReviewFileTree
                       tree={treeModel}
@@ -1487,32 +1534,55 @@ export default function ToolCallReviewModal({
                     />
                   )}
                 </div>
-                <div className="grid grid-cols-4 divide-x divide-border/35 border-t border-border/45 bg-[rgb(var(--color-surface-dark)/0.62)]">
-                  <SummaryItem
-                    label="components.toolCallReview.summary.changes"
-                    fallbackLabel="Changes"
-                    value={totals.changes}
-                    tone="blue"
-                  />
-                  <SummaryItem
-                    label="components.toolCallReview.summary.add"
-                    fallbackLabel="Add"
-                    value={totals.additions.toLocaleString()}
-                    tone="green"
-                  />
-                  <SummaryItem
-                    label="components.toolCallReview.summary.del"
-                    fallbackLabel="Del"
-                    value={totals.deletions.toLocaleString()}
-                    tone="amber"
-                  />
-                  <SummaryItem
-                    label="components.toolCallReview.summary.err"
-                    fallbackLabel="Err"
-                    value={totals.errors}
-                    tone="red"
-                  />
-                </div>
+                {resolvedMode === "shell" ? (
+                  <div className="grid grid-cols-3 divide-x divide-border/35 border-t border-border/45 bg-[rgb(var(--color-surface-dark)/0.62)]">
+                    <SummaryItem
+                      label="components.toolCallReview.summary.shell"
+                      fallbackLabel="Shell"
+                      value={modeCounts.shell}
+                      tone="blue"
+                    />
+                    <SummaryItem
+                      label="components.toolCallReview.summary.executed"
+                      fallbackLabel="Executed"
+                      value={totals.changes}
+                      tone="green"
+                    />
+                    <SummaryItem
+                      label="components.toolCallReview.summary.err"
+                      fallbackLabel="Err"
+                      value={totals.errors}
+                      tone="red"
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-4 divide-x divide-border/35 border-t border-border/45 bg-[rgb(var(--color-surface-dark)/0.62)]">
+                    <SummaryItem
+                      label="components.toolCallReview.summary.changes"
+                      fallbackLabel="Changes"
+                      value={totals.changes}
+                      tone="blue"
+                    />
+                    <SummaryItem
+                      label="components.toolCallReview.summary.add"
+                      fallbackLabel="Add"
+                      value={totals.additions.toLocaleString()}
+                      tone="green"
+                    />
+                    <SummaryItem
+                      label="components.toolCallReview.summary.del"
+                      fallbackLabel="Del"
+                      value={totals.deletions.toLocaleString()}
+                      tone="amber"
+                    />
+                    <SummaryItem
+                      label="components.toolCallReview.summary.err"
+                      fallbackLabel="Err"
+                      value={totals.errors}
+                      tone="red"
+                    />
+                  </div>
+                )}
               </aside>
             )}
 

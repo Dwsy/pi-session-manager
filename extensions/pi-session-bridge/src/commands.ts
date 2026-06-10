@@ -72,7 +72,6 @@ async function openInPsmCommand(args: string, ctx: ExtensionContext) {
   }
 }
 
-register("open-in-pms", "Open current session in Pi Session Manager", openInPsmCommand);
 register("open-in-psm", "Open current session in Pi Session Manager", openInPsmCommand);
 
 // ── /psm — Single-action panel ────────────────────────

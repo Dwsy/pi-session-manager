@@ -67,6 +67,8 @@ export const session = {
     rightPanelButtons: '右侧面板按钮',
     dragRightPanelButtons: '拖到右侧边缘取消固定',
     dragRightPanelButtonsToToolbar: '拖到工具栏固定',
+    pinToToolbar: '固定到工具栏',
+    unpinFromToolbar: '从工具栏取消固定',
     sessionFeatures: '会话功能',
     openPanel: '打开面板',
   },

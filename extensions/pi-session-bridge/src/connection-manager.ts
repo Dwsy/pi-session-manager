@@ -38,6 +38,18 @@ function shouldNotify(newState: string): boolean {
   return true;
 }
 
+function resolveSessionId(sessionFile: string): string {
+  const base = sessionFile.replace(/\.jsonl$/, "");
+  const stem = base.substring(base.lastIndexOf("/") + 1);
+
+  const underscoreIndex = stem.lastIndexOf("_");
+  if (underscoreIndex >= 0 && underscoreIndex < stem.length - 1) {
+    return stem.substring(underscoreIndex + 1);
+  }
+
+  return stem;
+}
+
 // ── Status badge mapping ──────────────────────────────
 
 function applyStatus(ctx: ExtensionContext, state: BridgeState, attempt: number) {
@@ -290,8 +302,8 @@ export function initSession(ctx: ExtensionContext, pi?: ExtensionAPI) {
   latestCtx = ctx;
   if (pi) piApi = pi;
   const sf = ctx.sessionManager.getSessionFile() || "";
-  sessionId = path.basename(sf, ".jsonl");
   sessionPath = sf;
+  sessionId = resolveSessionId(sf);
   lastNotifyState = "";
 
   if (!liveModeEnabled) return;
@@ -317,16 +329,14 @@ export function tryMidSessionInit(pi: {
   getCurrentContext?: () => ExtensionContext;
   context?: ExtensionContext;
 }) {
-  if (!liveModeEnabled) return;
   try {
     const ctx = pi.getCurrentContext?.() || pi.context;
-    if (ctx) {
-      latestCtx = ctx;
-      const sf = ctx.sessionManager.getSessionFile() || "";
-      sessionId = path.basename(sf, ".jsonl");
-      sessionPath = sf;
-      if (sessionId) doConnect();
-    }
+    if (!ctx) return;
+    latestCtx = ctx;
+    const sf = ctx.sessionManager.getSessionFile() || "";
+    sessionPath = sf;
+    sessionId = resolveSessionId(sf);
+    if (liveModeEnabled && sessionId) doConnect();
   } catch {
     /* fail gracefully */
   }

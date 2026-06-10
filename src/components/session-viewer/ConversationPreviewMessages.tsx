@@ -268,6 +268,10 @@ function CollapsedProcessSummary({
     t("session.preview.process", "process"),
   );
 
+  const hasReviewableOps = summaryItems.some((item) =>
+    item.key.startsWith("tool:"),
+  );
+
   return (
     <div className="group/process-summary relative flex h-9 w-full overflow-hidden rounded-sm border border-border/70 bg-secondary/30 transition-colors hover:bg-secondary/45">
       <button
@@ -304,7 +308,8 @@ function CollapsedProcessSummary({
       <button
         type="button"
         onClick={handleReview}
-        className="inline-flex h-full flex-shrink-0 items-center gap-1.5 border-l border-border/55 px-2.5 text-[11px] font-medium text-muted-foreground motion-color focus-ring hover:bg-surface/60 hover:text-foreground"
+        disabled={!hasReviewableOps}
+        className="inline-flex h-full flex-shrink-0 items-center gap-1.5 border-l border-border/55 px-2.5 text-[11px] font-medium text-muted-foreground motion-color focus-ring hover:bg-surface/60 hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label={t("session.preview.review", "Review tool calls")}
         title={t("session.preview.review", "Review tool calls")}
       >

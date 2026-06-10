@@ -158,7 +158,7 @@ pi install Dwsy/psm-bridge
 | `/psm-connect` / `/psm-disconnect` | Manual connection control |
 | `/state` `/state-set` `/state-list` `/state-clear` | Tag management |
 | `/flow <action>` | Quick transitions (todo → wip → done) |
-| `/open-in-psm` | Open current session in PSM desktop app |
+| `/open-in-psm` | Open current session in PSM (web app by default; append `web` to force browser) |
 
 Status indicators: `[psm]` connected, `[retry N]` reconnecting, `[timeout]` disconnected, `[psm: off]` live mode disabled.
 
