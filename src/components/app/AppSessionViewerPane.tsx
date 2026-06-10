@@ -18,6 +18,7 @@ const RIGHT_PANEL_MAX_WIDTH = 720;
 
 interface SessionFeatureItem {
   id: string;
+  panelId?: string;
   title: string;
   description: string;
   active: boolean;
@@ -239,6 +240,7 @@ function AppSessionViewerPane({
   const terminalDescription = t("terminal.sessionDescription", "Session shell");
   const rightFeatureItems = useMemo<SessionFeatureItem[]>(() => rightPanelToolbarItems.map((item) => ({
     id: item.id,
+    panelId: item.panelId,
     title: item.title,
     description: openPanelDescription,
     active: item.panelId ? activePanelId === item.panelId : false,
@@ -250,8 +252,9 @@ function AppSessionViewerPane({
     icon: <PanelRightOpen className="h-4 w-4" aria-hidden="true" />,
   })), [activePanelId, openPanelDescription, rightPanelToolbarItems, togglePanel]);
   const bottomFeatureItems = useMemo<SessionFeatureItem[]>(() => {
-    const items = bottomPanelToolbarItems.map((item) => ({
+    const items: SessionFeatureItem[] = bottomPanelToolbarItems.map((item) => ({
       id: item.id,
+      panelId: item.panelId,
       title: item.title,
       description: openPanelDescription,
       active: item.panelId ? activeBottomPanelId === item.panelId : false,

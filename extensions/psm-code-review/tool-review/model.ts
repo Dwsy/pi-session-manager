@@ -27,7 +27,7 @@ export interface FileOperation {
   metrics: OperationMetrics;
 }
 
-export type ReviewFilter = "all" | "changes" | "reads" | "shell" | "errors";
+export type ReviewFilter = "all" | "writes" | "edits" | "reads" | "shell" | "errors";
 
 export const DEFAULT_REVIEW_FILTER: ReviewFilter = "all";
 
@@ -55,6 +55,54 @@ function getStringArg(
     }
   }
   return "";
+}
+
+function getEditTextPair(args: Record<string, unknown>) {
+  const oldText = getStringArg(
+    args,
+    "old_string",
+    "oldStr",
+    "before",
+    "oldText",
+  );
+  const newText = getStringArg(
+    args,
+    "new_string",
+    "newStr",
+    "after",
+    "newText",
+  );
+
+  if (oldText || newText) {
+    return { oldText, newText };
+  }
+
+  const edits = args.edits;
+  if (!Array.isArray(edits)) return null;
+
+  for (const item of edits) {
+    const edit = asRecord(item);
+    const nestedOldText = getStringArg(
+      edit,
+      "old_string",
+      "oldStr",
+      "before",
+      "oldText",
+    );
+    const nestedNewText = getStringArg(
+      edit,
+      "new_string",
+      "newStr",
+      "after",
+      "newText",
+    );
+
+    if (nestedOldText || nestedNewText) {
+      return { oldText: nestedOldText, newText: nestedNewText };
+    }
+  }
+
+  return null;
 }
 
 function normalizeReviewToolName(name: string) {
@@ -223,11 +271,6 @@ export function formatShortPath(path: string) {
   return `.../${parts.slice(-3).join("/")}`;
 }
 
-function normalizeDiffPath(path: string) {
-  const trimmed = path.trim();
-  return trimmed && trimmed !== "Unknown target" ? trimmed : "untitled";
-}
-
 function isUnifiedDiff(value: string) {
   return (
     /(^|\n)@@ /.test(value) &&
@@ -235,24 +278,9 @@ function isUnifiedDiff(value: string) {
   );
 }
 
-function makeNewFilePatch(path: string, content: string) {
-  if (!content) return "";
-  const lines = content.split("\n");
-  return [
-    "--- /dev/null",
-    `+++ b/${normalizeDiffPath(path)}`,
-    `@@ -0,0 +1,${Math.max(1, lines.length)} @@`,
-    lines.map((line) => `+${line}`).join("\n"),
-  ].join("\n");
-}
-
 export function getOperationPatch(operation: FileOperation) {
   if (operation.diff && isUnifiedDiff(operation.diff)) {
     return operation.diff;
-  }
-
-  if (operation.toolName === "write" && operation.content) {
-    return makeNewFilePatch(operation.filePath, operation.content);
   }
 
   return "";
@@ -304,23 +332,12 @@ function getEditFileContents(operation: FileOperation): {
   newFile: FileContents;
 } | null {
   const fileName = getPathBasename(operation.filePath);
-  const oldString = getStringArg(
-    operation.args,
-    "old_string",
-    "oldStr",
-    "before",
-  );
-  const newString = getStringArg(
-    operation.args,
-    "new_string",
-    "newStr",
-    "after",
-  );
+  const textPair = getEditTextPair(operation.args);
 
-  if (oldString || newString) {
+  if (textPair) {
     return {
-      oldFile: { name: fileName, contents: oldString },
-      newFile: { name: fileName, contents: newString },
+      oldFile: { name: fileName, contents: textPair.oldText },
+      newFile: { name: fileName, contents: textPair.newText },
     };
   }
 
@@ -445,7 +462,11 @@ export function extractFileOperations(
       const args = asRecord(resolved.args ?? toolCall.arguments);
       const output = typeof resolved.output === "string" ? resolved.output : "";
       const diff = typeof resolved.diff === "string" ? resolved.diff : "";
-      const contentArg = getStringArg(args, "content", "new_string");
+      const editTextPair = toolName === "edit" ? getEditTextPair(args) : null;
+      const contentArg =
+        toolName === "edit"
+          ? (editTextPair?.newText || getStringArg(args, "content", "new_string"))
+          : getStringArg(args, "content", "new_string");
       const filePath = getOperationPath(toolName, args);
       const preview = getOperationPreview(
         toolName,

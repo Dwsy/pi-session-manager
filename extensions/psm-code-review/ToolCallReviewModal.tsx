@@ -60,6 +60,12 @@ interface DiffConfig {
   indicators: boolean;
 }
 
+function toPierreLineDiffType(type: DiffConfig['lineDiffType']) {
+  if (type === 'words') return 'word';
+  if (type === 'chars') return 'char';
+  return 'none';
+}
+
 interface ToolCallReviewModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -137,6 +143,7 @@ const FILTER_OPTIONS: Array<{
   labelKey: string;
   fallbackLabel: string;
   predicate: (operation: FileOperation) => boolean;
+  iconClass?: string;
 }> = [
   {
     id: "all",
@@ -146,11 +153,20 @@ const FILTER_OPTIONS: Array<{
     predicate: () => true,
   },
   {
-    id: "changes",
+    id: "writes",
+    icon: FilePlus,
+    labelKey: "components.toolCallReview.filters.writes",
+    fallbackLabel: "New",
+    predicate: (operation) => operation.toolName === "write",
+    iconClass: "text-[var(--tool-color-write)]",
+  },
+  {
+    id: "edits",
     icon: FileEdit,
-    labelKey: "components.toolCallReview.filters.changes",
-    fallbackLabel: "Changes",
-    predicate: isChangeOperation,
+    labelKey: "components.toolCallReview.filters.edits",
+    fallbackLabel: "Edit",
+    predicate: (operation) => operation.toolName === "edit",
+    iconClass: "text-[var(--tool-color-edit)]",
   },
   {
     id: "reads",
@@ -364,6 +380,9 @@ function FilterBar({
         const disabled = counts[option.id] === 0 && option.id !== "all";
         const Icon = option.icon;
         const label = t(option.labelKey, option.fallbackLabel);
+        const iconClass = active
+          ? option.iconClass ?? "text-[var(--accent)]"
+          : "text-muted-foreground/70 group-hover:text-foreground";
         return (
           <button
             key={option.id}
@@ -382,7 +401,7 @@ function FilterBar({
             }`}
           >
             <Icon
-              className={`h-3.5 w-3.5 flex-shrink-0 ${active ? "text-[var(--accent)]" : "text-muted-foreground/70 group-hover:text-foreground"}`}
+              className={`h-3.5 w-3.5 flex-shrink-0 ${iconClass}`}
               aria-hidden="true"
             />
             <span className="truncate">{label}</span>
@@ -623,6 +642,7 @@ function DetailPanel({
   contentExpanded,
   onToggleContentExpanded,
   controls,
+  diffConfig,
 }: {
   operation: FileOperation | null;
   codeViewItems: CodeViewItem[];
@@ -632,6 +652,7 @@ function DetailPanel({
   contentExpanded: boolean;
   onToggleContentExpanded: () => void;
   controls: CodeViewControls;
+  diffConfig?: DiffConfig;
 }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -685,6 +706,7 @@ function DetailPanel({
     operation.diff,
   );
   const usesCodeView = isChangeOperation(operation) && hasCodeViewOutput;
+  const showsDiffControls = usesCodeView && codeViewItems.some((item) => item.type === "diff");
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const rootIsDark = document.documentElement.classList.contains("theme-dark");
   const themeType =
@@ -738,7 +760,7 @@ function DetailPanel({
             {displayPath}
           </div>
         </div>
-        {usesCodeView && <ViewControlsToolbar controls={controls} />}
+        {showsDiffControls && <ViewControlsToolbar controls={controls} />}
         <button
           type="button"
           onClick={onToggleContentExpanded}
@@ -802,15 +824,15 @@ function DetailPanel({
                   options={{
                     theme: { dark: "pierre-dark", light: "pierre-light" },
                     themeType,
-                    diffStyle: controls.splitView ? "split" : "stacked",
+                    diffStyle: controls.splitView ? "split" : "unified",
                     overflow: controls.wrap ? "wrap" : "scroll",
                     stickyHeaders: true,
                     hunkSeparators: "line-info",
                     diffIndicators: diffConfig?.indicators ?? true ? "bars" : "none",
-                    lineDiffType: diffConfig?.lineDiffType ?? "words",
+                    lineDiffType: toPierreLineDiffType(diffConfig?.lineDiffType ?? "words"),
                     disableLineNumbers: !(diffConfig?.lineNumbers ?? true),
                     expandUnchanged: controls.expandUnchanged,
-                    lineHoverHighlight: true,
+                    lineHoverHighlight: "line",
                     enableLineSelection: true,
                     enableGutterUtility: true,
                     itemMetrics: {
@@ -903,7 +925,7 @@ function DetailPanel({
           </div>
         </div>
 
-        {false && !contentExpanded && (
+        {!contentExpanded && (
           <aside className="hidden min-h-0 w-72 flex-shrink-0 flex-col border-l border-border/55 bg-[rgb(var(--color-surface-dark)/0.46)] xl:flex">
             <div className="flex min-h-[40px] items-center gap-2 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.64)] px-3 py-2 text-[12px] font-semibold text-foreground">
               <Braces
@@ -987,6 +1009,18 @@ export default function ToolCallReviewModal({
   const [splitView, setSplitView] = useState(diffConfig?.splitView ?? true);
   const [wrap, setWrap] = useState(diffConfig?.wrap ?? false);
   const [expandUnchanged, setExpandUnchanged] = useState(diffConfig?.expandUnchanged ?? false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSplitView(diffConfig?.splitView ?? true);
+    setWrap(diffConfig?.wrap ?? false);
+    setExpandUnchanged(diffConfig?.expandUnchanged ?? false);
+  }, [
+    diffConfig?.expandUnchanged,
+    diffConfig?.splitView,
+    diffConfig?.wrap,
+    isOpen,
+  ]);
 
   const codeViewControls = useMemo<CodeViewControls>(
     () => ({
@@ -1359,6 +1393,7 @@ export default function ToolCallReviewModal({
               contentExpanded={contentExpanded}
               onToggleContentExpanded={handleToggleContentExpanded}
               controls={codeViewControls}
+              diffConfig={diffConfig}
             />
           </div>
         )}

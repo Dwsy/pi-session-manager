@@ -57,13 +57,14 @@ export const components = {
     },
     filters: {
       all: '全部',
-      changes: '变更',
+      writes: '新建',
+      edits: '编辑',
       reads: '读取',
       shell: '命令',
       errors: '错误',
     },
     tools: {
-      write: '写入',
+      write: '新建',
       edit: '编辑',
       read: '读取',
       bash: '命令',

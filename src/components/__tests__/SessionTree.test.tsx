@@ -293,6 +293,56 @@ describe('SessionTree', () => {
     expect(onNodeClick).toHaveBeenCalledWith('root-user', 'root-user');
   });
 
+  it('supports collapsing and expanding branch nodes', () => {
+    const branchedEntries: SessionEntry[] = [
+      {
+        type: 'message',
+        id: 'root-user',
+        timestamp: '2026-04-09T10:00:00Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Root prompt' }],
+        },
+      },
+      {
+        type: 'message',
+        id: 'branch-a-assistant',
+        parentId: 'root-user',
+        timestamp: '2026-04-09T10:01:00Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Original branch reply' }],
+        },
+      },
+      {
+        type: 'message',
+        id: 'branch-b-assistant',
+        parentId: 'root-user',
+        timestamp: '2026-04-09T10:02:00Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Newer branch reply' }],
+        },
+      },
+    ];
+
+    renderSessionTree({
+      entries: branchedEntries,
+      activeLeafId: 'branch-a-assistant',
+      resolvedLabelsByTargetId: {},
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse branch Root prompt' }));
+
+    expect(screen.queryByText('Original branch reply')).toBeNull();
+    expect(screen.queryByText('Newer branch reply')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand branch Root prompt' }));
+
+    expect(screen.getAllByText('Original branch reply').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Newer branch reply').length).toBeGreaterThan(0);
+  });
+
   it('preserves nodes that depend on raw label entries in the tree topology', () => {
     renderSessionTree({ filter: 'all' });
 

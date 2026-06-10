@@ -1,8 +1,8 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use colored::*;
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::Write;
 use std::time::Duration;
 
@@ -666,13 +666,13 @@ pub async fn run() -> Result<()> {
 }
 
 /// Handle update check command
-async fn handle_update_check(
-    client: &Client,
-    base_url: &str,
-    channel: &str,
-) -> Result<()> {
-    println!("{} Checking for updates (channel: {})...", "→".cyan(), channel.yellow());
-    
+async fn handle_update_check(client: &Client, base_url: &str, channel: &str) -> Result<()> {
+    println!(
+        "{} Checking for updates (channel: {})...",
+        "→".cyan(),
+        channel.yellow()
+    );
+
     let data = request_command(
         client,
         base_url,
@@ -682,7 +682,10 @@ async fn handle_update_check(
     .await?;
 
     if data.is_null() || data.as_null().is_some() {
-        println!("{}", "✓ No updates available. You are running the latest version.".green());
+        println!(
+            "{}",
+            "✓ No updates available. You are running the latest version.".green()
+        );
         return Ok(());
     }
 
@@ -693,7 +696,7 @@ async fn handle_update_check(
     println!("{}", format!("⚠ Update available!").yellow().bold());
     println!("  Current version: {}", current_version.cyan());
     println!("  Latest version:  {}", new_version.green().bold());
-    
+
     if !body.is_empty() {
         println!("\n{}", "Release notes:".dimmed());
         for line in body.lines().take(10) {
@@ -704,8 +707,11 @@ async fn handle_update_check(
         }
     }
 
-    println!("\nTo install, run: {}", format!("pi-session-cli update install --channel {}", channel).cyan());
-    
+    println!(
+        "\nTo install, run: {}",
+        format!("pi-session-cli update install --channel {}", channel).cyan()
+    );
+
     Ok(())
 }
 
@@ -726,7 +732,10 @@ async fn handle_update_install(
     .await?;
 
     if data.is_null() || data.as_null().is_some() {
-        println!("{}", "✓ No updates available. You are running the latest version.".green());
+        println!(
+            "{}",
+            "✓ No updates available. You are running the latest version.".green()
+        );
         return Ok(());
     }
 
@@ -734,27 +743,37 @@ async fn handle_update_install(
     let new_version = data["version"].as_str().unwrap_or("unknown");
 
     println!("{}", format!("⚠ Update found:").yellow().bold());
-    println!("  {} → {}", current_version.cyan(), new_version.green().bold());
+    println!(
+        "  {} → {}",
+        current_version.cyan(),
+        new_version.green().bold()
+    );
 
     // CLI mode: provide download URL and instructions
     let update_channels_json = include_str!("../../src/runtime-data/update-channels.json");
     let config: Value = serde_json::from_str(update_channels_json)?;
     let owner = config["owner"].as_str().unwrap_or("Dwsy");
     let repo = config["repo"].as_str().unwrap_or("pi-session-manager");
-    
-    let release_url = format!("https://github.com/{}/{}/releases/tag/v{}", owner, repo, new_version);
-    
-    println!("\n{}", "Note: CLI self-update requires manual download.".dimmed());
+
+    let release_url = format!(
+        "https://github.com/{}/{}/releases/tag/v{}",
+        owner, repo, new_version
+    );
+
+    println!(
+        "\n{}",
+        "Note: CLI self-update requires manual download.".dimmed()
+    );
     println!("{}", "Download the new version from:".dimmed());
     println!("  {}", release_url.cyan().underline());
-    
+
     if !skip_confirm {
         print!("\n{} Open browser to download page? [y/N] ", "?".yellow());
         std::io::stdout().flush()?;
-        
+
         let mut input = String::new();
         std::io::stdin().read_line(&mut input)?;
-        
+
         if input.trim().to_lowercase() != "y" {
             println!("{}", "Cancelled.".dimmed());
             return Ok(());
@@ -768,13 +787,16 @@ async fn handle_update_install(
     let open_cmd = "xdg-open";
     #[cfg(target_os = "windows")]
     let open_cmd = "start";
-    
+
     let _ = std::process::Command::new(open_cmd)
         .arg(&release_url)
         .spawn();
-    
+
     println!("{}", "Opening browser...".green());
-    println!("\n{}", "After downloading, replace the binary with the new version.".dimmed());
+    println!(
+        "\n{}",
+        "After downloading, replace the binary with the new version.".dimmed()
+    );
 
     Ok(())
 }

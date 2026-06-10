@@ -57,13 +57,14 @@ export const components = {
     },
     filters: {
       all: 'All',
-      changes: 'Changes',
+      writes: 'New',
+      edits: 'Edit',
       reads: 'Reads',
       shell: 'Shell',
       errors: 'Errors',
     },
     tools: {
-      write: 'Write',
+      write: 'New',
       edit: 'Edit',
       read: 'Read',
       bash: 'Shell',

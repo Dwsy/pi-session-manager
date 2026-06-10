@@ -33,6 +33,22 @@ describe("useSessionViewerDerivedData", () => {
     ]);
   });
 
+  it("keeps the full transcript renderable when tree selection changes", () => {
+    const entries = [
+      message("root-user", "user", "Root prompt"),
+      message("branch-a-assistant", "assistant", "Original branch reply", "root-user"),
+      message("branch-b-assistant", "assistant", "Newer branch reply", "root-user"),
+    ];
+
+    const { result } = renderHook(() => useSessionViewerDerivedData(entries, "branch-a-assistant"));
+
+    expect(result.current.renderableEntries.map((entry) => entry.id)).toEqual([
+      "root-user",
+      "branch-a-assistant",
+      "branch-b-assistant",
+    ]);
+  });
+
   it("indexes tool results by tool call id", () => {
     const entries = [
       message("assistant-1", "assistant", "Running tool"),

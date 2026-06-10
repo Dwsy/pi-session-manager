@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "@/transport";
-import type { SessionInfo } from "@/types";
+import { invoke, listen } from "@/transport";
+import type { SessionInfo, SessionsDiff } from "@/types";
 import {
   DEFAULT_SESSION_SORT_BY,
   DEFAULT_SESSION_SORT_ORDER,
@@ -355,20 +355,65 @@ export function usePaginatedSessions({
 
     void requestPage(0, { append: false });
 
-    // Auto-refresh on live events (debounced to avoid scan storms)
+    // Auto-refresh paginated sidebar data for backend runtimes.
     if (shouldUseBackend) {
+      let disposed = false;
+      let unlistenSessionsChanged: (() => void) | null = null;
+      let watcherDebounce: ReturnType<typeof setTimeout> | null = null;
       let liveDebounce: ReturnType<typeof setTimeout> | null = null;
-      const debouncedRefresh = () => {
+
+      const debouncedWatcherRefresh = () => {
+        if (watcherDebounce) clearTimeout(watcherDebounce);
+        watcherDebounce = setTimeout(() => {
+          watcherDebounce = null;
+          void refresh({ silent: true, preserveCount: true });
+        }, 150);
+      };
+
+      const debouncedLiveRefresh = () => {
         if (liveDebounce) clearTimeout(liveDebounce);
         liveDebounce = setTimeout(() => {
           liveDebounce = null;
-          refresh({ silent: true });
+          void refresh({ silent: true });
         }, 5000);
       };
-      const unsubscribeRegistered = psmRuntimeEventBus.subscribe("pi-live:session_registered", debouncedRefresh);
-      const unsubscribeDisconnected = psmRuntimeEventBus.subscribe("pi-live:session_disconnected", debouncedRefresh);
+
+      void listen<SessionsDiff>("sessions-changed", ({ payload }) => {
+        const hasChanges =
+          (payload?.updated?.length ?? 0) > 0 ||
+          (payload?.removed?.length ?? 0) > 0;
+        if (!hasChanges) {
+          return;
+        }
+        debouncedWatcherRefresh();
+      })
+        .then((unlisten) => {
+          if (disposed) {
+            unlisten();
+            return;
+          }
+          unlistenSessionsChanged = unlisten;
+        })
+        .catch((error) => {
+          console.error(
+            "[usePaginatedSessions] Failed to subscribe sessions-changed:",
+            error,
+          );
+        });
+
+      const unsubscribeRegistered = psmRuntimeEventBus.subscribe(
+        "pi-live:session_registered",
+        debouncedLiveRefresh,
+      );
+      const unsubscribeDisconnected = psmRuntimeEventBus.subscribe(
+        "pi-live:session_disconnected",
+        debouncedLiveRefresh,
+      );
       return () => {
+        disposed = true;
+        if (watcherDebounce) clearTimeout(watcherDebounce);
         if (liveDebounce) clearTimeout(liveDebounce);
+        unlistenSessionsChanged?.();
         unsubscribeRegistered();
         unsubscribeDisconnected();
       };

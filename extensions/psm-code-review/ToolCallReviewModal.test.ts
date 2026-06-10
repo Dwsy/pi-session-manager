@@ -237,6 +237,44 @@ describe("ToolCallReviewModal data model", () => {
     });
   });
 
+  it("extracts nested Pi edit operations from edits oldText/newText", () => {
+    const operations = extractFileOperations(
+      [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-pi-edit",
+            name: "edit",
+            arguments: {
+              path: "app/build.gradle",
+              edits: [
+                {
+                  oldText: "packagingOptions {\n    exclude \"/META-INF/**\"\n}",
+                  newText:
+                    "packagingOptions {\n    resources {\n        excludes += [\"META-INF/LICENSE*\"]\n    }\n}",
+                },
+              ],
+            },
+          },
+        ]),
+      ],
+      new Map(),
+    );
+
+    expect(operations[0]).toMatchObject({
+      toolName: "edit",
+      filePath: "app/build.gradle",
+      content:
+        "packagingOptions {\n    resources {\n        excludes += [\"META-INF/LICENSE*\"]\n    }\n}",
+      preview: "packagingOptions {",
+      metrics: {
+        additions: 0,
+        deletions: 0,
+        lines: 5,
+      },
+    });
+  });
+
   it("extracts task operations with description fallback and output metrics", () => {
     const operations = extractFileOperations(
       [
@@ -396,6 +434,55 @@ describe("ToolCallReviewModal UI behavior", () => {
 
     expect(await screen.findByText("Task")).toBeTruthy();
     expect(screen.getAllByText(/review repository changes/).length).toBeGreaterThan(0);
+  });
+
+  it("splits new file and edit operations into separate filters", async () => {
+    renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-write",
+            name: "write",
+            arguments: {
+              file_path: "src/NewFile.ts",
+              content: "export const created = true;\n",
+            },
+          },
+          {
+            type: "toolCall",
+            id: "call-edit",
+            name: "edit",
+            arguments: {
+              path: "src/ExistingFile.ts",
+              old_string: "export const value = 1;",
+              new_string: "export const value = 2;",
+            },
+          },
+          {
+            type: "toolCall",
+            id: "call-read",
+            name: "read",
+            arguments: { path: "src/config.ts" },
+          },
+        ]),
+      ],
+    });
+
+    expect(screen.getByRole("radio", { name: /New\s*1/ })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /Edit\s*1/ })).toBeTruthy();
+    expect(screen.queryByRole("radio", { name: /Changes/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole("radio", { name: /New\s*1/ }));
+
+    const shadowRoot = await getFileTreeShadowRoot();
+    await waitFor(() => {
+      const treeText = Array.from(shadowRoot.querySelectorAll("button"))
+        .map((button) => `${button.textContent ?? ""} ${button.getAttribute("data-item-path") ?? ""}`)
+        .join("\n");
+      expect(treeText).toContain("NewFile.ts");
+      expect(treeText).not.toContain("ExistingFile.ts");
+    });
   });
 
   it("selects shell tree nodes and keeps the detail panel on that command", async () => {

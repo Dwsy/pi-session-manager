@@ -107,7 +107,7 @@ function AppDesktopSidebar({
 
   return (
     <div
-      className="app-desktop-sidebar w-80 border-r border-border flex flex-col"
+      className="app-desktop-sidebar relative w-80 border-r border-border flex flex-col"
       role="navigation"
       aria-label={t("app.sidebar.label", "Primary navigation")}
     >
@@ -314,15 +314,6 @@ function AppDesktopSidebar({
               </button>
             </KbdTooltip>
           )}
-          {isRemoteMode() && (
-            <span
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-info/15 text-info border border-info/20 ml-0.5"
-              title={t("app.sidebar.remoteMode", "Remote server")}
-            >
-              <Wifi className="h-3 w-3" aria-hidden="true" />
-              {t("app.sidebar.remote", "Remote")}
-            </span>
-          )}
           <KbdTooltip shortcut="Cmd+,">
             <button
               type="button"
@@ -350,6 +341,16 @@ function AppDesktopSidebar({
       >
         {content}
       </div>
+
+      {isRemoteMode() && (
+        <div
+          className="absolute bottom-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-info/10 text-info/80 border border-info/15 pointer-events-none select-none"
+          title={t("app.sidebar.remoteMode", "Remote server")}
+        >
+          <Wifi className="h-2.5 w-2.5" aria-hidden="true" />
+          {t("app.sidebar.remote", "Remote")}
+        </div>
+      )}
     </div>
   );
 }

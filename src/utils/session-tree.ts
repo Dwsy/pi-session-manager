@@ -374,6 +374,29 @@ export function filterFlatNodes(
   return baseFiltered;
 }
 
+export function filterCollapsedFlatNodes(
+  filteredNodes: FlatNode[],
+  allFlatNodes: FlatNode[],
+  collapsedNodeIds: ReadonlySet<string>,
+): FlatNode[] {
+  if (filteredNodes.length === 0 || collapsedNodeIds.size === 0) {
+    return filteredNodes;
+  }
+
+  const hiddenIds = new Set<string>();
+  for (const flatNode of allFlatNodes) {
+    const { id, parentId } = flatNode.node.entry;
+    if (parentId != null && (collapsedNodeIds.has(parentId) || hiddenIds.has(parentId))) {
+      hiddenIds.add(id);
+    }
+  }
+
+  return recalculateVisualStructure(
+    filteredNodes.filter((flatNode) => !hiddenIds.has(flatNode.node.entry.id)),
+    allFlatNodes,
+  );
+}
+
 export function recalculateVisualStructure(
   filteredNodes: FlatNode[],
   allFlatNodes: FlatNode[],

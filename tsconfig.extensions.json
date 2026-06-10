@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/vite-env.d.ts",
+    "extensions/psm-code-review/**/*.ts",
+    "extensions/psm-code-review/**/*.tsx"
+  ],
+  "exclude": [
+    "extensions/psm-code-review/**/*.test.ts",
+    "extensions/psm-code-review/**/*.test.tsx"
+  ]
+}

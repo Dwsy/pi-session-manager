@@ -5,6 +5,7 @@ import type {
   PsmPluginCommandContext,
   PsmPluginHostContext,
   PsmPluginI18nClient,
+  PsmPluginSettingsClient,
   PsmSessionReference,
 } from '@pi-session-manager/plugin-sdk'
 
@@ -54,7 +55,7 @@ function CodeReviewToolbarButton({
 }: {
   client: PsmCapabilityClient
   i18n: PsmPluginI18nClient
-  settings: { get<T>(key: string, fallback: T): T }
+  settings: PsmPluginSettingsClient
   session: PsmSessionReference
 }) {
   const [open, setOpen] = useState(false)

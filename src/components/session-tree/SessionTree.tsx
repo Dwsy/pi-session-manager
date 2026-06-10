@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { useSessionTreeLookup } from "@/hooks/useSessionTreeLookup";
 import type { SessionEntry } from "@/types";
@@ -19,6 +20,7 @@ import { getCachedSettings } from "@/utils/settingsApi";
 import {
   buildActivePathIds,
   buildTree,
+  filterCollapsedFlatNodes,
   filterFlatNodes,
   findNewestLeaf,
   flattenTree,
@@ -26,6 +28,7 @@ import {
   getEntryRoleClass,
   getEntryToolName,
   getSearchableText,
+  isNoneParent,
   type FlatNode,
 } from "@/utils/session-tree";
 
@@ -241,6 +244,7 @@ const SessionTree = memo(
     const [currentResultIndex, setCurrentResultIndex] = useState(0);
     const [searchResults, setSearchResults] = useState<string[]>([]);
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+    const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
     const [activePluginViewId, setActivePluginViewId] = useState<string | null>(null);
 
     useImperativeHandle(ref, () => ({
@@ -266,6 +270,7 @@ const SessionTree = memo(
       [newestLeafMap],
     );
     const { resolveScrollTarget } = useSessionTreeLookup(entries, activeLeafId);
+    const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
 
     // ─── Search ───
     const extractContent = useCallback((content: unknown): string => {
@@ -311,9 +316,13 @@ const SessionTree = memo(
 
     const searchResultSet = useMemo(() => new Set(searchResults), [searchResults]);
     const currentSearchResultId = searchResults[currentResultIndex];
-    const filteredNodes = useMemo(
+    const filterMatchedNodes = useMemo(
       () => filterFlatNodes(flatNodes, searchTerms, currentFilter, extractContent),
       [currentFilter, extractContent, flatNodes, searchTerms],
+    );
+    const filteredNodes = useMemo(
+      () => filterCollapsedFlatNodes(filterMatchedNodes, flatNodes, collapsedNodeIds),
+      [collapsedNodeIds, filterMatchedNodes, flatNodes],
     );
     const stickyShift = useMemo(() => getStickyShift(filteredNodes), [filteredNodes]);
     const selectedFlatNode = useMemo(
@@ -352,15 +361,58 @@ const SessionTree = memo(
       }
     }, [activeLeafId, selectedNodeId]);
 
+    const expandEntryPath = useCallback(
+      (entryId: string) => {
+        setCollapsedNodeIds((prev) => {
+          if (prev.size === 0) return prev;
+
+          const next = new Set(prev);
+          let currentId: string | undefined = entryId;
+          let changed = false;
+
+          while (currentId) {
+            if (next.delete(currentId)) changed = true;
+            const currentEntry = entryById.get(currentId);
+            const parentId = currentEntry?.parentId;
+            if (!parentId || isNoneParent(parentId) || parentId === currentId) break;
+            currentId = parentId;
+          }
+
+          return changed ? next : prev;
+        });
+      },
+      [entryById],
+    );
+
+    useEffect(() => {
+      if (activeLeafId) {
+        expandEntryPath(activeLeafId);
+      }
+    }, [activeLeafId, expandEntryPath]);
+
+    const handleToggleCollapse = useCallback((entryId: string) => {
+      setSelectedNodeId(entryId);
+      setCollapsedNodeIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(entryId)) {
+          next.delete(entryId);
+        } else {
+          next.add(entryId);
+        }
+        return next;
+      });
+    }, []);
+
     // ─── Navigation ───
     const navigateToEntry = useCallback(
       (entryId: string) => {
+        expandEntryPath(entryId);
         if (!onNodeClick) return;
         const targetId = resolveScrollTarget(entryId);
         const leafId = targetId === entryId ? entryId : findNewestLeafFn(entryId);
         onNodeClick(leafId, targetId);
       },
-      [findNewestLeafFn, onNodeClick, resolveScrollTarget],
+      [expandEntryPath, findNewestLeafFn, onNodeClick, resolveScrollTarget],
     );
 
     const handleNodeClick = useCallback(
@@ -506,6 +558,9 @@ const SessionTree = memo(
                 isSearchMatch && currentSearchResultId === entry.id;
               const isUserMessage =
                 entry.type === "message" && entry.message?.role === "user";
+              const isCollapsible = flatNode.node.children.length > 0;
+              const isCollapsed = collapsedNodeIds.has(entry.id);
+              const disclosureLabel = `${isCollapsed ? "Expand" : "Collapse"} branch ${displayText}`;
 
               return (
                 <div key={entry.id}>
@@ -514,6 +569,26 @@ const SessionTree = memo(
                     onClick={() => handleNodeClick(flatNode)}
                   >
                     <TreeGutter flatNode={flatNode} stickyShift={stickyShift} />
+                    {isCollapsible ? (
+                      <button
+                        type="button"
+                        className="tree-disclosure"
+                        aria-label={disclosureLabel}
+                        title={disclosureLabel}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleToggleCollapse(entry.id);
+                        }}
+                      >
+                        {isCollapsed ? (
+                          <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        ) : (
+                          <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                        )}
+                      </button>
+                    ) : (
+                      <span className="tree-disclosure-spacer" aria-hidden="true" />
+                    )}
                     <span
                       className={`tree-marker ${isActive ? "current" : isSelected ? "selected" : isInPath ? "path" : ""}`}
                     />
