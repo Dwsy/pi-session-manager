@@ -222,7 +222,7 @@ function getOperationPath(toolName: string, args: Record<string, unknown>) {
   }
 
   return (
-    getStringArg(args, "file_path", "path", "notebook_path", "absolute_path") ||
+    getStringArg(args, "file_path", "path", "filePath", "absolutePath", "notebook_path", "absolute_path") ||
     getStringArg(args, "description") ||
     "Unknown target"
   );
@@ -466,7 +466,9 @@ export function extractFileOperations(
       const contentArg =
         toolName === "edit"
           ? (editTextPair?.newText || getStringArg(args, "content", "new_string"))
-          : getStringArg(args, "content", "new_string");
+          : toolName === "read"
+            ? output || getStringArg(args, "content", "new_string")
+            : getStringArg(args, "content", "new_string");
       const filePath = getOperationPath(toolName, args);
       const preview = getOperationPreview(
         toolName,

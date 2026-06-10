@@ -371,7 +371,7 @@ function FilterBar({
 
   return (
     <div
-      className="flex flex-shrink-0 flex-wrap gap-1"
+      className="flex flex-shrink-0 flex-wrap gap-1.5"
       role="radiogroup"
       aria-label={t("components.toolCallReview.filterLabel", "Review filter")}
     >
@@ -392,12 +392,12 @@ function FilterBar({
             aria-checked={active}
             disabled={disabled}
             title={`${label} (${counts[option.id]})`}
-            className={`group inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium motion-surface focus-ring ${
+            className={`group inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium motion-surface focus-ring ${
               active
                 ? "border-border/70 bg-background text-foreground shadow-[0_1px_2px_rgba(var(--shadow-rgb),0.16)]"
                 : disabled
-                  ? "border-transparent text-muted-foreground/45"
-                  : "border-transparent text-muted-foreground hover:bg-background/55 hover:text-foreground"
+                  ? "border-border/20 bg-background/18 text-muted-foreground/55"
+                  : "border-border/25 bg-background/30 text-muted-foreground hover:border-border/45 hover:bg-background/55 hover:text-foreground"
             }`}
           >
             <Icon
@@ -409,7 +409,9 @@ function FilterBar({
               className={`inline-flex h-4 min-w-[1.25rem] items-center justify-center rounded-full px-1 font-mono text-[10px] leading-none tabular-nums ${
                 active
                   ? "bg-surface text-foreground"
-                  : "bg-background/45 text-muted-foreground/85"
+                  : disabled
+                    ? "bg-background/32 text-muted-foreground/65"
+                    : "bg-background/45 text-muted-foreground/85"
               }`}
             >
               {counts[option.id]}
@@ -434,7 +436,7 @@ function ReviewModeSwitch({
 
   return (
     <div
-      className="flex min-w-0 flex-1 gap-0.5 rounded-[6px] border border-border/40 bg-background/50 p-0.5"
+      className="grid min-w-0 grid-cols-2 gap-1 rounded-[8px] border border-border/40 bg-background/38 p-1"
       role="radiogroup"
       aria-label={t("components.toolCallReview.modeLabel", "Review mode")}
     >
@@ -450,15 +452,19 @@ function ReviewModeSwitch({
             onClick={() => onChange(option.id)}
             role="radio"
             aria-checked={active}
-            className={`flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[5px] px-2 text-[11px] font-medium motion-surface focus-ring ${
+            className={`flex h-9 min-w-0 items-center justify-between gap-2 rounded-[6px] border px-3 text-[11px] font-medium motion-surface focus-ring ${
               active
-                ? "bg-surface text-foreground shadow-[0_1px_2px_rgba(var(--shadow-rgb),0.14)]"
-                : "text-muted-foreground hover:bg-surface/55 hover:text-foreground"
+                ? "border-border/65 bg-background text-foreground shadow-[0_1px_2px_rgba(var(--shadow-rgb),0.14)]"
+                : "border-transparent text-muted-foreground hover:border-border/35 hover:bg-surface/45 hover:text-foreground"
             }`}
           >
-            <Icon className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-            <span className="truncate">{label}</span>
-            <span className="font-mono text-[10px] tabular-nums opacity-75">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Icon className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+              <span className="truncate">{label}</span>
+            </span>
+            <span className={`inline-flex h-4 min-w-[1.25rem] items-center justify-center rounded-full px-1 font-mono text-[10px] tabular-nums ${
+              active ? "bg-surface text-foreground" : "bg-background/45 text-muted-foreground/85"
+            }`}>
               {counts[option.id]}
             </span>
           </button>
@@ -511,6 +517,88 @@ function DetailMetric({
       </div>
       <div className={`mt-1 font-mono text-[14px] font-semibold tabular-nums ${className}`}>
         {value}
+      </div>
+    </div>
+  );
+}
+
+function InspectorPopover({
+  operation,
+  argsText,
+  onClose,
+}: {
+  operation: FileOperation;
+  argsText: string;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="absolute right-0 top-[calc(100%+8px)] z-30 w-[min(420px,calc(100vw-32px))] overflow-hidden rounded-[10px] border border-border/60 bg-background shadow-[0_18px_48px_-24px_rgba(var(--shadow-rgb),0.58)]">
+      <div className="flex min-h-[40px] items-center justify-between gap-2 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.64)] px-3 py-2 text-[12px] font-semibold text-foreground">
+        <div className="inline-flex items-center gap-2">
+          <Braces
+            className="h-3.5 w-3.5 text-muted-foreground"
+            aria-hidden="true"
+          />
+          {t("components.toolCallReview.inspector", "Inspector")}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("common.close", "Close")}
+          className="inline-flex h-6 w-6 items-center justify-center rounded-[5px] text-muted-foreground motion-surface focus-ring hover:bg-background/55 hover:text-foreground"
+        >
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </div>
+      <div className="grid grid-cols-2 border-b border-border/40 bg-background/35">
+        <DetailMetric
+          label="components.toolCallReview.sequence"
+          fallbackLabel="Sequence"
+          value={`#${operation.sequence}`}
+        />
+        <DetailMetric
+          label="components.toolCallReview.size"
+          fallbackLabel="Size"
+          value={formatBytes(operation.metrics.bytes)}
+        />
+        <DetailMetric
+          label="components.toolCallReview.additions"
+          fallbackLabel="Additions"
+          value={`+${operation.metrics.additions}`}
+          className="text-success"
+        />
+        <DetailMetric
+          label="components.toolCallReview.deletions"
+          fallbackLabel="Deletions"
+          value={`-${operation.metrics.deletions}`}
+          className="text-destructive"
+        />
+      </div>
+      <InspectorRow
+        label="components.toolCallReview.entry"
+        fallbackLabel="Entry"
+        value={operation.entryId}
+      />
+      <InspectorRow
+        label="components.toolCallReview.time"
+        fallbackLabel="Time"
+        value={formatTimestamp(operation.timestamp) || "-"}
+      />
+      <div className="max-h-[min(46vh,420px)] overflow-hidden border-t border-border/45 bg-background/45">
+        <div className="border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.34)] px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          {t("components.toolCall.arguments", "Arguments")}
+        </div>
+        <div
+          className="tool-review-code-surface tool-review-inspector-code custom-scrollbar max-h-[min(46vh,360px)] overflow-auto p-2"
+          style={{ scrollbarGutter: "stable" }}
+        >
+          <CodeBlock
+            code={argsText}
+            language="json"
+          />
+        </div>
       </div>
     </div>
   );
@@ -643,6 +731,9 @@ function DetailPanel({
   onToggleContentExpanded,
   controls,
   diffConfig,
+  inspectorOpen,
+  onToggleInspector,
+  onCloseInspector,
 }: {
   operation: FileOperation | null;
   codeViewItems: CodeViewItem[];
@@ -653,6 +744,9 @@ function DetailPanel({
   onToggleContentExpanded: () => void;
   controls: CodeViewControls;
   diffConfig?: DiffConfig;
+  inspectorOpen: boolean;
+  onToggleInspector: () => void;
+  onCloseInspector: () => void;
 }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -707,12 +801,18 @@ function DetailPanel({
   );
   const usesCodeView = isChangeOperation(operation) && hasCodeViewOutput;
   const showsDiffControls = usesCodeView && codeViewItems.some((item) => item.type === "diff");
+  const showInlinePath = !usesCodeView;
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const rootIsDark = document.documentElement.classList.contains("theme-dark");
   const themeType =
     theme === "dark" || rootIsDark || (theme === "system" && prefersDark)
       ? "dark"
       : "light";
+  const detailTitle = usesCodeView
+    ? showsDiffControls
+      ? t("components.toolCallReview.patch", "Patch")
+      : t("components.toolCallReview.writtenContent", "Written content")
+    : getOperationTitle(operation);
   const contentFullscreenLabel = contentExpanded
     ? t(
         "components.toolCallReview.exitContentFullscreen",
@@ -726,7 +826,7 @@ function DetailPanel({
 
   return (
     <div
-      className="flex min-h-0 min-w-0 flex-1 flex-col bg-background"
+      className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background"
       style={getReviewAccentStyle(operation.toolName)}
     >
       <div className="relative flex min-h-[50px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.58)] px-3 py-1.5">
@@ -744,7 +844,7 @@ function DetailPanel({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <span className="truncate text-[13px] font-semibold text-foreground">
-              {getOperationTitle(operation)}
+              {detailTitle}
             </span>
             <span className="rounded-[4px] border border-border/40 bg-background/45 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
               {t(config.labelKey, config.fallbackLabel)}
@@ -756,11 +856,45 @@ function DetailPanel({
               </span>
             )}
           </div>
-          <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
-            {displayPath}
-          </div>
+          {showInlinePath && (
+            <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
+              {displayPath}
+            </div>
+          )}
         </div>
         {showsDiffControls && <ViewControlsToolbar controls={controls} />}
+        <div className="relative flex-shrink-0">
+          <button
+            type="button"
+            onClick={onToggleInspector}
+            aria-pressed={inspectorOpen}
+            aria-label={t(
+              "components.toolCallReview.inspector",
+              "Inspector",
+            )}
+            title={t(
+              "components.toolCallReview.inspector",
+              "Inspector",
+            )}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-[5px] border px-2.5 py-1.5 text-xs motion-surface focus-ring ${
+              inspectorOpen
+                ? "border-border-hover bg-surface text-foreground"
+                : "border-border/45 bg-background/60 text-muted-foreground hover:border-border-hover hover:bg-surface hover:text-foreground"
+            }`}
+          >
+            <Braces className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="font-medium">
+              {t("components.toolCallReview.inspector", "Inspector")}
+            </span>
+          </button>
+          {inspectorOpen && (
+            <InspectorPopover
+              operation={operation}
+              argsText={argsText}
+              onClose={onCloseInspector}
+            />
+          )}
+        </div>
         <button
           type="button"
           onClick={onToggleContentExpanded}
@@ -802,7 +936,7 @@ function DetailPanel({
               usesCodeView ? "flex h-full flex-col gap-2" : "space-y-2"
             }`}
           >
-            {isChangeOperation(operation) && (
+            {isChangeOperation(operation) && !usesCodeView && (
               <ReviewStatusStrip
                 operation={operation}
                 hasPatch={hasCodeViewOutput}
@@ -878,6 +1012,37 @@ function DetailPanel({
                   </div>
                 )}
               </div>
+            ) : operation.toolName === "read" ? (
+              <div className="space-y-3">
+                {(operation.content || operation.output) ? (
+                  <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
+                    <div className="flex items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.52)] px-3 py-2 text-xs font-medium text-foreground">
+                      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                      {displayPath}
+                    </div>
+                    <CodeBlock
+                      code={operation.content || operation.output || ''}
+                      language={language}
+                      showLineNumbers
+                    />
+                  </div>
+                ) : (
+                  <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
+                    <div className="flex items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.45)] px-3 py-2">
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                      <div className="min-w-0 flex-1 text-xs font-medium text-foreground">
+                        {displayPath}
+                      </div>
+                      <span className="text-[10px] font-medium text-muted-foreground/80">
+                        {t(
+                          "components.toolCallReview.noRenderableOutput",
+                          "No renderable output was captured for this operation."
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : operation.diff ? (
               <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
                 <CodeBlock
@@ -925,64 +1090,13 @@ function DetailPanel({
           </div>
         </div>
 
-        {!contentExpanded && (
-          <aside className="hidden min-h-0 w-72 flex-shrink-0 flex-col border-l border-border/55 bg-[rgb(var(--color-surface-dark)/0.46)] xl:flex">
-            <div className="flex min-h-[40px] items-center gap-2 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.64)] px-3 py-2 text-[12px] font-semibold text-foreground">
-              <Braces
-                className="h-3.5 w-3.5 text-muted-foreground"
-                aria-hidden="true"
-              />
-              {t("components.toolCallReview.inspector", "Inspector")}
-            </div>
-            <div className="grid grid-cols-2 border-b border-border/40 bg-background/35">
-              <DetailMetric
-                label="components.toolCallReview.sequence"
-                fallbackLabel="Sequence"
-                value={`#${operation.sequence}`}
-              />
-              <DetailMetric
-                label="components.toolCallReview.size"
-                fallbackLabel="Size"
-                value={formatBytes(operation.metrics.bytes)}
-              />
-              <DetailMetric
-                label="components.toolCallReview.additions"
-                fallbackLabel="Additions"
-                value={`+${operation.metrics.additions}`}
-                className="text-success"
-              />
-              <DetailMetric
-                label="components.toolCallReview.deletions"
-                fallbackLabel="Deletions"
-                value={`-${operation.metrics.deletions}`}
-                className="text-destructive"
-              />
-            </div>
-            <InspectorRow
-              label="components.toolCallReview.entry"
-              fallbackLabel="Entry"
-              value={operation.entryId}
-            />
-            <InspectorRow
-              label="components.toolCallReview.time"
-              fallbackLabel="Time"
-              value={formatTimestamp(operation.timestamp) || "-"}
-            />
-            <div className="min-h-0 flex-1 overflow-hidden border-t border-border/45 bg-background/45">
-              <div className="border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.34)] px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                {t("components.toolCall.arguments", "Arguments")}
-              </div>
-              <div
-                className="tool-review-code-surface tool-review-inspector-code custom-scrollbar h-full min-h-0 overflow-auto p-2"
-                style={{ scrollbarGutter: "stable" }}
-              >
-                <CodeBlock
-                  code={argsText}
-                  language="json"
-                />
-              </div>
-            </div>
-          </aside>
+        {inspectorOpen && (
+          <button
+            type="button"
+            aria-label={t("common.close", "Close")}
+            className="absolute inset-0 z-20 cursor-default bg-transparent"
+            onClick={onCloseInspector}
+          />
         )}
       </div>
     </div>
@@ -1004,6 +1118,7 @@ export default function ToolCallReviewModal({
   const [activeMode, setActiveMode] = useState<ReviewMode>("files");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [contentExpanded, setContentExpanded] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
 
   // Initialize from plugin settings config if provided, otherwise use defaults
   const [splitView, setSplitView] = useState(diffConfig?.splitView ?? true);
@@ -1140,6 +1255,10 @@ export default function ToolCallReviewModal({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
+        if (inspectorOpen) {
+          setInspectorOpen(false);
+          return;
+        }
         if (contentExpanded) {
           setContentExpanded(false);
           return;
@@ -1174,14 +1293,29 @@ export default function ToolCallReviewModal({
 
     document.addEventListener("keydown", handleKeyDown, { capture: true });
     return () => document.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [contentExpanded, filteredOperations, isOpen, onClose, selectedId]);
+  }, [contentExpanded, filteredOperations, inspectorOpen, isOpen, onClose, selectedId]);
 
   useEffect(() => {
-    if (!isOpen) setContentExpanded(false);
+    if (!isOpen) {
+      setContentExpanded(false);
+      setInspectorOpen(false);
+    }
   }, [isOpen]);
+
+  useEffect(() => {
+    setInspectorOpen(false);
+  }, [selectedId, contentExpanded]);
 
   const handleToggleContentExpanded = useCallback(() => {
     setContentExpanded((value) => !value);
+  }, []);
+
+  const handleToggleInspector = useCallback(() => {
+    setInspectorOpen((value) => !value);
+  }, []);
+
+  const handleCloseInspector = useCallback(() => {
+    setInspectorOpen(false);
   }, []);
 
   const handleTreeSelect = useCallback(
@@ -1394,6 +1528,9 @@ export default function ToolCallReviewModal({
               onToggleContentExpanded={handleToggleContentExpanded}
               controls={codeViewControls}
               diffConfig={diffConfig}
+              inspectorOpen={inspectorOpen}
+              onToggleInspector={handleToggleInspector}
+              onCloseInspector={handleCloseInspector}
             />
           </div>
         )}
