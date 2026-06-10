@@ -67,12 +67,7 @@ fn default_auth_enabled() -> bool {
 
 impl Default for ServerConfig {
     fn default() -> Self {
-        Self {
-            http_enabled: true,
-            http_port: 52131,
-            bind_addr: "0.0.0.0".to_string(),
-            auth_enabled: true,
-        }
+        Self { http_enabled: true, http_port: 52131, bind_addr: "0.0.0.0".to_string(), auth_enabled: true }
     }
 }
 
@@ -86,12 +81,7 @@ fn load_config() -> ServerConfig {
         })
     });
 
-    ServerConfig {
-        http_enabled: value["http_enabled"].as_bool().unwrap_or(true),
-        http_port: value["http_port"].as_u64().unwrap_or(52131) as u16,
-        bind_addr: value["bind_addr"].as_str().unwrap_or("0.0.0.0").to_string(),
-        auth_enabled: value["auth_enabled"].as_bool().unwrap_or(true),
-    }
+    ServerConfig { http_enabled: value["http_enabled"].as_bool().unwrap_or(true), http_port: value["http_port"].as_u64().unwrap_or(52131) as u16, bind_addr: value["bind_addr"].as_str().unwrap_or("0.0.0.0").to_string(), auth_enabled: value["auth_enabled"].as_bool().unwrap_or(true) }
 }
 
 fn query_param(uri: &Uri, key: &str) -> Option<String> {
@@ -110,19 +100,11 @@ fn is_authorized(ip: &std::net::IpAddr, headers: &HeaderMap, uri: &Uri) -> bool 
     if !pi_session_manager::auth::is_auth_required(&real_ip) {
         return true;
     }
-    let header_ok = headers
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .map(pi_session_manager::auth::validate)
-        .unwrap_or(false);
+    let header_ok = headers.get("authorization").and_then(|v| v.to_str().ok()).and_then(|v| v.strip_prefix("Bearer ")).map(pi_session_manager::auth::validate).unwrap_or(false);
     if header_ok {
         return true;
     }
-    query_param(uri, "token")
-        .as_deref()
-        .map(pi_session_manager::auth::validate)
-        .unwrap_or(false)
+    query_param(uri, "token").as_deref().map(pi_session_manager::auth::validate).unwrap_or(false)
 }
 
 /// Extract real client IP from X-Forwarded-For (ngrok/reverse proxy) or use socket IP
@@ -160,10 +142,7 @@ async fn main() {
     println!("PID: {}", std::process::id().to_string().yellow());
 
     let (event_tx, _) = broadcast::channel(100);
-    let state = Arc::new(AppState {
-        event_tx,
-        terminal_manager: Mutex::new(TerminalManager::new()),
-    });
+    let state = Arc::new(AppState { event_tx, terminal_manager: Mutex::new(TerminalManager::new()) });
 
     // Init auth
     if config.auth_enabled {
@@ -229,19 +208,9 @@ struct ApiReq {
     payload: Value,
 }
 
-async fn api_handler(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(state): State<SharedState>,
-    headers: HeaderMap,
-    uri: Uri,
-    Json(body): Json<ApiReq>,
-) -> impl IntoResponse {
+async fn api_handler(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(state): State<SharedState>, headers: HeaderMap, uri: Uri, Json(body): Json<ApiReq>) -> impl IntoResponse {
     if !is_authorized(&addr.ip(), &headers, &uri) {
-        return (
-            StatusCode::UNAUTHORIZED,
-            cors_headers(),
-            Json(serde_json::json!({ "success": false, "error": "Unauthorized" })),
-        );
+        return (StatusCode::UNAUTHORIZED, cors_headers(), Json(serde_json::json!({ "success": false, "error": "Unauthorized" })));
     }
     let result = dispatch_command(&state, &body.command, &body.payload).await;
     let resp = match result {
@@ -255,11 +224,7 @@ async fn preflight_handler() -> impl IntoResponse {
     (StatusCode::NO_CONTENT, cors_headers())
 }
 
-async fn auth_check(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    headers: HeaderMap,
-    uri: Uri,
-) -> impl IntoResponse {
+async fn auth_check(ConnectInfo(addr): ConnectInfo<SocketAddr>, headers: HeaderMap, uri: Uri) -> impl IntoResponse {
     let real_ip = get_real_ip(&addr.ip(), &headers);
     let needs_auth = pi_session_manager::auth::is_auth_required(&real_ip);
     let is_valid = is_authorized(&addr.ip(), &headers, &uri);
@@ -278,18 +243,10 @@ async fn health_handler() -> Json<Value> {
 }
 
 fn extract_string(payload: &Value, key: &str) -> Result<String, String> {
-    payload
-        .get(key)
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .ok_or_else(|| format!("Missing or invalid '{key}'"))
+    payload.get(key).and_then(Value::as_str).map(str::to_string).ok_or_else(|| format!("Missing or invalid '{key}'"))
 }
 
-async fn dispatch_command(
-    state: &SharedState,
-    command: &str,
-    payload: &Value,
-) -> Result<Value, String> {
+async fn dispatch_command(state: &SharedState, command: &str, payload: &Value) -> Result<Value, String> {
     match command {
         "terminal_create" => {
             let id = extract_string(payload, "id")?;
@@ -297,21 +254,14 @@ async fn dispatch_command(
             let shell = extract_string(payload, "shell")?;
             let rows = payload.get("rows").and_then(Value::as_u64).unwrap_or(24) as u16;
             let cols = payload.get("cols").and_then(Value::as_u64).unwrap_or(80) as u16;
-            let manager = state
-                .terminal_manager
-                .lock()
-                .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
-            let result =
-                manager.create_session(id, state.event_tx.clone(), cwd, shell, rows, cols)?;
+            let manager = state.terminal_manager.lock().map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+            let result = manager.create_session(id, state.event_tx.clone(), cwd, shell, rows, cols)?;
             Ok(serde_json::json!(result))
         }
         "terminal_write" => {
             let id = extract_string(payload, "id")?;
             let data = extract_string(payload, "data")?;
-            let manager = state
-                .terminal_manager
-                .lock()
-                .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+            let manager = state.terminal_manager.lock().map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
             manager.write_to_session(&id, data)?;
             Ok(Value::Null)
         }
@@ -319,42 +269,27 @@ async fn dispatch_command(
             let id = extract_string(payload, "id")?;
             let rows = payload.get("rows").and_then(Value::as_u64).unwrap_or(24) as u16;
             let cols = payload.get("cols").and_then(Value::as_u64).unwrap_or(80) as u16;
-            let manager = state
-                .terminal_manager
-                .lock()
-                .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+            let manager = state.terminal_manager.lock().map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
             manager.resize_session(&id, rows, cols)?;
             Ok(Value::Null)
         }
         "terminal_close" => {
             let id = extract_string(payload, "id")?;
-            let manager = state
-                .terminal_manager
-                .lock()
-                .map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
+            let manager = state.terminal_manager.lock().map_err(|e| format!("Failed to lock terminal manager: {e}"))?;
             manager.close_session(&id)?;
             Ok(Value::Null)
         }
         "get_default_shell" => {
             let shells = terminal::scan_shells();
             let fallback = if cfg!(windows) { "cmd.exe" } else { "/bin/sh" };
-            Ok(serde_json::json!(shells
-                .first()
-                .map(|(_, p)| p.as_str())
-                .unwrap_or(fallback)))
+            Ok(serde_json::json!(shells.first().map(|(_, p)| p.as_str()).unwrap_or(fallback)))
         }
         "get_available_shells" => Ok(serde_json::json!(terminal::scan_shells())),
         _ => pi_session_manager::dispatch::dispatch(command, payload).await,
     }
 }
 
-async fn ws_upgrade(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    State(state): State<SharedState>,
-    headers: HeaderMap,
-    uri: Uri,
-    ws: WebSocketUpgrade,
-) -> Response {
+async fn ws_upgrade(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(state): State<SharedState>, headers: HeaderMap, uri: Uri, ws: WebSocketUpgrade) -> Response {
     let pre_authed = is_authorized(&addr.ip(), &headers, &uri);
     let real_ip = get_real_ip(&addr.ip(), &headers);
     let needs_auth = pi_session_manager::auth::is_auth_required(&real_ip);
@@ -366,21 +301,11 @@ async fn static_handler(uri: Uri) -> Response {
     if !path.is_empty() {
         if let Some(file) = FrontendAssets::get(path) {
             let mime = mime_guess::from_path(path).first_or_octet_stream();
-            return (
-                StatusCode::OK,
-                [(header::CONTENT_TYPE, mime.as_ref())],
-                file.data,
-            )
-                .into_response();
+            return (StatusCode::OK, [(header::CONTENT_TYPE, mime.as_ref())], file.data).into_response();
         }
     }
     match FrontendAssets::get("index.html") {
-        Some(f) => (
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, "text/html")],
-            f.data,
-        )
-            .into_response(),
+        Some(f) => (StatusCode::OK, [(header::CONTENT_TYPE, "text/html")], f.data).into_response(),
         None => (StatusCode::NOT_FOUND, "Frontend not embedded").into_response(),
     }
 }
@@ -388,27 +313,14 @@ async fn static_handler(uri: Uri) -> Response {
 // ─── Unified server ─────────────────────────────────────────
 
 fn build_router(state: SharedState) -> Router {
-    Router::new()
-        .route(
-            "/api/auth-check",
-            get(auth_check).options(preflight_handler),
-        )
-        .route("/api", post(api_handler).options(preflight_handler))
-        .route("/health", get(health_handler))
-        .route("/ws", get(ws_upgrade))
-        .fallback(static_handler)
-        .with_state(state)
+    Router::new().route("/api/auth-check", get(auth_check).options(preflight_handler)).route("/api", post(api_handler).options(preflight_handler)).route("/health", get(health_handler)).route("/ws", get(ws_upgrade)).fallback(static_handler).with_state(state)
 }
 
 async fn run_server(state: SharedState, addr: &str) -> Result<(), Box<dyn std::error::Error>> {
     let app = build_router(state);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("{} Server listening on {addr}", "🌐".blue());
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await?;
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
     Ok(())
 }
 
@@ -440,14 +352,7 @@ async fn run_server_dual(state: SharedState, port: u16) -> Result<(), Box<dyn st
 }
 
 fn cors_headers() -> [(&'static str, &'static str); 3] {
-    [
-        ("access-control-allow-origin", "*"),
-        ("access-control-allow-methods", "GET, POST, OPTIONS"),
-        (
-            "access-control-allow-headers",
-            "content-type, authorization",
-        ),
-    ]
+    [("access-control-allow-origin", "*"), ("access-control-allow-methods", "GET, POST, OPTIONS"), ("access-control-allow-headers", "content-type, authorization")]
 }
 
 // ─── WebSocket handler ──────────────────────────────────────
@@ -457,19 +362,12 @@ async fn handle_ws(socket: WebSocket, state: SharedState, pre_authed: bool, need
 
     // Auth handshake if needed
     if needs_auth && !pre_authed {
-        let authed = match tokio::time::timeout(std::time::Duration::from_secs(10), rx.next()).await
-        {
-            Ok(Some(Ok(AxumWsMsg::Text(text)))) => serde_json::from_str::<Value>(&text)
-                .ok()
-                .and_then(|v| v.get("auth")?.as_str().map(String::from))
-                .map(|t| pi_session_manager::auth::validate(&t))
-                .unwrap_or(false),
+        let authed = match tokio::time::timeout(std::time::Duration::from_secs(10), rx.next()).await {
+            Ok(Some(Ok(AxumWsMsg::Text(text)))) => serde_json::from_str::<Value>(&text).ok().and_then(|v| v.get("auth")?.as_str().map(String::from)).map(|t| pi_session_manager::auth::validate(&t)).unwrap_or(false),
             _ => false,
         };
         if !authed {
-            let _ = tx
-                .send(AxumWsMsg::Text(r#"{"error":"Unauthorized"}"#.into()))
-                .await;
+            let _ = tx.send(AxumWsMsg::Text(r#"{"error":"Unauthorized"}"#.into())).await;
             let _ = tx.close().await;
             return;
         }

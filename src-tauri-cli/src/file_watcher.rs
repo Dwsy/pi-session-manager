@@ -15,11 +15,7 @@ use tracing::{error, info, warn};
 fn is_excluded_path(path: &std::path::Path) -> bool {
     path.components().any(|c| {
         let s = c.as_os_str();
-        s == "subagent-artifacts"
-            || s == "transcripts"
-            || s == "subagents"
-            || s == ".timelines"
-            || s == "checkpoints"
+        s == "subagent-artifacts" || s == "transcripts" || s == "subagents" || s == ".timelines" || s == "checkpoints"
     })
 }
 
@@ -50,45 +46,30 @@ impl CliFileWatcher {
             return Err("No existing session directories to watch".to_string());
         }
 
-        info!(
-            "Starting CLI file watcher for {} directories",
-            existing_paths.len()
-        );
+        info!("Starting CLI file watcher for {} directories", existing_paths.len());
         for p in &existing_paths {
             info!("  watch: {}", p.display());
         }
 
         let (tx, rx) = channel();
-        let mut debouncer = new_debouncer(Duration::from_secs(3), None, tx)
-            .map_err(|e| format!("Failed to create file watcher: {e}"))?;
+        let mut debouncer = new_debouncer(Duration::from_secs(3), None, tx).map_err(|e| format!("Failed to create file watcher: {e}"))?;
 
         for path in &existing_paths {
-            debouncer
-                .watcher()
-                .watch(path, RecursiveMode::Recursive)
-                .map_err(|e| format!("Failed to watch {}: {e}", path.display()))?;
+            debouncer.watcher().watch(path, RecursiveMode::Recursive).map_err(|e| format!("Failed to watch {}: {e}", path.display()))?;
         }
 
         thread::spawn(move || process_events(rx, event_tx));
 
-        Ok(Self {
-            _debouncer: Arc::new(Mutex::new(debouncer)),
-        })
+        Ok(Self { _debouncer: Arc::new(Mutex::new(debouncer)) })
     }
 }
 
-fn process_events(
-    rx: std::sync::mpsc::Receiver<DebounceEventResult>,
-    event_tx: broadcast::Sender<WsEvent>,
-) {
+fn process_events(rx: std::sync::mpsc::Receiver<DebounceEventResult>, event_tx: broadcast::Sender<WsEvent>) {
     let mut last_notification = Instant::now();
     let min_interval = Duration::from_secs(5);
     let mut pending_paths: HashSet<PathBuf> = HashSet::new();
 
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("Failed to create tokio runtime for CLI file watcher");
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("Failed to create tokio runtime for CLI file watcher");
 
     loop {
         if let Ok(event_result) = rx.recv_timeout(Duration::from_secs(1)) {
@@ -121,10 +102,7 @@ fn process_events(
         // Mark watcher as active so ScannerScheduler skips redundant full scans.
         pi_session_manager::scanner::mark_watcher_active();
 
-        let changed: Vec<String> = pending_paths
-            .drain()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect();
+        let changed: Vec<String> = pending_paths.drain().map(|p| p.to_string_lossy().to_string()).collect();
 
         match rt.block_on(pi_session_manager::scanner::rescan_changed_files(changed)) {
             Ok(diff) => {
@@ -132,11 +110,7 @@ fn process_events(
                     continue;
                 }
                 let payload = serde_json::to_value(&diff).unwrap_or(Value::Null);
-                let _ = event_tx.send(WsEvent {
-                    event_type: "event".to_string(),
-                    event: "sessions-changed".to_string(),
-                    payload,
-                });
+                let _ = event_tx.send(WsEvent { event_type: "event".to_string(), event: "sessions-changed".to_string(), payload });
                 last_notification = Instant::now();
             }
             Err(e) => warn!("CLI watcher rescan failed: {}", e),
