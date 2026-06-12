@@ -19,8 +19,16 @@ export function getGithubLatestReleaseApiUrl(): string {
   return `https://api.github.com/repos/${getGithubRepoSlug()}/releases/latest`
 }
 
+export function getGithubLatestReleaseProxyApiUrl(): string {
+  return `https://jsp.dwsy.link/-----${getGithubLatestReleaseApiUrl()}`
+}
+
 export function getGithubReleasesApiUrl(perPage = 20): string {
   return `https://api.github.com/repos/${getGithubRepoSlug()}/releases?per_page=${perPage}`
+}
+
+export function getGithubReleasesProxyApiUrl(perPage = 20): string {
+  return `https://jsp.dwsy.link/-----${getGithubReleasesApiUrl(perPage)}`
 }
 
 export function normalizeUpdateChannel(value: string | null | undefined): UpdateChannel {
