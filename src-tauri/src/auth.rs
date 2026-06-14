@@ -202,13 +202,11 @@ pub fn is_local(ip: &IpAddr) -> bool {
 
 fn generate_token() -> String {
     let mut buf = [0u8; 32];
-    #[cfg(unix)]
-    {
-        use std::io::Read;
-        if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
-            let _ = f.read_exact(&mut buf);
-            return buf.iter().map(|b| format!("{b:02x}")).collect();
-        }
+    // getrandom is cross-platform: on Unix it reads /dev/urandom or getrandom(2),
+    // on Windows it calls RtlGenRandom (BCryptGenRandom). Falls back to a weak
+    // timestamp-based token only if the OS CSPRNG is unavailable.
+    if getrandom::getrandom(&mut buf).is_ok() {
+        return buf.iter().map(|b| format!("{b:02x}")).collect();
     }
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     format!("psm-{nanos:x}")

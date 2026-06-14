@@ -90,6 +90,41 @@ pub fn read_session_from_str(path: &Path, content: &str) -> Result<CanonicalSess
         }
 
         let model = entry.pointer("/message/model").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+        // Claude Code streams a single assistant turn as several consecutive
+        // JSONL lines, each carrying one content block (thinking/text/tool_use)
+        // but all sharing the same response id (`message.id`). Merge such lines
+        // into one CanonicalMessage so a turn renders as a single message,
+        // matching Pi's one-message-per-turn shape.
+        let response_id = entry.pointer("/message/id").and_then(|v| v.as_str()).map(|s| s.to_string());
+        if role == MessageRole::Assistant {
+            if let Some(ref rid) = response_id {
+                if let Some(last) = messages.last_mut() {
+                    if last.role == MessageRole::Assistant {
+                        if let Some(last_rid) = last.extra.pointer("/message/id").and_then(|v| v.as_str()) {
+                            if last_rid == rid.as_str() {
+                                if !content.trim().is_empty() {
+                                    if !last.content.is_empty() {
+                                        last.content.push('\n');
+                                    }
+                                    last.content.push_str(&content);
+                                }
+                                last.tool_calls.extend(tool_calls);
+                                if let Some(ref m) = model {
+                                    last.author = Some(m.clone());
+                                    *model_counts.entry(m.clone()).or_insert(0) += 1;
+                                }
+                                // Keep the full raw entry around for downstream
+                                // fields (usage, stop_reason) without losing the
+                                // first fragment's id chain.
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if let Some(ref m) = model {
             *model_counts.entry(m.clone()).or_insert(0) += 1;
         }

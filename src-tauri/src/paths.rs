@@ -2,7 +2,11 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 pub fn home_dir() -> Result<PathBuf, String> {
-    // Respect HOME env var for tests and portability, consistent with sqlite bootstrap
+    // On Unix, respect HOME for tests and portability (consistent with the
+    // original behavior). On Windows, HOME is usually undefined and, when set
+    // by Git Bash / MSYS / WSL interop, may point to a Unix-style or UNC path
+    // that Win32 cannot open — so prefer USERPROFILE / dirs::home_dir() there.
+    #[cfg(not(target_os = "windows"))]
     if let Ok(home) = std::env::var("HOME") {
         return Ok(PathBuf::from(home));
     }

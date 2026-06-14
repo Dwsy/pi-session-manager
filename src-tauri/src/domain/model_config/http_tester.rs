@@ -24,7 +24,16 @@ fn build_masked_curl_command(url: &str, headers: &HeaderMap, body: &str) -> Stri
 
 fn resolve_dynamic_value(raw: &str) -> Result<String, String> {
     if let Some(command) = raw.strip_prefix('!') {
-        let output = Command::new("sh").arg("-lc").arg(command).output().map_err(|e| format!("Run command for dynamic value failed: {e}"))?;
+        // On Unix use `sh -lc`; on Windows `sh` is rarely on PATH, so use
+        // `cmd /C` (handles the common `op read ...`-style commands that ship
+        // as `.exe`). PowerShell could be used too, but cmd preserves the
+        // existing quoting/escape expectations better.
+        let output = if cfg!(windows) {
+            Command::new("cmd").args(["/C", command]).output()
+        } else {
+            Command::new("sh").args(["-lc", command]).output()
+        }
+        .map_err(|e| format!("Run command for dynamic value failed: {e}"))?;
         if !output.status.success() {
             return Err(format!("Command for dynamic value failed: {}", String::from_utf8_lossy(&output.stderr)));
         }

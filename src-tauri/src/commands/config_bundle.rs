@@ -68,7 +68,7 @@ fn resolve_home_path(path: &str) -> PathBuf {
 
 /// Get the backup directory for config bundles.
 fn backup_dir() -> PathBuf {
-    crate::unified_config::backup_root_dir("config-bundles").unwrap_or_else(|_| PathBuf::from("/tmp/pi-config-backups"))
+    crate::unified_config::backup_root_dir("config-bundles").unwrap_or_else(|_| std::env::temp_dir().join("pi-config-backups"))
 }
 
 /// Generate a timestamp-based backup ID.
@@ -109,7 +109,9 @@ pub async fn export_config_bundle_internal(target_path: &str) -> Result<String, 
     let cursor = Cursor::new(Vec::new());
     let mut zip = zip::ZipWriter::new(cursor);
 
-    let options = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated).unix_permissions(0o644);
+    let options = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    #[cfg(unix)]
+    let options = options.unix_permissions(0o644);
 
     // Add metadata
     let metadata = BundleMetadata {

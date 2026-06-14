@@ -53,6 +53,7 @@ zip = "2.2"
 tempfile = "3.14"
 urlencoding = "2.1"
 sha2 = "0.10"
+getrandom = "0.2"
 casr = { package = "cross_agent_session_resumer", path = "crates/casr" }
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]

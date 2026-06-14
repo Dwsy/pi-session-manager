@@ -25,6 +25,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             16 => migration_16(conn)?,
             17 => migration_17(conn)?,
             18 => migration_18(conn)?,
+            19 => migration_19(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -347,4 +348,200 @@ fn migration_17(conn: &Connection) -> Result<(), String> {
 /// Plugin records hold extension-defined JSON payloads with FTS and declared index projections.
 fn migration_18(conn: &Connection) -> Result<(), String> {
     super::plugin_records::ensure_plugin_records_schema(conn)
+}
+
+/// Migration to version 19: invalidate cached Claude Code / Codex message data.
+///
+/// The assistant-turn grouping fix (claude_code.rs / codex.rs) changes how
+/// fragmented assistant turns are parsed — previously each fragment became its
+/// own message; now they collapse into one. DBs populated before the fix still
+/// hold the fragmented `message_entries`, stale `session_details_cache`, and
+/// `scan_state` rows that prevent a re-parse (unmodified files look current).
+///
+/// We only touch Claude Code and Codex sessions (identified via scan_state's
+/// provider_slug, stored hyphenated). Pi/other-provider caches are left intact.
+/// Deleting scan_state forces the next scan to classify these files as
+/// "no_scan_state" and re-parse them with the corrected parser, repopulating
+/// message_entries and session_details_cache. The sessions row itself is kept
+/// so the session doesn't vanish from the list before the rescan completes.
+fn migration_19(conn: &Connection) -> Result<(), String> {
+    // Collect paths of Claude Code / Codex sessions from scan_state.
+    // provider_slug is stored hyphenated (e.g. "claude-code", "codex").
+    let affected_paths: Vec<String> = {
+        let scan_state_exists: bool = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='scan_state'", [], |row| row.get::<_, i64>(0)).map(|c| c > 0).unwrap_or(false);
+        if !scan_state_exists {
+            return Ok(());
+        }
+        let mut stmt = conn.prepare("SELECT path FROM scan_state WHERE provider_slug IN ('claude-code', 'codex')").map_err(|e| format!("Migration 19 failed preparing scan_state select: {e}"))?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0)).map_err(|e| format!("Migration 19 failed querying scan_state paths: {e}"))?;
+        let mut paths: Vec<String> = Vec::new();
+        for row in rows {
+            match row {
+                Ok(path) => paths.push(path),
+                Err(_) => continue,
+            }
+        }
+        paths
+    };
+
+    if affected_paths.is_empty() {
+        return Ok(());
+    }
+
+    // message_entries may not exist on fresh DBs that skipped earlier migrations;
+    // guard with an existence check.
+    let message_entries_exists: bool = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, i64>(0)).map(|c| c > 0).unwrap_or(false);
+    if message_entries_exists {
+        for chunk in affected_paths.chunks(500) {
+            let placeholders = (0..chunk.len()).map(|i| format!("?{}", i + 1)).collect::<Vec<_>>().join(", ");
+            let sql = format!("DELETE FROM message_entries WHERE session_path IN ({placeholders})");
+            let params: Vec<&dyn rusqlite::ToSql> = chunk.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+            conn.execute(&sql, params.as_slice()).map_err(|e| format!("Migration 19 failed deleting message_entries: {e}"))?;
+        }
+    }
+
+    // session_details_cache is keyed by path.
+    let details_cache_exists: bool = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='session_details_cache'", [], |row| row.get::<_, i64>(0)).map(|c| c > 0).unwrap_or(false);
+    if details_cache_exists {
+        for chunk in affected_paths.chunks(500) {
+            let placeholders = (0..chunk.len()).map(|i| format!("?{}", i + 1)).collect::<Vec<_>>().join(", ");
+            let sql = format!("DELETE FROM session_details_cache WHERE path IN ({placeholders})");
+            let params: Vec<&dyn rusqlite::ToSql> = chunk.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+            conn.execute(&sql, params.as_slice()).map_err(|e| format!("Migration 19 failed deleting session_details_cache: {e}"))?;
+        }
+    }
+
+    // Drop scan_state rows so the next scan re-parses these files.
+    for chunk in affected_paths.chunks(500) {
+        let placeholders = (0..chunk.len()).map(|i| format!("?{}", i + 1)).collect::<Vec<_>>().join(", ");
+        let sql = format!("DELETE FROM scan_state WHERE path IN ({placeholders})");
+        let params: Vec<&dyn rusqlite::ToSql> = chunk.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+        conn.execute(&sql, params.as_slice()).map_err(|e| format!("Migration 19 failed deleting scan_state: {e}"))?;
+    }
+
+    info!("[migration:19] invalidated {} Claude Code / Codex sessions for re-parse", affected_paths.len());
+    Ok(())
+}
+
+#[cfg(test)]
+mod migration_19_tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    /// Build the minimal schema migration_19 inspects (scan_state + message_entries +
+    /// session_details_cache). FKs are omitted so we can insert rows without a sessions row.
+    fn setup_test_db() -> Connection {
+        let conn = Connection::open_in_memory().expect("open in-memory db");
+        conn.execute(
+            "CREATE TABLE scan_state (
+                path TEXT PRIMARY KEY,
+                backing_path TEXT NOT NULL,
+                provider_slug TEXT NOT NULL,
+                file_modified TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                last_scanned_at TEXT NOT NULL,
+                last_parse_status TEXT NOT NULL,
+                read_offset INTEGER NOT NULL DEFAULT 0,
+                append_trust_count INTEGER NOT NULL DEFAULT 0
+            )",
+            [],
+        )
+        .expect("create scan_state");
+        conn.execute(
+            "CREATE TABLE message_entries (
+                id TEXT PRIMARY KEY,
+                entry_id TEXT NOT NULL,
+                session_path TEXT NOT NULL,
+                role TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                content TEXT NOT NULL,
+                search_text TEXT NOT NULL DEFAULT '',
+                timestamp TEXT NOT NULL
+            )",
+            [],
+        )
+        .expect("create message_entries");
+        conn.execute(
+            "CREATE TABLE session_details_cache (
+                path TEXT PRIMARY KEY,
+                file_modified TEXT NOT NULL,
+                user_messages INTEGER NOT NULL,
+                assistant_messages INTEGER NOT NULL,
+                input_tokens INTEGER NOT NULL,
+                output_tokens INTEGER NOT NULL,
+                cache_read_tokens INTEGER NOT NULL,
+                cache_write_tokens INTEGER NOT NULL,
+                input_cost REAL NOT NULL,
+                output_cost REAL NOT NULL,
+                cache_read_cost REAL NOT NULL,
+                cache_write_cost REAL NOT NULL,
+                models_json TEXT NOT NULL,
+                model_usage_json TEXT NOT NULL DEFAULT '{}'
+            )",
+            [],
+        )
+        .expect("create session_details_cache");
+        conn
+    }
+
+    fn count(conn: &Connection, table: &str, clause: &str) -> i64 {
+        let sql = format!("SELECT COUNT(*) FROM {table} WHERE {clause}");
+        conn.query_row(&sql, [], |row| row.get::<_, i64>(0)).unwrap_or(0)
+    }
+
+    #[test]
+    fn purges_claude_code_and_codex_sessions_only() {
+        let conn = setup_test_db();
+
+        // Claude Code + Codex sessions should be purged.
+        for (path, slug) in [("/home/u/.claude/projects/abc/cc-1.jsonl", "claude-code"), ("/home/u/.codex/sessions/2026/01/01/codex-1.jsonl", "codex")] {
+            conn.execute("INSERT INTO scan_state (path, backing_path, provider_slug, file_modified, file_size, last_scanned_at, last_parse_status) VALUES (?1, ?1, ?2, '2026-01-01', 100, '2026-01-01', 'ok')", params![path, slug]).unwrap();
+            conn.execute("INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?1, ?2, 'assistant', 'assistant', 'fragment', '2026-01-01')", params![format!("{path}-e1"), path]).unwrap();
+            conn.execute(
+                "INSERT INTO session_details_cache (path, file_modified, user_messages, assistant_messages, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, input_cost, output_cost, cache_read_cost, cache_write_cost, models_json) VALUES (?1, '2026-01-01', 1, 1, 10, 20, 0, 0, 0, 0, 0, 0, '[]')",
+                params![path],
+            )
+            .unwrap();
+        }
+
+        // A Pi session must be left untouched.
+        let pi_path = "/home/u/.pi/agent/sessions/pi-1.jsonl";
+        let _ = pi_path;
+        conn.execute("INSERT INTO scan_state (path, backing_path, provider_slug, file_modified, file_size, last_scanned_at, last_parse_status) VALUES (?1, ?1, 'pi', '2026-01-01', 100, '2026-01-01', 'ok')", params![pi_path]).unwrap();
+        conn.execute("INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, timestamp) VALUES (?1, ?1, ?2, 'user', 'user', 'hello', '2026-01-01')", params![format!("{pi_path}-e1"), pi_path]).unwrap();
+        conn.execute(
+            "INSERT INTO session_details_cache (path, file_modified, user_messages, assistant_messages, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, input_cost, output_cost, cache_read_cost, cache_write_cost, models_json) VALUES (?1, '2026-01-01', 1, 0, 5, 0, 0, 0, 0, 0, 0, 0, '[]')",
+            params![pi_path],
+        )
+        .unwrap();
+
+        migration_19(&conn).expect("migration runs");
+
+        // Claude/Codex: scan_state, message_entries, session_details_cache all gone.
+        assert_eq!(count(&conn, "scan_state", "provider_slug IN ('claude-code', 'codex')"), 0, "claude/codex scan_state should be purged");
+        assert_eq!(count(&conn, "message_entries", "session_path LIKE '%.claude/%' OR session_path LIKE '%.codex/%'"), 0, "claude/codex message_entries should be purged");
+        assert_eq!(count(&conn, "session_details_cache", "path LIKE '%.claude/%' OR path LIKE '%.codex/%'"), 0, "claude/codex details cache should be purged");
+
+        // Pi: untouched.
+        assert_eq!(count(&conn, "scan_state", "provider_slug = 'pi'"), 1, "pi scan_state must survive");
+        assert_eq!(count(&conn, "message_entries", "session_path LIKE '%.pi/%'"), 1, "pi message_entries must survive");
+        assert_eq!(count(&conn, "session_details_cache", "path LIKE '%.pi/%'"), 1, "pi details cache must survive");
+    }
+
+    #[test]
+    fn is_a_noop_when_scan_state_table_missing() {
+        // Fresh DBs (e.g. brand new installs) may not have scan_state yet; the
+        // migration must not error.
+        let conn = Connection::open_in_memory().expect("open in-memory db");
+        migration_19(&conn).expect("migration is a no-op without scan_state");
+    }
+
+    #[test]
+    fn is_a_noop_when_no_claude_or_codex_sessions() {
+        let conn = setup_test_db();
+        // Only a Pi session.
+        conn.execute("INSERT INTO scan_state (path, backing_path, provider_slug, file_modified, file_size, last_scanned_at, last_parse_status) VALUES ('/p/pi.jsonl', '/p/pi.jsonl', 'pi', '2026-01-01', 1, '2026-01-01', 'ok')", []).unwrap();
+        migration_19(&conn).expect("migration runs cleanly");
+        assert_eq!(count(&conn, "scan_state", "1=1"), 1, "pi row preserved");
+    }
 }

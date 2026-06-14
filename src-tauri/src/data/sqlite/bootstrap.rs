@@ -58,11 +58,9 @@ pub fn get_primary_db_path() -> Result<PathBuf, String> {
         return Ok(path);
     }
 
-    // Use HOME env var directly to respect runtime changes (e.g., in tests)
-    let home = match std::env::var("HOME") {
-        Ok(h) => PathBuf::from(h),
-        Err(_) => dirs::home_dir().ok_or("Cannot find home directory")?,
-    };
+    // Resolve the user home via the shared helper so Windows uses USERPROFILE
+    // (HOME may be stale/MSYS-style and unreadable by Win32).
+    let home = crate::paths::home_dir()?;
     let sessions_dir = home.join(".pi").join("agent").join("sessions");
     fs::create_dir_all(&sessions_dir).map_err(|e| format!("Failed to create sessions dir: {e}"))?;
     Ok(sessions_dir.join("sessions.db"))
@@ -81,19 +79,13 @@ pub fn get_db_path_for_config(config: &Config) -> Result<PathBuf, String> {
         let active_dataset_ids = config.effective_active_dataset_ids();
         if active_dataset_ids.len() == 1 {
             if let Some(dataset) = config.datasets.iter().find(|item| item.id == active_dataset_ids[0]) {
-                let home = match std::env::var("HOME") {
-                    Ok(h) => PathBuf::from(h),
-                    Err(_) => dirs::home_dir().ok_or("Cannot find home directory")?,
-                };
+                let home = crate::paths::home_dir()?;
                 let dataset_dir = home.join(".pi").join("agent").join("sessions").join("datasets").join(&dataset.slug);
                 fs::create_dir_all(&dataset_dir).map_err(|e| format!("Failed to create dataset dir: {e}"))?;
                 return Ok(dataset_dir.join("sessions.db"));
             }
         } else if active_dataset_ids.len() > 1 {
-            let home = match std::env::var("HOME") {
-                Ok(h) => PathBuf::from(h),
-                Err(_) => dirs::home_dir().ok_or("Cannot find home directory")?,
-            };
+            let home = crate::paths::home_dir()?;
             let mut hasher = DefaultHasher::new();
             let mut hashed_dataset_ids = active_dataset_ids.clone();
             hashed_dataset_ids.sort();

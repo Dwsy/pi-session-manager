@@ -385,6 +385,10 @@ fn extract_workspace_from_messages(messages: &[CanonicalMessage]) -> Option<Path
                 return Some(PathBuf::from(normalized));
             }
         }
+        // Windows drive-letter paths: e.g. C:\Users\foo\project or C:/Users/foo/project
+        if let Some(workspace) = extract_windows_drive_workspace(&msg.content) {
+            return Some(workspace);
+        }
         for prefix in ["/home/", "/Users/", "/root/"] {
             if let Some(idx) = msg.content.find(prefix) {
                 let rest = &msg.content[idx..];
@@ -400,4 +404,41 @@ fn extract_workspace_from_messages(messages: &[CanonicalMessage]) -> Option<Path
         }
     }
     None
+}
+
+/// Extract a workspace path from a Windows drive-letter path embedded in message
+/// text. Accepts both `C:\Users\foo\project` and `C:/Users/foo/project`.
+fn extract_windows_drive_workspace(content: &str) -> Option<PathBuf> {
+    let bytes = content.as_bytes();
+    let mut start = None;
+    for i in 0..bytes.len().saturating_sub(2) {
+        let b = bytes[i];
+        // ASCII letter
+        if !(b.is_ascii_alphabetic()) {
+            continue;
+        }
+        if bytes[i + 1] != b':' {
+            continue;
+        }
+        let sep = bytes[i + 2];
+        if sep != b'\\' && sep != b'/' {
+            continue;
+        }
+        start = Some(i);
+        break;
+    }
+    let idx = start?;
+    let rest = &content[idx..];
+    let path: String = rest
+        .chars()
+        .take_while(|c| !c.is_whitespace() && *c != '"' && *c != '\'')
+        .collect();
+    if path.len() < 6 {
+        return None;
+    }
+    let candidate = PathBuf::from(&path);
+    if candidate.is_file() {
+        return candidate.parent().map(Path::to_path_buf).or(Some(candidate));
+    }
+    Some(candidate)
 }

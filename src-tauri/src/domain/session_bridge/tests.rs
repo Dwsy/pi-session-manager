@@ -816,3 +816,232 @@ fn codex_roundtrip_preserves_tool_blocks() {
     assert_eq!(readback.messages[2].tool_results.len(), 1);
     assert_eq!(readback.messages[2].tool_results[0].content, "file contents");
 }
+
+#[test]
+fn claude_code_read_groups_assistant_fragments_by_response_id() {
+    use crate::domain::casr_min::providers::claude_code::read_session_from_str;
+
+    let temp = tempfile::tempdir().expect("tempdir");
+    let path = temp.path().join("claude-fragmented.jsonl");
+    let response_id = "resp_0e2c4a75be94873b016a1339ced2d48191a9f7c4";
+    let lines = [
+        serde_json::json!({
+            "type": "user",
+            "uuid": "u1",
+            "sessionId": "claude-frag-1",
+            "cwd": "/repo/demo",
+            "timestamp": "2026-04-08T10:00:01.000Z",
+            "message": { "role": "user", "content": "Fix auth" }
+        }),
+        serde_json::json!({
+            "type": "assistant",
+            "uuid": "a-thinking",
+            "parentUuid": "u1",
+            "sessionId": "claude-frag-1",
+            "timestamp": "2026-04-08T10:00:02.000Z",
+            "message": {
+                "id": response_id,
+                "role": "assistant",
+                "model": "claude-sonnet-4",
+                "content": [{ "type": "thinking", "thinking": "Check the logs first." }]
+            }
+        }),
+        serde_json::json!({
+            "type": "assistant",
+            "uuid": "a-text",
+            "parentUuid": "a-thinking",
+            "sessionId": "claude-frag-1",
+            "timestamp": "2026-04-08T10:00:03.000Z",
+            "message": {
+                "id": response_id,
+                "role": "assistant",
+                "model": "claude-sonnet-4",
+                "content": [{ "type": "text", "text": "Reading the auth file." }]
+            }
+        }),
+        serde_json::json!({
+            "type": "assistant",
+            "uuid": "a-tool-1",
+            "parentUuid": "a-text",
+            "sessionId": "claude-frag-1",
+            "timestamp": "2026-04-08T10:00:04.000Z",
+            "message": {
+                "id": response_id,
+                "role": "assistant",
+                "model": "claude-sonnet-4",
+                "content": [{ "type": "tool_use", "id": "toolu_1", "name": "read_file", "input": { "path": "src/auth.ts" } }]
+            }
+        }),
+        serde_json::json!({
+            "type": "assistant",
+            "uuid": "a-tool-2",
+            "parentUuid": "a-tool-1",
+            "sessionId": "claude-frag-1",
+            "timestamp": "2026-04-08T10:00:05.000Z",
+            "message": {
+                "id": response_id,
+                "role": "assistant",
+                "model": "claude-sonnet-4",
+                "content": [{ "type": "tool_use", "id": "toolu_2", "name": "bash", "input": { "command": "npm test" } }]
+            }
+        }),
+    ]
+    .iter()
+    .map(|value| serde_json::to_string(value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&path, lines).expect("write source");
+
+    let canonical = read_session_from_str(&path, &std::fs::read_to_string(&path).unwrap()).expect("read claude");
+
+    // 1 user + 1 grouped assistant (not 4 assistant fragments)
+    assert_eq!(canonical.messages.len(), 2);
+    let assistant = &canonical.messages[1];
+    assert_eq!(assistant.role, MessageRole::Assistant);
+    assert_eq!(assistant.author.as_deref(), Some("claude-sonnet-4"));
+    // Text from the two text-bearing fragments is concatenated.
+    assert!(assistant.content.contains("Check the logs first."));
+    assert!(assistant.content.contains("Reading the auth file."));
+    // Both tool calls are captured.
+    assert_eq!(assistant.tool_calls.len(), 2);
+    assert_eq!(assistant.tool_calls[0].name, "read_file");
+    assert_eq!(assistant.tool_calls[1].name, "bash");
+    assert_eq!(assistant.tool_calls[0].id.as_deref(), Some("toolu_1"));
+}
+
+#[test]
+fn claude_code_read_does_not_merge_assistant_lines_without_response_id() {
+    use crate::domain::casr_min::providers::claude_code::read_session_from_str;
+
+    let temp = tempfile::tempdir().expect("tempdir");
+    let path = temp.path().join("claude-no-id.jsonl");
+    let lines = [
+        serde_json::json!({
+            "type": "assistant",
+            "uuid": "a1",
+            "timestamp": "2026-04-08T10:00:02.000Z",
+            "message": { "role": "assistant", "model": "claude-sonnet-4", "content": [{ "type": "text", "text": "one" }] }
+        }),
+        serde_json::json!({
+            "type": "assistant",
+            "uuid": "a2",
+            "parentUuid": "a1",
+            "timestamp": "2026-04-08T10:00:03.000Z",
+            "message": { "role": "assistant", "model": "claude-sonnet-4", "content": [{ "type": "text", "text": "two" }] }
+        }),
+    ]
+    .iter()
+    .map(|value| serde_json::to_string(value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&path, lines).expect("write source");
+
+    let canonical = read_session_from_str(&path, &std::fs::read_to_string(&path).unwrap()).expect("read claude");
+    assert_eq!(canonical.messages.len(), 2, "without message.id, lines stay separate");
+}
+
+#[test]
+fn codex_read_groups_function_call_fragments_with_final_message() {
+    use crate::domain::casr_min::providers::codex::read_session_from_str;
+
+    let temp = tempfile::tempdir().expect("tempdir");
+    let path = temp.path().join("codex-fragmented.jsonl");
+    let lines = [
+        serde_json::json!({
+            "type": "session_meta",
+            "timestamp": "2026-04-08T10:00:00.000Z",
+            "payload": { "id": "codex-frag-1", "cwd": "/repo/demo" }
+        }),
+        serde_json::json!({
+            "type": "event_msg",
+            "timestamp": "2026-04-08T10:00:01.000Z",
+            "payload": { "type": "user_message", "message": "Fix auth" }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": "2026-04-08T10:00:02.000Z",
+            "payload": { "type": "function_call", "call_id": "call_1", "name": "shell", "arguments": { "command": ["ls"] } }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": "2026-04-08T10:00:03.000Z",
+            "payload": { "type": "function_call", "call_id": "call_2", "name": "read_file", "arguments": { "path": "src/auth.ts" } }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": "2026-04-08T10:00:04.000Z",
+            "payload": { "type": "function_call_output", "call_id": "call_1", "output": "file list" }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": "2026-04-08T10:00:05.000Z",
+            "payload": { "type": "function_call_output", "call_id": "call_2", "output": "file contents" }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": "2026-04-08T10:00:06.000Z",
+            "payload": { "type": "message", "role": "assistant", "content": [{ "type": "output_text", "text": "Fixed the auth module." }] }
+        }),
+    ]
+    .iter()
+    .map(|value| serde_json::to_string(value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&path, lines).expect("write source");
+
+    let canonical = read_session_from_str(&path, &std::fs::read_to_string(&path).unwrap()).expect("read codex");
+
+    // 1 user + 1 grouped assistant + 2 tool results = 4 messages.
+    let assistants: Vec<_> = canonical.messages.iter().filter(|m| m.role == MessageRole::Assistant).collect();
+    let tools: Vec<_> = canonical.messages.iter().filter(|m| m.role == MessageRole::Tool).collect();
+    let users: Vec<_> = canonical.messages.iter().filter(|m| m.role == MessageRole::User).collect();
+    assert_eq!(assistants.len(), 1, "two tool-call fragments + final text collapse into one assistant message");
+    assert_eq!(tools.len(), 2, "tool results stay as separate messages");
+    assert_eq!(users.len(), 1);
+
+    let assistant = assistants[0];
+    assert!(assistant.content.contains("Fixed the auth module."), "assistant content should carry the answer text: {}", assistant.content);
+    assert_eq!(assistant.tool_calls.len(), 2, "both tool calls should be attached to the merged message");
+    let mut tool_call_ids: Vec<&str> = assistant.tool_calls.iter().filter_map(|tc| tc.id.as_deref()).collect();
+    tool_call_ids.sort();
+    assert_eq!(tool_call_ids, vec!["call_1", "call_2"]);
+
+    // Tool results keep their call_id linkage.
+    let mut tool_call_links: Vec<&str> = tools.iter().filter_map(|m| m.tool_results.first()).filter_map(|tr| tr.call_id.as_deref()).collect();
+    tool_call_links.sort();
+    assert_eq!(tool_call_links, vec!["call_1", "call_2"]);
+}
+
+#[test]
+fn codex_read_does_not_merge_isolated_assistant_text_messages() {
+    use crate::domain::casr_min::providers::codex::read_session_from_str;
+
+    let temp = tempfile::tempdir().expect("tempdir");
+    let path = temp.path().join("codex-text-only.jsonl");
+    let lines = [
+        serde_json::json!({
+            "type": "session_meta",
+            "timestamp": "2026-04-08T10:00:00.000Z",
+            "payload": { "id": "codex-text-1", "cwd": "/repo/demo" }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": "2026-04-08T10:00:01.000Z",
+            "payload": { "type": "message", "role": "assistant", "content": [{ "type": "output_text", "text": "one" }] }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": "2026-04-08T10:00:02.000Z",
+            "payload": { "type": "message", "role": "assistant", "content": [{ "type": "output_text", "text": "two" }] }
+        }),
+    ]
+    .iter()
+    .map(|value| serde_json::to_string(value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&path, lines).expect("write source");
+
+    let canonical = read_session_from_str(&path, &std::fs::read_to_string(&path).unwrap()).expect("read codex");
+    let assistants: Vec<_> = canonical.messages.iter().filter(|m| m.role == MessageRole::Assistant).collect();
+    assert_eq!(assistants.len(), 2, "back-to-back assistant text messages without tool calls stay separate");
+}

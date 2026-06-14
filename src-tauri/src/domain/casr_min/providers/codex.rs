@@ -10,7 +10,7 @@ pub fn session_roots() -> Vec<PathBuf> {
 }
 
 pub fn build_target_path(target_session_id: &str, now: DateTime<Utc>) -> Result<PathBuf, String> {
-    let sessions_dir = dirs::home_dir().map(|h| h.join(".codex").join("sessions")).ok_or_else(|| "cannot determine Codex sessions directory".to_string())?;
+    let sessions_dir = crate::paths::home_dir()?.join(".codex").join("sessions");
     let date_dir = now.format("%Y/%m/%d").to_string();
     let stamp = now.format("%Y-%m-%dT%H-%M-%S").to_string();
     Ok(sessions_dir.join(date_dir).join(format!("rollout-{stamp}-{target_session_id}.jsonl")))
@@ -135,6 +135,7 @@ fn read_envelopes(path: &Path, envelopes: Vec<Value>) -> Result<CanonicalSession
         }
     }
 
+    group_codex_assistant_fragments(&mut messages);
     reindex_messages(&mut messages);
     let session_id = session_id.unwrap_or_else(|| path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string());
     let title = messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100));
@@ -359,4 +360,165 @@ fn extract_payload_tool_results(payload: &Value) -> Vec<ToolResult> {
     let content = payload.get("output").or_else(|| payload.get("content")).or_else(|| payload.get("result")).map(flatten_content).unwrap_or_default();
     let is_error = payload.get("is_error").and_then(|v| v.as_bool()).or_else(|| payload.get("status").and_then(|v| v.as_str()).map(|s| s == "error")).unwrap_or(false);
     vec![ToolResult { call_id: payload.get("call_id").or_else(|| payload.get("tool_use_id")).or_else(|| payload.get("id")).and_then(|v| v.as_str()).map(String::from), content, is_error }]
+}
+
+/// What a single assistant `CanonicalMessage` carries, for grouping purposes.
+enum AssistantFragment {
+    Thinking,
+    ToolCalls,
+    Text,
+    /// Already a complete turn (text + tool calls together, or anything mixed);
+    /// leave it alone.
+    Complete,
+    NotAssistant,
+}
+
+fn classify_fragment(msg: &CanonicalMessage) -> AssistantFragment {
+    if msg.role != MessageRole::Assistant {
+        return AssistantFragment::NotAssistant;
+    }
+    let has_text = !msg.content.trim().is_empty() && msg.author.as_deref() != Some("reasoning");
+    let has_thinking = !msg.content.trim().is_empty() && msg.author.as_deref() == Some("reasoning");
+    let has_tools = !msg.tool_calls.is_empty();
+    if has_text && has_tools {
+        return AssistantFragment::Complete;
+    }
+    if has_text {
+        return AssistantFragment::Text;
+    }
+    if has_thinking {
+        return AssistantFragment::Thinking;
+    }
+    if has_tools {
+        return AssistantFragment::ToolCalls;
+    }
+    AssistantFragment::Complete
+}
+
+/// Collapse the assistant-side fragments of a Codex turn into a single
+/// `CanonicalMessage`. Codex writes one turn as: a series of `function_call`
+/// lines (each a lone tool call), the matching `function_call_output` tool
+/// results, optionally a reasoning line, and a final `message[assistant]` with
+/// the answer text. Without grouping, each piece becomes its own message.
+///
+/// This keeps tool-result (`MessageRole::Tool`) messages in place — they stay
+/// individually addressable via `call_id` — and merges adjacent assistant
+/// tool-call fragments with the finalized answer text into one message. Thinking
+/// fragments are left as their own messages (the canonical model carries a
+/// single flattened `content`, so folding reasoning into the answer would mangle
+/// both). The group closes at the first text fragment (the answer) or at any
+/// non-absorbable boundary (user message, complete turn, etc.).
+fn group_codex_assistant_fragments(messages: &mut Vec<CanonicalMessage>) {
+    if messages.len() < 2 {
+        return;
+    }
+
+    let mut result: Vec<CanonicalMessage> = Vec::with_capacity(messages.len());
+    let mut group: Vec<CanonicalMessage> = Vec::new();
+    // Tool-result messages absorbed while a group is open are re-emitted after
+    // the merged assistant message so they keep their call_id linkage.
+    let mut pending_tool: Vec<CanonicalMessage> = Vec::new();
+
+    for msg in messages.drain(..) {
+        let kind = classify_fragment(&msg);
+        match kind {
+            AssistantFragment::NotAssistant => {
+                if msg.role == MessageRole::Tool && !group.is_empty() {
+                    // Tool result that belongs to the in-progress turn.
+                    pending_tool.push(msg);
+                } else {
+                    // User message or stray tool result — flush, then emit.
+                    flush_codex_group(&mut group, &mut pending_tool, &mut result);
+                    result.push(msg);
+                }
+            }
+            AssistantFragment::Thinking => {
+                // Reasoning stays its own message; it never folds into a turn.
+                flush_codex_group(&mut group, &mut pending_tool, &mut result);
+                result.push(msg);
+            }
+            AssistantFragment::Complete => {
+                flush_codex_group(&mut group, &mut pending_tool, &mut result);
+                result.push(msg);
+            }
+            AssistantFragment::Text => {
+                let group_has_text = group.iter().any(|m| matches!(classify_fragment(m), AssistantFragment::Text));
+                if group_has_text {
+                    // Previous turn never closed; start a new one.
+                    flush_codex_group(&mut group, &mut pending_tool, &mut result);
+                }
+                group.push(msg);
+                // The finalized answer text closes the turn.
+                flush_codex_group(&mut group, &mut pending_tool, &mut result);
+            }
+            AssistantFragment::ToolCalls => {
+                group.push(msg);
+            }
+        }
+    }
+
+    flush_codex_group(&mut group, &mut pending_tool, &mut result);
+    *messages = result;
+}
+
+fn flush_codex_group(group: &mut Vec<CanonicalMessage>, pending_tool: &mut Vec<CanonicalMessage>, result: &mut Vec<CanonicalMessage>) {
+    if group.is_empty() {
+        for msg in pending_tool.drain(..) {
+            result.push(msg);
+        }
+        return;
+    }
+    if group.len() == 1 {
+        result.push(group.remove(0));
+    } else {
+        let merged = merge_codex_group(std::mem::take(group));
+        result.push(merged);
+    }
+    for msg in pending_tool.drain(..) {
+        result.push(msg);
+    }
+}
+
+fn merge_codex_group(fragments: Vec<CanonicalMessage>) -> CanonicalMessage {
+    // Groups only ever contain tool-call fragments and the final answer text
+    // (thinking fragments stay separate — see group_codex_assistant_fragments).
+    let mut tool_call_frags: Vec<CanonicalMessage> = Vec::new();
+    let mut text: Vec<CanonicalMessage> = Vec::new();
+    for frag in fragments {
+        match classify_fragment(&frag) {
+            AssistantFragment::ToolCalls => tool_call_frags.push(frag),
+            AssistantFragment::Text => text.push(frag),
+            _ => {
+                // Defensive: treat any stray assistant fragment as text.
+                if frag.role == MessageRole::Assistant {
+                    text.push(frag);
+                }
+            }
+        }
+    }
+
+    // The head carries the stable identity (id chain, timestamp, extra). Prefer
+    // the earliest fragment: tool calls first, then the answer text.
+    let head_ref = tool_call_frags.first().or_else(|| text.first()).expect("group has at least one fragment");
+    let mut head = head_ref.clone();
+
+    let mut tool_calls: Vec<ToolCall> = Vec::new();
+    for frag in &tool_call_frags {
+        for tc in &frag.tool_calls {
+            tool_calls.push(tc.clone());
+        }
+    }
+
+    // Content is the finalized answer text (tool-call fragments carry none).
+    head.content = text.first().map(|t| t.content.clone()).unwrap_or_default();
+    head.tool_calls = tool_calls;
+    // Author comes from the finalized answer fragment.
+    if let Some(answer) = text.first() {
+        if answer.author.as_deref() != Some("reasoning") {
+            if let Some(a) = &answer.author {
+                head.author = Some(a.clone());
+            }
+        }
+    }
+    head
 }

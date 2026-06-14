@@ -136,7 +136,10 @@ fn open_web<R: Runtime>(_app: &AppHandle<R>) {
     }
     #[cfg(target_os = "windows")]
     {
-        let _ = std::process::Command::new("cmd").args(["/C", "start", &url]).spawn();
+        // Pass an empty title as the first arg: `cmd /C start "" <url>`. Without
+        // it, `start` treats the first quoted token of the URL as the window
+        // title and any `&` in the URL is parsed as a command separator.
+        let _ = std::process::Command::new("cmd").args(["/C", "start", "", &url]).spawn();
     }
 }
 
