@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke, listen } from "@/transport";
 import type { SessionInfo, SessionsDiff } from "@/types";
+import { getPathBasename, pathsEqual, stripJsonlExt } from "@/utils/path";
 import {
   DEFAULT_SESSION_SORT_BY,
   DEFAULT_SESSION_SORT_ORDER,
@@ -55,7 +56,7 @@ function isSameSessionInfo(left: SessionInfo, right: SessionInfo): boolean {
   return (
     left.id === right.id &&
     left.path === right.path &&
-    left.cwd === right.cwd &&
+    pathsEqual(left.cwd, right.cwd) &&
     left.name === right.name &&
     left.isDraft === right.isDraft &&
     left.created === right.created &&
@@ -255,7 +256,7 @@ export function usePaginatedSessions({
             }
             // Index by path basename (without directory and extension)
             if (l.sessionPath) {
-              const basename = l.sessionPath.split('/').pop()?.replace(/\.jsonl$/, '');
+              const basename = stripJsonlExt(getPathBasename(l.sessionPath));
               if (basename) {
                 liveByFlexibleKey.set(basename, l);
               }
@@ -266,7 +267,7 @@ export function usePaginatedSessions({
             // Try matching by id, UUID, or path basename
             const liveInfo =
               liveByFlexibleKey.get(s.id) ||
-              liveByFlexibleKey.get(s.path.split('/').pop()?.replace(/\.jsonl$/, '') || '');
+              liveByFlexibleKey.get(stripJsonlExt(getPathBasename(s.path)) || '');
             if (liveInfo) {
               return { ...s, isLive: true, pid: liveInfo.pid };
             }

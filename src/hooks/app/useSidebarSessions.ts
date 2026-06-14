@@ -7,6 +7,7 @@ import type { FavoriteItem, SessionInfo, SessionTag, Tag, DateRange } from "@/ty
 import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
 import { filterSessions } from "@/utils/sessionFilters";
 import { getDirectoryName } from "@/utils/sessionDisplay";
+import { pathsEqual } from "@/utils/path";
 import { usePaginatedSessions } from "@/hooks/usePaginatedSessions";
 
 export type AppSidebarViewMode = "list" | "project" | "app";
@@ -246,10 +247,10 @@ export function useSidebarSessions({
       return null;
     }
 
-    const matchedSession = sessions.find((session) => session.cwd === selectedProject);
+    const matchedSession = sessions.find((session) => pathsEqual(session.cwd, selectedProject));
     const projectName = getDirectoryName(matchedSession?.cwd || selectedProject);
     const sessionCount = sessions.filter(
-      (session) => session.cwd === selectedProject,
+      (session) => pathsEqual(session.cwd, selectedProject),
     ).length;
 
     return {

@@ -12,6 +12,7 @@ import type {
 import { trimMarkdownCacheOnSessionSwitch } from "@/utils/markdown";
 import { getCachedSettings } from "@/utils/settingsApi";
 import { getSessionSourceSlug, parseSessionEntriesWithLineCount } from "@/utils/session";
+import { getPathBasename, pathsEqual, stripJsonlExt } from "@/utils/path";
 import {
   BROWSER_DATASET_REFRESHED_EVENT,
   isBrowserDatasetModeEnabled,
@@ -23,8 +24,7 @@ import {
 } from "@/runtime-data/sessionSource";
 
 function extractSessionId(sessionPath: string): string {
-  const base = sessionPath.replace(/\.jsonl$/, "");
-  return base.substring(base.lastIndexOf("/") + 1);
+  return stripJsonlExt(getPathBasename(sessionPath));
 }
 
 function appendDeltaToMessageContent(
@@ -400,9 +400,7 @@ export function useSessionViewerData({
         if (isLiveRef.current && isPiSession) {
           try {
             const liveEntries = await invoke<any[]>("get_pi_agent_entries", {
-              sessionId:
-                sessionPath.split("/").pop()?.replace(".jsonl", "") ||
-                sessionPath,
+              sessionId: stripJsonlExt(getPathBasename(sessionPath)) || sessionPath,
             });
             if (liveEntries && liveEntries.length > 0) {
               setEntries(liveEntries);
@@ -597,7 +595,7 @@ export function useSessionViewerData({
           if (!diff?.updated?.length) return;
 
           const hit = diff.updated.some(
-            (session) => session.path === sessionPath,
+            (session) => pathsEqual(session.path, sessionPath),
           );
           if (hit) {
             void loadMoreHistory({ asRealtime: true });

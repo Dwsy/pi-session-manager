@@ -9,6 +9,7 @@ import SelectedProjectHeader from "@/components/project/SelectedProjectHeader";
 import AppPluginSidebarPane from "./AppPluginSidebarPane";
 import type { FavoriteItem, SessionInfo } from "@/types";
 import type { AppDesktopSidebarMode } from "./AppDesktopSidebar";
+import { pathsEqual } from "@/utils/path";
 
 type SessionListProps = ComponentProps<typeof SessionList>;
 type ProjectListProps = ComponentProps<typeof ProjectList>;
@@ -107,7 +108,7 @@ function AppDesktopSidebarContent({
   const selectedProjectLiveCount = useMemo(() => {
     if (!selectedProject) return 0;
     return filteredSessions.filter(
-      (s) => s.cwd === selectedProject && (s.isLive || (liveSessionIds?.has(s.id) ?? false)),
+      (s) => pathsEqual(s.cwd, selectedProject) && (s.isLive || (liveSessionIds?.has(s.id) ?? false)),
     ).length;
   }, [selectedProject, filteredSessions, liveSessionIds]);
 

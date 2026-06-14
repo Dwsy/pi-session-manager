@@ -32,7 +32,7 @@ import {
   getRuntimeDayStats,
   getRuntimeStats,
 } from "@/runtime-data/sessionSource";
-import { getPathBasename, hasPathSeparator } from "@/utils/path";
+import { getPathBasename, hasPathSeparator, pathsEqual } from "@/utils/path";
 
 interface DashboardProps {
   sessions: SessionInfo[];
@@ -195,7 +195,7 @@ export default function Dashboard({
 
   const handleOpenSessionFromModal = (sessionPath: string) => {
     const targetSession = sessions.find(
-      (session) => session.path === sessionPath,
+      (session) => pathsEqual(session.path, sessionPath),
     );
     if (targetSession) {
       setPreviewSession(targetSession);

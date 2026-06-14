@@ -27,6 +27,7 @@ import { useDeferredPresence } from "@/hooks/useDeferredPresence";
 import type { PsmSessionTreeViewRuntimeRegistration } from "@/plugins/runtime-host/types";
 import type { SessionSearchTarget } from "@/hooks/useSessionViewerInMessageSearch";
 import type { LegacySessionStats, SessionEntry, SessionInfo } from "@/types";
+import { getPathBasename, stripJsonlExt } from "@/utils/path";
 
 export interface SessionViewerBodySidebarProps {
   showSidebar: boolean;
@@ -165,7 +166,7 @@ export default function SessionViewerBody({
             <span className="text-muted-foreground/60">↩️</span>
             <span>{forkedFromLabel}:</span>
             <span className="truncate max-w-[200px]" title={session.parent_session_path}>
-              {session.parent_session_path.split("/").pop()?.replace(/\.jsonl$/, "") || session.parent_session_path}
+              {stripJsonlExt(getPathBasename(session.parent_session_path)) || session.parent_session_path}
             </span>
           </div>
         )}

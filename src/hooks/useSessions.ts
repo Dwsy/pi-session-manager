@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNotification } from "@/hooks/useNotification";
 import { psmRuntimeEventBus } from "@/plugins/runtime-host/eventBus";
 import type { SessionInfo, SessionsDiff } from "@/types";
+import { getPathBasename, stripJsonlExt } from "@/utils/path";
 import type {
   PiLiveSessionDisconnectedPayload,
   PiLiveSessionRegisteredPayload,
@@ -653,7 +654,7 @@ export function useSessions(): UseSessionsReturn {
       const now = new Date().toISOString();
       // Extract a meaningful display name from path/cwd, fallback to sessionId
       const sessionPath = payload.sessionPath || "";
-      const displayName = sessionPath.split("/").pop()?.replace(/\.jsonl$/, "") || payload.cwd?.split("/").pop() || sessionId;
+      const displayName = stripJsonlExt(getPathBasename(sessionPath)) || getPathBasename(payload.cwd || "") || sessionId;
       patchSessions({
         updated: [{
           id: sessionId,

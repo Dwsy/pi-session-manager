@@ -2,6 +2,7 @@ import type { SessionInfo, SessionTag } from "@/types";
 import { getSessionSourceSlug } from "./session";
 import { getSessionIdMatchKind, normalizeSessionIdQuery } from "./session";
 import { parseQuotedQuery } from "./search";
+import { pathsEqual } from "./path";
 
 export type TimeRange = 'any' | '1h' | '24h' | '2d' | '7d' | '30d';
 
@@ -162,7 +163,7 @@ export function filterSessions({
   let result = sessions;
 
   if (projectFilter) {
-    result = result.filter((session) => session.cwd === projectFilter);
+    result = result.filter((session) => pathsEqual(session.cwd, projectFilter));
   }
 
   if (filterTagIds.length > 0) {

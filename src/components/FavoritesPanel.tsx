@@ -4,7 +4,7 @@ import type { SessionInfo, FavoriteItem } from '@/types'
 import { SessionBadge } from './session-viewer/SessionBadge'
 import { FavoritesSkeleton } from './ui/Skeleton'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
-import { getPathBasename } from '@/utils/path'
+import { getPathBasename, pathsEqual } from '@/utils/path'
 import { getSessionSourceSlug, getSessionSourceTag } from '@/utils/session'
 import { useSettings } from '@/hooks/useSettings'
 
@@ -62,7 +62,7 @@ export default function FavoritesPanel({
             {t('favorites.projects')} ({favoriteProjects.length})
           </div>
           {favoriteProjects.map(favorite => {
-            const projectSessions = sessions.filter(s => s.cwd === favorite.path)
+            const projectSessions = sessions.filter(s => pathsEqual(s.cwd, favorite.path))
             return (
               <div
                 key={favorite.id}

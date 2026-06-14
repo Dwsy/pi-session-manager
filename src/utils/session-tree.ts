@@ -587,7 +587,9 @@ export function getEntryDisplayText(entry: SessionEntry, label?: string): string
     }
 
     const parts = normalized.split("/").filter(Boolean);
-    if (normalized.startsWith("/") && parts.length > 4) {
+    // Absolute Unix paths ("/...") and Windows drive-letter paths ("C:/...")
+    const isAbsolute = normalized.startsWith("/") || /^[A-Za-z]:\//.test(normalized);
+    if (isAbsolute && parts.length > 4) {
       return `./${parts.slice(-4).join("/")}`;
     }
     return value;

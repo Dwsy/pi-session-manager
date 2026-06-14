@@ -1,4 +1,4 @@
-import type { SessionEntry, LegacySessionStats, Content } from '@/types'
+import type { SessionEntry, LegacySessionStats, Content, Message } from '@/types'
 import { parseQuotedQuery } from './search'
 
 export const SHORT_SESSION_ID_LENGTH = 12
@@ -48,7 +48,7 @@ export function parseSessionEntriesWithLineCount(jsonlContent: string): {
           entries.push(normalized)
         }
 
-        return { entries, lineCount: rawItems.length }
+        return { entries: groupProviderAssistantFragments(entries), lineCount: rawItems.length }
       }
     } catch {
       // Fall through to line-based parsing.
@@ -95,7 +95,16 @@ export function parseSessionEntriesWithLineCount(jsonlContent: string): {
     }
   }
 
-  return { entries, lineCount }
+  return { entries: groupProviderAssistantFragments(entries), lineCount }
+}
+
+/**
+ * Apply per-provider assistant-fragment grouping. Claude Code fragments share
+ * a response id; Codex fragments are role-adjacent. Each helper is a no-op for
+ * the other provider's shapes, so running both is safe and idempotent.
+ */
+function groupProviderAssistantFragments(entries: SessionEntry[]): SessionEntry[] {
+  return groupCodexAssistantFragments(groupClaudeAssistantFragments(entries))
 }
 
 export function computeStats(entries: SessionEntry[]): LegacySessionStats {
@@ -255,6 +264,9 @@ function convertClaudeLineToSessionEntry(line: any): SessionEntry | null {
     typeof line.timestamp === 'string' ? line.timestamp : new Date().toISOString()
   const resolvedRole = toolResult ? 'toolResult' : role
 
+  const responseId =
+    typeof message.id === 'string' && message.id ? message.id : undefined
+
   return {
     type: 'message',
     id: (line.uuid as string) || generateFallbackId('claude-entry'),
@@ -270,6 +282,253 @@ function convertClaudeLineToSessionEntry(line: any): SessionEntry | null {
       usage: normalizeTokenUsage(message.usage),
       stopReason:
         typeof message.stop_reason === 'string' ? message.stop_reason : undefined,
+      responseId: resolvedRole === 'assistant' ? responseId : undefined,
+    },
+  }
+}
+
+/**
+ * Claude Code writes a single assistant turn (thinking + text + multiple
+ * tool_use blocks) as several consecutive JSONL lines, each with its own
+ * `uuid` but sharing the same response id (`message.id`). Without grouping,
+ * every fragment is rendered as a standalone message, so a turn shows up as
+ * one thinking message, one text message, and one message per tool call.
+ *
+ * This merges consecutive `assistant` entries that share the same `responseId`
+ * back into a single message whose `content` carries all blocks — matching the
+ * shape Pi already uses. `user`/`toolResult` entries are left untouched.
+ *
+ * Safe to run on any provider: it only acts on adjacent assistant entries with
+ * a populated `responseId`, which Pi/Codex/etc. never produce.
+ */
+function groupClaudeAssistantFragments(entries: SessionEntry[]): SessionEntry[] {
+  if (entries.length < 2) return entries
+
+  const merged: SessionEntry[] = []
+  let current: SessionEntry | null = null
+  let currentResponseId: string | undefined
+
+  const flushCurrent = () => {
+    if (current) {
+      merged.push(current)
+      current = null
+      currentResponseId = undefined
+    }
+  }
+
+  for (const entry of entries) {
+    const isAssistant = entry.type === 'message' && entry.message?.role === 'assistant'
+    const responseId = isAssistant ? entry.message?.responseId : undefined
+
+    if (isAssistant && responseId && responseId === currentResponseId && current) {
+      current = mergeAssistantInto(current, entry)
+      continue
+    }
+
+    flushCurrent()
+
+    if (isAssistant && responseId) {
+      current = entry
+      currentResponseId = responseId
+    } else {
+      merged.push(entry)
+    }
+  }
+
+  flushCurrent()
+  return merged
+}
+
+function mergeAssistantInto(head: SessionEntry, fragment: SessionEntry): SessionEntry {
+  const headMsg = head.message!
+  const fragMsg = fragment.message!
+  const content = [...(headMsg.content ?? []), ...(fragMsg.content ?? [])]
+
+  return {
+    ...head,
+    message: {
+      ...headMsg,
+      content,
+      model: fragMsg.model || headMsg.model,
+      usage: mergeUsage(headMsg.usage, fragMsg.usage),
+      stopReason: fragMsg.stopReason ?? headMsg.stopReason,
+    },
+  }
+}
+
+function mergeUsage(
+  a: Message['usage'] | undefined,
+  b: Message['usage'] | undefined,
+): Message['usage'] | undefined {
+  if (!a) return b
+  if (!b) return a
+  // Streaming fragments accumulate usage; take the max per field to reflect
+  // the final totals rather than double-counting partial deltas.
+  return {
+    input: Math.max(a.input, b.input),
+    output: Math.max(a.output, b.output),
+    cacheRead: Math.max(a.cacheRead, b.cacheRead),
+    cacheWrite: Math.max(a.cacheWrite, b.cacheWrite),
+  }
+}
+
+/**
+ * Classify an assistant entry by what it carries. Codex writes a single
+ * assistant mini-turn as several consecutive entries: one per tool call, plus
+ * a final `message[assistant]` carrying the answer text. Each piece on its own
+ * renders as a standalone message, so we collapse them into one.
+ */
+type AssistantFragmentKind = 'toolCalls' | 'thinking' | 'text' | 'other'
+
+function classifyAssistantEntry(entry: SessionEntry): AssistantFragmentKind {
+  const content = entry.message?.content ?? []
+  const hasText = content.some((c) => c.type === 'text' && (c.text ?? '').trim().length > 0)
+  const hasToolCall = content.some((c) => c.type === 'toolCall')
+  const hasThinking = content.some((c) => c.type === 'thinking')
+  if (hasToolCall && !hasText && !hasThinking) return 'toolCalls'
+  if (hasThinking && !hasText && !hasToolCall) return 'thinking'
+  if (hasText && !hasToolCall) return 'text'
+  return 'other'
+}
+
+/**
+ * Codex spreads one assistant turn across several lines: a series of
+ * `function_call` entries (each a lone toolCall), the matching
+ * `function_call_output` toolResult entries, optionally a reasoning/thinking
+ * entry, and a final `message[assistant]` with the answer text. Group these
+ * assistant fragments into a single assistant message whose `content` holds
+ * every block — matching Pi/Claude's one-message-per-turn shape.
+ *
+ * Group boundaries:
+ *  - A user message always flushes the current group.
+ *  - toolResult entries between assistant fragments are absorbed positionally
+ *    (the turn is still in progress) but emitted as their own entries so they
+ *    keep linking to toolCalls via toolCallId.
+ *  - The group closes when an assistant *text* fragment (the finalized answer)
+ *    is appended, or when a non-absorbable entry arrives.
+ *  - Already-complete turns (text+toolCall in one entry) are left untouched.
+ *
+ * Safe for other providers: it only acts on adjacent assistant/toolResult
+ * sequences where assistant entries are pure toolCall/thinking/text fragments.
+ */
+function groupCodexAssistantFragments(entries: SessionEntry[]): SessionEntry[] {
+  if (entries.length < 2) return entries
+
+  const result: SessionEntry[] = []
+  // Each pending item is either an assistant fragment to merge or a toolResult
+  // entry to re-emit in place.
+  let assistantFrags: SessionEntry[] = []
+  let pending: SessionEntry[] = []
+
+  const flushGroup = () => {
+    if (assistantFrags.length === 0) {
+      // Only toolResults were pending (no open turn) — emit them as-is.
+      for (const e of pending) result.push(e)
+    } else if (assistantFrags.length === 1) {
+      result.push(assistantFrags[0])
+      for (const e of pending) result.push(e)
+    } else {
+      result.push(mergeCodexAssistantGroup(assistantFrags))
+      for (const e of pending) result.push(e)
+    }
+    assistantFrags = []
+    pending = []
+  }
+
+  for (const entry of entries) {
+    const role = entry.type === 'message' ? entry.message?.role : undefined
+
+    if (role === 'user') {
+      // A new user turn always starts fresh.
+      flushGroup()
+      result.push(entry)
+      continue
+    }
+
+    if (role === 'toolResult') {
+      // toolResults between assistant fragments belong to the same turn; hold
+      // them to re-emit after the merged assistant message.
+      if (assistantFrags.length > 0) {
+        pending.push(entry)
+      } else {
+        result.push(entry)
+      }
+      continue
+    }
+
+    if (role !== 'assistant') {
+      flushGroup()
+      result.push(entry)
+      continue
+    }
+
+    const kind = classifyAssistantEntry(entry)
+    // An already-complete turn (text + toolCall together, or unrecognised mix)
+    // is its own message.
+    if (kind === 'other') {
+      flushGroup()
+      result.push(entry)
+      continue
+    }
+
+    // Thinking fragments stay as their own messages — folding reasoning into a
+    // turn would merge it with the answer text and lose the distinction.
+    if (kind === 'thinking') {
+      flushGroup()
+      result.push(entry)
+      continue
+    }
+
+    const hasText = assistantFrags.some((e) => classifyAssistantEntry(e) === 'text')
+    // A second text fragment means a new turn started (previous turn had no
+    // trailing non-text fragment to close it).
+    if (kind === 'text' && hasText) {
+      flushGroup()
+    }
+
+    assistantFrags.push(entry)
+
+    // The finalized answer text closes the turn.
+    if (kind === 'text') {
+      flushGroup()
+    }
+  }
+
+  flushGroup()
+  return result
+}
+
+function mergeCodexAssistantGroup(fragments: SessionEntry[]): SessionEntry {
+  // Groups only ever contain tool-call fragments and the final answer text
+  // (thinking fragments stay separate — see groupCodexAssistantFragments).
+  const head = fragments[0]
+  const content: Content[] = []
+  let model: string | undefined
+  let usage: Message['usage'] | undefined
+  let stopReason: string | undefined
+
+  // Preserve a natural reading order: toolCalls → text.
+  const ordered = [
+    ...fragments.filter((f) => classifyAssistantEntry(f) === 'toolCalls'),
+    ...fragments.filter((f) => classifyAssistantEntry(f) === 'text'),
+  ]
+
+  for (const frag of ordered) {
+    const msg = frag.message!
+    for (const block of msg.content ?? []) content.push(block)
+    model = msg.model || model
+    usage = mergeUsage(usage, msg.usage)
+    stopReason = msg.stopReason ?? stopReason
+  }
+
+  return {
+    ...head,
+    message: {
+      ...head.message!,
+      content,
+      model,
+      usage,
+      stopReason,
     },
   }
 }

@@ -1,4 +1,5 @@
 import { getPlatformDefaults, type TerminalType } from "@/components/settings/types";
+import { detectPlatform } from "@/components/settings/types";
 import { invoke, isTauri } from "@/transport";
 import type {
   SessionConvertResult,
@@ -16,6 +17,24 @@ export interface ResumeCommandOverrides {
 export interface OpenSessionInTerminalOverrides extends ResumeCommandOverrides {
   terminal?: TerminalType | string;
   customCommand?: string;
+}
+
+/**
+ * Build a `cd <cwd>` prefix that works in the user's default shell. The emitted
+ * resume command is either copied to the clipboard or passed to the backend
+ * `open_session_in_terminal` (which runs it under cmd.exe / PowerShell on
+ * Windows, sh on Unix). Windows PowerShell 5.1 does NOT support `&&`, so on
+ * Windows we emit cmd-compatible `cd /d "X" & pi ...` (`&` runs unconditionally
+ * and is understood by both cmd and modern PowerShell).
+ */
+export function buildChangeDirAndRun(cwd: string, cmd: string): string {
+  if (!cwd) return cmd;
+  if (detectPlatform() === "windows") {
+    // cmd.exe syntax; PowerShell also accepts `cd` (alias for Set-Location) and
+    // `&` as a statement separator. `/d` lets cmd switch drives.
+    return `cd /d "${cwd}" & ${cmd}`;
+  }
+  return `cd "${cwd}" && ${cmd}`;
 }
 
 function applyResumeTemplate(
@@ -40,9 +59,7 @@ export function buildPiResumeCommand(
 
   if (!template.trim()) {
     const baseCommand = `${piCommand} --session \"${session.path}\"`;
-    return session.cwd
-      ? `cd \"${session.cwd}\" && ${baseCommand}`
-      : baseCommand;
+    return buildChangeDirAndRun(session.cwd || "", baseCommand);
   }
 
   const hasPlaceholders =
@@ -54,7 +71,7 @@ export function buildPiResumeCommand(
     const sessionSuffix = session.id ? session.id.slice(0, 4) : "pi";
     const sessionName = `pi-${sessionSuffix}`;
     const nestedCommand = session.cwd
-      ? `cd \"${session.cwd}\" && ${piCommand} --session \"${session.path}\"`
+      ? buildChangeDirAndRun(session.cwd, `${piCommand} --session \"${session.path}\"`)
       : `${piCommand} --session \"${session.path}\"`;
     return `${template.replace(/-s\\s+pi\\b/, `-s ${sessionName}`)} '${nestedCommand}'`;
   }
@@ -72,9 +89,7 @@ export function buildPiForkCommand(
 
   if (!template.trim()) {
     const baseCommand = `${piCommand} --fork "${session.path}"`;
-    return session.cwd
-      ? `cd "${session.cwd}" && ${baseCommand}`
-      : baseCommand;
+    return buildChangeDirAndRun(session.cwd || "", baseCommand);
   }
 
   const hasPlaceholders =
@@ -86,7 +101,7 @@ export function buildPiForkCommand(
     const sessionSuffix = session.id ? session.id.slice(0, 4) : "pi";
     const sessionName = `pi-${sessionSuffix}`;
     const nestedCommand = session.cwd
-      ? `cd "${session.cwd}" && ${piCommand} --fork "${session.path}"`
+      ? buildChangeDirAndRun(session.cwd, `${piCommand} --fork "${session.path}"`)
       : `${piCommand} --fork "${session.path}"`;
     return `${template.replace(/-s\\s+pi\b/, `-s ${sessionName}`)} '${nestedCommand}'`;
   }
@@ -122,8 +137,8 @@ export async function buildCopyResumeCommand(
 
   const result = await invoke<SessionConvertResult>("convert_session_format", {
     path: session.path,
-    target_format: getFallbackExternalResumeTarget(),
-    dry_run: false,
+    targetFormat: getFallbackExternalResumeTarget(),
+    dryRun: false,
     force: false,
   });
   return result.resume_command || "";
@@ -141,8 +156,8 @@ export async function buildCopyResumeCommandForTarget(
 
   const result = await invoke<SessionConvertResult>("convert_session_format", {
     path: session.path,
-    target_format: target,
-    dry_run: false,
+    targetFormat: target,
+    dryRun: false,
     force: false,
   });
   return result.resume_command || "";

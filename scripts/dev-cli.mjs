@@ -20,8 +20,15 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { readFileSync } from 'fs';
+import { homedir } from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Cross-platform user home: Windows uses USERPROFILE (HOME is usually unset,
+// and when set by Git Bash/MSYS may point to a Unix-style path Win32 can't open).
+function userHome() {
+  return process.env.HOME || process.env.USERPROFILE || homedir();
+}
 const projectRoot = resolve(__dirname, '..');
 
 const args = process.argv.slice(2);
@@ -50,7 +57,7 @@ const log = {
 };
 
 function getCliPort() {
-  const configPath = resolve(process.env.HOME || '~', '.config/pi-session-manager.json');
+  const configPath = resolve(userHome(), '.config', 'pi-session-manager.json');
   try {
     const config = JSON.parse(readFileSync(configPath, 'utf-8'));
     return config?.server?.http_port || 52131;
@@ -63,7 +70,6 @@ function checkCargoWatch() {
   return new Promise((resolve) => {
     const check = spawn('cargo', ['watch', '--version'], {
       stdio: 'pipe',
-      shell: true,
     });
     check.on('close', (code) => resolve(code === 0));
     check.on('error', () => resolve(false));

@@ -1,7 +1,7 @@
 import { FileText } from 'lucide-react'
 import { BaseSearchPlugin } from '@/plugins/base/BaseSearchPlugin'
 import type { SearchContext, SearchPluginResult } from '@/plugins/types'
-import { getPathBasename } from '@/utils/path'
+import { getPathBasename, pathsEqual } from '@/utils/path'
 import { parseQuotedQuery } from '@/utils/search'
 import { formatShortSessionId, getSessionIdMatchKind } from '@/utils/session'
 
@@ -35,7 +35,7 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
 
       // Filter session list if 'Search current project only' is enabled
       const sessionsToSearch = context.searchCurrentProjectOnly && context.selectedProject
-        ? context.sessions.filter(s => s.cwd === context.selectedProject)
+        ? context.sessions.filter(s => pathsEqual(s.cwd, context.selectedProject))
         : context.sessions
 
       const parsedQuery = parseQuotedQuery(query)

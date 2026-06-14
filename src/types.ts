@@ -214,6 +214,13 @@ export interface Message {
   provider?: string
   usage?: TokenUsage
   stopReason?: string
+  /**
+   * Underlying response id (e.g. Claude Code's `message.id` like `resp_xxx`).
+   * Multiple JSONL lines from a single assistant turn share this id; the
+   * frontend parser groups them into one message. Undefined for providers
+   * that never fragment a turn across lines.
+   */
+  responseId?: string
   errorMessage?: string
   cancelled?: boolean
   exitCode?: number
