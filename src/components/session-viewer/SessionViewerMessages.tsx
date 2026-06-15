@@ -1,7 +1,10 @@
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
+  useRef,
+  useState,
   type Dispatch,
   type MutableRefObject,
   type PointerEvent as ReactPointerEvent,
@@ -26,6 +29,7 @@ import SessionEntryRenderer from "./SessionEntryRenderer";
 import ConversationPreviewMessages from "./ConversationPreviewMessages";
 import type { SessionPreviewVariant } from "./previewTypes";
 import NewMessagesButton from "./NewMessagesButton";
+import ScrollToBottomButton from "./ScrollToBottomButton";
 import {
   SessionMessagesEmptyState,
   SessionMessagesErrorState,
@@ -149,6 +153,47 @@ const SessionViewerMessages = forwardRef<
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();
+
+  // Centered "scroll to bottom" affordance, revealed when the pointer enters
+  // the bottom 10% of the visible message area (and we're not already at the
+  // bottom). The button pins itself open on hover so it stays clickable.
+  const [pointerInBottomZone, setPointerInBottomZone] = useState(false);
+  const [overScrollToBottomButton, setOverScrollToBottomButton] = useState(false);
+  const hoverRafRef = useRef<number | null>(null);
+
+  const handleContainerPointerMove = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (hoverRafRef.current !== null) return;
+      hoverRafRef.current = requestAnimationFrame(() => {
+        hoverRafRef.current = null;
+        const container = messagesContainerRef.current;
+        if (!container) {
+          setPointerInBottomZone(false);
+          return;
+        }
+        const rect = container.getBoundingClientRect();
+        const pointerY = event.clientY;
+        const zoneTop = rect.bottom - rect.height * 0.1;
+        setPointerInBottomZone(pointerY >= zoneTop && pointerY <= rect.bottom);
+      });
+    },
+    [],
+  );
+
+  const handleContainerPointerLeave = useCallback(() => {
+    setPointerInBottomZone(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (hoverRafRef.current !== null) {
+        cancelAnimationFrame(hoverRafRef.current);
+      }
+    };
+  }, []);
+
+  const showScrollToBottomHover =
+    !isAtBottom && (pointerInBottomZone || overScrollToBottomButton);
 
   useSessionViewerSearchHighlight({
     container: messagesContainerRef.current,
@@ -275,9 +320,18 @@ const SessionViewerMessages = forwardRef<
           label={t("session.newMessages", "New messages")}
         />
       )}
+      <ScrollToBottomButton
+        title={t("session.scrollToBottom", "Scroll to bottom")}
+        visible={showScrollToBottomHover}
+        onClick={() => scrollToBottom(true)}
+        onMouseEnter={() => setOverScrollToBottomButton(true)}
+        onMouseLeave={() => setOverScrollToBottomButton(false)}
+      />
       <div
         className="h-full overflow-y-auto session-viewer"
         ref={messagesContainerRef}
+        onMouseMove={handleContainerPointerMove}
+        onMouseLeave={handleContainerPointerLeave}
       >
         <SessionHeader
           sessionId={sessionId}
