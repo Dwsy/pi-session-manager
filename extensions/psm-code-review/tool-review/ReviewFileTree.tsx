@@ -1,8 +1,16 @@
-import { type CSSProperties, useEffect, useMemo, useRef } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import type { FileTreeIconConfig } from "@pierre/trees";
+import { Copy, ExternalLink, FileText, FolderOpen } from "lucide-react";
 
 import type { ReviewFileNode, ReviewTreeModel } from "./viewModel";
+
+interface ContextMenuState {
+  x: number;
+  y: number;
+  path: string;
+  isDir: boolean;
+}
 
 interface ReviewFileTreeProps {
   tree: ReviewTreeModel;
@@ -31,26 +39,22 @@ const REVIEW_TREE_UNSAFE_CSS = `
   }
 
   [data-type='item'] {
-    margin: 1px 6px;
-    border: 1px solid transparent;
-    border-left: 2px solid transparent;
     border-radius: 5px;
+    box-shadow: inset 0 0 0 1px transparent, inset 2px 0 0 transparent;
     transition:
       background-color 140ms ease,
-      border-color 140ms ease,
+      box-shadow 140ms ease,
       color 140ms ease;
   }
 
   [data-type='item']:hover {
     background: rgb(var(--color-background) / 0.52);
-    border-color: rgb(var(--color-border) / 0.28);
+    box-shadow: inset 0 0 0 1px rgb(var(--color-border) / 0.28), inset 2px 0 0 transparent;
   }
 
   [data-type='item'][data-item-selected] {
     background: rgb(var(--color-background) / 0.88);
-    border-color: rgb(var(--color-border) / 0.62);
-    border-left-color: var(--trees-accent);
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
+    box-shadow: inset 0 0 0 1px rgb(var(--color-border) / 0.62), inset 2px 0 0 var(--trees-accent), inset 0 1px 2px rgb(0 0 0 / 0.14);
   }
 
   [data-type='item'][data-item-selected] [data-item-section='label'] {
@@ -153,6 +157,9 @@ export default function ReviewFileTree({
   nodeByPathRef.current = nodeByPath;
   onSelectPathRef.current = onSelectPath;
 
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const hoveredPathRef = useRef<string | null>(null);
+
   const { model } = useFileTree({
     flattenEmptyDirectories: true,
     gitStatus: tree.status,
@@ -168,6 +175,7 @@ export default function ReviewFileTree({
     },
     paths: tree.paths,
     renderRowDecoration: ({ item }) => {
+      hoveredPathRef.current = item.path;
       const node = nodeByPathRef.current.get(item.path);
       if (!node) return null;
 
@@ -179,6 +187,82 @@ export default function ReviewFileTree({
     stickyFolders: false,
     unsafeCSS: REVIEW_TREE_UNSAFE_CSS,
   });
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, path: string, isDir: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, path, isDir });
+  }, []);
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  const handleCopyPath = useCallback(async (path: string) => {
+    try {
+      await navigator.clipboard.writeText(path);
+    } catch {
+      const textArea = document.createElement("textarea");
+      textArea.value = path;
+      textArea.style.position = "fixed";
+      textArea.style.top = "-9999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+    }
+    setContextMenu(null);
+  }, []);
+
+  const handleCopyRelativePath = useCallback(async (path: string) => {
+    const parts = path.split("/");
+    const relativePath = parts.slice(1).join("/") || parts[0] || path;
+    try {
+      await navigator.clipboard.writeText(relativePath);
+    } catch {
+      const textArea = document.createElement("textarea");
+      textArea.value = relativePath;
+      textArea.style.position = "fixed";
+      textArea.style.top = "-9999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+    }
+    setContextMenu(null);
+  }, []);
+
+  const handleOpenDefault = useCallback(async (path: string) => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("open_path_with_default_app", { path });
+    } catch (err) {
+      console.error("Failed to open with default app:", err);
+    }
+    setContextMenu(null);
+  }, []);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      const menu = document.getElementById("review-file-tree-context-menu");
+      if (menu && !menu.contains(target)) {
+        setContextMenu(null);
+      }
+    };
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setContextMenu(null);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    document.addEventListener("keydown", keyHandler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+      document.removeEventListener("keydown", keyHandler);
+    };
+  }, [contextMenu]);
 
   useEffect(() => {
     model.resetPaths(tree.paths, {
@@ -206,13 +290,65 @@ export default function ReviewFileTree({
   if (tree.paths.length === 0) return null;
 
   return (
-    <div className="h-full min-h-0 bg-transparent py-1.5">
+    <div
+      className="flex h-full min-h-0 flex-col bg-transparent py-1.5"
+      onContextMenu={(e) => {
+        const path = hoveredPathRef.current;
+        if (path) {
+          const node = nodeByPathRef.current.get(path);
+          const isDir = !node || node.operations.length === 0;
+          handleContextMenu(e, path, isDir);
+        }
+      }}
+    >
       <FileTree
         model={model}
         aria-label={ariaLabel}
         className="h-full min-h-0 w-full"
         style={reviewTreeStyle}
       />
+      {contextMenu && (
+        <div
+          id="review-file-tree-context-menu"
+          className="fixed z-[9999] w-48 rounded-lg border border-border bg-card shadow-xl overflow-hidden py-1"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            type="button"
+            onClick={() => handleCopyPath(contextMenu.path)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-secondary"
+          >
+            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>复制路径</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleCopyRelativePath(contextMenu.path)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-secondary"
+          >
+            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>复制相对路径</span>
+          </button>
+          {!contextMenu.isDir && (
+            <button
+              type="button"
+              onClick={() => handleOpenDefault(contextMenu.path)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-secondary"
+            >
+              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>打开 (默认程序)</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleCloseContextMenu}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground hover:bg-secondary border-t border-border/50 mt-1"
+          >
+            <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>取消</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
