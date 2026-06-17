@@ -31,7 +31,7 @@ function buildToolResultByCallId(entries: SessionEntry[]) {
   const byCallId = new Map<string, SessionEntry>()
 
   for (const entry of entries) {
-    if (entry.message?.role !== 'tool') continue
+    if (entry.message?.role !== 'toolResult') continue
     const toolCallId = entry.message.toolCallId
     if (toolCallId) byCallId.set(toolCallId, entry)
   }
@@ -60,6 +60,7 @@ function CodeReviewToolbarButton({
 }) {
   const [open, setOpen] = useState(false)
   const [entries, setEntries] = useState<SessionEntry[]>([])
+  const [hasReviewableOps, setHasReviewableOps] = useState(false)
   const [overrideEntries, setOverrideEntries] = useState<SessionEntry[] | null>(null)
   const [overrideMap, setOverrideMap] = useState<Map<string, SessionEntry> | null>(null)
   const [loading, setLoading] = useState(false)
@@ -72,6 +73,26 @@ function CodeReviewToolbarButton({
 
   const activeEntries = overrideEntries ?? entries
   const activeToolResultByCallId = overrideMap ?? sessionToolResultByCallId
+
+  // Pre-load entries on mount to check for reviewable operations
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      setLoading(true)
+      try {
+        const loaded = await readSessionEntries(client, session.path)
+        if (cancelled) return
+        setEntries(loaded)
+        const map = buildToolResultByCallId(loaded)
+        setHasReviewableOps(extractFileOperations(loaded, map).length > 0)
+      } catch {
+        if (!cancelled) setHasReviewableOps(false)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [client, session.path])
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -126,7 +147,8 @@ function CodeReviewToolbarButton({
           setOverrideMap(null)
           setOpen(true)
         }}
-        className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-border/70 bg-secondary px-2 text-xs text-muted-foreground transition-colors hover:bg-secondary-hover hover:text-foreground focus-ring"
+        disabled={!hasReviewableOps || loading}
+        className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-border/70 bg-secondary px-2 text-xs text-muted-foreground transition-colors hover:bg-secondary-hover hover:text-foreground focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
         title={title}
         aria-label={title}
         aria-busy={loading}
