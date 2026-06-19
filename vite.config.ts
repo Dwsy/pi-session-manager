@@ -1,9 +1,16 @@
 import fs from 'fs'
 import path from 'path'
+import os from 'os'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { codeInspectorPlugin } from 'code-inspector-plugin'
 import { VitePWA } from 'vite-plugin-pwa'
+
+// Cross-platform user home: Windows uses USERPROFILE (HOME is usually unset,
+// and when set by Git Bash/MSYS may point to a Unix-style path Win32 can't open).
+function userHome(env: NodeJS.ProcessEnv = process.env): string {
+  return env.HOME || env.USERPROFILE || os.homedir()
+}
 
 function normalizeVersion(value: string): string {
   return value.trim().replace(/^v/i, '')
@@ -17,30 +24,112 @@ function resolveBuildVersion(): string {
   return '0.0.0'
 }
 
-function getPsmPort(): number {
-  // CLI dev mode: use env var from dev-cli.mjs
-  if (process.env.CLI_SERVER_PORT) {
-    return parseInt(process.env.CLI_SERVER_PORT, 10) || 52131
+export const DEFAULT_PSM_PORT = 52131
+
+export interface PsmProxyTarget {
+  httpTarget: string
+  wsTarget: string
+}
+
+export interface PsmClientEnv {
+  httpBaseUrl: string
+  wsUrl: string
+}
+
+/**
+ * Normalize a PSM base URL (either `ws://host:port[/ws]` or `http://host:port`)
+ * into matched http + ws targets. ws path defaults to `/ws`.
+ */
+export function resolvePsmProxyTarget(psmUrl: string): PsmProxyTarget {
+  const trimmed = psmUrl.trim()
+  let httpBase: string
+  let wsPath = '/ws'
+
+  if (trimmed.startsWith('ws://') || trimmed.startsWith('wss://')) {
+    const scheme = trimmed.startsWith('wss://') ? 'https' : 'http'
+    const after = trimmed.slice(trimmed.indexOf('://') + 3)
+    const slashIdx = after.indexOf('/')
+    const hostPart = slashIdx === -1 ? after : after.slice(0, slashIdx)
+    if (slashIdx !== -1) {
+      const pathPart = after.slice(slashIdx).replace(/\/+$/, '')
+      if (pathPart.length > 0) wsPath = pathPart
+    }
+    httpBase = `${scheme}://${hostPart}`
+  } else {
+    // treat as http base; strip any trailing path for the host, but keep it as ws path
+    const after = trimmed.includes('://') ? trimmed.slice(trimmed.indexOf('://') + 3) : trimmed
+    const slashIdx = after.indexOf('/')
+    const hostPart = slashIdx === -1 ? after : after.slice(0, slashIdx)
+    const scheme = trimmed.startsWith('https://') ? 'https' : 'http'
+    if (slashIdx !== -1) {
+      const pathPart = after.slice(slashIdx).replace(/\/+$/, '')
+      if (pathPart.length > 0) wsPath = pathPart
+    }
+    httpBase = `${scheme}://${hostPart}`
   }
 
+  return {
+    httpTarget: httpBase,
+    wsTarget: `${httpBase.replace(/^http/, 'ws')}${wsPath}`,
+  }
+}
+
+function readConfigPort(env: NodeJS.ProcessEnv): number | null {
   try {
+    // Must match the backend: ~/.pi/pi-session-manager/config.json
+    // (see src-tauri paths.rs psm_root_dir + unified_config.rs config_file_path).
     const configPath = path.join(
-      process.env.HOME || '',
-      '.config',
-      'pi-session-manager.json'
+      userHome(env),
+      '.pi',
+      'pi-session-manager',
+      'config.json',
     )
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-      return config.server?.http_port || 52131
+      const port = config?.server?.http_port
+      if (typeof port === 'number' && Number.isFinite(port)) {
+        return port
+      }
     }
   } catch {
-    // ignore
+    // ignore — fall back to default
   }
-  return 52131
+  return null
+}
+
+function resolveBaseUrl(env: NodeJS.ProcessEnv): string {
+  // Explicit override wins (used by tests / remote dev).
+  if (env.PSM_URL && env.PSM_URL.trim().length > 0) {
+    return env.PSM_URL.trim()
+  }
+  // CLI dev mode: dev-cli.mjs passes the CLI server port via this env var.
+  if (env.CLI_SERVER_PORT) {
+    const port = parseInt(env.CLI_SERVER_PORT, 10)
+    if (Number.isFinite(port) && port > 0) {
+      return `http://127.0.0.1:${port}`
+    }
+  }
+  const port = readConfigPort(env) ?? DEFAULT_PSM_PORT
+  return `http://127.0.0.1:${port}`
+}
+
+/** Resolve the http + ws proxy targets honoring PSM_URL > CLI_SERVER_PORT > config file > default. */
+export function getPsmProxyTarget(env: NodeJS.ProcessEnv = process.env): PsmProxyTarget {
+  return resolvePsmProxyTarget(resolveBaseUrl(env))
+}
+
+/** Resolve the http/ws URLs injected into the browser client (same source as the proxy). */
+export function getPsmClientEnv(env: NodeJS.ProcessEnv = process.env): PsmClientEnv {
+  const { httpTarget, wsTarget } = getPsmProxyTarget(env)
+  return { httpBaseUrl: httpTarget, wsUrl: wsTarget }
 }
 
 const buildVersion = resolveBuildVersion()
-const psmPort = getPsmPort()
+const psmPort = (() => {
+  const { httpTarget } = getPsmProxyTarget()
+  const match = httpTarget.match(/:(\d+)$/)
+  return match ? parseInt(match[1], 10) : DEFAULT_PSM_PORT
+})()
 
 export default defineConfig(({ mode }) => {
   const isDemoBuild = mode === 'demo'
@@ -151,25 +240,29 @@ export default defineConfig(({ mode }) => {
     },
     clearScreen: false,
     server: isCliDev
-      ? {
-          // CLI dev mode: use same port as Tauri dev (1420), proxy to CLI server
-          port: 1420,
-          strictPort: true,
-          allowedHosts: true,
-          proxy: {
-            '/api': {
-              target: `http://127.0.0.1:${getPsmPort()}`,
-              changeOrigin: true,
+      ? (() => {
+          // CLI dev mode: use same port as Tauri dev (1420), proxy to CLI server.
+          // CLI_SERVER_PORT is resolved inside getPsmProxyTarget.
+          const { httpTarget, wsTarget } = getPsmProxyTarget()
+          return {
+            port: 1420,
+            strictPort: true,
+            allowedHosts: true,
+            proxy: {
+              '/api': {
+                target: httpTarget,
+                changeOrigin: true,
+              },
+              '/ws': {
+                target: wsTarget,
+                ws: true,
+              },
             },
-            '/ws': {
-              target: `ws://127.0.0.1:${getPsmPort()}`,
-              ws: true,
+            hmr: {
+              overlay: false,
             },
-          },
-          hmr: {
-            overlay: false,
-          },
-        }
+          }
+        })()
       : {
           port: 1420,
           strictPort: true,

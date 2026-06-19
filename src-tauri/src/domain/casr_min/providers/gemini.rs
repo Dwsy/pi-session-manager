@@ -429,10 +429,7 @@ fn extract_windows_drive_workspace(content: &str) -> Option<PathBuf> {
     }
     let idx = start?;
     let rest = &content[idx..];
-    let path: String = rest
-        .chars()
-        .take_while(|c| !c.is_whitespace() && *c != '"' && *c != '\'')
-        .collect();
+    let path: String = rest.chars().take_while(|c| !c.is_whitespace() && *c != '"' && *c != '\'').collect();
     if path.len() < 6 {
         return None;
     }

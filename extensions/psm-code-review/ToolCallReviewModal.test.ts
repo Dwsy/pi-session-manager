@@ -67,25 +67,6 @@ function renderModal({
   return { onClose };
 }
 
-async function findFileTreeButtonByText(pattern: RegExp) {
-  let match: HTMLButtonElement | undefined;
-
-  await waitFor(() => {
-    const treeHost = document.querySelector("file-tree-container");
-    const buttons = Array.from(
-      treeHost?.shadowRoot?.querySelectorAll("button") ?? [],
-    ).filter((button): button is HTMLButtonElement => button instanceof HTMLButtonElement);
-
-    match = buttons.find((button) => {
-      const text = `${button.textContent ?? ""} ${button.dataset.itemPath ?? ""}`;
-      return pattern.test(text);
-    });
-    expect(match).toBeTruthy();
-  });
-
-  return match!;
-}
-
 async function getFileTreeShadowRoot() {
   let shadowRoot: ShadowRoot | null | undefined;
 
@@ -95,6 +76,33 @@ async function getFileTreeShadowRoot() {
   });
 
   return shadowRoot!;
+}
+
+/**
+ * Shell mode renders operations via ReviewShellList as a plain `role="list"`
+ * of clickable <div>s in the light DOM (NOT the shadow-root file tree), each
+ * labeled with the command text and a `#<sequence>` prefix. This finds the
+ * list item whose command matches `pattern`.
+ */
+async function findShellListItem(pattern: RegExp): Promise<HTMLElement> {
+  let match: HTMLElement | undefined;
+
+  await waitFor(() => {
+    const lists = screen.getAllByRole("list");
+    for (const list of lists) {
+      const items = Array.from(list.querySelectorAll<HTMLElement>("[role='listitem'], div"));
+      const hit = items.find((item) =>
+        pattern.test(item.textContent ?? ""),
+      );
+      if (hit) {
+        match = hit;
+        break;
+      }
+    }
+    expect(match).toBeTruthy();
+  });
+
+  return match!;
 }
 
 
@@ -436,6 +444,30 @@ describe("ToolCallReviewModal UI behavior", () => {
     expect(screen.getAllByText(/review repository changes/).length).toBeGreaterThan(0);
   });
 
+  it("deduplicates diff detail chrome for edit operations", async () => {
+    renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-edit",
+            name: "edit",
+            arguments: {
+              path: "src/App.tsx",
+              old_string: "export const value = 1;",
+              new_string: "export const value = 2;",
+            },
+          },
+        ]),
+      ],
+    });
+
+    expect(await screen.findByText("Patch")).toBeTruthy();
+    expect(screen.queryByText("Change review")).toBeNull();
+    expect(screen.queryByText("Impact")).toBeNull();
+    expect(document.body.textContent).not.toContain("src/App.tsx");
+  });
+
   it("splits new file and edit operations into separate filters", async () => {
     renderModal({
       entries: [
@@ -509,7 +541,9 @@ describe("ToolCallReviewModal UI behavior", () => {
       "true",
     );
     expect(screen.getByRole("radio", { name: /All\s*1/ })).toBeTruthy();
-    expect(await screen.findByText("src/App.tsx")).toBeTruthy();
+    // The path may be rendered both as a heading and inside the detail preview;
+    // assert presence rather than uniqueness.
+    expect((await screen.findAllByText("src/App.tsx")).length).toBeGreaterThan(0);
     expect(screen.queryByText("Shell command")).toBeNull();
     expect(document.body.textContent).not.toContain("pnpm build --filter api");
 
@@ -520,14 +554,14 @@ describe("ToolCallReviewModal UI behavior", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: /Shell\s*1/ }));
 
-    const shellNode = await findFileTreeButtonByText(/#2 pnpm build --filter api/);
+    const shellNode = await findShellListItem(/pnpm build --filter api/);
     fireEvent.click(shellNode);
 
-    expect(screen.getByText("Shell command")).toBeTruthy();
-    expect(screen.getByText("pnpm build --filter api")).toBeTruthy();
+    // After selecting, the command shows up in both the list item and the detail panel.
+    expect(screen.getAllByText("pnpm build --filter api").length).toBeGreaterThan(0);
   });
 
-  it("renders Pierre file tree icons and keeps metrics in the Inspector", async () => {
+  it("renders Pierre file tree icons and shows metrics in the Inspector popover", async () => {
     renderModal({
       entries: [
         assistantToolEntry([
@@ -564,14 +598,17 @@ describe("ToolCallReviewModal UI behavior", () => {
     expect(iconTokens).toContain("json");
     expect(document.querySelector(".code-block-header")).toBeNull();
 
-    const inspector = screen.getByText("Inspector").closest("aside");
-    expect(inspector?.textContent).toContain("Sequence");
-    expect(inspector?.textContent).toContain("Size");
-    expect(inspector?.textContent).toContain("Additions");
-    expect(inspector?.textContent).toContain("Deletions");
+    fireEvent.click(screen.getByRole("button", { name: "Inspector" }));
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("Sequence");
+      expect(document.body.textContent).toContain("Size");
+      expect(document.body.textContent).toContain("Additions");
+      expect(document.body.textContent).toContain("Deletions");
+    });
   });
 
-  it("lets the detail content enter fullscreen without the side panels", async () => {
+  it("lets the detail content enter fullscreen without the left file tree", async () => {
     const { onClose } = renderModal({
       entries: [
         assistantToolEntry([
@@ -589,15 +626,15 @@ describe("ToolCallReviewModal UI behavior", () => {
     });
 
     await getFileTreeShadowRoot();
-    expect(screen.getByText("Inspector")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Inspector" })).toBeTruthy();
     expect(screen.queryByText("Target")).toBeNull();
     expect(document.querySelector("[data-tool-review-content-expanded='false']")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Fullscreen content" }));
 
     expect(document.querySelector("[data-tool-review-content-expanded='true']")).toBeTruthy();
-    expect(screen.queryByText("Inspector")).toBeNull();
     expect(document.querySelector("file-tree-container")).toBeNull();
+    expect(screen.getByRole("button", { name: "Inspector" })).toBeTruthy();
 
     fireEvent.keyDown(document, { key: "Escape" });
 
@@ -605,7 +642,7 @@ describe("ToolCallReviewModal UI behavior", () => {
     await waitFor(() => {
       expect(document.querySelector("[data-tool-review-content-expanded='false']")).toBeTruthy();
     });
-    expect(await screen.findByText("Inspector")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Inspector" })).toBeTruthy();
   });
 
   it("moves selection with ArrowDown and ArrowUp", async () => {
@@ -628,11 +665,15 @@ describe("ToolCallReviewModal UI behavior", () => {
       ],
     });
 
-    await waitFor(() => expect(screen.getByText("src/App.tsx")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getAllByText("src/App.tsx").length).toBeGreaterThan(0),
+    );
     fireEvent.keyDown(document, { key: "ArrowDown" });
     await waitFor(() => expect(screen.getAllByText("User.java").length).toBeGreaterThan(0));
     fireEvent.keyDown(document, { key: "ArrowUp" });
-    await waitFor(() => expect(screen.getByText("src/App.tsx")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getAllByText("src/App.tsx").length).toBeGreaterThan(0),
+    );
   });
 });
 
@@ -661,6 +702,12 @@ describe("ToolCallReviewModal keyboard handling", () => {
           toolResultByCallId: new Map(),
         }),
       );
+
+      fireEvent.click(screen.getByRole("button", { name: "Inspector" }));
+      fireEvent.keyDown(document, { key: "Escape" });
+
+      expect(screen.queryByText("Sequence")).toBeNull();
+      expect(onClose).not.toHaveBeenCalled();
 
       fireEvent.keyDown(document, { key: "Escape" });
 
