@@ -11,12 +11,12 @@ export const onboarding = {
     browse: {
       title: 'Sitzungen nach Projekt durchsuchen',
       description: 'Alle Ihre Coding-Sitzungen sind nach Projekt organisiert. Wechseln Sie zwischen Listen- und Projektansicht, um genau das zu finden, was Sie brauchen.',
-      hint: 'Cmd+P zum Wechseln zur Projektansicht',
+      hint: 'Cmd+Shift+G zum Wechseln zur Projektansicht',
     },
     search: {
       title: 'Über alle Sitzungen suchen',
       description: 'Verwenden Sie die globale Suche, um Nachrichten, Sitzungen und Projekte in Ihrem gesamten Arbeitsbereich zu finden. Die Sitzungssuche hilft Ihnen, innerhalb einer einzelnen Konversation zu navigieren.',
-      hint: 'Cmd+K für globale Suche, Cmd+F für Sitzungssuche',
+      hint: 'Cmd+P / Cmd+Shift+F für globale Suche, Cmd+F für Sitzungssuche',
     },
     tree: {
       title: 'Im Sitzungsbaum navigieren',

@@ -98,8 +98,8 @@ export const settings = {
       toggleSidebar: 'Sitzungsbaum umschalten',
     },
     cmdFBehaviorHint: {
-      search: 'Cmd+Shift+F schaltet Sitzungsbaum um',
-      sidebar: 'Cmd+Shift+F öffnet Sitzungssuche',
+      search: 'Cmd+F öffnet Sitzungssuche. Mit Cmd+Option+B Sitzungsbaum umschalten.',
+      sidebar: 'Cmd+F schaltet Sitzungsbaum um. Sitzungssuche kann über die Symbolleiste geöffnet werden.',
     },
     scrollMarkersEnabled: 'Scroll-Markierungen',
     scrollMarkersEnabledHelp: 'Navigationspunkte am Rand zum schnellen Springen zwischen Nachrichten anzeigen',
