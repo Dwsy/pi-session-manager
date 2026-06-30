@@ -495,8 +495,8 @@ export const settings = {
       toggleSidebar: "切换会话树",
     },
     cmdFBehaviorHint: {
-      search: "Cmd+Shift+F 切换会话树",
-      sidebar: "Cmd+Shift+F 打开会话内搜索",
+      search: "Cmd+F 打开会话内搜索。使用 Cmd+Option+B 切换会话树。",
+      sidebar: "Cmd+F 切换会话树。会话内搜索可通过工具栏打开。",
     },
     scrollMarkersEnabled: "滚动标记",
     scrollMarkersEnabledHelp: "在侧边显示导航圆点，快速跳转不同消息",

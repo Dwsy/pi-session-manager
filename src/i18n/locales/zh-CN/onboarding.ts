@@ -11,12 +11,12 @@ export const onboarding = {
     browse: {
       title: '按项目浏览会话',
       description: '所有编程会话都按项目分组。在列表视图和项目视图之间切换，快速找到你需要的会话。',
-      hint: 'Cmd+P 切换到项目视图',
+      hint: 'Cmd+Shift+G 切换到项目视图',
     },
     search: {
       title: '跨会话全局搜索',
       description: '使用全局搜索来查找所有工作区中的消息、会话和项目。会话内搜索帮助你在单个对话中快速定位。',
-      hint: 'Cmd+K 全局搜索，Cmd+F 会话内搜索',
+      hint: 'Cmd+P / Cmd+Shift+F 全局搜索，Cmd+F 会话内搜索',
     },
     tree: {
       title: '导航会话树',

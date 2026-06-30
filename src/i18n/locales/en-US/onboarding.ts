@@ -11,12 +11,12 @@ export const onboarding = {
     browse: {
       title: 'Browse Sessions by Project',
       description: 'All your coding sessions are organized by project. Switch between list view and project view to find exactly what you need.',
-      hint: 'Cmd+P to switch to project view',
+      hint: 'Cmd+Shift+G to switch to project view',
     },
     search: {
       title: 'Search Across All Sessions',
       description: 'Use the global search to find messages, sessions, and projects across your entire workspace. In-session search helps you navigate within a single conversation.',
-      hint: 'Cmd+K for global search, Cmd+F for in-session search',
+      hint: 'Cmd+P / Cmd+Shift+F for global search, Cmd+F for in-session search',
     },
     tree: {
       title: 'Navigate the Session Tree',

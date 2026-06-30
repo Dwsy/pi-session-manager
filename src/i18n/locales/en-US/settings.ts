@@ -527,8 +527,8 @@ export const settings = {
       toggleSidebar: "Toggle session tree",
     },
     cmdFBehaviorHint: {
-      search: "Cmd+Shift+F toggles session tree",
-      sidebar: "Cmd+Shift+F opens in-session search",
+      search: "Cmd+F opens in-session search. Use Cmd+Option+B to toggle session tree.",
+      sidebar: "Cmd+F toggles session tree. In-session search can be opened via the toolbar.",
     },
     scrollMarkersEnabled: "Scroll markers",
     scrollMarkersEnabledHelp:
