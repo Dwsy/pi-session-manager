@@ -189,24 +189,20 @@
   // Windows accent), no hardcoded brand blue. Falls back to --color-info
   // on engines that do not resolve `AccentColor`.
   .settings-accent-fg {
-    color: rgb(var(--color-info));
-    color: AccentColor;
+    color: var(--accent, rgb(var(--color-info)));
   }
 
   .settings-accent-bg-soft {
-    background-color: rgb(var(--color-info) / 0.12);
-    background-color: color-mix(in srgb, AccentColor 14%, transparent);
+    background-color: color-mix(in srgb, var(--accent, rgb(var(--color-info))) 16%, transparent);
   }
 
   .settings-accent-bg-strong {
-    background-color: rgb(var(--color-info));
-    background-color: AccentColor;
-    color: #fff;
+    background-color: var(--accent, rgb(var(--color-info)));
+    color: rgb(var(--color-primary-foreground, 255 255 255));
   }
 
   .settings-accent-ring {
-    box-shadow: inset 0 0 0 1px rgb(var(--color-info) / 0.45);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, AccentColor 55%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent, rgb(var(--color-info))) 55%, transparent);
   }
 
   // Native-feel section label: replaces uppercase + 0.12em tracking heading

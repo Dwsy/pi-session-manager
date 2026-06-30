@@ -54,4 +54,51 @@ describe('MarkdownContent link handling', () => {
     expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Unsupported link protocol'))
     expect(invokeMock).not.toHaveBeenCalled()
   })
+
+  it('renders custom XML tags as collapsible details blocks and parses markdown inside them', () => {
+    const content = `
+Before XML
+<read-files>
+- [file1](file:///path/to/file1)
+- [file2](file:///path/to/file2)
+</read-files>
+After XML
+`
+    const { container } = render(<MarkdownContent content={content} />)
+
+    // Check that we have a details element
+    const details = container.querySelector('details.xml-details-block')
+    expect(details).not.toBeNull()
+    expect(details?.getAttribute('open')).not.toBeNull()
+
+    // Check summary tag and title
+    const summary = details?.querySelector('summary.xml-details-summary')
+    expect(summary).not.toBeNull()
+    expect(summary?.textContent?.trim()).toContain('read-files')
+
+    // Check parsed markdown content inside
+    const link = screen.getByRole('link', { name: 'file1' })
+    expect(link).not.toBeNull()
+    expect(link.getAttribute('data-markdown-href')).toBe('file:///path/to/file1')
+  })
+
+  it('does not parse XML tags inside markdown code blocks', () => {
+    const content = `
+\`\`\`xml
+<read-files>
+- [file1](file:///path/to/file1)
+</read-files>
+\`\`\`
+`
+    const { container } = render(<MarkdownContent content={content} />)
+
+    // Check that we do NOT have a details element
+    const details = container.querySelector('details.xml-details-block')
+    expect(details).toBeNull()
+
+    // Check that the raw text is preserved inside code block
+    const code = container.querySelector('code.shiki')
+    expect(code?.textContent).toContain('<read-files>')
+    expect(code?.textContent).toContain('- [file1](file:///path/to/file1)')
+  })
 })

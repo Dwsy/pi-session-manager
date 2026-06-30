@@ -185,13 +185,31 @@ export function resolveShikiTheme(themeId: string): string {
   if (themeId === 'monokai' || themeId === 'dracula') return themeId
   if (themeId === 'one-dark-pro') return 'one-dark-pro'
 
-  // All other themes use their id directly as Shiki theme name
+  // All other explicit themes use their id directly
   if (themeId !== 'github') return themeId
 
-  // 'github' → follow app theme
-  return document.documentElement.classList.contains('theme-light')
-    ? 'github-light'
-    : 'github-dark'
+  if (typeof document !== 'undefined') {
+    const chatTheme = (document.documentElement.getAttribute('data-chat-theme') || '').toLowerCase()
+    if (chatTheme.includes('tokyo')) return 'tokyo-night'
+    if (chatTheme.includes('catppuccin') && chatTheme.includes('latte')) return 'catppuccin-latte'
+    if (chatTheme.includes('catppuccin')) return 'catppuccin-mocha'
+    if (chatTheme.includes('dracula')) return 'dracula'
+    if (chatTheme.includes('nord')) return 'nord'
+    if (chatTheme.includes('rose') || chatTheme.includes('rosé')) return 'rose-pine'
+    if (chatTheme.includes('night-owl') || chatTheme.includes('night owl')) return 'night-owl'
+    if (chatTheme.includes('solarized') && chatTheme.includes('light')) return 'solarized-light'
+    if (chatTheme.includes('solarized')) return 'solarized-dark'
+    if (chatTheme.includes('one') && chatTheme.includes('dark')) return 'one-dark-pro'
+    if (chatTheme.includes('gruvbox')) {
+      return document.documentElement.classList.contains('theme-light') ? 'solarized-light' : 'solarized-dark'
+    }
+
+    return document.documentElement.classList.contains('theme-light')
+      ? 'github-light'
+      : 'github-dark'
+  }
+
+  return 'github-dark'
 }
 
 /** Look up theme metadata by id */

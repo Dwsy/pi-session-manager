@@ -387,6 +387,49 @@ export function trimMarkdownCacheOnSessionSwitch(): void {
   }
 }
 
+function preprocessXmlBlocks(text: string): string {
+  // Mask code blocks to avoid rendering XML tags inside them
+  const codeBlocks: string[] = [];
+  const maskPlaceholder = (index: number) => `__XML_MASK_PLACEHOLDER_${index}__`;
+
+  // Regex to match markdown code blocks and inline code
+  const codeBlockRegex = /(```[\s\S]*?```|`[^`\n]+`)/g;
+
+  let maskedText = text.replace(codeBlockRegex, (match) => {
+    codeBlocks.push(match);
+    return maskPlaceholder(codeBlocks.length - 1);
+  });
+
+  // Now process the XML blocks in the masked text
+  const xmlBlockRegex = /<(read-files|modified-files|read-file|write-file|task|goals|plan|file|files|details)\s*>([\s\S]*?)<\/\1>/gi;
+
+  maskedText = maskedText.replace(xmlBlockRegex, (match, tagName, innerContent) => {
+    // Parse the inner content as markdown.
+    const parsedInner = marked.parse(innerContent.trim()) as string;
+
+    // Convert to collapsible <details> tag with Tokyo Night styling
+    return `
+<details class="xml-details-block" open>
+  <summary class="xml-details-summary">
+    <span class="xml-details-title">${escapeHtml(tagName)}</span>
+  </summary>
+  <div class="xml-details-content">
+    ${parsedInner}
+  </div>
+</details>
+`;
+  });
+
+  // Restore masked code blocks
+  for (let i = 0; i < codeBlocks.length; i++) {
+    // Escape regex characters in the placeholder name to be safe
+    const placeholder = maskPlaceholder(i);
+    maskedText = maskedText.replace(placeholder, () => codeBlocks[i]);
+  }
+
+  return maskedText;
+}
+
 export function parseMarkdown(text: string): string {
   const now = Date.now()
   const cacheKey = createMarkdownCacheKey(text)
@@ -395,7 +438,8 @@ export function parseMarkdown(text: string): string {
     return cached
   }
 
-  const parsed = marked.parse(text) as string
+  const processedText = preprocessXmlBlocks(text)
+  const parsed = marked.parse(processedText) as string
   if (!canCacheMarkdown(text, parsed)) {
     return parsed
   }
@@ -403,6 +447,14 @@ export function parseMarkdown(text: string): string {
 }
 
 export function escapeHtml(text: string): string {
+  if (typeof document === 'undefined') {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
   const div = document.createElement('div')
   div.textContent = text
   return div.innerHTML
