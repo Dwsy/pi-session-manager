@@ -374,7 +374,7 @@ function FilterBar({
 
   return (
     <div
-      className="flex flex-shrink-0 flex-wrap gap-1.5"
+      className="flex min-w-0 items-center gap-1 overflow-x-auto rounded-lg border border-border/40 bg-background/50 p-1 custom-scrollbar"
       role="radiogroup"
       aria-label={t("components.toolCallReview.filterLabel", "Review filter")}
     >
@@ -384,8 +384,8 @@ function FilterBar({
         const Icon = option.icon;
         const label = t(option.labelKey, option.fallbackLabel);
         const iconClass = active
-          ? option.iconClass ?? "text-[var(--accent)]"
-          : "text-muted-foreground/70 group-hover:text-foreground";
+          ? option.iconClass ?? "text-accent"
+          : "text-muted-foreground group-hover:text-foreground";
         return (
           <button
             key={option.id}
@@ -395,26 +395,24 @@ function FilterBar({
             aria-checked={active}
             disabled={disabled}
             title={`${label} (${counts[option.id]})`}
-            className={`group inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium motion-surface focus-ring ${
+            className={`group flex h-7 flex-shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium transition-all ${
               active
-                ? "border-border/70 bg-background text-foreground shadow-[0_1px_2px_rgba(var(--shadow-rgb),0.16)]"
+                ? "bg-surface text-foreground shadow-sm ring-1 ring-border/50"
                 : disabled
-                  ? "border-border/20 bg-background/18 text-muted-foreground/55"
-                  : "border-border/25 bg-background/30 text-muted-foreground hover:border-border/45 hover:bg-background/55 hover:text-foreground"
+                  ? "opacity-40 cursor-not-allowed text-muted-foreground"
+                  : "text-muted-foreground hover:bg-surface/50 hover:text-foreground"
             }`}
           >
             <Icon
-              className={`h-3.5 w-3.5 flex-shrink-0 ${iconClass}`}
+              className={`h-3.5 w-3.5 flex-shrink-0 transition-colors ${iconClass}`}
               aria-hidden="true"
             />
-            <span className="truncate">{label}</span>
+            <span className="whitespace-nowrap">{label}</span>
             <span
-              className={`inline-flex h-4 min-w-[1.25rem] items-center justify-center rounded-full px-1 font-mono text-[10px] leading-none tabular-nums ${
+              className={`inline-flex h-4 min-w-[1.125rem] items-center justify-center rounded-full px-1 font-mono text-[10px] tabular-nums ${
                 active
-                  ? "bg-surface text-foreground"
-                  : disabled
-                    ? "bg-background/32 text-muted-foreground/65"
-                    : "bg-background/45 text-muted-foreground/85"
+                  ? "bg-accent/15 text-accent font-semibold"
+                  : "bg-background/60 text-muted-foreground"
               }`}
             >
               {counts[option.id]}
@@ -746,6 +744,7 @@ function DetailPanel({
   inspectorOpen,
   onToggleInspector,
   onCloseInspector,
+  onNavigateToPath,
 }: {
   operation: FileOperation | null;
   codeViewItems: CodeViewItem[];
@@ -759,6 +758,7 @@ function DetailPanel({
   inspectorOpen: boolean;
   onToggleInspector: () => void;
   onCloseInspector: () => void;
+  onNavigateToPath?: (path: string) => void;
 }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -814,7 +814,6 @@ function DetailPanel({
   );
   const usesCodeView = isChangeOperation(operation) && hasCodeViewOutput;
   const showsDiffControls = usesCodeView && codeViewItems.some((item) => item.type === "diff");
-  const showInlinePath = !usesCodeView;
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const rootIsDark = document.documentElement.classList.contains("theme-dark");
   const themeType =
@@ -854,25 +853,23 @@ function DetailPanel({
           className={`h-4 w-4 flex-shrink-0 ${config.iconClass}`}
           aria-hidden="true"
         />
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-[13px] font-semibold text-foreground">
-              {detailTitle}
+        <div className="min-w-0 flex-1 flex items-center gap-2 overflow-hidden">
+          <span className="rounded-[4px] flex-shrink-0 border border-border/40 bg-background/45 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
+            {t(config.labelKey, config.fallbackLabel)}
+          </span>
+          <button
+            type="button"
+            onClick={() => onNavigateToPath?.(displayPath)}
+            title="点击自动在左侧树结构中定位导航"
+            className="group flex min-w-0 items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-xs font-medium text-foreground hover:bg-surface/60 transition-colors"
+          >
+            <span className="truncate group-hover:text-accent group-hover:underline">{displayPath}</span>
+          </button>
+          {operation.isError && (
+            <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-[4px] border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-destructive">
+              <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+              {t("components.toolCallReview.error", "Error")}
             </span>
-            <span className="rounded-[4px] border border-border/40 bg-background/45 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-              {t(config.labelKey, config.fallbackLabel)}
-            </span>
-            {operation.isError && (
-              <span className="inline-flex items-center gap-1 rounded-[4px] border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-destructive">
-                <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-                {t("components.toolCallReview.error", "Error")}
-              </span>
-            )}
-          </div>
-          {showInlinePath && (
-            <div className="mt-1 truncate font-mono text-[11px] text-muted-foreground">
-              {displayPath}
-            </div>
           )}
         </div>
         {showsDiffControls && <ViewControlsToolbar controls={controls} />}
@@ -1030,8 +1027,8 @@ function DetailPanel({
                 {(operation.content || operation.output) ? (
                   <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
                     <div className="flex items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.52)] px-3 py-2 text-xs font-medium text-foreground">
-                      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
-                      <span className="flex-1 truncate">{displayPath}</span>
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                      <span className="flex-1 truncate text-muted-foreground">{t("components.toolCallReview.fileContent", "File Content")}</span>
                       {displayPath.toLowerCase().endsWith('.md') && (
                         <button
                           type="button"
@@ -1156,6 +1153,7 @@ export default function ToolCallReviewModal({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [contentExpanded, setContentExpanded] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Initialize from plugin settings config if provided, otherwise use defaults
   const [splitView, setSplitView] = useState(diffConfig?.splitView ?? true);
@@ -1222,9 +1220,19 @@ export default function ToolCallReviewModal({
     return option ? modeOperations.filter(option.predicate) : modeOperations;
   }, [activeFilter, modeOperations]);
 
+  const searchedOperations = useMemo(() => {
+    if (!searchQuery.trim()) return filteredOperations;
+    const q = searchQuery.toLowerCase();
+    return filteredOperations.filter((op) => {
+      const pathMatch = op.filePath.toLowerCase().includes(q);
+      const contentMatch = op.content?.toLowerCase().includes(q) || op.output?.toLowerCase().includes(q);
+      return pathMatch || contentMatch;
+    });
+  }, [filteredOperations, searchQuery]);
+
   const treeModel = useMemo(
-    () => buildReviewTreeModel(filteredOperations),
-    [filteredOperations],
+    () => buildReviewTreeModel(searchedOperations),
+    [searchedOperations],
   );
 
   const selectedOperation = useMemo(
@@ -1236,10 +1244,10 @@ export default function ToolCallReviewModal({
   const selectedFileOperations = useMemo(() => {
     if (!selectedOperation) return [];
     const selectedPath = getReviewTreePath(selectedOperation);
-    return filteredOperations.filter(
+    return searchedOperations.filter(
       (operation) => getReviewTreePath(operation) === selectedPath,
     );
-  }, [filteredOperations, selectedOperation]);
+  }, [searchedOperations, selectedOperation]);
 
   const selectedCodeViewItems = useMemo(
     () => buildCodeViewItems(selectedFileOperations),
@@ -1272,18 +1280,18 @@ export default function ToolCallReviewModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    if (filteredOperations.length === 0) {
+    if (searchedOperations.length === 0) {
       setSelectedId(null);
       return;
     }
 
     if (
       !selectedId ||
-      !filteredOperations.some((operation) => operation.id === selectedId)
+      !searchedOperations.some((operation) => operation.id === selectedId)
     ) {
-      setSelectedId(filteredOperations[0].id);
+      setSelectedId(searchedOperations[0].id);
     }
-  }, [filteredOperations, isOpen, selectedId]);
+  }, [searchedOperations, isOpen, selectedId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1313,18 +1321,18 @@ export default function ToolCallReviewModal({
       }
 
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-      if (filteredOperations.length === 0) return;
+      if (searchedOperations.length === 0) return;
 
       event.preventDefault();
-      const currentIndex = filteredOperations.findIndex(
+      const currentIndex = searchedOperations.findIndex(
         (operation) => operation.id === selectedId,
       );
       const nextIndex =
         event.key === "ArrowDown"
-          ? Math.min(filteredOperations.length - 1, currentIndex + 1)
+          ? Math.min(searchedOperations.length - 1, currentIndex + 1)
           : Math.max(0, currentIndex - 1);
       setSelectedId(
-        filteredOperations[nextIndex]?.id ?? filteredOperations[0].id,
+        searchedOperations[nextIndex]?.id ?? searchedOperations[0].id,
       );
     };
 
@@ -1495,9 +1503,28 @@ export default function ToolCallReviewModal({
                     counts={filterCounts}
                     onChange={setActiveFilter}
                   />
+                  <div className="relative flex items-center">
+                    <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder={resolvedMode === "files" ? "搜索文件名或路径..." : "搜索Shell命令..."}
+                      className="w-full rounded-md border border-border/40 bg-background/50 py-1 pl-8 pr-7 text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-2 p-0.5 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-hidden bg-[rgb(var(--color-surface-dark)/0.34)]">
-                  {filteredOperations.length === 0 ? (
+                  {searchedOperations.length === 0 ? (
                     <div className="flex h-full items-center justify-center px-5 py-8 text-center">
                       <div>
                         <Search
@@ -1514,7 +1541,7 @@ export default function ToolCallReviewModal({
                     </div>
                   ) : resolvedMode === "shell" ? (
                     <ReviewShellList
-                      operations={filteredOperations}
+                      operations={searchedOperations}
                       selectedId={selectedId}
                       onSelect={setSelectedId}
                       ariaLabel={t(
@@ -1601,6 +1628,7 @@ export default function ToolCallReviewModal({
               inspectorOpen={inspectorOpen}
               onToggleInspector={handleToggleInspector}
               onCloseInspector={handleCloseInspector}
+              onNavigateToPath={handleTreeSelect}
             />
           </div>
         )}

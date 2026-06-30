@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Terminal, AlertTriangle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Terminal, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import type { FileOperation } from "./model";
 
 interface ReviewShellListProps {
@@ -17,8 +17,10 @@ interface ShellListItemProps {
 
 function ShellListItem({ operation, isSelected, onClick }: ShellListItemProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const command = operation.filePath;
-  const summary = command.length > 80 ? `${command.slice(0, 77)}...` : command;
+  const [expanded, setExpanded] = useState(false);
+  const [isOverflowing, setIsOverflowing] = useState(false);
 
   useEffect(() => {
     if (isSelected && ref.current) {
@@ -26,27 +28,64 @@ function ShellListItem({ operation, isSelected, onClick }: ShellListItemProps) {
     }
   }, [isSelected]);
 
+  useEffect(() => {
+    if (contentRef.current) {
+      // Check if text exceeds threshold height (e.g. 72px)
+      setIsOverflowing(contentRef.current.scrollHeight > 76);
+    }
+  }, [command]);
+
   return (
     <div
       ref={ref}
       onClick={onClick}
-      className={`cursor-pointer select-none border-l-2 px-3 py-2 transition-colors ${
+      className={`group relative mb-1.5 cursor-pointer rounded-md border p-2.5 transition-all ${
         isSelected
-          ? "border-l-accent bg-background/88"
-          : "border-l-transparent hover:bg-background/52"
+          ? "border-accent bg-background/90 shadow-sm"
+          : "border-border/40 bg-surface/40 hover:border-border/70 hover:bg-surface/70"
       }`}
     >
-      <div className="flex items-center gap-2">
-        <Terminal className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-        <span className="flex-1 truncate font-mono text-xs text-foreground">
-          {summary}
-        </span>
+      <div className="flex items-start gap-2">
+        <Terminal className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <div
+            ref={contentRef}
+            className={`font-mono text-xs text-foreground break-all whitespace-pre-wrap ${
+              !expanded && isOverflowing ? "max-h-[72px] overflow-hidden" : ""
+            }`}
+          >
+            {command}
+          </div>
+          {!expanded && isOverflowing && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-7 h-6 bg-gradient-to-t from-background/90 to-transparent" />
+          )}
+        </div>
         {operation.isError && (
-          <AlertTriangle className="h-3 w-3 flex-shrink-0 text-destructive" />
+          <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-destructive" />
         )}
       </div>
-      <div className="mt-1 truncate text-[10px] text-muted-foreground/70">
-        #{operation.sequence} · {new Date(operation.timestamp).toLocaleTimeString()}
+
+      <div className="mt-2 flex items-center justify-between border-t border-border/30 pt-1.5 text-[10px] text-muted-foreground/80">
+        <div>
+          #{operation.sequence} · {new Date(operation.timestamp).toLocaleTimeString()}
+        </div>
+        {isOverflowing && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            className="flex items-center gap-0.5 font-medium text-accent hover:underline"
+          >
+            <span>{expanded ? "折叠" : "展开全文"}</span>
+            {expanded ? (
+              <ChevronUp className="h-3 w-3" />
+            ) : (
+              <ChevronDown className="h-3 w-3" />
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -60,7 +99,7 @@ export default function ReviewShellList({
 }: ReviewShellListProps) {
   return (
     <div
-      className="h-full overflow-auto py-1"
+      className="h-full overflow-auto px-2 py-1.5 custom-scrollbar"
       role="list"
       aria-label={ariaLabel}
     >

@@ -22,6 +22,13 @@ interface ReviewFileTreeProps {
 const REVIEW_TREE_ICONS: FileTreeIconConfig = {
   set: "complete",
   colored: true,
+  byFileExtension: {
+    java: "file-tree-builtin-c",
+    jav: "file-tree-builtin-c",
+    kt: "file-tree-builtin-c",
+    kts: "file-tree-builtin-c",
+    groovy: "file-tree-builtin-c",
+  },
   byFileNameContains: {
     bash: "file-tree-builtin-bash",
     cargo: "file-tree-builtin-bash",
