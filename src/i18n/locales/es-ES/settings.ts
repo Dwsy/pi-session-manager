@@ -98,8 +98,8 @@ export const settings = {
       toggleSidebar: 'Alternar árbol de sesiones',
     },
     cmdFBehaviorHint: {
-      search: 'Cmd+Shift+F alterna el árbol de sesiones',
-      sidebar: 'Cmd+Shift+F abre búsqueda en sesión',
+      search: 'Cmd+F abre búsqueda en sesión. Use Cmd+Option+B para alternar el árbol de sesiones.',
+      sidebar: 'Cmd+F alterna el árbol de sesiones. La búsqueda en sesión se puede abrir desde la barra de herramientas.',
     },
     scrollMarkersEnabled: 'Marcadores de desplazamiento',
     scrollMarkersEnabledHelp: 'Mostrar puntos de navegación laterales para saltar rápidamente entre mensajes',

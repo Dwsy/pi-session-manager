@@ -11,12 +11,12 @@ export const onboarding = {
     browse: {
       title: 'Explorar sesiones por proyecto',
       description: 'Todas tus sesiones de programación están organizadas por proyecto. Alterna entre vista de lista y vista de proyecto para encontrar lo que necesitas.',
-      hint: 'Cmd+P para cambiar a vista de proyecto',
+      hint: 'Cmd+Shift+G para cambiar a vista de proyecto',
     },
     search: {
       title: 'Buscar en todas las sesiones',
       description: 'Usa la búsqueda global para encontrar mensajes, sesiones y proyectos en todo tu espacio de trabajo. La búsqueda dentro de la sesión te ayuda a navegar en una conversación.',
-      hint: 'Cmd+K para búsqueda global, Cmd+F para buscar en la sesión',
+      hint: 'Cmd+P / Cmd+Shift+F para búsqueda global, Cmd+F para buscar en la sesión',
     },
     tree: {
       title: 'Navegar por el árbol de sesión',
