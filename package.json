@@ -37,6 +37,7 @@
     "@earendil-works/pi-agent-core": "^0.75.5",
     "@earendil-works/pi-ai": "^0.75.5",
     "@earendil-works/pi-coding-agent": "^0.75.5",
+    "@lobehub/icons": "^5.10.0",
     "@pierre/diffs": "^1.2.1",
     "@pierre/trees": "1.0.0-beta.4",
     "@shikijs/core": "^3.22.0",
@@ -67,6 +68,12 @@
     "recharts": "^3.7.0",
     "typebox": "1.1.38",
     "ws": "^8.20.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@google/genai": "npm:@empty/package@0.0.1",
+      "protobufjs@<=7.6.1": "npm:@empty/package@0.0.1"
+    }
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.1.0",

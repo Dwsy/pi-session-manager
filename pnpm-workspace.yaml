@@ -1,0 +1,5 @@
+allowBuilds:
+  protobufjs: true
+
+overrides:
+  "@earendil-works/pi-ai>@google/genai": "-"
