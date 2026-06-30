@@ -5,6 +5,17 @@ use super::util::parse_timestamp;
 /// Cached flag: does message_entries table exist?
 static MESSAGE_ENTRIES_EXISTS: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
+fn parse_models(model_opt: Option<String>, models_json_opt: Option<String>) -> Option<Vec<String>> {
+    if let Some(models_json) = models_json_opt {
+        if let Ok(models) = serde_json::from_str::<Vec<String>>(&models_json) {
+            if !models.is_empty() {
+                return Some(models);
+            }
+        }
+    }
+    model_opt.map(|m| vec![m])
+}
+
 pub fn upsert_session(conn: &mut Connection, session: &SessionInfo, file_modified: DateTime<Utc>, entries: Option<&[SessionEntry]>) -> Result<(), String> {
     let start = std::time::Instant::now();
     let entries_count = entries.map(|e| e.len()).unwrap_or(0);
@@ -159,13 +170,15 @@ pub fn upsert_session_in_tx(tx: &rusqlite::Transaction<'_>, session: &SessionInf
 pub fn get_session(conn: &Connection, path: &str) -> Result<Option<SessionInfo>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, path, cwd, name, created, modified, message_count, first_message, last_message, last_message_role, parent_session_path, model
-         FROM sessions WHERE path = ?",
+            "SELECT s.id, s.path, s.cwd, s.name, s.created, s.modified, s.message_count, s.first_message, s.last_message, s.last_message_role, s.parent_session_path, s.model, c.models_json
+         FROM sessions s LEFT JOIN session_details_cache c ON s.path = c.path WHERE s.path = ?",
         )
         .map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let session = stmt
         .query_row(params![path], |row| {
+            let model: Option<String> = row.get(11)?;
+            let models_json: Option<String> = row.get(12)?;
             Ok(SessionInfo {
                 path: row.get(1)?,
                 id: row.get(0)?,
@@ -180,7 +193,8 @@ pub fn get_session(conn: &Connection, path: &str) -> Result<Option<SessionInfo>,
                 last_message: row.get(8).unwrap_or_default(),
                 last_message_role: row.get(9).unwrap_or_default(),
                 parent_session_path: row.get(10)?,
-                model: row.get(11)?,
+                model: model.clone(),
+                models: parse_models(model, models_json),
             })
         })
         .ok();
@@ -195,13 +209,15 @@ pub fn get_session(conn: &Connection, path: &str) -> Result<Option<SessionInfo>,
 pub fn get_session_by_id(conn: &Connection, id: &str) -> Result<Option<SessionInfo>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, path, cwd, name, created, modified, message_count, first_message, last_message, last_message_role, parent_session_path, model
-         FROM sessions WHERE id = ? ORDER BY modified DESC LIMIT 1",
+            "SELECT s.id, s.path, s.cwd, s.name, s.created, s.modified, s.message_count, s.first_message, s.last_message, s.last_message_role, s.parent_session_path, s.model, c.models_json
+         FROM sessions s LEFT JOIN session_details_cache c ON s.path = c.path WHERE s.id = ? ORDER BY s.modified DESC LIMIT 1",
         )
         .map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let session = stmt
         .query_row(params![id], |row| {
+            let model: Option<String> = row.get(11)?;
+            let models_json: Option<String> = row.get(12)?;
             Ok(SessionInfo {
                 path: row.get(1)?,
                 id: row.get(0)?,
@@ -216,7 +232,8 @@ pub fn get_session_by_id(conn: &Connection, id: &str) -> Result<Option<SessionIn
                 last_message: row.get(8).unwrap_or_default(),
                 last_message_role: row.get(9).unwrap_or_default(),
                 parent_session_path: row.get(10)?,
-                model: row.get(11)?,
+                model: model.clone(),
+                models: parse_models(model, models_json),
             })
         })
         .ok();
@@ -232,13 +249,15 @@ pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
     let start = std::time::Instant::now();
     let mut stmt = conn
         .prepare(
-            "SELECT id, path, cwd, name, created, modified, message_count, first_message, last_message, last_message_role, parent_session_path, model
-         FROM sessions ORDER BY modified DESC, path ASC",
+            "SELECT s.id, s.path, s.cwd, s.name, s.created, s.modified, s.message_count, s.first_message, s.last_message, s.last_message_role, s.parent_session_path, s.model, c.models_json
+         FROM sessions s LEFT JOIN session_details_cache c ON s.path = c.path ORDER BY s.modified DESC, s.path ASC",
         )
         .map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let sessions = stmt
         .query_map([], |row| {
+            let model: Option<String> = row.get(11)?;
+            let models_json: Option<String> = row.get(12)?;
             Ok(SessionInfo {
                 path: row.get(1)?,
                 id: row.get(0)?,
@@ -253,7 +272,8 @@ pub fn get_all_sessions(conn: &Connection) -> Result<Vec<SessionInfo>, String> {
                 last_message: row.get(8).unwrap_or_default(),
                 last_message_role: row.get(9).unwrap_or_default(),
                 parent_session_path: row.get(10)?,
-                model: row.get(11)?,
+                model: model.clone(),
+                models: parse_models(model, models_json),
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?
@@ -272,15 +292,17 @@ pub fn get_all_sessions_for_list(conn: &Connection) -> Result<Vec<SessionInfo>, 
     // Truncate first_message/last_message to 200 chars — list view only needs preview.
     let mut stmt = conn
         .prepare(
-            "SELECT id, path, cwd, name, created, modified, message_count,
-                    SUBSTR(first_message, 1, 200), SUBSTR(last_message, 1, 200),
-                    last_message_role, parent_session_path, model
-             FROM sessions ORDER BY modified DESC, path ASC",
+            "SELECT s.id, s.path, s.cwd, s.name, s.created, s.modified, s.message_count,
+                    SUBSTR(s.first_message, 1, 200), SUBSTR(s.last_message, 1, 200),
+                    s.last_message_role, s.parent_session_path, s.model, c.models_json
+             FROM sessions s LEFT JOIN session_details_cache c ON s.path = c.path ORDER BY s.modified DESC, s.path ASC",
         )
         .map_err(|e| format!("Failed to prepare list statement: {e}"))?;
 
     let sessions = stmt
         .query_map([], |row| {
+            let model: Option<String> = row.get(11)?;
+            let models_json: Option<String> = row.get(12)?;
             Ok(SessionInfo {
                 path: row.get(1)?,
                 id: row.get(0)?,
@@ -295,7 +317,8 @@ pub fn get_all_sessions_for_list(conn: &Connection) -> Result<Vec<SessionInfo>, 
                 last_message: row.get(8).unwrap_or_default(),
                 last_message_role: row.get(9).unwrap_or_default(),
                 parent_session_path: row.get(10)?,
-                model: row.get(11)?,
+                model: model.clone(),
+                models: parse_models(model, models_json),
             })
         })
         .map_err(|e| format!("Failed to query list sessions: {e}"))?
@@ -328,13 +351,15 @@ pub fn get_all_cached_file_modified(conn: &Connection) -> Result<HashMap<String,
 pub fn get_sessions_modified_after(conn: &Connection, cutoff: DateTime<Utc>) -> Result<Vec<SessionInfo>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, path, cwd, name, created, modified, message_count, first_message, last_message, last_message_role, parent_session_path, model
-         FROM sessions WHERE modified > ? ORDER BY modified DESC, path ASC",
+            "SELECT s.id, s.path, s.cwd, s.name, s.created, s.modified, s.message_count, s.first_message, s.last_message, s.last_message_role, s.parent_session_path, s.model, c.models_json
+         FROM sessions s LEFT JOIN session_details_cache c ON s.path = c.path WHERE s.modified > ? ORDER BY s.modified DESC, s.path ASC",
         )
         .map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let sessions = stmt
         .query_map(params![cutoff.to_rfc3339()], |row| {
+            let model: Option<String> = row.get(11)?;
+            let models_json: Option<String> = row.get(12)?;
             Ok(SessionInfo {
                 path: row.get(1)?,
                 id: row.get(0)?,
@@ -349,7 +374,8 @@ pub fn get_sessions_modified_after(conn: &Connection, cutoff: DateTime<Utc>) -> 
                 last_message: row.get(8).unwrap_or_default(),
                 last_message_role: row.get(9).unwrap_or_default(),
                 parent_session_path: row.get(10)?,
-                model: row.get(11)?,
+                model: model.clone(),
+                models: parse_models(model, models_json),
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?
@@ -362,13 +388,15 @@ pub fn get_sessions_modified_after(conn: &Connection, cutoff: DateTime<Utc>) -> 
 pub fn get_sessions_modified_before(conn: &Connection, cutoff: DateTime<Utc>) -> Result<Vec<SessionInfo>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, path, cwd, name, created, modified, message_count, first_message, last_message, last_message_role, parent_session_path, model
-         FROM sessions WHERE modified <= ? ORDER BY modified DESC, path ASC",
+            "SELECT s.id, s.path, s.cwd, s.name, s.created, s.modified, s.message_count, s.first_message, s.last_message, s.last_message_role, s.parent_session_path, s.model, c.models_json
+         FROM sessions s LEFT JOIN session_details_cache c ON s.path = c.path WHERE s.modified <= ? ORDER BY s.modified DESC, s.path ASC",
         )
         .map_err(|e| format!("Failed to prepare statement: {e}"))?;
 
     let sessions = stmt
         .query_map(params![cutoff.to_rfc3339()], |row| {
+            let model: Option<String> = row.get(11)?;
+            let models_json: Option<String> = row.get(12)?;
             Ok(SessionInfo {
                 path: row.get(1)?,
                 id: row.get(0)?,
@@ -383,7 +411,8 @@ pub fn get_sessions_modified_before(conn: &Connection, cutoff: DateTime<Utc>) ->
                 last_message: row.get(8).unwrap_or_default(),
                 last_message_role: row.get(9).unwrap_or_default(),
                 parent_session_path: row.get(10)?,
-                model: row.get(11)?,
+                model: model.clone(),
+                models: parse_models(model, models_json),
             })
         })
         .map_err(|e| format!("Failed to query sessions: {e}"))?

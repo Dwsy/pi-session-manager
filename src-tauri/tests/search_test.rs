@@ -39,6 +39,7 @@ fn test_empty_query_returns_empty_results() {
         last_message_role: "user".to_string(),
         parent_session_path: None,
         model: None,
+        models: None,
     }];
 
     // Test empty query
@@ -78,6 +79,7 @@ fn test_single_word_search() {
         last_message_role: "user".to_string(),
         parent_session_path: None,
         model: None,
+        models: None,
     }];
 
     // Test matching word
@@ -119,6 +121,7 @@ fn test_multiple_word_search() {
         last_message_role: "user".to_string(),
         parent_session_path: None,
         model: None,
+        models: None,
     }];
 
     // Test OR logic: any word matches should return results
@@ -159,6 +162,7 @@ fn test_name_search_mode() {
         last_message_role: "user".to_string(),
         parent_session_path: None,
         model: None,
+        models: None,
     }];
 
     // Test searching by name
@@ -200,6 +204,7 @@ fn test_role_filter() {
         last_message_role: "user".to_string(),
         parent_session_path: None,
         model: None,
+        models: None,
     }];
 
     // Test user role filter
@@ -252,6 +257,7 @@ fn test_multiple_sessions() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         },
         SessionInfo {
             path: session2_path.clone(),
@@ -268,6 +274,7 @@ fn test_multiple_sessions() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         },
         SessionInfo {
             path: session3_path.clone(),
@@ -284,6 +291,7 @@ fn test_multiple_sessions() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         },
     ];
 
@@ -326,6 +334,7 @@ fn test_snippet_generation() {
         last_message_role: "user".to_string(),
         parent_session_path: None,
         model: None,
+        models: None,
     }];
 
     let results = search_sessions(&sessions, "keyword", SearchMode::Content, RoleFilter::All, true);
@@ -364,6 +373,7 @@ fn test_score_calculation() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         },
         SessionInfo {
             path: session2_path.clone(),
@@ -380,6 +390,7 @@ fn test_score_calculation() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         },
     ];
 
@@ -414,6 +425,7 @@ fn test_thinking_content() {
         last_message_role: "user".to_string(),
         parent_session_path: None,
         model: None,
+        models: None,
     }];
 
     // Test with include_tools = true (should search thinking content)
@@ -458,6 +470,7 @@ fn test_special_characters() {
         last_message_role: "user".to_string(),
         parent_session_path: None,
         model: None,
+        models: None,
     }];
 
     // Test searching for text without special characters
@@ -494,6 +507,7 @@ fn test_unicode_search() {
         last_message_role: "user".to_string(),
         parent_session_path: None,
         model: None,
+        models: None,
     }];
 
     // Test Chinese search
@@ -522,6 +536,7 @@ fn test_unicode_search() {
         last_message_role: "user".to_string(),
         parent_session_path: None,
         model: None,
+        models: None,
     }];
 
     let results = search_sessions(&sessions, "默认系统中文", SearchMode::Content, RoleFilter::All, true);
@@ -557,6 +572,7 @@ fn test_quoted_phrase_content_search_requires_contiguous_match() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         },
         SessionInfo {
             path: session_path_2,
@@ -573,6 +589,7 @@ fn test_quoted_phrase_content_search_requires_contiguous_match() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         },
     ];
 
@@ -610,6 +627,7 @@ fn test_quoted_phrase_name_search_requires_phrase_and_remainder_terms() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         },
         SessionInfo {
             path: session_path_2,
@@ -626,6 +644,7 @@ fn test_quoted_phrase_name_search_requires_phrase_and_remainder_terms() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         },
     ];
 

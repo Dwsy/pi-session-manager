@@ -121,7 +121,8 @@ pub fn parse_pi_session_info(path: &Path, file_modified: DateTime<Utc>) -> Resul
             last_message,
             last_message_role,
             parent_session_path: header.parent_session_path,
-            model: last_model,
+            model: last_model.clone(),
+            models: last_model.map(|m| vec![m]),
         },
         entries,
     ))
@@ -201,7 +202,8 @@ pub fn parse_pi_session_header_only(path: &Path, file_modified: DateTime<Utc>) -
         last_message,
         last_message_role,
         parent_session_path: header.parent_session_path,
-        model,
+        model: model.clone(),
+        models: model.map(|m| vec![m]),
     })
 }
 

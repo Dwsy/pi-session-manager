@@ -51,6 +51,7 @@ fn test_search_integration() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         },
         SessionInfo {
             path: session2_path.clone(),
@@ -67,6 +68,7 @@ fn test_search_integration() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         },
         SessionInfo {
             path: session3_path.clone(),
@@ -83,6 +85,7 @@ fn test_search_integration() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         },
     ];
 
@@ -173,6 +176,7 @@ fn test_search_results_mapping() {
         last_message_role: "user".to_string(),
         parent_session_path: None,
         model: None,
+        models: None,
     }];
 
     let results = search_sessions(&sessions, "test", SearchMode::Content, RoleFilter::All, true);
@@ -201,6 +205,7 @@ fn test_search_results_mapping() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         };
 
         println!("Mapped session cwd: {}", mapped.cwd);

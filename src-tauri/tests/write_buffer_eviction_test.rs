@@ -22,6 +22,7 @@ fn test_write_buffer_eviction() {
             last_message_role: "user".to_string(),
             parent_session_path: None,
             model: None,
+            models: None,
         }
     }
 

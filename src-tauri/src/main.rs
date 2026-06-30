@@ -3,6 +3,7 @@
 use pi_session_manager::cli_common::{self, CommonCliArgs};
 use pi_session_manager::resolve_window_dimensions;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::Emitter;
 use tauri::{Listener, Manager};
 
 // Window dimension helpers are in lib.rs — used by both main and tray
@@ -92,6 +93,7 @@ fn print_help() {
 
 const MENU_VIEW_RELOAD: &str = "view_reload";
 const MENU_VIEW_TOGGLE_DEVTOOLS: &str = "view_toggle_devtools";
+const MENU_CHECK_UPDATE: &str = "app_check_update";
 
 fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
     let handle = app.handle();
@@ -103,7 +105,8 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
 
     #[cfg(target_os = "macos")]
     let menu = {
-        let app_menu = SubmenuBuilder::new(handle, "Pi Session Manager").about(None).separator().services().separator().hide().hide_others().show_all().separator().quit().build()?;
+        let check_update_item = MenuItemBuilder::with_id(MENU_CHECK_UPDATE, "Check for Updates").build(handle)?;
+        let app_menu = SubmenuBuilder::new(handle, "Pi Session Manager").about(None).item(&check_update_item).separator().services().separator().hide().hide_others().show_all().separator().quit().build()?;
         let edit_menu = SubmenuBuilder::new(handle, "Edit").undo().redo().separator().cut().copy().paste().select_all().build()?;
         let window_menu = SubmenuBuilder::new(handle, "Window").minimize().fullscreen().separator().close_window().build()?;
         menu.item(&app_menu).item(&edit_menu).item(&view_menu).item(&window_menu)
@@ -131,6 +134,10 @@ fn handle_native_menu_event(app: &tauri::AppHandle, event: tauri::menu::MenuEven
             window.close_devtools();
         } else {
             window.open_devtools();
+        }
+    } else if event.id() == MENU_CHECK_UPDATE {
+        if let Err(error) = app.emit("menu-check-update", ()) {
+            log::warn!("Failed to emit check update event from native menu: {error}");
         }
     }
 }
@@ -563,6 +570,8 @@ fn main() {
             pi_session_manager::list_model_config_versions,
             pi_session_manager::test_model_http,
             pi_session_manager::read_resource_file,
+            pi_session_manager::write_resource_file,
+            pi_session_manager::delete_resource_file,
             pi_session_manager::get_pi_live_sessions,
             pi_session_manager::pi_agent_prompt,
             pi_session_manager::pi_agent_steer,

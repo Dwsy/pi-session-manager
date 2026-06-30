@@ -536,6 +536,20 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::read_resource_file_internal(path, scope).await?;
             Ok(Value::String(result))
         }
+        "write_resource_file" => {
+            let path = extract(payload, "path")?;
+            let content = extract(payload, "content")?;
+            let scope = extract(payload, "scope").unwrap_or_else(|_| "user".to_string());
+            crate::write_resource_file_internal(path, content, scope).await?;
+            Ok(Value::Null)
+        }
+        "delete_resource_file" => {
+            let path = extract(payload, "path")?;
+            let scope = extract(payload, "scope").unwrap_or_else(|_| "user".to_string());
+            crate::delete_resource_file_internal(path, scope).await?;
+            Ok(Value::Null)
+        }
+
 
         // ═══════════════════════════════════════════════════════════════
         // Model config (delegates to domain)

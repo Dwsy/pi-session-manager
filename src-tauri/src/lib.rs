@@ -237,6 +237,8 @@ pub fn run() {
             list_model_config_versions,
             test_model_http,
             read_resource_file,
+            write_resource_file,
+            delete_resource_file,
             get_pi_live_sessions,
             get_pi_agent_entries,
             pi_agent_prompt,

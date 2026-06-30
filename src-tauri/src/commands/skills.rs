@@ -377,3 +377,43 @@ pub async fn read_resource_file_internal(path: String, scope: String) -> Result<
 pub async fn read_resource_file(path: String, scope: String) -> Result<String, String> {
     read_resource_file_internal(path, scope).await
 }
+
+pub async fn write_resource_file_internal(path: String, content: String, scope: String) -> Result<(), String> {
+    let base = resource_base_dir(&scope)?;
+    let full = base.join(&path);
+    if let Some(parent) = full.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
+    }
+    let base_canonical = base.canonicalize().map_err(|e| format!("Resolve base dir: {e}"))?;
+    let parent_canonical = full.parent()
+        .and_then(|p| p.canonicalize().ok())
+        .ok_or_else(|| "Failed to resolve target parent directory".to_string())?;
+    if !parent_canonical.starts_with(&base_canonical) {
+        return Err("Path traversal denied".into());
+    }
+    fs::write(&full, content).map_err(|e| format!("Write {path}: {e}"))
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn write_resource_file(path: String, content: String, scope: String) -> Result<(), String> {
+    write_resource_file_internal(path, content, scope).await
+}
+
+pub async fn delete_resource_file_internal(path: String, scope: String) -> Result<(), String> {
+    let base = resource_base_dir(&scope)?;
+    let full = base.join(&path);
+    if !full.exists() {
+        return Ok(());
+    }
+    let canonical = full.canonicalize().map_err(|e| format!("Resolve path: {e}"))?;
+    let base_canonical = base.canonicalize().unwrap_or(base);
+    if !canonical.starts_with(&base_canonical) {
+        return Err("Path traversal denied".into());
+    }
+    fs::remove_file(&canonical).map_err(|e| format!("Delete {path}: {e}"))
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn delete_resource_file(path: String, scope: String) -> Result<(), String> {
+    delete_resource_file_internal(path, scope).await
+}

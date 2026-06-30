@@ -226,6 +226,7 @@ fn clone_session_for_list(session: &SessionInfo) -> SessionInfo {
         last_message_role: session.last_message_role.clone(),
         parent_session_path: session.parent_session_path.clone(),
         model: session.model.clone(),
+        models: session.models.clone(),
     }
 }
 
