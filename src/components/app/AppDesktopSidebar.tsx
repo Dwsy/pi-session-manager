@@ -159,7 +159,7 @@ function AppDesktopSidebar({
             role="radiogroup"
             aria-label={t("app.viewMode.label", "View mode")}
           >
-            <KbdTooltip shortcut="Cmd+1" label={t("app.viewMode.list")}>
+            <KbdTooltip shortcut="Cmd+Shift+E" label={t("app.viewMode.list")}>
               <button
                 type="button"
                 onClick={onSelectListView}
@@ -172,7 +172,7 @@ function AppDesktopSidebar({
                 <List className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </KbdTooltip>
-            <KbdTooltip shortcut="Cmd+2" label={t("app.viewMode.project")}>
+            <KbdTooltip shortcut="Cmd+Shift+G" label={t("app.viewMode.project")}>
               <button
                 type="button"
                 onClick={onSelectProjectView}
@@ -277,13 +277,13 @@ function AppDesktopSidebar({
           >
             <Star className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
-          <KbdTooltip shortcut="Cmd+K">
+          <KbdTooltip shortcut="Cmd+Shift+F">
             <button
               type="button"
               onClick={onOpenCommandPalette}
               aria-label={searchAllLabel}
               className="p-1 rounded motion-color motion-press focus-ring ml-0.5 text-muted-foreground hover:text-foreground hover:bg-secondary group relative"
-              title={appendShortcutLabel(searchAllLabel, "Cmd+K", { symbolic: true })}
+              title={appendShortcutLabel(searchAllLabel, "Cmd+Shift+F", { symbolic: true })}
             >
               <Search className="h-3.5 w-3.5" aria-hidden="true" />
             </button>

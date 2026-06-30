@@ -270,13 +270,13 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
                     ? formatShortcutText(
                         t(
                           "settings.session.cmdFBehaviorHint.search",
-                          "Cmd+Shift+F toggles session tree",
+                          "Cmd+F opens in-session search. Use Cmd+Option+B to toggle session tree.",
                         ),
                       )
                     : formatShortcutText(
                         t(
                           "settings.session.cmdFBehaviorHint.sidebar",
-                          "Cmd+Shift+F opens in-session search",
+                          "Cmd+F toggles session tree. In-session search can be opened via the toolbar.",
                         ),
                       )
                 }

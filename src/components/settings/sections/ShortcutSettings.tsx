@@ -12,6 +12,18 @@ interface ShortcutItem {
 
 const shortcuts: ShortcutItem[] = [
   {
+    keys: 'Cmd+P',
+    labelKey: 'app.shortcuts.quickOpen',
+    fallback: 'Quick Open (Search all)',
+    category: 'search',
+  },
+  {
+    keys: 'Cmd+Shift+P',
+    labelKey: 'app.shortcuts.commandPalette',
+    fallback: 'Command Palette',
+    category: 'search',
+  },
+  {
     keys: 'Cmd+Shift+F',
     labelKey: 'app.shortcuts.searchAll',
     fallback: 'Search all sessions',
@@ -36,15 +48,27 @@ const shortcuts: ShortcutItem[] = [
     category: 'search',
   },
   {
-    keys: 'Cmd+1',
+    keys: 'Cmd+Shift+E',
     labelKey: 'app.viewMode.list',
     fallback: 'List view',
     category: 'navigation',
   },
   {
-    keys: 'Cmd+2',
+    keys: 'Cmd+Shift+G',
     labelKey: 'app.shortcuts.projectView',
     fallback: 'Project view',
+    category: 'navigation',
+  },
+  {
+    keys: 'Cmd+1',
+    labelKey: 'app.shortcuts.listViewAlternative',
+    fallback: 'Switch to list view',
+    category: 'navigation',
+  },
+  {
+    keys: 'Cmd+2',
+    labelKey: 'app.shortcuts.projectViewAlternative',
+    fallback: 'Switch to project view',
     category: 'navigation',
   },
   {
@@ -64,6 +88,24 @@ const shortcuts: ShortcutItem[] = [
     labelKey: 'app.shortcuts.deleteSelected',
     fallback: 'Delete selected sessions',
     category: 'session',
+  },
+  {
+    keys: 'Delete',
+    labelKey: 'app.shortcuts.deleteSelectedKey',
+    fallback: 'Delete selected sessions (alternative)',
+    category: 'session',
+  },
+  {
+    keys: 'Ctrl+`',
+    labelKey: 'app.shortcuts.terminal',
+    fallback: 'Toggle terminal',
+    category: 'general',
+  },
+  {
+    keys: 'Cmd+J',
+    labelKey: 'app.shortcuts.terminalAlternative',
+    fallback: 'Toggle terminal (alternative)',
+    category: 'general',
   },
   {
     keys: 'Cmd+,',

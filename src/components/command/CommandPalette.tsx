@@ -96,12 +96,23 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      const key = e.key.toLowerCase()
+      if ((e.metaKey || e.ctrlKey) && key === 'p') {
         e.preventDefault()
         e.stopPropagation()
         isOpen ? close() : open()
       }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
+      if ((e.metaKey || e.ctrlKey) && key === 'k') {
+        e.preventDefault()
+        e.stopPropagation()
+        isOpen ? close() : open()
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && key === 'f') {
+        e.preventDefault()
+        e.stopPropagation()
+        isOpen ? close() : open()
+      }
+      if (e.key === 'F1') {
         e.preventDefault()
         e.stopPropagation()
         isOpen ? close() : open()
