@@ -573,6 +573,9 @@ export const settings = {
     showAgentIconInSessionBadge: "Show agent icon in SessionBadge",
     showAgentIconInSessionBadgeHelp:
       "Display the provider icon next to the source badge in session cards.",
+    showModelIconInSessionBadge: "Show model icons in SessionBadge",
+    showModelIconInSessionBadgeHelp:
+      "Display icons for the top 2 models used in session card badges.",
     defaultExternalResumeTarget: "Default external resume target",
     defaultExternalResumeTargetHelp:
       "When prompt is disabled, sessions will be resumed into this target CLI.",
