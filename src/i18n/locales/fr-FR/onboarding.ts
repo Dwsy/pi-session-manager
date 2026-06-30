@@ -11,12 +11,12 @@ export const onboarding = {
     browse: {
       title: 'Parcourir les sessions par projet',
       description: 'Toutes vos sessions de codage sont organisées par projet. Basculez entre la vue liste et la vue projet pour trouver exactement ce que vous cherchez.',
-      hint: 'Cmd+P pour passer en vue projet',
+      hint: 'Cmd+Shift+G pour passer en vue projet',
     },
     search: {
       title: 'Rechercher dans toutes les sessions',
       description: 'Utilisez la recherche globale pour trouver des messages, sessions et projets dans tout votre espace de travail. La recherche dans la session vous aide à naviguer dans une conversation.',
-      hint: 'Cmd+K pour la recherche globale, Cmd+F pour la recherche dans la session',
+      hint: 'Cmd+P / Cmd+Shift+F pour la recherche globale, Cmd+F pour la recherche dans la session',
     },
     tree: {
       title: 'Naviguer dans l\'arbre de session',

@@ -98,8 +98,8 @@ export const settings = {
       toggleSidebar: 'Basculer l\'arborescence des sessions',
     },
     cmdFBehaviorHint: {
-      search: 'Cmd+Shift+F bascule l\'arborescence des sessions',
-      sidebar: 'Cmd+Shift+F ouvre la recherche dans la session',
+      search: 'Cmd+F ouvre la recherche dans la session. Utilisez Cmd+Option+B pour basculer l\'arborescence des sessions.',
+      sidebar: 'Cmd+F bascule l\'arborescence des sessions. La recherche dans la session peut être ouverte depuis la barre d\'outils.',
     },
     scrollMarkersEnabled: 'Marqueurs de défilement',
     scrollMarkersEnabledHelp: 'Afficher des points de navigation latéraux pour sauter rapidement entre les messages',
