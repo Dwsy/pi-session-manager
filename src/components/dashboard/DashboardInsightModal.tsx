@@ -145,19 +145,22 @@ function getHourLabel(hour: number): string {
 
 function getModalTitle(
   mode: DashboardInsightModalProps["mode"],
+  t: any,
   selectedModel?: string | null,
 ): string {
   switch (mode) {
     case "session_overview":
-      return "Session Overview";
+      return t("dashboard.insight.sessionOverview", "Session Overview");
     case "message_mix":
-      return "Message Distribution Insight";
+      return t("dashboard.insight.messageMix", "Message Distribution Insight");
     case "activity_rhythm":
-      return "Activity Rhythm Insight";
+      return t("dashboard.insight.activityRhythm", "Activity Rhythm Insight");
     case "token_cost":
-      return "Token Usage & Cost Breakdown";
+      return t("dashboard.insight.tokenCost", "Token Usage & Cost Breakdown");
     case "model_projects":
-      return `Model Usage by Project · ${selectedModel ? formatModelName(selectedModel) : "Unknown"}`;
+      return t("dashboard.insight.modelProjects", "Model Usage by Project · {{model}}", {
+        model: selectedModel ? formatModelName(selectedModel) : "Unknown",
+      });
   }
 }
 
@@ -667,48 +670,48 @@ export default function DashboardInsightModal({
   const renderSessionOverview = () => (
     <>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <MetricCard icon={BarChart3} label="Sessions" value={formatNumber(displayStats.total_sessions)} tone="text-info" />
-        <MetricCard icon={MessageSquare} label="Messages" value={formatNumber(displayStats.total_messages)} tone="text-success" />
-        <MetricCard icon={Target} label="Avg / Session" value={displayStats.average_messages_per_session.toFixed(1)} tone="text-warning" />
-        <MetricCard icon={Activity} label="Live Sessions" value={formatNumber(sessionOverview.liveCount)} tone="text-info" />
+        <MetricCard icon={BarChart3} label={t("dashboard.insight.sessions", "Sessions")} value={formatNumber(displayStats.total_sessions)} tone="text-info" />
+        <MetricCard icon={MessageSquare} label={t("dashboard.insight.messages", "Messages")} value={formatNumber(displayStats.total_messages)} tone="text-success" />
+        <MetricCard icon={Target} label={t("dashboard.insight.avgPerSession", "Avg / Session")} value={displayStats.average_messages_per_session.toFixed(1)} tone="text-warning" />
+        <MetricCard icon={Activity} label={t("dashboard.insight.liveSessions", "Live Sessions")} value={formatNumber(sessionOverview.liveCount)} tone="text-info" />
       </div>
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
-          <div className="text-xs font-medium text-foreground mb-3">Session concentration</div>
+          <div className="text-xs font-medium text-foreground mb-3">{t("dashboard.insight.sessionConcentration", "Session concentration")}</div>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="rounded-lg bg-background/45 border border-border/15 p-3">
-              <div className="text-muted-foreground mb-1">Median length</div>
+              <div className="text-muted-foreground mb-1">{t("dashboard.insight.medianLength", "Median length")}</div>
               <div className="text-lg font-semibold text-foreground tabular-nums">{formatNumber(sessionOverview.medianMessages)}</div>
             </div>
             <div className="rounded-lg bg-background/45 border border-border/15 p-3">
-              <div className="text-muted-foreground mb-1">Longest session</div>
+              <div className="text-muted-foreground mb-1">{t("dashboard.insight.longestSession", "Longest session")}</div>
               <div className="text-lg font-semibold text-foreground tabular-nums">{formatNumber(sessionOverview.topSession?.message_count ?? 0)}</div>
             </div>
           </div>
           {sessionOverview.topSession ? (
             <div className="mt-3 rounded-lg border border-border/15 bg-background/35 p-3">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Longest session path</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{t("dashboard.insight.longestSessionPath", "Longest session path")}</div>
               <div className="text-xs text-foreground truncate" title={sessionOverview.topSession.path}>{sessionOverview.topSession.path}</div>
             </div>
           ) : null}
         </div>
 
         <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
-          <div className="text-xs font-medium text-foreground mb-3">Top projects by sessions</div>
+          <div className="text-xs font-medium text-foreground mb-3">{t("dashboard.insight.topProjectsBySessions", "Top projects by sessions")}</div>
           <div className="space-y-2">
             {sessionOverview.topProjects.map(([projectPath, count]) => (
               <InsightRow
                 key={projectPath}
                 label={getPathBasename(projectPath)}
-                value={`${count} sessions`}
+                value={t("dashboard.insight.sessionsUnit", "{{count}} sessions", { count })}
                 hint={projectPath}
                 percent={(count / Math.max(sessionOverview.topProjects[0]?.[1] ?? 1, 1)) * 100}
                 tone="bg-info"
               />
             ))}
             {sessionOverview.topProjects.length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center py-6">No project data.</div>
+              <div className="text-sm text-muted-foreground text-center py-6">{t("dashboard.insight.noProjectData", "No project data.")}</div>
             ) : null}
           </div>
         </div>
@@ -719,34 +722,34 @@ export default function DashboardInsightModal({
   const renderMessageMix = () => (
     <>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <MetricCard icon={MessageSquare} label="Total Messages" value={formatNumber(displayStats.total_messages)} tone="text-info" />
-        <MetricCard icon={User} label="User Share" value={formatPercent(messageMix.userPercent)} tone="text-info" />
-        <MetricCard icon={Bot} label="Assistant Share" value={formatPercent(messageMix.assistantPercent)} tone="text-success" />
-        <MetricCard icon={Target} label="Assistant / User" value={`1:${messageMix.ratio.toFixed(1)}`} tone="text-warning" />
+        <MetricCard icon={MessageSquare} label={t("dashboard.insight.totalMessages", "Total Messages")} value={formatNumber(displayStats.total_messages)} tone="text-info" />
+        <MetricCard icon={User} label={t("dashboard.insight.userShare", "User Share")} value={formatPercent(messageMix.userPercent)} tone="text-info" />
+        <MetricCard icon={Bot} label={t("dashboard.insight.assistantShare", "Assistant Share")} value={formatPercent(messageMix.assistantPercent)} tone="text-success" />
+        <MetricCard icon={Target} label={t("dashboard.insight.assistantUserRatio", "Assistant / User")} value={`1:${messageMix.ratio.toFixed(1)}`} tone="text-warning" />
       </div>
 
       <section className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
-        <div className="text-xs font-medium text-foreground mb-3">Role balance</div>
+        <div className="text-xs font-medium text-foreground mb-3">{t("dashboard.insight.roleBalance", "Role balance")}</div>
         <div className="space-y-3">
-          <InsightRow label="User messages" value={formatNumber(displayStats.user_messages)} percent={messageMix.userPercent} tone="bg-info" />
-          <InsightRow label="Assistant messages" value={formatNumber(displayStats.assistant_messages)} percent={messageMix.assistantPercent} tone="bg-success" />
+          <InsightRow label={t("dashboard.insight.userMessages", "User messages")} value={formatNumber(displayStats.user_messages)} percent={messageMix.userPercent} tone="bg-info" />
+          <InsightRow label={t("dashboard.insight.assistantMessages", "Assistant messages")} value={formatNumber(displayStats.assistant_messages)} percent={messageMix.assistantPercent} tone="bg-success" />
         </div>
       </section>
 
       <section className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
-        <div className="text-xs font-medium text-foreground mb-3">Busiest message days</div>
+        <div className="text-xs font-medium text-foreground mb-3">{t("dashboard.insight.busiestMessageDays", "Busiest message days")}</div>
         <div className="space-y-2">
           {messageMix.topMessageDays.map(([date, count]) => (
             <InsightRow
               key={date}
               label={date}
-              value={`${formatNumber(count)} msgs`}
+              value={`${formatNumber(count)} ${t("dashboard.insight.msgsUnit", "msgs")}`}
               percent={(count / Math.max(messageMix.topMessageDays[0]?.[1] ?? 1, 1)) * 100}
               tone="bg-warning"
             />
           ))}
           {messageMix.topMessageDays.length === 0 ? (
-            <div className="text-sm text-muted-foreground text-center py-6">No message timeline data.</div>
+            <div className="text-sm text-muted-foreground text-center py-6">{t("dashboard.insight.noMessageTimelineData", "No message timeline data.")}</div>
           ) : null}
         </div>
       </section>
@@ -756,45 +759,45 @@ export default function DashboardInsightModal({
   const renderActivityRhythm = () => (
     <>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <MetricCard icon={Calendar} label="Active Days" value={formatNumber(activityRhythm.activeDays)} tone="text-info" />
-        <MetricCard icon={Activity} label="Current Streak" value={`${activityRhythm.streak}d`} tone="text-success" />
-        <MetricCard icon={Clock} label="Peak Hour" value={getHourLabel(activityRhythm.peakHour.hour)} tone="text-warning" />
-        <MetricCard icon={MessageSquare} label="Peak Hour Msgs" value={formatNumber(activityRhythm.peakHour.message_count)} tone="text-info" />
+        <MetricCard icon={Calendar} label={t("dashboard.insight.activeDays", "Active Days")} value={formatNumber(activityRhythm.activeDays)} tone="text-info" />
+        <MetricCard icon={Activity} label={t("dashboard.insight.currentStreak", "Current Streak")} value={`${activityRhythm.streak}d`} tone="text-success" />
+        <MetricCard icon={Clock} label={t("dashboard.insight.peakHour", "Peak Hour")} value={getHourLabel(activityRhythm.peakHour.hour)} tone="text-warning" />
+        <MetricCard icon={MessageSquare} label={t("dashboard.insight.peakHourMsgs", "Peak Hour Msgs")} value={formatNumber(activityRhythm.peakHour.message_count)} tone="text-info" />
       </div>
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
-          <div className="text-xs font-medium text-foreground mb-3">Top active hours</div>
+          <div className="text-xs font-medium text-foreground mb-3">{t("dashboard.insight.topActiveHours", "Top active hours")}</div>
           <div className="space-y-2">
             {activityRhythm.topHours.map((point) => (
               <InsightRow
                 key={point.hour}
                 label={getHourLabel(point.hour)}
-                value={`${formatNumber(point.message_count)} msgs`}
+                value={`${formatNumber(point.message_count)} ${t("dashboard.insight.msgsUnit", "msgs")}`}
                 percent={(point.message_count / Math.max(activityRhythm.topHours[0]?.message_count ?? 1, 1)) * 100}
                 tone="bg-warning"
               />
             ))}
             {activityRhythm.topHours.length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center py-6">No hourly activity data.</div>
+              <div className="text-sm text-muted-foreground text-center py-6">{t("dashboard.insight.noHourlyActivityData", "No hourly activity data.")}</div>
             ) : null}
           </div>
         </div>
 
         <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
-          <div className="text-xs font-medium text-foreground mb-3">Weekday rhythm</div>
+          <div className="text-xs font-medium text-foreground mb-3">{t("dashboard.insight.weekdayRhythm", "Weekday rhythm")}</div>
           <div className="space-y-2">
             {activityRhythm.topWeekdays.map(([day, count]) => (
               <InsightRow
                 key={day}
-                label={day}
-                value={`${formatNumber(count)} msgs`}
+                label={t(`dashboard.insight.weekdays.${day.toLowerCase()}`, day)}
+                value={`${formatNumber(count)} ${t("dashboard.insight.msgsUnit", "msgs")}`}
                 percent={(count / Math.max(activityRhythm.topWeekdays[0]?.[1] ?? 1, 1)) * 100}
                 tone="bg-success"
               />
             ))}
             {activityRhythm.topWeekdays.length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center py-6">No weekday activity data.</div>
+              <div className="text-sm text-muted-foreground text-center py-6">{t("dashboard.insight.noWeekdayActivityData", "No weekday activity data.")}</div>
             ) : null}
           </div>
         </div>
@@ -819,10 +822,10 @@ export default function DashboardInsightModal({
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 text-xs text-muted-foreground mb-1.5">
               <Sparkles className="w-3.5 h-3.5 text-warning" />
-              Dashboard Insight
+              {t("dashboard.insight.title", "Dashboard Insight")}
             </div>
             <h3 className="text-lg font-semibold text-foreground truncate">
-              {getModalTitle(mode, selectedModel)}
+              {getModalTitle(mode, t, selectedModel)}
             </h3>
           </div>
           <button
@@ -846,19 +849,19 @@ export default function DashboardInsightModal({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <MetricCard
                   icon={Coins}
-                  label="Billable Tokens"
+                  label={t("dashboard.insight.billableTokens", "Billable Tokens")}
                   value={formatTokens(displayStats.total_tokens)}
                   tone="text-info"
                 />
                 <MetricCard
                   icon={DollarSign}
-                  label="Total Cost"
+                  label={t("dashboard.insight.totalCost", "Total Cost")}
                   value={formatCost(totalCostIncSubagents)}
                   tone="text-destructive"
                 />
                 <MetricCard
                   icon={WalletCards}
-                  label="Providers / Models"
+                  label={t("dashboard.insight.providersModels", "Providers / Models")}
                   value={`${formatNumber(providerGroups.length)} / ${formatNumber(Object.keys(displayStats.token_details.tokens_by_model).length)}`}
                   tone="text-warning"
                 />
@@ -884,7 +887,7 @@ export default function DashboardInsightModal({
                   ))}
                 </div>
                 {isFiltering && (
-                  <span className="text-[10px] text-muted-foreground animate-pulse">filtering...</span>
+                  <span className="text-[10px] text-muted-foreground animate-pulse">{t("dashboard.insight.filtering", "filtering...")}</span>
                 )}
               </div>
 
@@ -916,7 +919,7 @@ export default function DashboardInsightModal({
                   </div>
                   {searchQuery && (
                     <div className="text-xs text-muted-foreground">
-                      {filteredAndSortedGroups.length} providers
+                      {t("dashboard.insight.providersCount", "{{count}} providers", { count: filteredAndSortedGroups.length })}
                     </div>
                   )}
                 </div>
@@ -940,7 +943,7 @@ export default function DashboardInsightModal({
                             ? "bg-info/20 text-info"
                             : "bg-warning/20 text-warning"
                         }`}>
-                          {suggestion.type === "provider" ? "Provider" : "Model"}
+                          {suggestion.type === "provider" ? t("dashboard.insight.provider", "Provider") : t("dashboard.insight.model", "Model")}
                         </span>
                         <span className="text-foreground truncate">
                           {suggestion.value}
@@ -953,8 +956,13 @@ export default function DashboardInsightModal({
 
               <section className="rounded-xl border border-border/20 bg-background/35 overflow-hidden">
                 <div className="px-3.5 py-2.5 border-b border-border/20 bg-muted/20 text-[11px] text-muted-foreground flex items-center justify-between">
-                  <span>Provider grouped usage table</span>
-                  <span>{filteredAndSortedGroups.length} providers, {filteredAndSortedGroups.reduce((sum, g) => sum + g.models.length, 0)} models</span>
+                  <span>{t("dashboard.insight.providerGroupedTable", "Provider grouped usage table")}</span>
+                  <span>
+                    {t("dashboard.insight.providersModelsCount", "{{providers}} providers, {{models}} models", {
+                      providers: filteredAndSortedGroups.length,
+                      models: filteredAndSortedGroups.reduce((sum, g) => sum + g.models.length, 0),
+                    })}
+                  </span>
                 </div>
 
                 <div className="max-h-[46vh] overflow-y-auto">
@@ -966,7 +974,7 @@ export default function DashboardInsightModal({
                           onClick={() => handleSort("provider")}
                         >
                           <span className="inline-flex items-center gap-1">
-                            Provider / Model
+                            {t("dashboard.insight.providerModelHeader", "Provider / Model")}
                             {renderSortIcon("provider")}
                           </span>
                         </th>
@@ -975,7 +983,7 @@ export default function DashboardInsightModal({
                           onClick={() => handleSort("sessions")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
-                            Sessions
+                            {t("dashboard.insight.sessionsHeader", "Sessions")}
                             {renderSortIcon("sessions")}
                           </span>
                         </th>
@@ -984,7 +992,7 @@ export default function DashboardInsightModal({
                           onClick={() => handleSort("messages")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
-                            Msgs
+                            {t("dashboard.insight.msgsHeader", "Msgs")}
                             {renderSortIcon("messages")}
                           </span>
                         </th>
@@ -993,7 +1001,7 @@ export default function DashboardInsightModal({
                           onClick={() => handleSort("cost")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
-                            Cost
+                            {t("dashboard.insight.costHeader", "Cost")}
                             {renderSortIcon("cost")}
                           </span>
                         </th>
@@ -1002,7 +1010,7 @@ export default function DashboardInsightModal({
                           onClick={() => handleSort("tokens")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
-                            Tokens
+                            {t("dashboard.insight.tokensHeader", "Tokens")}
                             {renderSortIcon("tokens")}
                           </span>
                         </th>
@@ -1011,7 +1019,7 @@ export default function DashboardInsightModal({
                           onClick={() => handleSort("input")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
-                            ↑In
+                            {t("dashboard.insight.inHeader", "↑In")}
                             {renderSortIcon("input")}
                           </span>
                         </th>
@@ -1020,7 +1028,7 @@ export default function DashboardInsightModal({
                           onClick={() => handleSort("output")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
-                            ↓Out
+                            {t("dashboard.insight.outHeader", "↓Out")}
                             {renderSortIcon("output")}
                           </span>
                         </th>
@@ -1029,7 +1037,7 @@ export default function DashboardInsightModal({
                           onClick={() => handleSort("cache")}
                         >
                           <span className="inline-flex items-center gap-1 justify-end">
-                            Cache
+                            {t("dashboard.insight.cacheHeader", "Cache")}
                             {renderSortIcon("cache")}
                           </span>
                         </th>
@@ -1047,7 +1055,7 @@ export default function DashboardInsightModal({
                       {filteredAndSortedGroups.length === 0 && (
                         <tr>
                           <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
-                            No providers or models match "{searchQuery}"
+                            {t("dashboard.insight.noMatch", 'No providers or models match "{{query}}"', { query: searchQuery })}
                           </td>
                         </tr>
                       )}
@@ -1059,7 +1067,7 @@ export default function DashboardInsightModal({
                   <table className="w-full min-w-[860px] text-xs">
                     <tbody>
                       <tr className="font-semibold text-foreground">
-                        <td className="px-3 py-2.5 text-left">Total</td>
+                        <td className="px-3 py-2.5 text-left">{t("dashboard.insight.totalRow", "Total")}</td>
                         <td className="px-2 py-2.5 text-right tabular-nums">
                           {formatNumber(usageTotals.sessions)}
                         </td>
@@ -1090,8 +1098,7 @@ export default function DashboardInsightModal({
           ) : mode === "model_projects" ? (
             <>
               <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5 text-xs text-muted-foreground">
-                Shows which projects used this model, sorted by number of
-                sessions using that model.
+                {t("dashboard.insight.modelProjectsDescription", "Shows which projects used this model, sorted by number of sessions using that model.")}
               </div>
 
               {modelProjects.length > 0 ? (
@@ -1113,7 +1120,7 @@ export default function DashboardInsightModal({
                             </span>
                           </div>
                           <span className="text-xs text-muted-foreground tabular-nums">
-                            {count} sessions
+                            {t("dashboard.insight.sessionsUnit", "{{count}} sessions", { count })}
                           </span>
                         </div>
                         <div className="h-1.5 bg-muted/60 rounded-full overflow-hidden">
@@ -1131,7 +1138,7 @@ export default function DashboardInsightModal({
                 </div>
               ) : (
                 <div className="rounded-xl border border-border/20 bg-muted/15 p-4 text-sm text-muted-foreground text-center">
-                  No project-level usage found for this model.
+                  {t("dashboard.topModels.noProjectUsage", "No project-level usage found for this model.")}
                 </div>
               )}
             </>

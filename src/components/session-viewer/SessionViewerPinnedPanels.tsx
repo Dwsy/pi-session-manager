@@ -13,7 +13,7 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { PanelRightOpen, X } from "lucide-react";
+import { GripHorizontal, X } from "lucide-react";
 import type { PsmSessionToolbarItemRuntimeRegistration } from "@/plugins/runtime-host/types";
 
 interface SessionFeatureItem {
@@ -29,21 +29,19 @@ interface SessionFeatureItem {
 interface SortablePinnedPanelButtonProps {
   item: PsmSessionToolbarItemRuntimeRegistration;
   activePanelId: string | null;
-  onToggle: (id: string) => void;
   onUnpin: (panelId: string) => void;
-  featureToggleClass: string;
-  featureToggleActiveClass: string;
-  featureToggleInactiveClass: string;
+  renderItem: (item: PsmSessionToolbarItemRuntimeRegistration) => ReactNode;
+  unpinLabel: string;
+  dragLabel: string;
 }
 
 function SortablePinnedPanelButton({
   item,
   activePanelId,
-  onToggle,
   onUnpin,
-  featureToggleClass,
-  featureToggleActiveClass,
-  featureToggleInactiveClass,
+  renderItem,
+  unpinLabel,
+  dragLabel,
 }: SortablePinnedPanelButtonProps) {
   const {
     attributes,
@@ -67,19 +65,12 @@ function SortablePinnedPanelButton({
       ref={setNodeRef}
       style={style}
       className="psm-session-pinned-button-wrapper group"
+      data-active={isActive}
       data-dragging={isDragging}
     >
-      <button
-        type="button"
-        className={`${featureToggleClass} ${isActive ? featureToggleActiveClass : featureToggleInactiveClass}`}
-        onClick={() => item.panelId && onToggle(item.panelId)}
-        aria-pressed={isActive}
-        aria-label={item.title}
-        title={item.title}
-      >
-        <PanelRightOpen className="h-3.5 w-3.5" />
-      </button>
-      {/* Unpin button - shown on hover */}
+      <div className="psm-session-pinned-button__content">
+        {renderItem(item)}
+      </div>
       <button
         type="button"
         onClick={(e) => {
@@ -89,21 +80,21 @@ function SortablePinnedPanelButton({
           }
         }}
         className="psm-session-pinned-button__unpin"
-        aria-label="Unpin"
-        title="Unpin"
+        aria-label={`${unpinLabel}: ${item.title}`}
+        title={`${unpinLabel}: ${item.title}`}
       >
         <X className="h-2.5 w-2.5" />
       </button>
-      {/* Drag handle indicator - shown on hover, handles drag */}
-      <div
+      <button
+        type="button"
         className="psm-session-pinned-button__drag-indicator"
         {...attributes}
         {...listeners}
-        aria-label="Drag to reorder"
-        title="Drag to reorder"
-        role="button"
-        tabIndex={0}
-      />
+        aria-label={`${dragLabel}: ${item.title}`}
+        title={`${dragLabel}: ${item.title}`}
+      >
+        <GripHorizontal className="h-3 w-3" aria-hidden="true" />
+      </button>
     </div>
   );
 }
@@ -111,12 +102,11 @@ function SortablePinnedPanelButton({
 interface SortablePinnedPanelsProps {
   items: PsmSessionToolbarItemRuntimeRegistration[];
   activePanelId: string | null;
-  onToggle: (id: string) => void;
   onUnpin: (panelId: string) => void;
   onReorder: (ids: string[]) => void;
-  featureToggleClass: string;
-  featureToggleActiveClass: string;
-  featureToggleInactiveClass: string;
+  renderItem: (item: PsmSessionToolbarItemRuntimeRegistration) => ReactNode;
+  unpinLabel: string;
+  dragLabel: string;
 }
 
 // Memoized sensors to prevent recreating on every render
@@ -135,12 +125,11 @@ export function useSortableSensors() {
 export function SortablePinnedPanels({
   items,
   activePanelId,
-  onToggle,
   onUnpin,
   onReorder,
-  featureToggleClass,
-  featureToggleActiveClass,
-  featureToggleInactiveClass,
+  renderItem,
+  unpinLabel,
+  dragLabel,
 }: SortablePinnedPanelsProps) {
   const sensors = useSortableSensors();
 
@@ -167,11 +156,10 @@ export function SortablePinnedPanels({
             key={item.id}
             item={item}
             activePanelId={activePanelId}
-            onToggle={onToggle}
             onUnpin={onUnpin}
-            featureToggleClass={featureToggleClass}
-            featureToggleActiveClass={featureToggleActiveClass}
-            featureToggleInactiveClass={featureToggleInactiveClass}
+            renderItem={renderItem}
+            unpinLabel={unpinLabel}
+            dragLabel={dragLabel}
           />
         ))}
       </SortableContext>

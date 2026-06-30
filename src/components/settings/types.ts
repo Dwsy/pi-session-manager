@@ -124,6 +124,7 @@ export interface AppSettings {
     externalSessionsIncludeInStats: boolean;
     externalSessionsIncludeInSearch: boolean;
     showAgentIconInSessionBadge: boolean;
+    showModelIconInSessionBadge: boolean;
     externalResumePromptEnabled: boolean;
     defaultExternalResumeTarget: SessionConvertTarget;
     showMessagePreview: boolean;
@@ -223,6 +224,7 @@ export const defaultSettings: AppSettings = {
     externalSessionsIncludeInStats: false,
     externalSessionsIncludeInSearch: false,
     showAgentIconInSessionBadge: true,
+    showModelIconInSessionBadge: false,
     externalResumePromptEnabled: true,
     defaultExternalResumeTarget: "pi",
     showMessagePreview: true,

@@ -3,7 +3,7 @@
  */
 
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { Check, ChevronDown, Search, X } from 'lucide-react'
+import { Check, ChevronDown, Search, X, Sparkles, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import SettingsCard from '@/components/settings/SettingsCard'
 import SettingsField from '@/components/settings/SettingsField'
@@ -13,9 +13,11 @@ import SettingsSelect from '@/components/settings/SettingsSelect'
 import {
   getBuiltInBase46Themes,
   listUserPiThemes,
+  deleteUserPiTheme,
   resolveThemePreview,
   toBase46Selection,
 } from '@/utils/piTheme'
+import ThemeStudioModal from '@/components/settings/sections/ThemeStudioModal'
 import { CODE_THEMES, MONOSPACE_FONTS } from '@/utils/codeThemes'
 import { listAllSystemFonts, listSystemMonospaceFonts, type DetectedFont } from '@/utils/fontDetection'
 import { renderCodeHtmlWithTheme } from '@/utils/markdown'
@@ -329,6 +331,32 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
   const [themeQuery, setThemeQuery] = useState('')
   const [uiFontQuery, setUiFontQuery] = useState('')
   const [fontQuery, setFontQuery] = useState('')
+  const [studioOpen, setStudioOpen] = useState(false)
+  const [studioInitialTheme, setStudioInitialTheme] = useState<string | undefined>(undefined)
+
+  const handleOpenStudio = (initialName?: string) => {
+    setStudioInitialTheme(initialName || settings.appearance.customTheme)
+    setStudioOpen(true)
+  }
+
+  const handleThemeSaved = async (savedName: string) => {
+    const updatedUserThemes = await listUserPiThemes()
+    setPiThemes(updatedUserThemes)
+    onUpdate('appearance', 'theme', 'custom')
+    onUpdate('appearance', 'customTheme', savedName)
+  }
+
+  const handleDeleteTheme = async (themeName: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (confirm(`Are you sure you want to delete custom theme "${themeName}"?`)) {
+      await deleteUserPiTheme(themeName)
+      const updatedUserThemes = await listUserPiThemes()
+      setPiThemes(updatedUserThemes)
+      if (settings.appearance.customTheme === themeName) {
+        onUpdate('appearance', 'customTheme', 'app-default')
+      }
+    }
+  }
   const deferredThemeQuery = useDeferredValue(themeQuery)
   const deferredUiFontQuery = useDeferredValue(uiFontQuery)
   const deferredFontQuery = useDeferredValue(fontQuery)
@@ -515,29 +543,51 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
               searchKey="appearance-customTheme"
             >
               <div className="space-y-3">
-                <SettingsSelect
-                  value={settings.appearance.customTheme}
-                  onChange={(e) => onUpdate('appearance', 'customTheme', e.target.value)}
-                >
-                  <option value="app-default">{t('settings.appearance.appDefaultTheme', 'App default')}</option>
-                  <optgroup label={t('settings.appearance.builtInBase46Themes', 'Built-in base46 themes')}>
-                    {builtInThemes.map((theme) => (
-                      <option key={theme.id} value={toBase46Selection(theme.id)}>
-                        {theme.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label={t('settings.appearance.userThemes', 'User themes')}>
-                    {piThemes.length === 0 && (
-                      <option value="" disabled>{t('settings.appearance.noCustomThemes', 'No custom themes found')}</option>
-                    )}
-                    {piThemes.map((themeName) => (
-                      <option key={themeName} value={themeName}>
-                        {themeName}
-                      </option>
-                    ))}
-                  </optgroup>
-                </SettingsSelect>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <SettingsSelect
+                      value={settings.appearance.customTheme}
+                      onChange={(e) => onUpdate('appearance', 'customTheme', e.target.value)}
+                    >
+                      <option value="app-default">{t('settings.appearance.appDefaultTheme', 'App default')}</option>
+                      <optgroup label={t('settings.appearance.builtInBase46Themes', 'Built-in base46 themes')}>
+                        {builtInThemes.map((theme) => (
+                          <option key={theme.id} value={toBase46Selection(theme.id)}>
+                            {theme.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label={t('settings.appearance.userThemes', 'User themes')}>
+                        {piThemes.length === 0 && (
+                          <option value="" disabled>{t('settings.appearance.noCustomThemes', 'No custom themes found')}</option>
+                        )}
+                        {piThemes.map((themeName) => (
+                          <option key={themeName} value={themeName}>
+                            {themeName}
+                          </option>
+                        ))}
+                      </optgroup>
+                    </SettingsSelect>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenStudio()}
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Open Studio
+                  </button>
+                  {piThemes.includes(settings.appearance.customTheme) && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteTheme(settings.appearance.customTheme, e)}
+                      title="Delete theme"
+                      className="flex shrink-0 items-center justify-center rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-destructive hover:bg-destructive/20 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
 
                 {selectedPreview && (
                   <div
@@ -1312,6 +1362,13 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
           </div>
         </PickerDialog>
       )}
+
+      <ThemeStudioModal
+        isOpen={studioOpen}
+        onClose={() => setStudioOpen(false)}
+        initialThemeName={studioInitialTheme}
+        onThemeSaved={handleThemeSaved}
+      />
     </>
   )
 }

@@ -30,6 +30,7 @@ import ConversationPreviewMessages from "./ConversationPreviewMessages";
 import type { SessionPreviewVariant } from "./previewTypes";
 import NewMessagesButton from "./NewMessagesButton";
 import ScrollToBottomButton from "./ScrollToBottomButton";
+import ScrollToTopButton from "./ScrollToTopButton";
 import {
   SessionMessagesEmptyState,
   SessionMessagesErrorState,
@@ -133,6 +134,7 @@ const SessionViewerMessages = forwardRef<
     messagesWrapperRef,
     rowVirtualizer,
     isAtBottom,
+    isAtTop,
     scrollToTop,
     scrollToBottom,
     scrollToEntryId,
@@ -154,11 +156,14 @@ const SessionViewerMessages = forwardRef<
 
   const virtualRows = rowVirtualizer.getVirtualItems();
 
-  // Centered "scroll to bottom" affordance, revealed when the pointer enters
-  // the bottom 10% of the visible message area (and we're not already at the
-  // bottom). The button pins itself open on hover so it stays clickable.
+  // Centered scroll affordances.
+  // "scroll to bottom" is revealed when the pointer enters the bottom 10% of the visible area (and we're not at bottom).
+  // "scroll to top" is revealed when the pointer enters the top 10% of the visible area (and we're not at top).
+  // The buttons pin themselves open on hover so they stay clickable.
   const [pointerInBottomZone, setPointerInBottomZone] = useState(false);
+  const [pointerInTopZone, setPointerInTopZone] = useState(false);
   const [overScrollToBottomButton, setOverScrollToBottomButton] = useState(false);
+  const [overScrollToTopButton, setOverScrollToTopButton] = useState(false);
   const hoverRafRef = useRef<number | null>(null);
 
   const handleContainerPointerMove = useCallback(
@@ -169,12 +174,18 @@ const SessionViewerMessages = forwardRef<
         const container = messagesContainerRef.current;
         if (!container) {
           setPointerInBottomZone(false);
+          setPointerInTopZone(false);
           return;
         }
         const rect = container.getBoundingClientRect();
         const pointerY = event.clientY;
-        const zoneTop = rect.bottom - rect.height * 0.1;
+
+        const zoneHeight = rect.height * 0.1;
+        const zoneTop = rect.bottom - zoneHeight;
+        const zoneBottomLimit = rect.top + zoneHeight;
+
         setPointerInBottomZone(pointerY >= zoneTop && pointerY <= rect.bottom);
+        setPointerInTopZone(pointerY >= rect.top && pointerY <= zoneBottomLimit);
       });
     },
     [],
@@ -182,6 +193,7 @@ const SessionViewerMessages = forwardRef<
 
   const handleContainerPointerLeave = useCallback(() => {
     setPointerInBottomZone(false);
+    setPointerInTopZone(false);
   }, []);
 
   useEffect(() => {
@@ -194,6 +206,9 @@ const SessionViewerMessages = forwardRef<
 
   const showScrollToBottomHover =
     !isAtBottom && (pointerInBottomZone || overScrollToBottomButton);
+
+  const showScrollToTopHover =
+    !isAtTop && (pointerInTopZone || overScrollToTopButton);
 
   useSessionViewerSearchHighlight({
     container: messagesContainerRef.current,
@@ -320,6 +335,13 @@ const SessionViewerMessages = forwardRef<
           label={t("session.newMessages", "New messages")}
         />
       )}
+      <ScrollToTopButton
+        title={t("session.scrollToTop", "Scroll to top")}
+        visible={showScrollToTopHover}
+        onClick={() => scrollToTop()}
+        onMouseEnter={() => setOverScrollToTopButton(true)}
+        onMouseLeave={() => setOverScrollToTopButton(false)}
+      />
       <ScrollToBottomButton
         title={t("session.scrollToBottom", "Scroll to bottom")}
         visible={showScrollToBottomHover}

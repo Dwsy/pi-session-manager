@@ -101,6 +101,7 @@ export interface UseSessionViewerVirtualScrollResult {
   rowVirtualizer: Virtualizer<HTMLDivElement, HTMLDivElement>
   isAtBottom: boolean
   isAtBottomRef: MutableRefObject<boolean>
+  isAtTop: boolean
   scrollToTop: () => void
   scrollToBottom: (smooth?: boolean) => void
   scrollToEntryId: (entryId: string, align?: ScrollAlignment) => boolean
@@ -122,11 +123,13 @@ export function useSessionViewerVirtualScroll({
   handlesScrollTarget = false,
 }: UseSessionViewerVirtualScrollOptions): UseSessionViewerVirtualScrollResult {
   const [isAtBottom, setIsAtBottom] = useState(true)
+  const [isAtTop, setIsAtTop] = useState(true)
 
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const messagesWrapperRef = useRef<HTMLDivElement>(null)
   const internalIsAtBottomRef = useRef(true)
   const isAtBottomRef = externalIsAtBottomRef ?? internalIsAtBottomRef
+  const isAtTopRef = useRef(true)
   const measuredHeightsRef = useRef<Map<string, number>>(new Map())
   const hasTriggeredReachBottomRef = useRef(false)
 
@@ -179,6 +182,8 @@ export function useSessionViewerVirtualScroll({
     }
     setIsAtBottom(true)
     isAtBottomRef.current = true
+    setIsAtTop(true)
+    isAtTopRef.current = true
   }, [sessionPath, rowVirtualizer])
 
   // Preview mode change: clear cache and let virtualizer re-estimate.
@@ -334,6 +339,14 @@ export function useSessionViewerVirtualScroll({
           setIsAtBottom(atBottom)
         }
 
+        const atTop = container.scrollTop <= BOTTOM_THRESHOLD_PX
+        const wasAtTop = isAtTopRef.current
+
+        if (wasAtTop !== atTop) {
+          isAtTopRef.current = atTop
+          setIsAtTop(atTop)
+        }
+
         if (atBottom) {
           if (!wasAtBottom) {
             setHasNewMessages(false)
@@ -366,6 +379,7 @@ export function useSessionViewerVirtualScroll({
     rowVirtualizer,
     isAtBottom,
     isAtBottomRef,
+    isAtTop,
     scrollToTop,
     scrollToBottom,
     scrollToEntryId,

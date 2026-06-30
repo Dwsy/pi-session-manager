@@ -73,22 +73,18 @@ function AppSessionViewerPane({
   const [rightFeaturePickerOpen, setRightFeaturePickerOpen] = useState(false);
   const [bottomFeatureTrayOpen, setBottomFeatureTrayOpen] = useState(false);
   const [panelWidths, setPanelWidths] = useState<Record<string, number>>({});
-  const [pinnedRightPanelIds, setPinnedRightPanelIds] = useState<string[]>([]);
-
-  // Load pinned panels from session settings on mount
-  useEffect(() => {
+  const [pinnedRightPanelIds, setPinnedRightPanelIds] = useState<string[]>(() => {
     const saved = localStorage.getItem(PINNED_RIGHT_PANELS_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as string[];
-        if (Array.isArray(parsed)) {
-          setPinnedRightPanelIds(parsed);
-        }
-      } catch {
-        // Ignore parse errors
-      }
+    if (!saved) {
+      return [];
     }
-  }, []);
+    try {
+      const parsed = JSON.parse(saved) as unknown;
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+    } catch {
+      return [];
+    }
+  });
   const rightPanelResizeRef = useRef<{
     panelId: string;
     startX: number;
@@ -260,42 +256,41 @@ function AppSessionViewerPane({
   const terminalDescription = t("terminal.sessionDescription", "Session shell");
   // Pin/unpin handlers for right panel items
   const pinRightPanel = useCallback((panelId: string) => {
-    setPinnedRightPanelIds((prev) => {
-      if (prev.includes(panelId)) return prev;
-      const next = [...prev, panelId];
-      return next;
-    });
+    setPinnedRightPanelIds((prev) => (prev.includes(panelId) ? prev : [...prev, panelId]));
   }, []);
 
   const unpinRightPanel = useCallback((panelId: string) => {
-    setPinnedRightPanelIds((prev) => {
-      const next = prev.filter((id) => id !== panelId);
-      // If panel was open, close it when unpinning
-      if (activePanelId === panelId) {
-        setActivePanelId(null);
-      }
-      return next;
-    });
-  }, [activePanelId]);
+    setPinnedRightPanelIds((prev) => prev.filter((id) => id !== panelId));
+    setActivePanelId((prev) => (prev === panelId ? null : prev));
+  }, []);
+
+  const validPinnedRightPanelIds = useMemo(() => {
+    const availablePanelIds = new Set(rightPanelToolbarItems.map((item) => item.panelId).filter(Boolean));
+    return pinnedRightPanelIds.filter((id, index) => availablePanelIds.has(id) && pinnedRightPanelIds.indexOf(id) === index);
+  }, [pinnedRightPanelIds, rightPanelToolbarItems]);
+
+  useEffect(() => {
+    if (validPinnedRightPanelIds.length !== pinnedRightPanelIds.length
+      || validPinnedRightPanelIds.some((id, index) => id !== pinnedRightPanelIds[index])) {
+      setPinnedRightPanelIds(validPinnedRightPanelIds);
+    }
+  }, [pinnedRightPanelIds, validPinnedRightPanelIds]);
 
   // Save pinned panels when changed
   useEffect(() => {
-    localStorage.setItem(PINNED_RIGHT_PANELS_KEY, JSON.stringify(pinnedRightPanelIds));
-  }, [pinnedRightPanelIds]);
+    localStorage.setItem(PINNED_RIGHT_PANELS_KEY, JSON.stringify(validPinnedRightPanelIds));
+  }, [validPinnedRightPanelIds]);
 
   // Split into pinned and unpinned items
   const { pinnedRightItems, unpinnedRightItems } = useMemo(() => {
-    const pinned: typeof rightPanelToolbarItems = [];
-    const unpinned: typeof rightPanelToolbarItems = [];
-    for (const item of rightPanelToolbarItems) {
-      if (item.panelId && pinnedRightPanelIds.includes(item.panelId)) {
-        pinned.push(item);
-      } else {
-        unpinned.push(item);
-      }
-    }
+    const itemsByPanelId = new Map(rightPanelToolbarItems.map((item) => [item.panelId, item]));
+    const pinned = validPinnedRightPanelIds
+      .map((panelId) => itemsByPanelId.get(panelId))
+      .filter((item): item is PsmSessionToolbarItemRuntimeRegistration => Boolean(item));
+    const pinnedPanelIds = new Set(validPinnedRightPanelIds);
+    const unpinned = rightPanelToolbarItems.filter((item) => !item.panelId || !pinnedPanelIds.has(item.panelId));
     return { pinnedRightItems: pinned, unpinnedRightItems: unpinned };
-  }, [rightPanelToolbarItems, pinnedRightPanelIds]);
+  }, [rightPanelToolbarItems, validPinnedRightPanelIds]);
 
   const rightFeatureItems = useMemo<SessionFeatureItem[]>(() => unpinnedRightItems.map((item) => ({
     id: item.id,
@@ -305,13 +300,11 @@ function AppSessionViewerPane({
     active: item.panelId ? activePanelId === item.panelId : false,
     onSelect: () => {
       if (item.panelId) {
-        // Open panel and pin it
         togglePanel(item.panelId);
-        pinRightPanel(item.panelId);
       }
     },
     icon: <PanelRightOpen className="h-4 w-4" aria-hidden="true" />,
-  })), [activePanelId, openPanelDescription, unpinnedRightItems, togglePanel, pinRightPanel]);
+  })), [activePanelId, openPanelDescription, unpinnedRightItems, togglePanel]);
   const bottomFeatureItems = useMemo<SessionFeatureItem[]>(() => {
     const items: SessionFeatureItem[] = bottomPanelToolbarItems.map((item) => ({
       id: item.id,
@@ -425,6 +418,9 @@ function AppSessionViewerPane({
   const featureToggleInactiveClass = "text-muted-foreground";
   const rightFeatureToggleLabel = t("session.toolbar.rightPanelButtons", "Right panel buttons");
   const bottomFeatureToggleLabel = t("session.toolbar.sessionFeatures", "Session features");
+  const pinToToolbarLabel = t("session.toolbar.pinToToolbar", "Pin to toolbar");
+  const unpinFromToolbarLabel = t("session.toolbar.unpinFromToolbar", "Unpin from toolbar");
+  const dragPinnedPanelLabel = t("session.toolbar.dragPinnedPanel", "Drag to reorder");
 
   const sessionToolbarSlot = useMemo(() => {
     const singleBottomItem = bottomFeatureItems.length === 1 ? bottomFeatureItems[0] : null;
@@ -456,16 +452,14 @@ function AppSessionViewerPane({
             <TerminalIcon className="h-3.5 w-3.5" />
           </button>
         )}
-        {/* Pinned right panel items - shown as individual draggable buttons with unpin */}
         <SortablePinnedPanels
           items={pinnedRightItems}
           activePanelId={activePanelId}
-          onToggle={togglePanel}
           onUnpin={unpinRightPanel}
-          featureToggleClass={featureToggleClass}
-          featureToggleActiveClass={featureToggleActiveClass}
-          featureToggleInactiveClass={featureToggleInactiveClass}
           onReorder={setPinnedRightPanelIds}
+          renderItem={renderToolbarItem}
+          unpinLabel={unpinFromToolbarLabel}
+          dragLabel={dragPinnedPanelLabel}
         />
         {rightFeatureItems.length > 0 && (
           <button
@@ -485,9 +479,7 @@ function AppSessionViewerPane({
     bottomFeatureItems,
     bottomFeatureToggleLabel,
     bottomFeatureTrayOpen,
-    featureToggleActiveClass,
-    featureToggleClass,
-    featureToggleInactiveClass,
+    dragPinnedPanelLabel,
     pinnedRightItems,
     renderToolbarItem,
     rightFeatureItems.length,
@@ -495,8 +487,8 @@ function AppSessionViewerPane({
     rightFeatureToggleLabel,
     slots?.right,
     toggleBottomFeatureTray,
-    togglePanel,
     toggleRightFeaturePanel,
+    unpinFromToolbarLabel,
     activePanelId,
     toolbarSlotItems,
   ]);
@@ -530,6 +522,7 @@ function AppSessionViewerPane({
               }}
               className={`psm-session-feature-card psm-session-feature-card--side ${item.active ? "psm-session-feature-card--active" : ""}`}
               aria-pressed={item.active}
+              aria-label={item.title}
             >
               {item.icon}
               <span className="psm-session-feature-card__title">{item.title}</span>
@@ -545,8 +538,8 @@ function AppSessionViewerPane({
                 }
               }}
               className="psm-session-feature-card__pin-button"
-              aria-label={t("session.toolbar.pinToToolbar", "Pin to toolbar")}
-              title={t("session.toolbar.pinToToolbar", "Pin to toolbar")}
+              aria-label={`${pinToToolbarLabel}: ${item.title}`}
+              title={`${pinToToolbarLabel}: ${item.title}`}
             >
               <Pin className="h-3 w-3" />
             </button>
@@ -554,7 +547,7 @@ function AppSessionViewerPane({
         ))}
       </div>
     </aside>
-  ) : null), [handleRightPanelResizePointerDown, rightFeatureItems, rightFeaturePanelWidth, rightFeaturePickerOpen, t]);
+  ) : null), [activePanelId, handleRightPanelResizePointerDown, pinRightPanel, pinToToolbarLabel, rightFeatureItems, rightFeaturePanelWidth, rightFeaturePickerOpen, t]);
 
   const bottomFeatureTray = useMemo(() => (bottomFeatureTrayOpen && bottomFeatureItems.length > 1 ? (
     <div className="psm-session-bottom-features" data-no-window-drag>

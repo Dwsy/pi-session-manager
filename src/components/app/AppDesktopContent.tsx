@@ -12,6 +12,7 @@ export interface AppDesktopContentProps {
   sidebarVisible?: boolean;
   onToggleSidebar?: () => void;
   toggleSidebarTitle?: string;
+  hasTopToolbar?: boolean;
 }
 
 function AppDesktopContent({
@@ -23,6 +24,7 @@ function AppDesktopContent({
   sidebarVisible = true,
   onToggleSidebar,
   toggleSidebarTitle = "Show sidebar",
+  hasTopToolbar = false,
 }: AppDesktopContentProps) {
   const hideMainContent = showTerminal && terminalMaximized;
   const enableWindowDrag = isTauriRuntime && shouldUseTauriDragRegion();
@@ -56,7 +58,11 @@ function AppDesktopContent({
           <Menu className="h-4 w-4" aria-hidden="true" />
         </button>
       )}
-      <div className="app-desktop-content__shell flex-1 overflow-hidden flex flex-col">
+      <div
+        className={`app-desktop-content__shell flex-1 overflow-hidden flex flex-col ${
+          !sidebarVisible && !hasTopToolbar ? "pt-10" : ""
+        }`}
+      >
         <div
           className="app-desktop-content__main flex-1 overflow-hidden"
           style={{ display: hideMainContent ? "none" : undefined }}

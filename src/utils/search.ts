@@ -27,6 +27,47 @@ export interface ParsedLeadingSourceFilterToken {
 }
 
 const SEARCH_HIGHLIGHT_MARKUP = '<mark class="search-highlight">'
+
+// ── Single-value memoization for hot-path query parsing ────────────────────
+let _cachedQuotedQueryInput = ''
+let _cachedQuotedQueryResult: ParsedQuotedQuery | null = null
+
+function getCachedParsedQuotedQuery(query: string): ParsedQuotedQuery {
+  if (query !== _cachedQuotedQueryInput || !_cachedQuotedQueryResult) {
+    _cachedQuotedQueryInput = query
+    _cachedQuotedQueryResult = parseQuotedQuery(query)
+  }
+  return _cachedQuotedQueryResult
+}
+
+let _cachedRegexQueryInput = ''
+let _cachedRegexSource: string | null = null
+let _cachedRegexFlags = ''
+
+function getCachedSearchRegex(searchQuery: string): RegExp | null {
+  if (searchQuery !== _cachedRegexQueryInput || _cachedRegexSource === null) {
+    _cachedRegexQueryInput = searchQuery
+    const regex = getSearchRegex(searchQuery)
+    if (regex) {
+      _cachedRegexSource = regex.source
+      _cachedRegexFlags = regex.flags
+    } else {
+      _cachedRegexSource = null
+      _cachedRegexFlags = ''
+    }
+  }
+  // Always return a fresh RegExp to avoid stateful lastIndex issues
+  return _cachedRegexSource ? new RegExp(_cachedRegexSource, _cachedRegexFlags) : null
+}
+
+// ── HTML entity decoding (DOM-free) ────────────────────────────────────────
+const HTML_ENTITY_MAP: Record<string, string> = {
+  '&amp;': '&', '&lt;': '<', '&gt;': '>',
+  '&quot;': '"', '&#039;': "'", '&#x27;': "'", '&apos;': "'",
+  '&#39;': "'", '&nbsp;': ' ',
+}
+const HTML_ENTITY_REGEX = /&(?:amp|lt|gt|quot|nbsp|#039|#x27|apos|#39);/g
+const HTML_NUMERIC_ENTITY_REGEX = /&#(\d+);/g
 const SOURCE_FILTER_TOKEN_TO_VALUE = {
   '#all': 'all',
   '#labels': 'labels_only',
@@ -168,7 +209,7 @@ export function applyLeadingSourceFilterToken(
  * Get lowercased search terms for matching/highlighting
  */
 export function getQueryTerms(searchQuery: string): string[] {
-  const parsed = parseQuotedQuery(searchQuery)
+  const parsed = getCachedParsedQuotedQuery(searchQuery)
   if (!parsed.hasPhrases) {
     const trimmed = parsed.remainder.trim()
     return trimmed ? [trimmed.toLowerCase()] : []
@@ -220,13 +261,17 @@ export function collectSearchMatches(
  * @param searchQuery - Search query
  * @returns Highlighted HTML string
  */
-export function highlightSearchInHTML(html: string, searchQuery: string): string {
-  const regex = getSearchRegex(searchQuery)
+export function highlightSearchInHTML(
+  html: string,
+  searchQuery: string,
+  preCalculatedPlainText?: string,
+): string {
+  const regex = getCachedSearchRegex(searchQuery)
   if (!regex) {
     return html
   }
 
-  const searchableText = extractTextFromHTML(html)
+  const searchableText = preCalculatedPlainText ?? extractTextFromHTML(html)
   if (!containsSearchQuery(searchableText, searchQuery)) {
     return html
   }
@@ -250,9 +295,26 @@ export function highlightSearchInHTML(html: string, searchQuery: string): string
   return processedHtml
 }
 
-export function countSearchHighlightsInHTML(html: string, searchQuery: string): number {
-  const highlightedHtml = highlightSearchInHTML(html, searchQuery)
-  return highlightedHtml.split(SEARCH_HIGHLIGHT_MARKUP).length - 1
+/**
+ * Count search matches in HTML without building the full highlighted string.
+ * Strips HTML tags and counts regex matches on text-only content.
+ */
+export function countSearchHighlightsInHTML(
+  html: string,
+  searchQuery: string,
+  preCalculatedPlainText?: string,
+): number {
+  const regex = getCachedSearchRegex(searchQuery)
+  if (!regex) return 0
+
+  const searchableText = preCalculatedPlainText ?? extractTextFromHTML(html)
+  if (!containsSearchQuery(searchableText, searchQuery)) return 0
+
+  // Strip HTML tags and count regex matches on text-only content
+  const textOnly = html.replace(/<[^>]+>/g, '')
+  let count = 0
+  while (regex.exec(textOnly) !== null) count++
+  return count
 }
 
 export function countSearchHighlightsInText(text: string, searchQuery: string): number {
@@ -271,7 +333,7 @@ export function containsSearchQuery(text: string, searchQuery: string): boolean 
   }
 
   const textLower = text.toLowerCase()
-  const parsed = parseQuotedQuery(searchQuery)
+  const parsed = getCachedParsedQuotedQuery(searchQuery)
 
   if (!parsed.hasPhrases) {
     const trimmed = parsed.remainder.trim().toLowerCase()
@@ -289,13 +351,12 @@ export function containsSearchQuery(text: string, searchQuery: string): boolean 
 }
 
 /**
- * Extract plain-text message content (for search)
- * @param html - HTML string
- * @returns Plain text
+ * Extract plain-text from HTML without DOM operations.
+ * Strips tags, decodes common HTML entities via regex.
  */
 export function extractTextFromHTML(html: string): string {
   const text = html.replace(/<[^>]+>/g, ' ')
-  const textarea = document.createElement('textarea')
-  textarea.innerHTML = text
-  return textarea.value
+  return text
+    .replace(HTML_ENTITY_REGEX, (m) => HTML_ENTITY_MAP[m] ?? m)
+    .replace(HTML_NUMERIC_ENTITY_REGEX, (_, code) => String.fromCharCode(Number(code)))
 }

@@ -8,9 +8,10 @@ import { Copy, Check } from 'lucide-react'
 interface CompactionProps {
   tokensBefore?: number
   summary?: string
+  searchQuery?: string
 }
 
-export default function Compaction({ tokensBefore, summary }: CompactionProps) {
+export default function Compaction({ tokensBefore, summary, searchQuery = '' }: CompactionProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -31,6 +32,12 @@ export default function Compaction({ tokensBefore, summary }: CompactionProps) {
     document.addEventListener('selectionchange', handleSelectionChange)
     return () => document.removeEventListener('selectionchange', handleSelectionChange)
   }, [])
+
+  useEffect(() => {
+    if (searchQuery.trim() && summary && summary.toLowerCase().includes(searchQuery.toLowerCase())) {
+      setExpanded(true)
+    }
+  }, [searchQuery, summary])
 
   const handleToggle = () => {
     if (!isSelecting.current) {
@@ -88,7 +95,7 @@ export default function Compaction({ tokensBefore, summary }: CompactionProps) {
             </button>
           )}
         </div>
-        {summary ? <MarkdownContent content={summary} /> : null}
+        {summary ? <MarkdownContent content={summary} searchQuery={searchQuery} /> : null}
       </div>
     </div>
   )

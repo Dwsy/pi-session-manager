@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CheckCircle2, Circle, Search, Sparkles } from "lucide-react";
+import { BarChart3, CheckCircle2, Circle, Cpu, Search, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import SettingsCard from "@/components/settings/SettingsCard";
@@ -109,6 +109,23 @@ export default function ExternalSessionsSettings({
       onChange: (checked) =>
         onUpdate("session", "showAgentIconInSessionBadge", checked),
       searchKey: "external-sessions-showAgentIcon",
+    },
+    {
+      id: "model-icon",
+      kind: "toggle",
+      icon: <Cpu />,
+      title: t(
+        "settings.externalSessions.showModelIconInSessionBadge",
+        "Show model icons in SessionBadge",
+      ),
+      description: t(
+        "settings.externalSessions.showModelIconInSessionBadgeHelp",
+        "Display icons for the top 2 models used in session card badges.",
+      ),
+      checked: settings.session.showModelIconInSessionBadge === true,
+      onChange: (checked) =>
+        onUpdate("session", "showModelIconInSessionBadge", checked),
+      searchKey: "external-sessions-showModelIcon",
     },
   ];
 

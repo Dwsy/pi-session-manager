@@ -130,6 +130,7 @@ export function renderSessionEntry(
           key={entry.id}
           tokensBefore={entry.tokensBefore}
           summary={entry.summary}
+          searchQuery={searchQuery}
         />
       );
 

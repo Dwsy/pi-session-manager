@@ -8,7 +8,11 @@ import {
 } from '@/plugins/tools-render/utils/searchSegments'
 import { toolRenderRegistry } from '@/plugins/tools-render/registry'
 import { defaultResolveData } from '@/plugins/tools-render/utils/resolveData'
-import { countSearchHighlightsInHTML } from '@/utils/search'
+import {
+  countSearchHighlightsInHTML,
+  extractTextFromHTML,
+  containsSearchQuery,
+} from '@/utils/search'
 
 export type SessionSearchScope = 'all' | 'messages' | 'user'
 
@@ -45,26 +49,158 @@ export interface UseSessionViewerInMessageSearchResult {
   goToPreviousMatch: () => void
 }
 
-function getUserSearchHtmlSegments(content: Content[]): string[] {
+export interface SearchableSegment {
+  html: string
+  readonly plainText: string
+}
+
+/**
+ * Create a SearchableSegment with lazy plainText extraction.
+ * The plainText is only computed on first access, avoiding
+ * unnecessary work when the segment is never searched.
+ */
+function createSearchableSegment(html: string): SearchableSegment {
+  let _plainText: string | undefined
+  return {
+    html,
+    get plainText() {
+      if (_plainText === undefined) {
+        _plainText = extractTextFromHTML(html)
+      }
+      return _plainText
+    }
+  }
+}
+
+function getUserSearchSegments(content: Content[]): SearchableSegment[] {
   const userText = content
     .filter((item) => item.type === 'text' && item.text)
     .map((item) => item.text)
     .join('\n')
 
-  return userText.trim() ? [parseMarkdown(userText)] : []
+  if (!userText.trim()) {
+    return []
+  }
+
+  const html = parseMarkdown(userText)
+  return [createSearchableSegment(html)]
+}
+
+function getCachedUserSegments(
+  entry: SessionEntry,
+  cache: WeakMap<SessionEntry, any>
+): SearchableSegment[] {
+  let cached = cache.get(entry)
+  if (!cached) {
+    cached = {}
+    cache.set(entry, cached)
+  }
+
+  if (cached.userSegments) {
+    return cached.userSegments
+  }
+
+  if (!entry.message) {
+    cached.userSegments = []
+    return []
+  }
+
+  const segments = getUserSearchSegments(entry.message.content)
+  cached.userSegments = segments
+  return segments
+}
+
+function getCachedAssistantTextSegments(
+  entry: SessionEntry,
+  showThinking: boolean,
+  cache: WeakMap<SessionEntry, any>
+): SearchableSegment[] {
+  let cached = cache.get(entry)
+  if (!cached) {
+    cached = {}
+    cache.set(entry, cached)
+  }
+
+  const cacheKey = showThinking ? 'withThinking' : 'withoutThinking'
+  if (cached[cacheKey]) {
+    return cached[cacheKey]
+  }
+
+  if (!entry.message) {
+    cached[cacheKey] = []
+    return []
+  }
+
+  const { thinkingBlocks, textBlocks } = getAssistantDisplayedBlocks(
+    entry.message.content,
+  )
+  const visibleBlocks = [
+    ...(showThinking ? thinkingBlocks : []),
+    ...textBlocks,
+  ]
+
+  const segments: SearchableSegment[] = visibleBlocks
+    .map((block) => {
+      const html = parseMarkdown(block)
+      if (!html) return null
+      return createSearchableSegment(html)
+    })
+    .filter((s): s is SearchableSegment => s !== null)
+
+  cached[cacheKey] = segments
+  return segments
+}
+
+function getCachedToolCallSegments(
+  toolCall: Content,
+  index: number,
+  toolResultByCallId: Map<string, SessionEntry>,
+  toolCache: WeakMap<Content, { segments: SearchableSegment[]; resultRef?: SessionEntry }>
+): SearchableSegment[] {
+  const currentResultRef = toolCall.toolCallId ? toolResultByCallId.get(toolCall.toolCallId) : undefined
+  const cached = toolCache.get(toolCall)
+
+  if (cached && cached.resultRef === currentResultRef) {
+    return cached.segments
+  }
+
+  const htmlSegments = getSearchableToolCallRenderedHtmlSegments(
+    toolCall,
+    index,
+    toolResultByCallId,
+  )
+
+  const segments: SearchableSegment[] = htmlSegments.map((html) =>
+    createSearchableSegment(html)
+  )
+
+  toolCache.set(toolCall, {
+    segments,
+    resultRef: currentResultRef,
+  })
+
+  return segments
 }
 
 function getSearchMatchEntries(
   rowEntryId: string,
   matchElementId: string,
-  renderedHtmlSegments: string[],
+  segments: SearchableSegment[],
   searchQuery: string,
 ): SessionSearchMatch[] {
   const matches: SessionSearchMatch[] = []
   let occurrenceIndexInElement = 0
 
-  for (const renderedHtml of renderedHtmlSegments) {
-    const segmentMatchCount = countSearchHighlightsInHTML(renderedHtml, searchQuery)
+  for (const segment of segments) {
+    if (!containsSearchQuery(segment.plainText, searchQuery)) {
+      continue
+    }
+
+    const segmentMatchCount = countSearchHighlightsInHTML(
+      segment.html,
+      searchQuery,
+      segment.plainText,
+    )
     if (segmentMatchCount === 0) {
       continue
     }
@@ -89,24 +225,18 @@ function getAssistantSearchMatches(
   searchQuery: string,
   searchScope: SessionSearchScope,
   toolResultByCallId: Map<string, SessionEntry>,
+  cache: WeakMap<SessionEntry, any>,
+  toolCache: WeakMap<Content, { segments: SearchableSegment[]; resultRef?: SessionEntry }>,
 ): SessionSearchMatch[] {
   if (!entry.message) {
     return []
   }
 
-  const { thinkingBlocks, textBlocks } = getAssistantDisplayedBlocks(
-    entry.message.content,
-  )
-  const visibleBlocks = [
-    ...(showThinking ? thinkingBlocks : []),
-    ...textBlocks,
-  ]
+  const textSegments = getCachedAssistantTextSegments(entry, showThinking, cache)
   const textMatches = getSearchMatchEntries(
     entry.id,
     entry.id,
-    visibleBlocks
-      .map((block) => parseMarkdown(block))
-      .filter(Boolean),
+    textSegments,
     searchQuery,
   )
 
@@ -125,14 +255,17 @@ function getAssistantSearchMatches(
         toolResultByCallId
       ) ?? defaultResolveData(toolCall, index, toolResultByCallId)
 
+      const toolSegments = getCachedToolCallSegments(
+        toolCall,
+        index,
+        toolResultByCallId,
+        toolCache,
+      )
+
       return getSearchMatchEntries(
         entry.id,
         resolvedData.entryId,
-        getSearchableToolCallRenderedHtmlSegments(
-          toolCall,
-          index,
-          toolResultByCallId,
-        ),
+        toolSegments,
         searchQuery,
       )
     })
@@ -151,6 +284,8 @@ export function useSessionViewerInMessageSearch({
   const [searchScope, setSearchScopeState] = useState<SessionSearchScope>('all')
   const [currentMatchIndex, setCurrentMatchIndex] = useState(-1)
   const previousSearchSignatureRef = useRef('')
+  const cacheRef = useRef<WeakMap<SessionEntry, any>>(new WeakMap())
+  const toolCacheRef = useRef<WeakMap<Content, { segments: SearchableSegment[]; resultRef?: SessionEntry }>>(new WeakMap())
 
   const matches = useMemo<SessionSearchMatch[]>(() => {
     if (!searchQuery.trim()) {
@@ -163,10 +298,11 @@ export function useSessionViewerInMessageSearch({
       }
 
       if (entry.message.role === 'user') {
+        const userSegments = getCachedUserSegments(entry, cacheRef.current)
         return getSearchMatchEntries(
           entry.id,
           entry.id,
-          getUserSearchHtmlSegments(entry.message.content),
+          userSegments,
           searchQuery,
         )
       }
@@ -182,6 +318,8 @@ export function useSessionViewerInMessageSearch({
           searchQuery,
           searchScope,
           toolResultByCallId,
+          cacheRef.current,
+          toolCacheRef.current,
         )
       }
 
@@ -195,6 +333,8 @@ export function useSessionViewerInMessageSearch({
     setSearchQueryState('')
     setSearchScopeState('all')
     setCurrentMatchIndex(-1)
+    cacheRef.current = new WeakMap()
+    toolCacheRef.current = new WeakMap()
   }, [sessionPath])
 
   useEffect(() => {

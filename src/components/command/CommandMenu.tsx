@@ -123,7 +123,7 @@ export default memo(function CommandMenu({
     }
 
     const prefix = query.toLowerCase();
-    const filters: FullTextSearchSourceFilter[] = ["labels_only"];
+    const filters: FullTextSearchSourceFilter[] = ["labels_only", "content_only"];
     return filters.filter(
       (value) =>
         formatSourceFilterToken(value).startsWith(prefix) &&

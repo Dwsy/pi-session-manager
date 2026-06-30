@@ -15,6 +15,7 @@ import { useRouteSync } from "./hooks/useRouteSync";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSwipe } from "./hooks/useSwipe";
 import { triggerHaptic } from "./utils/haptics";
+import { isMacPlatform } from "./utils/platformShortcuts";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useDeepLink } from "./hooks/useDeepLink";
 import { useSessionBadges } from "./hooks/useSessionBadges";
@@ -50,10 +51,12 @@ import {
 import { invoke, isTauri } from "./transport";
 import { getCachedSettings } from "./utils/settingsApi";
 import { getSessionSourceSlug } from "./utils/session";
+import { getPathBasename, pathsEqual } from "./utils/path";
 import {
   buildPiResumeCommand,
   buildPiForkCommand,
   buildCopyResumeCommandForTarget,
+  buildChangeDirAndRun,
   getConfiguredExternalResumeTarget,
   getFallbackExternalResumeTarget,
 } from "./utils/sessionResume";
@@ -596,7 +599,7 @@ function App() {
       return {
         key: `project:${selectedProject}`,
         cwd: selectedProject,
-        label: selectedProject.split("/").pop() || selectedProject,
+        label: getPathBasename(selectedProject) || selectedProject,
       };
     }
     return {
@@ -610,7 +613,7 @@ function App() {
       const existing = prev[scope.key];
       if (
         existing &&
-        existing.cwd === scope.cwd &&
+        pathsEqual(existing.cwd, scope.cwd) &&
         existing.label === scope.label
       ) {
         return prev;
@@ -747,7 +750,7 @@ function App() {
           scopeOverride ?? {
             key: `cwd:${cwd || path || "workspace"}`,
             cwd: cwd || "/",
-            label: cwd.split("/").pop() || "Terminal",
+            label: getPathBasename(cwd) || "Terminal",
           },
           commandOverride || "",
         );
@@ -787,8 +790,8 @@ function App() {
         "convert_session_format",
         {
           path: session.path,
-          target_format: target,
-          dry_run: false,
+          targetFormat: target,
+          dryRun: false,
           force: false,
         },
       );
@@ -849,15 +852,15 @@ function App() {
           {
             key: `cwd:${cwd || "workspace"}`,
             cwd: cwd || "/",
-            label: cwd.split("/").pop() || "Terminal",
+            label: getPathBasename(cwd) || "Terminal",
           },
-          cwd ? `cd "${cwd}" && pi` : "pi",
+          cwd ? buildChangeDirAndRun(cwd, "pi") : "pi",
         );
         return;
       }
       // Build new session command: cd to folder, then pi (no --session)
       const piCommand = piPath || "pi";
-      const command = cwd ? `cd "${cwd}" && ${piCommand}` : piCommand;
+      const command = cwd ? buildChangeDirAndRun(cwd, piCommand) : piCommand;
       try {
         await invoke("open_session_in_terminal", {
           path: "",
@@ -1399,7 +1402,7 @@ function App() {
       currentDatasetId={standaloneDatasetId || DEFAULT_STANDALONE_DATASET_ID}
       sessions={
         selectedProject
-          ? filteredSessions.filter((session) => session.cwd === selectedProject)
+          ? filteredSessions.filter((session) => pathsEqual(session.cwd, selectedProject))
           : filteredSessions
       }
       selectedProject={selectedProject}
@@ -1744,6 +1747,7 @@ function App() {
         className="app-shell flex flex-col h-screen-safe bg-background text-foreground"
         data-runtime={appRuntime}
         data-sidebar-collapsed={!sidebarVisible}
+        data-os={isMacPlatform() ? "macos" : "other"}
       >
         <ConnectionBanner />
 
@@ -1797,6 +1801,7 @@ function App() {
             sidebarVisible={sidebarVisible}
             onToggleSidebar={() => setSidebarVisible((prev) => !prev)}
             toggleSidebarTitle={sidebarVisible ? t("app.sidebar.hideSidebar", "Hide sidebar") : t("app.sidebar.showSidebar", "Show sidebar")}
+            hasTopToolbar={!!selectedSession}
           />
 
           {renderOverlays()}

@@ -14,6 +14,7 @@ import {
 import './i18n'
 import './styles/index.less'
 import { isTauri } from './transport'
+import { isMacPlatform } from './utils/platformShortcuts'
 
 const SETTINGS_CACHE_KEY = 'pi-session-manager-settings'
 const LANGUAGE_KEY = 'app-language'
@@ -111,9 +112,12 @@ if (shouldBootstrapStandaloneDatasetSettings()) {
   clearDemoServiceWorkerAndCaches()
 }
 
-// Set titlebar height for Tauri desktop (drag region)
+// Set titlebar height for Tauri desktop (drag region) and clear macOS native title overlay
 if (isTauri()) {
   document.documentElement.style.setProperty('--titlebar-height', '32px')
+  if (isMacPlatform()) {
+    document.title = ''
+  }
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

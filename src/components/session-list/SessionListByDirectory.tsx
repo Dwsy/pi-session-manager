@@ -201,7 +201,7 @@ export default function SessionListByDirectory({
               ref={rowVirtualizer.measureElement}
               onClick={() => onSelectSession(session)}
               title={hoverTitle}
-              className={`px-3 py-2.5 cursor-pointer motion-color group pl-5 border-b border-border/20 ${
+              className={`px-3 py-2.5 cursor-pointer select-none motion-color group pl-5 border-b border-border/20 ${
                 selectedSession?.id === session.id ? 'bg-surface' : 'hover:bg-surface'
               }`}
               style={{

@@ -137,6 +137,8 @@ export default function SessionList({
   const { copyText } = useClipboard();
   const showAgentIconInBadge =
     getSessionSetting("showAgentIconInSessionBadge") !== false;
+  const showModelIconInBadge =
+    getSessionSetting("showModelIconInSessionBadge") === true;
   const listContainerRef = useRef<HTMLDivElement>(null);
   const [columnCount, setColumnCount] = useState(1);
   const [hoveredCard, setHoveredCard] = useState<{ session: SessionInfo; rect: DOMRect } | null>(null);
@@ -776,6 +778,11 @@ export default function SessionList({
                     const badgeType = getBadgeType
                       ? getBadgeType(session.id)
                       : null;
+                    const topModels = session.models?.length
+                      ? session.models.slice(0, 2)
+                      : session.model
+                      ? [session.model]
+                      : [];
 
                     return (
                       <div
@@ -820,7 +827,7 @@ export default function SessionList({
                             sessionId: session.id,
                           });
                         }}
-                        className={`relative px-3 py-2.5 motion-surface motion-color group rounded-lg overflow-clip border ${
+                        className={`relative px-3 py-2.5 motion-surface motion-color group rounded-lg overflow-clip border select-none cursor-pointer ${
                           isSelected
                             ? isSelectionMode
                               ? "border-primary/60 bg-primary/10 shadow-[0_0_0_1px_rgba(59,130,246,0.22)] ring-1 ring-primary/30"
@@ -949,6 +956,16 @@ export default function SessionList({
                                 className="text-[9px] sm:text-[10px]"
                               />
                             )}
+                            {showModelIconInBadge &&
+                              topModels.map((m) => (
+                                <SessionBadge
+                                  key={m}
+                                  type="model"
+                                  model={m}
+                                  showIcon={true}
+                                  className="text-[9px] sm:text-[10px]"
+                                />
+                              ))}
                             <span className="px-1.5 py-0.5  text-[9px] sm:text-[10px] tabular-nums font-medium text-muted-foreground flex-shrink-0">
                               {session.message_count}
                             </span>

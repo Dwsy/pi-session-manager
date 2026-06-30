@@ -15,13 +15,10 @@ interface UserMessageProps {
   searchQuery?: string
 }
 
-const HEIGHT_THRESHOLD = 200
-
 function UserMessage({ id, timestamp, content, className = '', searchQuery = '' }: UserMessageProps) {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
-  const contentRef = useRef<HTMLDivElement>(null)
-  const [shouldShowExpand, setShouldShowExpand] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const { copyText } = useClipboard()
 
   const images = useMemo(
@@ -39,27 +36,6 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
     [textItems],
   )
 
-  // Measure content height to decide whether to show expand button
-  useEffect(() => {
-    if (!contentRef.current) return
-
-    const measureHeight = () => {
-      if (contentRef.current) {
-        const height = contentRef.current.scrollHeight
-        setShouldShowExpand(height > HEIGHT_THRESHOLD)
-      }
-    }
-
-    measureHeight()
-
-    const observer = new ResizeObserver(() => {
-      measureHeight()
-    })
-
-    observer.observe(contentRef.current)
-    return () => observer.disconnect()
-  }, [text])
-
   const handleCopy = useCallback(async () => {
     try {
       await copyText(text)
@@ -70,115 +46,116 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
     }
   }, [copyText, text])
 
+  const handleOpenModal = useCallback(() => setIsModalOpen(true), [])
+  const handleCloseModal = useCallback(() => setIsModalOpen(false), [])
+
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [isTruncated, setIsTruncated] = useState(false)
+
+  useEffect(() => {
+    const element = bodyRef.current
+    if (!element) return
+
+    const observer = new ResizeObserver(() => {
+      setIsTruncated(element.scrollHeight > element.clientHeight)
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [text])
+
   return (
-    <div className={`user-message ${className}`} id={`entry-${id}`}>
-      <div className="user-message-header">
-        <div className="user-message-meta">
-          <span className="user-message-role">{t('components.userMessage.you')}</span>
-          {timestamp && <span className="message-timestamp">{formatDate(timestamp)}</span>}
-        </div>
-        <div className="flex items-center gap-1">
-          {text.trim() && (
+    <>
+      <div className={`user-message ${className}`} id={`entry-${id}`}>
+        <div className="user-message-header">
+          <div className="user-message-meta">
+            <span className="user-message-role">{t('components.userMessage.you')}</span>
+            {timestamp && <span className="message-timestamp">{formatDate(timestamp)}</span>}
+          </div>
+          <div className="flex items-center gap-1">
+            {text.trim() && (
+              <button
+                onClick={e => {
+                  e.stopPropagation()
+                  void handleCopy()
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    void handleCopy()
+                  }
+                }}
+                className="tool-copy-button user-message-copy-button"
+                aria-label={
+                  copied
+                    ? t('components.userMessage.copied') || 'Copied'
+                    : t('components.userMessage.copyText') || 'Copy text'
+                }
+                title={copied ? t('components.userMessage.copied') || 'Copied!' : t('components.userMessage.copyText') || 'Copy text'}
+              >
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              </button>
+            )}
             <button
-              onClick={() => {
-                void handleCopy()
+              onClick={e => {
+                e.stopPropagation()
+                handleOpenModal()
               }}
-              onKeyDown={(e) => {
+              onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
-                  void handleCopy()
+                  e.stopPropagation()
+                  handleOpenModal()
                 }
               }}
               className="tool-copy-button user-message-copy-button"
-              aria-label={
-                copied
-                  ? t('components.userMessage.copied') || 'Copied'
-                  : t('components.userMessage.copyText') || 'Copy text'
-              }
-              title={copied ? t('components.userMessage.copied') || 'Copied!' : t('components.userMessage.copyText') || 'Copy text'}
+              aria-label={t('components.userMessage.expand') || 'Expand message'}
+              title={t('components.userMessage.expand') || 'Expand message'}
             >
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              <Maximize2 className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+
+        <div onClick={handleOpenModal} className="cursor-pointer">
+          {images.length > 0 && (
+            <div className="message-images">
+              {images.map((img, idx) => (
+                <img
+                  key={idx}
+                  src={`data:${img.mimeType};base64,${img.data}`}
+                  className="message-image"
+                  alt={t('components.userMessage.imageAlt')}
+                />
+              ))}
+            </div>
           )}
-          {shouldShowExpand && (
-            <ExpandButton
-              text={text}
-              images={images}
-              timestamp={timestamp}
-              searchQuery={searchQuery}
-            />
+
+          {text.trim() && (
+            <div
+              ref={bodyRef}
+              className={`user-message-body-truncated ${isTruncated ? 'is-truncated' : ''}`}
+            >
+              <MarkdownContent content={text} className="user-message-body" searchQuery={searchQuery} />
+            </div>
           )}
         </div>
       </div>
 
-      {images.length > 0 && (
-        <div className="message-images">
-          {images.map((img, idx) => (
-            <img
-              key={idx}
-              src={`data:${img.mimeType};base64,${img.data}`}
-              className="message-image"
-              alt={t('components.userMessage.imageAlt')}
-            />
-          ))}
-        </div>
-      )}
-
-      {text.trim() && (
-        <div ref={contentRef} className="user-message-body-truncated">
-          <MarkdownContent content={text} className="user-message-body" searchQuery={searchQuery} />
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Expand button opens the modal - separated to isolate hooks
-function ExpandButton({ text, images, timestamp, searchQuery }: {
-  text: string
-  images: { type: string; data?: string; mimeType?: string }[]
-  timestamp?: string
-  searchQuery?: string
-}) {
-  const { t } = useTranslation()
-  const [isOpen, setIsOpen] = useState(false)
-
-  const handleOpen = useCallback(() => setIsOpen(true), [])
-  const handleClose = useCallback(() => setIsOpen(false), [])
-
-  return (
-    <>
-      <button
-        onClick={handleOpen}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            handleOpen()
-          }
-        }}
-        className="tool-copy-button user-message-copy-button"
-        aria-label={t('components.userMessage.expand') || 'Expand message'}
-        title={t('components.userMessage.expand') || 'Expand message'}
-      >
-        <Maximize2 className="w-4 h-4" />
-      </button>
-
-      {isOpen && (
+      {isModalOpen && (
         <UserMessageModal
           text={text}
           images={images}
           timestamp={timestamp}
           searchQuery={searchQuery}
-          onClose={handleClose}
+          onClose={handleCloseModal}
         />
       )}
     </>
   )
 }
 
-// Modal component - isolated to prevent hook order issues
-// Rendered via portal at document.body so ancestors with `backdrop-filter` /
-// `transform` / `contain: paint` don't trap the fixed-positioned overlay.
+// Modal component - rendered via portal to avoid stacking context issues
 function UserMessageModal({ text, images, timestamp, searchQuery, onClose }: {
   text: string
   images: { type: string; data?: string; mimeType?: string }[]
@@ -189,7 +166,7 @@ function UserMessageModal({ text, images, timestamp, searchQuery, onClose }: {
   const { t } = useTranslation()
   const closeButtonRef = useRef<HTMLButtonElement>(null)
 
-  // Global ESC handler — focus may not always be inside the dialog.
+  // Global ESC handler
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -201,7 +178,7 @@ function UserMessageModal({ text, images, timestamp, searchQuery, onClose }: {
     return () => document.removeEventListener('keydown', handleKey)
   }, [onClose])
 
-  // Lock body scroll while modal is open and restore on close.
+  // Lock body scroll while modal is open
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
     const previousPaddingRight = document.body.style.paddingRight
@@ -216,43 +193,43 @@ function UserMessageModal({ text, images, timestamp, searchQuery, onClose }: {
     }
   }, [])
 
-  // Auto-focus close button for keyboard users.
+  // Auto-focus close button
   useEffect(() => {
     closeButtonRef.current?.focus()
   }, [])
 
   const modal = (
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md motion-overlay-enter"
-      onClick={(e) => {
+      className="user-message-modal-overlay motion-overlay-enter"
+      onClick={e => {
         if (e.target === e.currentTarget) onClose()
       }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="user-message-modal-title"
     >
-      <div className="flex h-[80vh] w-[80vw] max-w-5xl flex-col overflow-hidden rounded-xl border border-border/70 bg-surface-dark/95 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl motion-overlay-surface-enter">
-        <div className="flex items-start justify-between gap-4 border-b border-border/60 bg-surface-dark/55 px-6 py-4">
-          <div className="min-w-0">
-            <h3 id="user-message-modal-title" className="truncate text-base font-semibold text-foreground">
+      <div className="user-message-modal-container motion-overlay-surface-enter">
+        <div className="user-message-modal-header">
+          <div className="user-message-modal-title-area">
+            <h3 id="user-message-modal-title" className="user-message-modal-title">
               {t('components.userMessage.fullMessage') || 'Full Message'}
             </h3>
             {timestamp && (
-              <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(timestamp)}</p>
+              <p className="user-message-modal-subtitle">{formatDate(timestamp)}</p>
             )}
           </div>
           <button
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+            className="user-message-modal-close-btn"
             title={t('components.userMessage.close') || 'Close'}
             aria-label={t('components.userMessage.close') || 'Close'}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+        <div className="user-message-modal-body">
           {images.length > 0 && (
             <div className="message-images mb-4 flex flex-wrap gap-3">
               {images.map((img, idx) => (

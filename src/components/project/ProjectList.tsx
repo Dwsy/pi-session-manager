@@ -138,7 +138,7 @@ export default function ProjectList({
               key={project.dir}
               data-index={virtualRow.index}
               ref={projectsVirtualizer.measureElement}
-              className={`px-3 py-2 motion-surface motion-color border-b border-border/10 group ${isSelected ? "bg-info/10" : "hover:bg-background"}`}
+              className={`px-3 py-2 motion-surface motion-color border-b border-border/10 group select-none cursor-pointer ${isSelected ? "bg-info/10" : "hover:bg-background"}`}
               style={{
                 position: "absolute",
                 top: 0,
@@ -155,11 +155,11 @@ export default function ProjectList({
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <div className="p-0.5 rounded flex-shrink-0">
-                        {isFavorite ? (
-                          <Pin className="h-4 w-4 flex-shrink-0 text-yellow-500 fill-current" />
-                        ) : (
-                          <FolderOpen className="h-4 w-4 flex-shrink-0 text-blue-400" />
-                        )}
+                        <FolderOpen
+                          className={`h-4 w-4 flex-shrink-0 ${
+                            isFavorite ? "text-yellow-500" : "text-blue-400"
+                          }`}
+                        />
                       </div>
                       <div className="text-[13px] sm:text-sm font-medium truncate leading-tight">
                         {project.dirName}

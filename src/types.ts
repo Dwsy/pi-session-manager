@@ -17,6 +17,7 @@ export interface SessionInfo {
   isLive?: boolean
   pid?: number
   model?: string
+  models?: string[]
 }
 
 export interface DateRange {

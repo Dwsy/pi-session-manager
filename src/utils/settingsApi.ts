@@ -168,6 +168,8 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
       rawSession?.externalSessionsIncludeInSearch === true,
     showAgentIconInSessionBadge:
       rawSession?.showAgentIconInSessionBadge !== false,
+    showModelIconInSessionBadge:
+      rawSession?.showModelIconInSessionBadge === true,
     externalResumePromptEnabled:
       rawSession?.externalResumePromptEnabled !== false,
     defaultExternalResumeTarget: (

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const panelRenderSpy = vi.fn()
@@ -112,6 +112,19 @@ vi.mock('@/components/SessionViewer', () => ({
 
 import AppSessionViewerPane from './AppSessionViewerPane'
 
+const testSession = {
+  id: 'session-1',
+  path: '/tmp/session.jsonl',
+  cwd: '/tmp',
+  created: '2026-05-23T00:00:00Z',
+  modified: '2026-05-23T00:00:00Z',
+  message_count: 0,
+  first_message: '',
+  last_message: '',
+  last_message_role: 'assistant',
+  model: 'claude-4',
+}
+
 afterEach(() => {
   cleanup()
   localStorage.clear()
@@ -141,7 +154,7 @@ describe('AppSessionViewerPane', () => {
     )
 
     fireEvent.click(await screen.findByRole('button', { name: 'Right panel buttons' }))
-    fireEvent.click(await screen.findByRole('button', { name: /Test Toolbar/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Test Toolbar' }))
 
     expect((await screen.findByTestId('plugin-panel')).textContent).toBe('entry-42')
     expect(document.querySelector('.psm-session-right-feature-panel__grid')).toBeNull()
@@ -176,7 +189,7 @@ describe('AppSessionViewerPane', () => {
 
     expect(await screen.findByRole('button', { name: 'Right panel buttons' })).not.toBeNull()
     expect(await screen.findByRole('button', { name: 'Test Bottom' })).not.toBeNull()
-    expect(screen.queryByRole('button', { name: /Test Toolbar/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Test Toolbar' })).toBeNull()
   })
 
   it('expands right panel actions as a feature grid', async () => {
@@ -201,7 +214,7 @@ describe('AppSessionViewerPane', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Right panel buttons' }))
 
-    expect((await screen.findByRole('button', { name: /Test Toolbar/ })).closest('.psm-session-right-feature-panel__grid')).not.toBeNull()
+    expect((await screen.findByRole('button', { name: 'Test Toolbar' })).closest('.psm-session-right-feature-panel__grid')).not.toBeNull()
   })
 
   it('resizes the right feature panel with the resize handle', async () => {
@@ -321,5 +334,61 @@ describe('AppSessionViewerPane', () => {
         viewer: mockViewerController,
       }),
     )
+  })
+
+  it('opens a right panel from the picker without pinning it automatically', async () => {
+    render(<AppSessionViewerPane session={testSession} onExport={() => {}} slots={{}} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Right panel buttons' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Test Toolbar' }))
+
+    expect(await screen.findByTestId('plugin-panel')).not.toBeNull()
+    expect(localStorage.getItem('psm:session:pinnedRightPanels')).toBe('[]')
+    fireEvent.click(await screen.findByRole('button', { name: 'Right panel buttons' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Right panel buttons' }))
+    expect(await screen.findByRole('button', { name: 'Test Toolbar' })).not.toBeNull()
+  })
+
+  it('pins a right panel to the toolbar and renders the plugin toolbar item there', async () => {
+    render(<AppSessionViewerPane session={testSession} onExport={() => {}} slots={{}} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Right panel buttons' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Pin to toolbar: Test Toolbar' }))
+
+    expect(localStorage.getItem('psm:session:pinnedRightPanels')).toBe('["test.panel"]')
+    expect(await screen.findByTestId('plugin-toggle')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'Test Toolbar' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Pin to toolbar: Test Toolbar' })).toBeNull()
+
+    fireEvent.click(screen.getByTestId('plugin-toggle'))
+
+    expect(await screen.findByTestId('plugin-panel')).not.toBeNull()
+  })
+
+  it('unpins a toolbar panel, closes it, and returns it to the picker', async () => {
+    localStorage.setItem('psm:session:pinnedRightPanels', JSON.stringify(['test.panel']))
+    render(<AppSessionViewerPane session={testSession} onExport={() => {}} slots={{}} />)
+
+    fireEvent.click(await screen.findByTestId('plugin-toggle'))
+    expect(await screen.findByTestId('plugin-panel')).not.toBeNull()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Unpin from toolbar: Test Toolbar' }))
+
+    await waitFor(() => expect(screen.queryByTestId('plugin-toggle')).toBeNull())
+    await waitFor(() => expect(screen.queryByTestId('plugin-panel')).toBeNull())
+    expect(localStorage.getItem('psm:session:pinnedRightPanels')).toBe('[]')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Right panel buttons' }))
+    expect(await screen.findByRole('button', { name: 'Test Toolbar' })).not.toBeNull()
+  })
+
+  it('cleans unavailable pinned panel ids from storage', async () => {
+    localStorage.setItem('psm:session:pinnedRightPanels', JSON.stringify(['missing.panel', 'test.panel']))
+
+    render(<AppSessionViewerPane session={testSession} onExport={() => {}} slots={{}} />)
+
+    await waitFor(() => {
+      expect(localStorage.getItem('psm:session:pinnedRightPanels')).toBe('["test.panel"]')
+    })
   })
 })
