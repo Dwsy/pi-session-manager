@@ -111,12 +111,18 @@ const MAX_TERMINAL_SCOPES = 5;
 const GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY = [
   // Keep app-level navigation shortcuts available while typing, but do not
   // allow destructive or session-launch actions to fire from text inputs.
-  "cmd+l",
+  "cmd+1",
+  "cmd+2",
+  "cmd+shift+e",
+  "cmd+shift+g",
+  "cmd+shift+p",
   "cmd+p",
   "cmd+,",
   "cmd+`",
+  "cmd+j",
   "cmd+shift+f",
   "cmd+shift+i",
+  "cmd+alt+i",
   "cmd+shift+r",
   "cmd+alt+b",
   "f12",
@@ -916,8 +922,22 @@ function App() {
 
               void handleDeleteSession(selectedSession);
             },
+            "delete": () => {
+              if (!selectedSession || isBlockingShortcutOverlayOpen) {
+                return;
+              }
+
+              void handleDeleteSession(selectedSession);
+            },
           }),
       "cmd+1": () => {
+        setSidebarMode("list");
+        setActiveAppViewId(null);
+        setSelectedProject(null);
+        setShowFavorites(false);
+        navigateToSessions();
+      },
+      "cmd+shift+e": () => {
         setSidebarMode("list");
         setActiveAppViewId(null);
         setSelectedProject(null);
@@ -931,14 +951,7 @@ function App() {
         setShowFavorites(false);
         navigateToProjects();
       },
-      "cmd+l": () => {
-        setSidebarMode("list");
-        setActiveAppViewId(null);
-        setSelectedProject(null);
-        setShowFavorites(false);
-        navigateToSessions();
-      },
-      "cmd+p": () => {
+      "cmd+shift+g": () => {
         setSidebarMode("project");
         setActiveAppViewId(null);
         setSelectedProject(null);
@@ -956,7 +969,13 @@ function App() {
       },
       "cmd+,": () => setShowSettings(true),
       "cmd+`": toggleCurrentTerminalScope,
+      "cmd+j": toggleCurrentTerminalScope,
       "cmd+shift+i": async () => {
+        if (isTauri()) {
+          await invoke("toggle_devtools");
+        }
+      },
+      "cmd+alt+i": async () => {
         if (isTauri()) {
           await invoke("toggle_devtools");
         }

@@ -58,7 +58,7 @@ export function useDesktopSidebarActions({
 
   const onOpenCommandPalette = useCallback(() => {
     window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "k", metaKey: true }),
+      new KeyboardEvent("keydown", { key: "p", metaKey: true }),
     );
   }, []);
 

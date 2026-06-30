@@ -51,17 +51,6 @@ export function useSessionViewerHotkeys({
 
       const key = event.key.toLowerCase()
 
-      // Cmd+Shift+F behavior depends on cmdFBehavior setting
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && key === 'f') {
-        event.preventDefault()
-        event.stopPropagation()
-        if (cmdFBehavior === 'inSessionSearch') {
-          onToggleSidebar()
-        } else {
-          onOpenSearch()
-        }
-        return
-      }
 
       // Cmd+F behavior depends on cmdFBehavior setting
       if ((event.metaKey || event.ctrlKey) && key === 'f') {
