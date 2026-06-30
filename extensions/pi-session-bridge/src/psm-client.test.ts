@@ -44,4 +44,25 @@ describe("PSM HTTP client", () => {
     );
   });
 
+  it("passes optional project path filter in full text search", async () => {
+    const psm = await import("./psm-client.js");
+
+    await psm.fullTextSearch({ query: "hello", page_size: 3, project_path: "/Users/me/project/demo" });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [, init] = fetchMock.mock.calls[0];
+    const body = JSON.parse(String(init.body));
+
+    expect(body).toEqual(
+      expect.objectContaining({
+        command: "full_text_search",
+        payload: expect.objectContaining({
+          query: "hello",
+          project_path: "/Users/me/project/demo",
+          page_size: 3,
+        }),
+      }),
+    );
+  });
+
 });

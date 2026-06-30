@@ -54,6 +54,17 @@ Real-time session sync via WebSocket. When connected:
 | `session_context` | Fetch messages from a specific session |
 | `session_tag` | List/set/remove session tags |
 
+`session_search` 可选参数：
+
+- `query`：搜索文本（必填）
+- `roleFilter`：`all | user | assistant`，默认 `all`
+- `matchMode`：`any | all | phrase`，默认 `any`
+- `pageSize`：返回数量，1~20，默认 `8`
+- `sortOrder`：`relevance | newest | oldest`，默认 `relevance`
+- `from`：开始时间（RFC3339，可选）
+- `to`：结束时间（RFC3339，可选）
+- `projectPath`：按会话 `cwd` 精确匹配项目路径（可选）
+
 ### Tags
 
 All tag operations use PSM's backend API (no local SQLite). Tags are managed via the `/psm` panel's "Manage Tags..." picker or the `session_tag` LLM tool.

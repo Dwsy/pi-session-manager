@@ -52,6 +52,52 @@ describe("pi-session-bridge tools", () => {
     expect(result.content[0].text).toContain("Demo Session [abcdef12]");
   });
 
+  it("forwards session_search time range params to backend", async () => {
+    fullTextSearch.mockResolvedValue({
+      hits: [],
+      total_hits: 0,
+      has_more: false,
+    });
+    const { sessionSearchTool } = await import("./tools.js");
+
+    await sessionSearchTool.execute("call-1", {
+      query: "hello",
+      from: "2026-06-01T00:00:00Z",
+      to: "2026-06-30T23:59:59Z",
+      pageSize: 5,
+    });
+
+    expect(fullTextSearch).toHaveBeenCalledWith(expect.objectContaining({
+      query: "hello",
+      page_size: 5,
+      from: "2026-06-01T00:00:00Z",
+      to: "2026-06-30T23:59:59Z",
+      source_filter: "content_only",
+    }));
+  });
+
+  it("forwards session_search project path filter to backend", async () => {
+    fullTextSearch.mockResolvedValue({
+      hits: [],
+      total_hits: 0,
+      has_more: false,
+    });
+    const { sessionSearchTool } = await import("./tools.js");
+
+    await sessionSearchTool.execute("call-1", {
+      query: "hello",
+      projectPath: "/Users/me/project/demo",
+      pageSize: 10,
+    });
+
+    expect(fullTextSearch).toHaveBeenCalledWith(expect.objectContaining({
+      query: "hello",
+      page_size: 10,
+      project_path: "/Users/me/project/demo",
+      source_filter: "content_only",
+    }));
+  });
+
   it("sets an existing session tag through local Kanban files", async () => {
     const home = mkdtempSync(join(tmpdir(), "psm-tools-"));
     const previousHome = process.env.HOME;

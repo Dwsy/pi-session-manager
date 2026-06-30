@@ -73,6 +73,18 @@ export const sessionSearchTool = {
         enum: ["relevance", "newest", "oldest"],
         description: "Sort order. Defaults to relevance.",
       },
+      from: {
+        type: "string",
+        description: "Optional start time, RFC3339 format, e.g. 2026-05-01T00:00:00Z.",
+      },
+      to: {
+        type: "string",
+        description: "Optional end time, RFC3339 format, e.g. 2026-05-31T23:59:59Z.",
+      },
+      projectPath: {
+        type: "string",
+        description: "Optional project path filter. Matches session cwd exactly (path), e.g. /Users/me/projects/demo.",
+      },
     },
     required: ["query"],
   },
@@ -81,6 +93,10 @@ export const sessionSearchTool = {
     if (!query) return { content: [{ type: "text", text: "query is required." }], isError: true };
 
     try {
+      const fromRaw = String(params.from || "").trim();
+      const toRaw = String(params.to || "").trim();
+      const projectPathRaw = String((params as Record<string, unknown>).projectPath || params.project_path || "").trim();
+
       const fts = await psm.fullTextSearch({
         query,
         role_filter: String(params.roleFilter || "all"),
@@ -88,6 +104,9 @@ export const sessionSearchTool = {
         page_size: Math.min(Math.max(Number(params.pageSize) || 8, 1), 20),
         sort_order: String(params.sortOrder || "relevance"),
         source_filter: "content_only",
+        ...(fromRaw ? { from: fromRaw } : {}),
+        ...(toRaw ? { to: toRaw } : {}),
+        ...(projectPathRaw ? { project_path: projectPathRaw } : {}),
       });
 
       const hits = (fts.hits || []).filter(

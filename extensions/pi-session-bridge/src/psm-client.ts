@@ -72,6 +72,9 @@ export async function fullTextSearch(params: {
   page_size?: number;
   sort_order?: string;
   source_filter?: string;
+  project_path?: string | null;
+  from?: string;
+  to?: string;
 }): Promise<FullTextSearchResponse> {
   return command<FullTextSearchResponse>("full_text_search", {
     role_filter: "all",
