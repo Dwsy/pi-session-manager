@@ -101,8 +101,8 @@ export const settings = {
       toggleSidebar: 'セッションツリーの切り替え',
     },
     cmdFBehaviorHint: {
-      search: 'Cmd+Shift+F でセッションツリーを切り替え',
-      sidebar: 'Cmd+Shift+F でセッション内検索を開く',
+      search: 'Cmd+F でセッション内検索を開く。Cmd+Option+B でセッションツリーを切り替え。',
+      sidebar: 'Cmd+F でセッションツリーを切り替え。セッション内検索はツールバーから開くことができます。',
     },
     scrollMarkersEnabled: 'スクロールマーカー',
     scrollMarkersEnabledHelp: 'メッセージ間を素早く移動するためのサイドナビゲーションドットを表示',
