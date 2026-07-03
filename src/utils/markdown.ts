@@ -403,7 +403,7 @@ function preprocessXmlBlocks(text: string): string {
   // Now process the XML blocks in the masked text
   const xmlBlockRegex = /<(read-files|modified-files|read-file|write-file|task|goals|plan|file|files|details)\s*>([\s\S]*?)<\/\1>/gi;
 
-  maskedText = maskedText.replace(xmlBlockRegex, (match, tagName, innerContent) => {
+  maskedText = maskedText.replace(xmlBlockRegex, (_, tagName, innerContent) => {
     // Parse the inner content as markdown.
     const parsedInner = marked.parse(innerContent.trim()) as string;
 

@@ -26,8 +26,6 @@ export interface ParsedLeadingSourceFilterToken {
   token: '#all' | '#labels' | '#content' | null
 }
 
-const SEARCH_HIGHLIGHT_MARKUP = '<mark class="search-highlight">'
-
 // ── Single-value memoization for hot-path query parsing ────────────────────
 let _cachedQuotedQueryInput = ''
 let _cachedQuotedQueryResult: ParsedQuotedQuery | null = null

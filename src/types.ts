@@ -296,6 +296,7 @@ export interface Content {
   data?: string
   name?: string
   id?: string
+  toolCallId?: string
   arguments?: Record<string, any>
 }
 
