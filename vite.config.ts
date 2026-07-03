@@ -236,6 +236,7 @@ export default defineConfig(({ mode }) => {
         '@demo': path.resolve(__dirname, './src/demo'),
         '@styles': path.resolve(__dirname, './src/styles'),
         '@pi-session-manager/plugin-sdk': path.resolve(__dirname, './packages/runtime-sdk/src/index.ts'),
+        '@google/genai': path.resolve(__dirname, './src/utils/empty.ts'),
       },
     },
     clearScreen: false,
