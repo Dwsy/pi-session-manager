@@ -664,9 +664,15 @@ export default function TerminalSettings({
                   "Toggle built-in terminal",
                 )}
               </span>
-              <kbd className="px-2 py-0.5 rounded bg-secondary text-[11px] font-mono text-foreground">
-                {formatShortcutDisplay("Cmd+`", { symbolic: true })}
-              </kbd>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-2 py-0.5 rounded bg-secondary text-[11px] font-mono text-foreground">
+                  {formatShortcutDisplay("Ctrl+`", { symbolic: true })}
+                </kbd>
+                <span className="text-xs text-muted-foreground">/</span>
+                <kbd className="px-2 py-0.5 rounded bg-secondary text-[11px] font-mono text-foreground">
+                  {formatShortcutDisplay("Cmd+J", { symbolic: true })}
+                </kbd>
+              </div>
             </div>
           </div>
         </div>
