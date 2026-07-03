@@ -550,7 +550,6 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             Ok(Value::Null)
         }
 
-
         // ═══════════════════════════════════════════════════════════════
         // Model config (delegates to domain)
         // ═══════════════════════════════════════════════════════════════

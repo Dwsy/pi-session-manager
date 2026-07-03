@@ -385,9 +385,7 @@ pub async fn write_resource_file_internal(path: String, content: String, scope: 
         fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
     }
     let base_canonical = base.canonicalize().map_err(|e| format!("Resolve base dir: {e}"))?;
-    let parent_canonical = full.parent()
-        .and_then(|p| p.canonicalize().ok())
-        .ok_or_else(|| "Failed to resolve target parent directory".to_string())?;
+    let parent_canonical = full.parent().and_then(|p| p.canonicalize().ok()).ok_or_else(|| "Failed to resolve target parent directory".to_string())?;
     if !parent_canonical.starts_with(&base_canonical) {
         return Err("Path traversal denied".into());
     }
