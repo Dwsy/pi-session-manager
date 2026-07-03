@@ -327,8 +327,9 @@ export const settings = {
     customTheme: "Custom Theme Preset",
     appDefaultTheme: "App default",
     customThemeHelp:
-      "Choose a built-in base46 theme or a theme file from ~/.pi/agent/themes",
+      "Choose a built-in base46/Codex theme or a theme file from ~/.pi/agent/themes",
     builtInBase46Themes: "Built-in base46 themes",
+    builtInCodexThemes: "Built-in Codex themes",
     userThemes: "User themes",
     base46Preview: "base46 preview",
     noCustomThemes: "No custom themes found in ~/.pi/agent/themes",

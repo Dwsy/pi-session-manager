@@ -5,14 +5,27 @@ import {
   isBuiltInBase46ThemeSelection,
   toPiThemeFileFromBase46,
 } from './base46Themes'
+import type { ThemePreviewModel } from './base46Themes'
+import {
+  getBuiltInCodexTheme,
+  isBuiltInCodexThemeSelection,
+  toPiThemeFileFromCodex,
+} from './codexThemes'
 
 export {
   getBuiltInBase46Themes,
   isBuiltInBase46ThemeSelection,
-  resolveThemePreview,
   toBase46Selection,
   toPiThemeFileFromBase46,
 } from './base46Themes'
+
+export {
+  getBuiltInCodexThemes,
+  isBuiltInCodexThemeSelection,
+  toCodexSelection,
+  toPiThemeFileFromCodex,
+} from './codexThemes'
+
 
 export interface PiThemeFile {
   name?: string
@@ -279,12 +292,83 @@ function loadBuiltInBase46Theme(selection: string): PiThemeFile | null {
   return theme ? toPiThemeFileFromBase46(theme) : null
 }
 
+function loadBuiltInCodexTheme(selection: string): PiThemeFile | null {
+  const theme = getBuiltInCodexTheme(selection)
+  return theme ? toPiThemeFileFromCodex(theme) : null
+}
+
 function resolveThemeName(selection: string): string | null {
   if (selection === APP_DEFAULT_THEME) return null
   if (isBuiltInBase46ThemeSelection(selection)) return null
+  if (isBuiltInCodexThemeSelection(selection)) return null
   const sanitized = sanitizeThemeName(selection)
   return sanitized || null
 }
+
+export function resolveThemePreview(selection: string | undefined): ThemePreviewModel | null {
+  if (!selection) return null
+
+  if (isBuiltInBase46ThemeSelection(selection)) {
+    const theme = getBuiltInBase46Theme(selection)
+    if (!theme) return null
+
+    const mapped = toPiThemeFileFromBase46(theme)
+    const vars = mapped.vars
+
+    return {
+      selection,
+      label: theme.label,
+      source: 'built-in',
+      scheme: theme.scheme,
+      colors: {
+        background: vars.background,
+        panel: vars.panel,
+        panelAlt: vars.panelAlt,
+        text: vars.text,
+        muted: vars.muted,
+        accent: vars.accent,
+        border: vars.border,
+        success: vars.success,
+        warning: vars.warning,
+        error: vars.error,
+        code: vars.mdCode,
+        markdown: vars.mdHeading,
+      },
+    }
+  }
+
+  if (isBuiltInCodexThemeSelection(selection)) {
+    const theme = getBuiltInCodexTheme(selection)
+    if (!theme) return null
+
+    const mapped = toPiThemeFileFromCodex(theme)
+    const vars = mapped.vars!
+
+    return {
+      selection,
+      label: theme.name,
+      source: 'built-in',
+      scheme: theme.mode,
+      colors: {
+        background: vars.background,
+        panel: vars.panel,
+        panelAlt: vars.panelAlt,
+        text: vars.text,
+        muted: vars.muted,
+        accent: vars.accent,
+        border: vars.border,
+        success: vars.success,
+        warning: vars.warning,
+        error: vars.error,
+        code: vars.mdCode,
+        markdown: vars.mdHeading,
+      },
+    }
+  }
+
+  return null
+}
+
 
 export async function listUserPiThemes(): Promise<string[]> {
   try {
@@ -304,7 +388,7 @@ export async function listUserPiThemes(): Promise<string[]> {
 
 export async function resolvePiThemeColorScheme(selection: string | undefined): Promise<'dark' | 'light' | null> {
   const normalized = (selection || APP_DEFAULT_THEME).trim() || APP_DEFAULT_THEME
-  const builtInTheme = loadBuiltInBase46Theme(normalized)
+  const builtInTheme = loadBuiltInBase46Theme(normalized) || loadBuiltInCodexTheme(normalized)
   if (builtInTheme) return resolveThemeColorScheme(builtInTheme)
 
   const themeName = resolveThemeName(normalized)
@@ -329,7 +413,7 @@ export async function applyPiChatTheme(selection: string | undefined) {
   const applyId = ++activeThemeApplyId
 
   const normalized = (selection || APP_DEFAULT_THEME).trim() || APP_DEFAULT_THEME
-  const builtInTheme = loadBuiltInBase46Theme(normalized)
+  const builtInTheme = loadBuiltInBase46Theme(normalized) || loadBuiltInCodexTheme(normalized)
   const themeName = resolveThemeName(normalized)
 
   if (!builtInTheme && !themeName) {

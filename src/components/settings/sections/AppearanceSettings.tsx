@@ -12,10 +12,12 @@ import SettingsOptionGroup from '@/components/settings/SettingsOptionGroup'
 import SettingsSelect from '@/components/settings/SettingsSelect'
 import {
   getBuiltInBase46Themes,
+  getBuiltInCodexThemes,
   listUserPiThemes,
   deleteUserPiTheme,
   resolveThemePreview,
   toBase46Selection,
+  toCodexSelection,
 } from '@/utils/piTheme'
 import ThemeStudioModal from '@/components/settings/sections/ThemeStudioModal'
 import { CODE_THEMES, MONOSPACE_FONTS } from '@/utils/codeThemes'
@@ -361,6 +363,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
   const deferredUiFontQuery = useDeferredValue(uiFontQuery)
   const deferredFontQuery = useDeferredValue(fontQuery)
   const builtInThemes = useMemo(() => getBuiltInBase46Themes(), [])
+  const builtInCodexThemes = useMemo(() => getBuiltInCodexThemes(), [])
   const selectedPreview = useMemo(
     () => resolveThemePreview(settings.appearance.customTheme),
     [settings.appearance.customTheme]
@@ -554,6 +557,13 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
                         {builtInThemes.map((theme) => (
                           <option key={theme.id} value={toBase46Selection(theme.id)}>
                             {theme.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label={t('settings.appearance.builtInCodexThemes', 'Built-in Codex themes')}>
+                        {builtInCodexThemes.map((theme) => (
+                          <option key={theme.slug} value={toCodexSelection(theme.slug)}>
+                            {theme.name}
                           </option>
                         ))}
                       </optgroup>

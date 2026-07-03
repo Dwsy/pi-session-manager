@@ -7,6 +7,9 @@ import {
   isBuiltInBase46ThemeSelection,
   resolveThemePreview,
   toPiThemeFileFromBase46,
+  getBuiltInCodexThemes,
+  isBuiltInCodexThemeSelection,
+  toPiThemeFileFromCodex,
 } from './piTheme'
 
 afterEach(() => {
@@ -98,5 +101,56 @@ describe('base46 theme support', () => {
     expect(root.style.getPropertyValue('--accent')).toBe('')
     expect(root.getAttribute('data-chat-theme')).toBeNull()
     expect(root.getAttribute('data-chat-theme-scheme')).toBeNull()
+  })
+})
+
+describe('codex theme support', () => {
+  it('ships a built-in codex theme catalog', () => {
+    const themes = getBuiltInCodexThemes()
+    expect(themes.length).toBeGreaterThanOrEqual(20)
+    expect(themes.some((theme) => theme.mode === 'dark')).toBe(true)
+    expect(themes.some((theme) => theme.mode === 'light')).toBe(true)
+    expect(themes.map((theme) => theme.slug)).toContain('tokyo-night')
+  })
+
+  it('maps codex theme values to app theme tokens', () => {
+    const theme = getBuiltInCodexThemes().find((item) => item.slug === 'tokyo-night')
+    expect(theme).toBeTruthy()
+
+    const mapped = toPiThemeFileFromCodex(theme!)
+
+    expect(mapped.name).toBe('Tokyo Night')
+    expect(mapped.vars?.background).toBe('#1a1b26')
+    expect(mapped.vars?.panel).toBe('#24283b')
+    expect(mapped.vars?.text).toBe('#c0caf5')
+    expect(mapped.vars?.accent).toBe('#7aa2f7')
+    expect(mapped.vars?.toolDiffAdded).toBe('#9ece6a')
+  })
+
+  it('recognizes built-in codex selections', () => {
+    expect(isBuiltInCodexThemeSelection('codex:tokyo-night')).toBe(true)
+    expect(isBuiltInCodexThemeSelection('tokyo-night')).toBe(false)
+  })
+
+  it('builds a preview model for built-in codex themes', () => {
+    const preview = resolveThemePreview('codex:tokyo-night')
+
+    expect(preview?.source).toBe('built-in')
+    expect(preview?.label).toBe('Tokyo Night')
+    expect(preview?.scheme).toBe('dark')
+    expect(preview?.colors.background).toBe('#1a1b26')
+    expect(preview?.colors.accent).toBe('#7aa2f7')
+  })
+
+  it('applies built-in codex themes through the DOM override lifecycle', async () => {
+    const root = document.documentElement
+
+    await applyPiChatTheme('codex:tokyo-night')
+
+    expect(root.style.getPropertyValue('--color-background')).toBe('26 27 38')
+    expect(root.style.getPropertyValue('--accent')).toBe('#7aa2f7')
+    expect(root.getAttribute('data-chat-theme')).toBe('Tokyo Night')
+    expect(root.getAttribute('data-chat-theme-scheme')).toBe('dark')
+    expect(root.classList.contains('theme-dark')).toBe(true)
   })
 })
