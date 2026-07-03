@@ -1303,7 +1303,7 @@ mod tests {
         let result = dispatch("read_session_file", &serde_json::json!({})).await;
         assert!(result.is_err(), "expected error for missing required field");
         let error = result.unwrap_err();
-        assert!(error.contains("Missing required field"), "error should mention missing field, got: {error}");
+        assert!(error.contains("Missing or invalid field"), "error should mention missing field, got: {error}");
     }
 
     #[cfg(not(feature = "gui"))]

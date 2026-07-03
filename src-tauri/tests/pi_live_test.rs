@@ -1,5 +1,7 @@
 //! Integration tests for Pi Live functionality
 
+#![cfg(feature = "gui")]
+
 use pi_session_manager::pi_agent_registry::{PiAgentRegistry, PiLiveSession};
 use std::sync::Arc;
 
