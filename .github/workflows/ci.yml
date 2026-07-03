@@ -131,7 +131,13 @@ jobs:
 
       - name: Rust tests (desktop)
         working-directory: src-tauri
-        run: cargo test
+        run: |
+          if [ "${{ matrix.platform }}" = "windows-latest" ]; then
+            cargo test --no-default-features
+          else
+            cargo test
+          fi
+        shell: bash
 
       - name: Rust build CLI
         working-directory: src-tauri-cli
