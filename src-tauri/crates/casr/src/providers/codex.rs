@@ -504,9 +504,6 @@ impl Codex {
                 }
                 "response_item" => {
                     if let Some(p) = payload {
-                        let role_str = p.get("role").and_then(|v| v.as_str()).unwrap_or("assistant");
-                        let role = normalize_role(role_str);
-
                         let content_val = p.get("content");
                         let text = codex_extract_text_content(content_val);
                         let mut tool_calls = codex_extract_tool_calls(content_val);
@@ -518,6 +515,14 @@ impl Codex {
                             trace!(line = line_num, "skipping empty response_item");
                             continue;
                         }
+
+                        let payload_type = p.get("type").and_then(|v| v.as_str()).unwrap_or_default();
+                        let role = if matches!(payload_type, "function_call_output" | "custom_tool_call_output") || (text.trim().is_empty() && tool_calls.is_empty() && !tool_results.is_empty()) {
+                            MessageRole::Tool
+                        } else {
+                            let role_str = p.get("role").and_then(|v| v.as_str()).unwrap_or("assistant");
+                            normalize_role(role_str)
+                        };
 
                         let next_message = CanonicalMessage { idx: 0, role, content: text, timestamp: ts, author: None, tool_calls, tool_results, extra: envelope };
 
@@ -858,6 +863,7 @@ mod tests {
         let session = provider.read_jsonl(Path::new("/tmp/rollout-test.jsonl"), &file_text).expect("Codex JSONL reader should parse tool_result-only response_item");
 
         assert_eq!(session.messages.len(), 1);
+        assert_eq!(session.messages[0].role, MessageRole::Tool);
         assert_eq!(session.messages[0].tool_results.len(), 1);
         assert_eq!(session.messages[0].tool_results[0].content, "lint clean");
     }
@@ -905,6 +911,7 @@ mod tests {
         let session = provider.read_jsonl(Path::new("/tmp/rollout-fco.jsonl"), &file_text).expect("Codex JSONL reader should parse payload-level function_call_output");
 
         assert_eq!(session.messages.len(), 1);
+        assert_eq!(session.messages[0].role, MessageRole::Tool);
         assert_eq!(session.messages[0].tool_results.len(), 1);
         assert_eq!(session.messages[0].tool_results[0].call_id.as_deref(), Some("call-42"));
         assert_eq!(session.messages[0].tool_results[0].content, "done");

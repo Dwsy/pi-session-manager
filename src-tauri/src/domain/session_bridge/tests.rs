@@ -507,7 +507,9 @@ fn convert_codex_to_pi_writes_existing_pi_style_bridge_file() {
     let temp = tempfile::tempdir().expect("tempdir");
     std::env::set_var("HOME", temp.path());
 
-    let source_path = temp.path().join("codex-source.jsonl");
+    let codex_dir = temp.path().join(".codex/sessions/2026/07/06");
+    std::fs::create_dir_all(&codex_dir).expect("create codex sessions dir");
+    let source_path = codex_dir.join("rollout-2026-07-06T11-35-33-codex-source-1.jsonl");
     let lines = [
         serde_json::json!({
             "type": "session_meta",
@@ -522,6 +524,16 @@ fn convert_codex_to_pi_writes_existing_pi_style_bridge_file() {
         serde_json::json!({
             "type": "response_item",
             "timestamp": 1737300002.0,
+            "payload": { "type": "function_call", "call_id": "call-read", "name": "read_file", "arguments": { "path": "src/auth.ts" } }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": 1737300003.0,
+            "payload": { "type": "function_call_output", "call_id": "call-read", "output": "file contents" }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": 1737300004.0,
             "payload": { "role": "assistant", "content": [{ "type": "output_text", "text": "Done" }] }
         }),
     ]
@@ -545,6 +557,11 @@ fn convert_codex_to_pi_writes_existing_pi_style_bridge_file() {
     assert!(entries[1..].iter().all(|entry| entry["type"] == "message"));
     assert!(entries[1].get("id").is_some());
     assert!(entries[1].get("parentId").is_some());
+    let tool_result = entries.iter().find(|entry| entry["message"]["role"] == "toolResult").expect("Codex function_call_output should become Pi toolResult");
+    assert_eq!(tool_result["message"]["toolCallId"], Value::String("call-read".to_string()));
+    assert_eq!(tool_result["message"]["content"][0]["text"], Value::String("file contents".to_string()));
+    let assistant_plain_tool_output = entries.iter().any(|entry| entry["message"]["role"] == "assistant" && entry["message"]["content"][0]["text"] == "file contents");
+    assert!(!assistant_plain_tool_output, "tool output must not be rendered as assistant text");
 
     if let Some(home) = previous_home {
         std::env::set_var("HOME", home);
@@ -560,7 +577,9 @@ fn convert_claude_code_to_pi_writes_existing_pi_style_bridge_file() {
     let temp = tempfile::tempdir().expect("tempdir");
     std::env::set_var("HOME", temp.path());
 
-    let source_path = temp.path().join("claude-source.jsonl");
+    let claude_dir = temp.path().join(".claude/projects/-repo-demo");
+    std::fs::create_dir_all(&claude_dir).expect("create claude projects dir");
+    let source_path = claude_dir.join("claude-source-1.jsonl");
     let lines = [
         serde_json::json!({
             "type": "user",
@@ -577,6 +596,24 @@ fn convert_claude_code_to_pi_writes_existing_pi_style_bridge_file() {
             "sessionId": "claude-source-1",
             "cwd": "/repo/demo",
             "timestamp": "2026-04-08T10:00:02.000Z",
+            "message": { "role": "assistant", "model": "claude-sonnet-4", "content": [{ "type": "tool_use", "id": "toolu-read", "name": "Read", "input": { "file_path": "/repo/demo/main.go" } }] }
+        }),
+        serde_json::json!({
+            "type": "user",
+            "uuid": "u2",
+            "parentUuid": "a1",
+            "sessionId": "claude-source-1",
+            "cwd": "/repo/demo",
+            "timestamp": "2026-04-08T10:00:03.000Z",
+            "message": { "role": "user", "content": [{ "type": "tool_result", "tool_use_id": "toolu-read", "content": "file contents", "is_error": false }] }
+        }),
+        serde_json::json!({
+            "type": "assistant",
+            "uuid": "a2",
+            "parentUuid": "u2",
+            "sessionId": "claude-source-1",
+            "cwd": "/repo/demo",
+            "timestamp": "2026-04-08T10:00:04.000Z",
             "message": { "role": "assistant", "model": "claude-sonnet-4", "content": [{ "type": "text", "text": "Done" }] }
         }),
     ]
@@ -600,6 +637,11 @@ fn convert_claude_code_to_pi_writes_existing_pi_style_bridge_file() {
     assert!(entries[1..].iter().all(|entry| entry["type"] == "message"));
     assert!(entries[1].get("id").is_some());
     assert!(entries[1].get("parentId").is_some());
+    let tool_result = entries.iter().find(|entry| entry["message"]["role"] == "toolResult").expect("Claude Code tool_result should become Pi toolResult");
+    assert_eq!(tool_result["message"]["toolCallId"], Value::String("toolu-read".to_string()));
+    assert_eq!(tool_result["message"]["content"][0]["text"], Value::String("file contents".to_string()));
+    let user_plain_tool_output = entries.iter().any(|entry| entry["message"]["role"] == "user" && entry["message"]["content"][0]["text"] == "file contents");
+    assert!(!user_plain_tool_output, "tool output must not be rendered as user text");
 
     if let Some(home) = previous_home {
         std::env::set_var("HOME", home);

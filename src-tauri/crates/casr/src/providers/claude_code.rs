@@ -241,13 +241,17 @@ impl Provider for ClaudeCode {
 
             // Extract role from message.role → top-level type.
             let role_str = entry.pointer("/message/role").and_then(|v| v.as_str()).or(entry_type).unwrap_or("user");
-            let role = normalize_role(role_str);
 
             // Extract content from message.content → top-level content.
             let content_value = entry.pointer("/message/content").or_else(|| entry.get("content"));
             let content = claude_extract_text_content(content_value);
             let tool_calls = extract_tool_calls(content_value);
             let tool_results = extract_tool_results(content_value);
+            let role = if role_str == "user" && content.trim().is_empty() && !tool_results.is_empty() {
+                MessageRole::Tool
+            } else {
+                normalize_role(role_str)
+            };
 
             // Skip messages that have neither text nor tool payloads.
             if content.trim().is_empty() && tool_calls.is_empty() && tool_results.is_empty() {
@@ -715,7 +719,20 @@ mod tests {
 {"type":"assistant","sessionId":"s6","message":{"role":"assistant","content":[{"type":"text","text":"Got it"}],"model":"m1"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
         );
         // User message has text + tool_result, so content includes "Here's the result".
+        assert_eq!(session.messages[0].role, MessageRole::User);
         assert_eq!(session.messages[0].tool_results.len(), 1);
+        assert_eq!(session.messages[0].tool_results[0].content, "file contents here");
+    }
+
+    #[test]
+    fn reader_pure_tool_result_user_entry_becomes_tool_message() {
+        let session = read_cc_jsonl(
+            r#"{"type":"user","sessionId":"s6","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"file contents here","is_error":false}]},"uuid":"u1","timestamp":"2026-01-01T00:00:00Z"}
+{"type":"assistant","sessionId":"s6","message":{"role":"assistant","content":[{"type":"text","text":"Got it"}],"model":"m1"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
+        );
+        assert_eq!(session.messages[0].role, MessageRole::Tool);
+        assert_eq!(session.messages[0].tool_results.len(), 1);
+        assert_eq!(session.messages[0].tool_results[0].call_id.as_deref(), Some("t1"));
         assert_eq!(session.messages[0].tool_results[0].content, "file contents here");
     }
 
