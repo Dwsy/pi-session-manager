@@ -127,7 +127,7 @@ describe('SessionSideChatPanel', () => {
       recordType: 'sidechat.thread',
     }))
     expect(await screen.findByText('Previously answered context.')).toBeTruthy()
-    expect(screen.getByRole('combobox')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Auto' })).toBeTruthy()
   })
 
   it('appends a user message, streams the assistant answer, and persists history', async () => {

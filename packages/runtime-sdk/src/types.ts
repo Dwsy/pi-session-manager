@@ -75,6 +75,7 @@ export interface PsmPluginSettingDefinition {
   step?: number
   providerKey?: string
   modelKey?: string
+  onboarding?: boolean
 }
 
 export interface PsmPluginConfiguration {

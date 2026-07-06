@@ -38,7 +38,6 @@ import {
   formatTimestamp,
   getClipboardText,
   getOperationLanguage,
-  getOperationTitle,
   getReviewStatus,
   isChangeOperation,
   stringifyArgs,
@@ -820,11 +819,6 @@ function DetailPanel({
     theme === "dark" || rootIsDark || (theme === "system" && prefersDark)
       ? "dark"
       : "light";
-  const detailTitle = usesCodeView
-    ? showsDiffControls
-      ? t("components.toolCallReview.patch", "Patch")
-      : t("components.toolCallReview.writtenContent", "Written content")
-    : getOperationTitle(operation);
   const contentFullscreenLabel = contentExpanded
     ? t(
         "components.toolCallReview.exitContentFullscreen",

@@ -77,7 +77,8 @@ function pluginI18nBase(plugin: PsmPluginStatus) {
   return `plugins.${plugin.id}`;
 }
 
-function permissionLabel(permission: PsmPermission) {
+function permissionLabel(permission: PsmPermission, t: (key: string, defaultValue: string) => string) {
+  const labelKey = `settings.psmPlugins.permissions.${permission.replace(':', '_')}.label`;
   const labels: Record<PsmPermission, string> = {
     "sessions:read": "Sessions",
     "records:read": "Read records",
@@ -93,10 +94,11 @@ function permissionLabel(permission: PsmPermission) {
     "fs:read": "Files",
     "windows:open": "Windows",
   };
-  return labels[permission] ?? permission;
+  return t(labelKey, labels[permission] ?? permission);
 }
 
-function permissionDescription(permission: PsmPermission) {
+function permissionDescription(permission: PsmPermission, t: (key: string, defaultValue: string) => string) {
+  const descKey = `settings.psmPlugins.permissions.${permission.replace(':', '_')}.description`;
   const descriptions: Record<PsmPermission, string> = {
     "sessions:read": "Read session metadata and entries",
     "records:read": "Read plugin-owned records",
@@ -109,10 +111,10 @@ function permissionDescription(permission: PsmPermission) {
     "events:read": "Subscribe to host runtime events",
     "model:invoke": "Invoke host-managed model calls",
     "agent:invoke": "Create and run host-managed agent sessions",
-    "fs:read": "Read files through declared restricted roots, including saved widget HTML",
-    "windows:open": "Open host-managed popup windows",
+    "fs:read": "Read-only access to specific project path files",
+    "windows:open": "Request host to open window dialogs",
   };
-  return descriptions[permission] ?? permission;
+  return t(descKey, descriptions[permission] ?? permission);
 }
 
 function settingValue(plugin: PsmPluginStatus, definition: PsmPluginSettingDefinition): PsmPluginSettingValue {
@@ -589,7 +591,7 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
         title={
           <span className="flex min-w-0 items-center gap-2">
             {statusIcon(plugin)}
-            <span className="truncate">{plugin.name}</span>
+            <span className="truncate">{t(`${pluginI18nBase(plugin)}.name`, plugin.name)}</span>
             {plugin.version && <span className="shrink-0 text-xs font-normal text-muted-foreground">{plugin.version}</span>}
           </span>
         }
@@ -599,19 +601,24 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
             <span className="px-1.5">·</span>
             <span>{sourceLabel(plugin)}</span>
             <span className="px-1.5">·</span>
-            <span>{plugin.commands.length} commands</span>
+            <span>{t("settings.psmPlugins.commandsCount", "{{count}} commands", { count: plugin.commands.length })}</span>
             <span className="px-1.5">/</span>
-            <span>{plugin.tools.length} tools</span>
+            <span>{t("settings.psmPlugins.toolsCount", "{{count}} tools", { count: plugin.tools.length })}</span>
             {plugin.permissions?.length ? (
               <>
                 <span className="px-1.5">·</span>
-                <span>{plugin.permissions.filter((permission) => permission.granted).length}/{plugin.permissions.length} permissions</span>
+                <span>
+                  {t("settings.psmPlugins.permissionsCountGranted", "{{granted}}/{{total}} permissions", {
+                    granted: plugin.permissions.filter((permission) => permission.granted).length,
+                    total: plugin.permissions.length,
+                  })}
+                </span>
               </>
             ) : null}
             {plugin.manifest?.configuration?.properties?.length ? (
               <>
                 <span className="px-1.5">·</span>
-                <span>{plugin.manifest.configuration.properties.length} settings</span>
+                <span>{t("settings.psmPlugins.settingsCount", "{{count}} settings", { count: plugin.manifest.configuration.properties.length })}</span>
               </>
             ) : null}
           </span>
@@ -687,11 +694,11 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
               title={
                 <span className="flex min-w-0 items-center gap-2">
                   {permission.granted ? <ShieldCheck className="h-4 w-4 text-emerald-500" /> : <ShieldOff className="h-4 w-4 text-muted-foreground" />}
-                  <span>{permissionLabel(permission.permission)}</span>
+                  <span>{permissionLabel(permission.permission, t)}</span>
                   <span className="font-mono text-[11px] font-normal text-muted-foreground">{permission.permission}</span>
                 </span>
               }
-              description={permissionDescription(permission.permission)}
+              description={permissionDescription(permission.permission, t)}
               checked={permission.granted}
               onChange={(granted) => void updatePluginPermission(plugin, permission.permission, granted)}
               toggleSize="sm"

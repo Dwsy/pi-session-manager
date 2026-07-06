@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Brain,
   CheckCircle2,
@@ -18,6 +18,7 @@ import {
   type PsmSessionReference,
 } from "@pi-session-manager/plugin-sdk";
 import { refreshSessionSummaryWithAgent } from "./agentSummary";
+import ModelSelector, { type RPCModel } from "../../src/components/ModelSelector";
 
 const SESSION_INTELLIGENCE_RECORD = "session.intelligence";
 const MODEL_OPTIONS_TIMEOUT_MS = 5000;
@@ -147,13 +148,32 @@ export default function SessionIntelligenceToolbarPanel({
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelLoadFailed, setModelLoadFailed] = useState(false);
   const [requestedModels, setRequestedModels] = useState(Boolean(cachedModelOptions));
-  const [modelRetryCount, setModelRetryCount] = useState(0);
-  const modelsLoadingRef = useRef(modelsLoading);
-  modelsLoadingRef.current = modelsLoading;
-  const requestedModelsRef = useRef(requestedModels);
-  requestedModelsRef.current = requestedModels;
   const [selectedProvider, setSelectedProvider] = useState(settings.provider);
   const [selectedModel, setSelectedModel] = useState(settings.model);
+
+  const rpcModels = useMemo<RPCModel[]>(() => {
+    return [
+      { id: "", name: t("session.intelligence.modelAuto", "Auto"), provider: "" },
+      ...models.map((m) => ({
+        id: m.model,
+        name: m.model,
+        provider: m.provider,
+      })),
+    ];
+  }, [models, t]);
+
+  const currentModel = useMemo<RPCModel | null>(() => {
+    return {
+      id: selectedModel || "",
+      name: selectedModel ? selectedModel : t("session.intelligence.modelAuto", "Auto"),
+      provider: selectedProvider || "",
+    };
+  }, [selectedProvider, selectedModel, t]);
+
+  const handleModelSelect = useCallback((model: RPCModel) => {
+    setSelectedProvider(model.provider);
+    setSelectedModel(model.id);
+  }, []);
 
   const payload = asPayload(record);
   const updatedAt = formatUpdatedAt(record, language);
@@ -171,38 +191,44 @@ export default function SessionIntelligenceToolbarPanel({
     setSelectedModel(settings.model);
   }, [open, session.path, settings.model, settings.provider]);
 
-  useEffect(() => {
-    // Use refs to check current values without including them as deps — otherwise
-    // setModelsLoading(true) would trigger a dep change, fire the cleanup (cancelled=true),
-    // and the timeout handler would never be able to clear the loading state.
-    if (!open || models.length > 0 || modelsLoadingRef.current || requestedModelsRef.current) return;
+  const modelRequestSeqRef = useRef(0);
 
-    let cancelled = false;
+  const fetchModelOptions = useCallback(() => {
+    const seq = ++modelRequestSeqRef.current;
     setRequestedModels(true);
     setModelsLoading(true);
     setModelLoadFailed(false);
 
     loadModelOptions(client)
       .then((items) => {
-        if (cancelled) return;
+        if (modelRequestSeqRef.current !== seq) return;
         setModels(items);
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (modelRequestSeqRef.current !== seq) return;
         setModelLoadFailed(true);
         console.error("[SessionIntelligenceToolbarPanel] Failed to load model options:", err);
       })
       .finally(() => {
-        if (cancelled) return;
+        if (modelRequestSeqRef.current !== seq) return;
         setModelsLoading(false);
       });
+  }, [client]);
 
+  useEffect(() => {
+    if (open && models.length === 0 && !modelsLoading && !requestedModels) {
+      fetchModelOptions();
+    }
+  }, [open, models.length, modelsLoading, requestedModels, fetchModelOptions]);
+
+  useEffect(() => {
+    if (!open) {
+      modelRequestSeqRef.current += 1;
+    }
     return () => {
-      cancelled = true;
-      setModelsLoading(false);
-      setRequestedModels(Boolean(cachedModelOptions));
+      modelRequestSeqRef.current += 1;
     };
-  }, [client, models.length, open, modelRetryCount]);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -291,10 +317,7 @@ export default function SessionIntelligenceToolbarPanel({
   ) : modelLoadFailed ? (
     <button
       type="button"
-      onClick={() => {
-        setModelLoadFailed(false);
-        setModelRetryCount((c) => c + 1);
-      }}
+      onClick={fetchModelOptions}
       className="text-[11px] text-warning hover:text-foreground"
     >
       {t("session.intelligence.retryLoadModels", "Retry")}
@@ -336,31 +359,15 @@ export default function SessionIntelligenceToolbarPanel({
               ))}
             </div>
             <div className="mt-3 flex items-center gap-2">
-              <label className="min-w-0 flex-1">
-                <span className="sr-only">{t("session.intelligence.model", "Model")}</span>
-                <select
-                  aria-label={t("session.intelligence.model", "Model")}
-                  value={selectedModelValue}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (!value) {
-                      setSelectedProvider("");
-                      setSelectedModel("");
-                      return;
-                    }
-                    const [nextProvider, nextModel] = value.split("::");
-                    setSelectedProvider(nextProvider);
-                    setSelectedModel(nextModel);
-                  }}
-                  className="h-8 w-full rounded-md border border-border/70 bg-background/75 px-2.5 text-xs text-foreground outline-none focus:border-primary/50"
-                >
-                  {modelOptions.map((option) => (
-                    <option key={`session-summary-model-${option.value || "auto"}`} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="min-w-0 flex-1">
+                <ModelSelector
+                  models={rpcModels}
+                  currentModel={currentModel}
+                  onSelect={handleModelSelect}
+                  loading={modelsLoading}
+                  className="w-full max-w-none justify-between h-8 border-border/70 bg-background/75"
+                />
+              </div>
               {modelStatus}
             </div>
           </div>

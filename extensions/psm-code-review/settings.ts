@@ -55,5 +55,13 @@ export const codeReviewConfiguration: PsmPluginConfiguration = {
       type: 'boolean',
       default: false,
     },
+    {
+      key: 'interceptExpand',
+      title: 'Intercept Tool Call Expand',
+      description: 'Open reviewable tool calls in the review popup instead of expanding them in the conversation view',
+      type: 'boolean',
+      default: true,
+      onboarding: true,
+    },
   ],
 }

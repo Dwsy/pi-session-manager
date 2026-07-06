@@ -117,11 +117,13 @@ describe('SessionIntelligenceToolbarPanel', () => {
       />,
     )
 
-    await screen.findByRole('option', { name: 'openai/gpt-5.5' })
-    const modelSelects = await screen.findAllByRole('combobox', { name: 'Model' })
-    const modelSelect = modelSelects[modelSelects.length - 1] as HTMLSelectElement
-    fireEvent.change(modelSelect, { target: { value: 'openai::gpt-5.5' } })
-    await waitFor(() => expect(modelSelect.value).toBe('openai::gpt-5.5'))
+    const modelButton = screen.getByRole('button', { name: 'Auto' })
+    fireEvent.click(modelButton)
+
+    const option = await screen.findByRole('button', { name: 'openai/gpt-5.5' })
+    fireEvent.click(option)
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'openai/gpt-5.5' })).toBeTruthy())
 
     const generateButtons = await screen.findAllByRole('button', { name: 'Generate' })
     fireEvent.click(generateButtons[generateButtons.length - 1])

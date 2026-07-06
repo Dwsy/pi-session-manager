@@ -21,6 +21,7 @@ import {
 } from "@pi-session-manager/plugin-sdk";
 import { askSideChatWithAgent } from "./agentSidechat";
 import { sideChatStyles } from "./styles";
+import ModelSelector, { type RPCModel } from "../../src/components/ModelSelector";
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
 const SNIPPET_LIMIT_OPTIONS = [4, 6, 8, 10, 12] as const;
@@ -281,6 +282,29 @@ export default function SessionSideChatPanel({
     ? `${options.provider}/${options.model}`
     : t("session.sideChat.modelAuto", "Auto");
 
+  const rpcModels = useMemo<RPCModel[]>(() => {
+    return [
+      { id: "", name: t("session.sideChat.modelAuto", "Auto"), provider: "" },
+      ...models.map((m) => ({
+        id: m.model,
+        name: m.model,
+        provider: m.provider,
+      })),
+    ];
+  }, [models, t]);
+
+  const currentModel = useMemo<RPCModel | null>(() => {
+    return {
+      id: options.model || "",
+      name: options.model ? options.model : t("session.sideChat.modelAuto", "Auto"),
+      provider: options.provider || "",
+    };
+  }, [options.provider, options.model, t]);
+
+  const handleModelSelect = useCallback((model: RPCModel) => {
+    setOptions((prev) => ({ ...prev, provider: model.provider, model: model.id }));
+  }, []);
+
   const scrollToBottom = useCallback(() => {
     const list = listRef.current;
     if (!list) return;
@@ -311,32 +335,44 @@ export default function SessionSideChatPanel({
     };
   }, [isResizing, onWidthChange]);
 
-  useEffect(() => {
-    if (!open || models.length > 0 || modelsLoading || requestedModels) return;
+  const modelRequestSeqRef = useRef(0);
 
-    let cancelled = false;
+  const fetchModelOptions = useCallback(() => {
+    const seq = ++modelRequestSeqRef.current;
     setRequestedModels(true);
     setModelsLoading(true);
     setModelLoadFailed(false);
 
     loadModelOptions(client)
       .then((items) => {
-        if (cancelled) return;
+        if (modelRequestSeqRef.current !== seq) return;
         setModels(items);
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (modelRequestSeqRef.current !== seq) return;
         setModelLoadFailed(true);
         console.error("[SessionSideChatPanel] Failed to load model options:", err);
       })
       .finally(() => {
-        if (!cancelled) setModelsLoading(false);
+        if (modelRequestSeqRef.current !== seq) return;
+        setModelsLoading(false);
       });
+  }, [client]);
 
+  useEffect(() => {
+    if (open && models.length === 0 && !modelsLoading && !requestedModels) {
+      fetchModelOptions();
+    }
+  }, [open, models.length, modelsLoading, requestedModels, fetchModelOptions]);
+
+  useEffect(() => {
+    if (!open) {
+      modelRequestSeqRef.current += 1;
+    }
     return () => {
-      cancelled = true;
+      modelRequestSeqRef.current += 1;
     };
-  }, [client, models.length, modelsLoading, open, requestedModels]);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -530,10 +566,7 @@ export default function SessionSideChatPanel({
   ) : modelLoadFailed ? (
     <button
       type="button"
-      onClick={() => {
-        setRequestedModels(false);
-        setModelLoadFailed(false);
-      }}
+      onClick={fetchModelOptions}
       className="text-[11px] text-warning hover:text-foreground"
     >
       {t("session.sideChat.retryLoadModels", "Retry")}
@@ -591,28 +624,15 @@ export default function SessionSideChatPanel({
         </div>
 
         <div className="mt-3 flex items-center gap-2">
-          <label className="relative min-w-0 flex-1">
-            <span className="sr-only">{t("session.sideChat.model", "Model")}</span>
-            <select
-              value={options.provider && options.model ? `${options.provider}::${options.model}` : ""}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (!value) {
-                  setOptions((prev) => ({ ...prev, provider: "", model: "" }));
-                  return;
-                }
-                const [provider, model] = value.split("::");
-                setOptions((prev) => ({ ...prev, provider, model }));
-              }}
-              className="h-8 w-full rounded-md border border-border/70 bg-background/75 px-2.5 text-xs text-foreground outline-none focus:border-primary/50"
-            >
-              {modelOptions.map((option) => (
-                <option key={`header-model-${option.value || "auto"}`} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="min-w-0 flex-1">
+            <ModelSelector
+              models={rpcModels}
+              currentModel={currentModel}
+              onSelect={handleModelSelect}
+              loading={modelsLoading}
+              className="w-full max-w-none justify-between h-8 border-border/70 bg-background/75"
+            />
+          </div>
           {modelStatus}
           <button
             type="button"
