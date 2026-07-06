@@ -17,12 +17,12 @@ VERIFY_AFTER=1
 SHOW_HELP=0
 
 if [[ -t 1 ]]; then
-  RED='\033[0;31m'
-  GREEN='\033[0;32m'
-  YELLOW='\033[1;33m'
-  BLUE='\033[0;34m'
-  CYAN='\033[0;36m'
-  NC='\033[0m'
+  RED=$'\033[0;31m'
+  GREEN=$'\033[0;32m'
+  YELLOW=$'\033[1;33m'
+  BLUE=$'\033[0;34m'
+  CYAN=$'\033[0;36m'
+  NC=$'\033[0m'
 else
   RED='' GREEN='' YELLOW='' BLUE='' CYAN='' NC=''
 fi
@@ -423,7 +423,7 @@ main() {
   verify_install "$target_path"
   check_path
 
-  ok "$(msg done): ${CYAN}${target_path}${NC}"
+  ok "$(msg "done"): ${CYAN}${target_path}${NC}"
   info "$(msg run): ${CYAN}pi-session-cli${NC}"
 }
 
