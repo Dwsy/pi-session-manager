@@ -1,5 +1,5 @@
 #[cfg(feature = "gui")]
-use reqwest::Url;
+use reqwest::{header::{HeaderMap, HeaderValue, REFERER}, Url};
 #[cfg(feature = "gui")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "gui")]
@@ -9,6 +9,10 @@ use tauri_plugin_updater::UpdaterExt;
 
 #[cfg(feature = "gui")]
 const UPDATE_CHANNELS_JSON: &str = include_str!("../../../src/runtime-data/update-channels.json");
+#[cfg(feature = "gui")]
+const JSP_PROXY_ORIGIN: &str = "https://jsp.dwsy.link";
+#[cfg(feature = "gui")]
+const JSP_PROXY_VERSION: &str = "110";
 
 #[cfg(feature = "gui")]
 #[derive(Debug, Clone, Deserialize)]
@@ -72,16 +76,51 @@ fn update_manifest_urls(channel: &str) -> Result<Vec<Url>, String> {
     let normalized = normalize_update_channel(channel);
     let config = update_channels_config()?;
     let entry = config.channels.get(normalized).ok_or_else(|| format!("Unknown update channel: {normalized}"))?;
-    [format!("https://raw.githubusercontent.com/{}/{}/{}/{}", config.owner, config.repo, config.manifest_branch, entry.manifest_path), format!("https://cdn.jsdelivr.net/gh/{}/{}@{}/{}", config.owner, config.repo, config.manifest_branch, entry.manifest_path)]
-        .into_iter()
+
+    let direct_urls = [
+        format!("https://raw.githubusercontent.com/{}/{}/{}/{}", config.owner, config.repo, config.manifest_branch, entry.manifest_path),
+        format!("https://cdn.jsdelivr.net/gh/{}/{}@{}/{}", config.owner, config.repo, config.manifest_branch, entry.manifest_path),
+    ];
+
+    direct_urls
+        .iter()
+        .cloned()
+        .chain(direct_urls.iter().map(|value| format!("{JSP_PROXY_ORIGIN}/http/{value}")))
         .map(|value| Url::parse(&value).map_err(|error| format!("Invalid update endpoint {value}: {error}")))
         .collect()
 }
 
 #[cfg(feature = "gui")]
+fn github_proxy_referer() -> String {
+    let mut params = std::collections::BTreeMap::new();
+    params.insert("--ver", JSP_PROXY_VERSION);
+    params.insert("--mode", "cors");
+    params.insert("--type", "");
+    params.insert("--aceh", "1");
+    params.insert("--level", "1");
+    let query = params
+        .into_iter()
+        .map(|(key, value)| format!("{}={}", key, urlencoding::encode(value)))
+        .collect::<Vec<_>>()
+        .join("&");
+    format!("{JSP_PROXY_ORIGIN}/?{query}")
+}
+
+#[cfg(feature = "gui")]
 fn build_channel_updater<R: Runtime>(app: &AppHandle<R>, channel: &str) -> Result<tauri_plugin_updater::Updater, String> {
     let endpoints = update_manifest_urls(channel)?;
-    app.updater_builder().endpoints(endpoints).map_err(|error| format!("Failed to configure updater endpoints: {error}"))?.build().map_err(|error| format!("Failed to build updater: {error}"))
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        REFERER,
+        HeaderValue::from_str(&github_proxy_referer()).map_err(|error| format!("Invalid updater Referer header: {error}"))?,
+    );
+
+    app.updater_builder()
+        .endpoints(endpoints)
+        .map_err(|error| format!("Failed to configure updater endpoints: {error}"))?
+        .headers(headers)
+        .build()
+        .map_err(|error| format!("Failed to build updater: {error}"))
 }
 
 #[cfg(feature = "gui")]

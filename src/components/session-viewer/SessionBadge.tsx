@@ -64,24 +64,30 @@ export function SessionBadge(props: SessionBadgeProps) {
     const tone = sourceProps.tone ?? "source";
     const showIcon = sourceProps.showIcon === true;
     const sourceSlug = sourceProps.sourceSlug;
+    const sourceToneStyle =
+      tone === "source"
+        ? {
+            borderColor: "rgba(var(--accent-rgb), 0.2)",
+            backgroundColor: "rgba(var(--accent-rgb), 0.1)",
+            color: "var(--accent)",
+          }
+        : undefined;
+
     return (
       <span
         className={`
           inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium
           flex-shrink-0 leading-none border
-          ${
-            tone === "source"
-              ? "border-blue-500/20 bg-blue-500/10 text-blue-500/90"
-              : "border-border/60 bg-muted/30 text-muted-foreground"
-          }
+          ${tone === "source" ? "" : "border-border/60 bg-muted/30 text-muted-foreground"}
           ${props.className ?? ""}
         `}
+        style={sourceToneStyle}
       >
         {showIcon && sourceSlug && (
           <AgentIcon
             source={sourceSlug}
             size={14}
-            className={tone === "source" ? "text-current" : "text-current"}
+            className="text-current"
           />
         )}
         {sourceProps.label}

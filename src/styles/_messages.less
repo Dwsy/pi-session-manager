@@ -110,6 +110,15 @@
   overflow: hidden;
   border-radius: 16px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  color: var(--userMessageText);
+  --text: var(--userMessageText);
+  --mdHeading: var(--userMessageText);
+  --mdQuote: color-mix(in srgb, var(--userMessageText) 78%, transparent);
+  --mdLink: color-mix(in srgb, var(--accent) 70%, white 30%);
+  --mdLinkUrl: color-mix(in srgb, var(--userMessageText) 56%, transparent);
+  --mdCode: color-mix(in srgb, var(--accent) 72%, white 28%);
+  --mdCodeBlockBorder: color-mix(in srgb, var(--accent) 26%, transparent);
+  --mdHr: color-mix(in srgb, var(--userMessageText) 18%, transparent);
 
   // Background matches user-message styling, with higher opacity for text readability
   background: var(--color-background);
@@ -136,14 +145,13 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
-  color: var(--color-foreground);
+  color: inherit;
 }
 
 .user-message-modal-subtitle {
   margin: 4px 0 0 0;
   font-size: 0.75rem;
-  color: rgb(var(--color-muted-foreground));
-  opacity: 0.85;
+  color: color-mix(in srgb, var(--userMessageText) 72%, transparent);
 }
 
 .user-message-modal-close-btn {

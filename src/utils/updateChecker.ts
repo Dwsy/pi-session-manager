@@ -1,6 +1,7 @@
 import {
   getGithubLatestReleaseApiUrl,
   getGithubLatestReleaseProxyApiUrl,
+  getGithubProxyRequestHeaders,
   getGithubReleasesApiUrl,
   getGithubReleasesProxyApiUrl,
   getReleaseUrl,
@@ -146,10 +147,16 @@ function isPreferredBetaRelease(release: GithubRelease): boolean {
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
+  const headers: HeadersInit = {
+    Accept: 'application/vnd.github+json',
+  }
+
+  if (url.startsWith('https://jsp.dwsy.link/')) {
+    Object.assign(headers as Record<string, string>, getGithubProxyRequestHeaders())
+  }
+
   const response = await fetch(url, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-    },
+    headers,
   })
 
   if (!response.ok) {

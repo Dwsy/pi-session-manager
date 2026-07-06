@@ -19,8 +19,31 @@ export function getGithubLatestReleaseApiUrl(): string {
   return `https://api.github.com/repos/${getGithubRepoSlug()}/releases/latest`
 }
 
+const JSP_PROXY_ORIGIN = 'https://jsp.dwsy.link'
+const JSP_PROXY_VERSION = '110'
+
+function getGithubProxyReferer(params: Record<string, string>): string {
+  return `${JSP_PROXY_ORIGIN}/?${new URLSearchParams(params).toString()}`
+}
+
+function getGithubProxyApiUrl(targetUrl: string): string {
+  return `${JSP_PROXY_ORIGIN}/http/${targetUrl}`
+}
+
+export function getGithubProxyRequestHeaders(): HeadersInit {
+  return {
+    Referer: getGithubProxyReferer({
+      '--ver': JSP_PROXY_VERSION,
+      '--mode': 'cors',
+      '--type': '',
+      '--aceh': '1',
+      '--level': '1',
+    }),
+  }
+}
+
 export function getGithubLatestReleaseProxyApiUrl(): string {
-  return `https://jsp.dwsy.link/-----${getGithubLatestReleaseApiUrl()}`
+  return getGithubProxyApiUrl(getGithubLatestReleaseApiUrl())
 }
 
 export function getGithubReleasesApiUrl(perPage = 20): string {
@@ -28,7 +51,7 @@ export function getGithubReleasesApiUrl(perPage = 20): string {
 }
 
 export function getGithubReleasesProxyApiUrl(perPage = 20): string {
-  return `https://jsp.dwsy.link/-----${getGithubReleasesApiUrl(perPage)}`
+  return getGithubProxyApiUrl(getGithubReleasesApiUrl(perPage))
 }
 
 export function normalizeUpdateChannel(value: string | null | undefined): UpdateChannel {

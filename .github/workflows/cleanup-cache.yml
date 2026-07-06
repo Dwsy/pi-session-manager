@@ -1,0 +1,149 @@
+name: Cleanup GitHub Actions Cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Cleanup scope'
+        required: true
+        type: choice
+        options:
+          - 'older-than'
+          - 'all'
+          - 'branch'
+          - 'key-prefix'
+        default: 'older-than'
+      days:
+        description: 'Days threshold for "older-than" scope (e.g., 7)'
+        required: false
+        type: string
+        default: '7'
+      branch:
+        description: 'Branch name/ref for "branch" scope (e.g., main or refs/heads/main)'
+        required: false
+        type: string
+        default: ''
+      prefix:
+        description: 'Cache key prefix for "key-prefix" scope'
+        required: false
+        type: string
+        default: ''
+  schedule:
+    # Run automatically every week (Sunday at 2:00 AM UTC) to clean up caches older than 7 days
+    - cron: '0 2 * * 0'
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup Caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          INPUT_SCOPE: ${{ github.event.inputs.scope || 'older-than' }}
+          INPUT_DAYS: ${{ github.event.inputs.days || '7' }}
+          INPUT_BRANCH: ${{ github.event.inputs.branch }}
+          INPUT_PREFIX: ${{ github.event.inputs.prefix }}
+        run: |
+          set -e
+
+          # Standardize branch ref if provided
+          BRANCH_REF=""
+          if [ -n "$INPUT_BRANCH" ]; then
+            if [[ "$INPUT_BRANCH" == refs/* ]]; then
+              BRANCH_REF="$INPUT_BRANCH"
+            else
+              BRANCH_REF="refs/heads/$INPUT_BRANCH"
+            fi
+          fi
+
+          echo "Starting cleanup under scope: $INPUT_SCOPE"
+
+          if [ "$INPUT_SCOPE" = "all" ]; then
+            echo "Deleting ALL caches in the repository..."
+            # Delete all caches using gh cache delete --all
+            gh cache delete --all --repo "$REPO"
+            echo "Done."
+
+          elif [ "$INPUT_SCOPE" = "branch" ]; then
+            if [ -z "$BRANCH_REF" ]; then
+              echo "Error: Branch is required for scope 'branch'"
+              exit 1
+            fi
+            echo "Deleting caches for branch: $BRANCH_REF..."
+            # List all caches for this ref and delete them
+            caches=$(gh cache list --repo "$REPO" --ref "$BRANCH_REF" --limit 100 --json id --jq '.[].id')
+            if [ -z "$caches" ]; then
+              echo "No caches found for branch: $BRANCH_REF"
+            else
+              for id in $caches; do
+                echo "Deleting cache ID: $id"
+                gh cache delete "$id" --repo "$REPO" || true
+              done
+            fi
+            echo "Done."
+
+          elif [ "$INPUT_SCOPE" = "key-prefix" ]; then
+            if [ -z "$INPUT_PREFIX" ]; then
+              echo "Error: Key prefix is required for scope 'key-prefix'"
+              exit 1
+            fi
+            echo "Deleting caches with prefix: $INPUT_PREFIX..."
+            # List all caches matching the key prefix
+            caches=$(gh cache list --repo "$REPO" --key "$INPUT_PREFIX" --limit 100 --json id --jq '.[].id')
+            if [ -z "$caches" ]; then
+              echo "No caches found with prefix: $INPUT_PREFIX"
+            else
+              for id in $caches; do
+                echo "Deleting cache ID: $id"
+                gh cache delete "$id" --repo "$REPO" || true
+              done
+            fi
+            echo "Done."
+
+          else
+            # Default or "older-than"
+            DAYS=${INPUT_DAYS:-7}
+            echo "Deleting caches older than $DAYS days..."
+            cutoff=$(date -d "$DAYS days ago" -u +%Y-%m-%dT%H:%M:%SZ)
+            echo "Cutoff time: $cutoff"
+
+            # Fetch caches page by page and delete those older than cutoff
+            page=1
+            while true; do
+              echo "Checking page $page of caches..."
+              resp=$(gh api "repos/$REPO/actions/caches?per_page=100&page=$page" || true)
+              if [ -z "$resp" ]; then
+                echo "No response from GitHub API."
+                break
+              fi
+
+              total=$(echo "$resp" | jq '.total_count // 0')
+              if [ "$total" -eq 0 ]; then
+                echo "No caches found in total."
+                break
+              fi
+
+              # Extract IDs of caches created before or at cutoff time
+              ids=$(echo "$resp" | jq --arg cutoff "$cutoff" -r '.actions_caches[] | select(.created_at <= $cutoff) | .id')
+              if [ -z "$ids" ]; then
+                echo "No caches older than $cutoff on page $page."
+              else
+                for id in $ids; do
+                  echo "Deleting old cache ID: $id"
+                  gh cache delete "$id" --repo "$REPO" || true
+                done
+              fi
+
+              count=$(echo "$resp" | jq '.actions_caches | length')
+              if [ "$count" -lt 100 ]; then
+                break
+              fi
+              page=$((page + 1))
+            done
+            echo "Done."
+          fi

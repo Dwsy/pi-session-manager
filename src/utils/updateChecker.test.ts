@@ -59,7 +59,9 @@ describe('updateChecker', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/releases/latest'),
-      expect.objectContaining({ headers: { Accept: 'application/vnd.github+json' } }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Accept: 'application/vnd.github+json' }),
+      }),
     )
     expect(result.status).toBe('update')
     if (result.status === 'update') {
@@ -110,7 +112,9 @@ describe('updateChecker', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/releases?per_page=20'),
-      expect.objectContaining({ headers: { Accept: 'application/vnd.github+json' } }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Accept: 'application/vnd.github+json' }),
+      }),
     )
     expect(result.status).toBe('update')
     if (result.status === 'update') {
