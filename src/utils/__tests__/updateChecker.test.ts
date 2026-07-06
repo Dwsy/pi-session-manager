@@ -65,6 +65,9 @@ describe('checkForUpdates - fallback logic', () => {
   it('falls back to proxy when official API fails', async () => {
     let callCount = 0
     globalThis.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/latest.json')) {
+        return Promise.resolve({ ok: false, status: 404 })
+      }
       callCount++
       if (url.startsWith('https://api.github.com')) {
         return Promise.resolve({ ok: false, status: 403 })
@@ -98,6 +101,9 @@ describe('checkForUpdates - fallback logic', () => {
   it('handles beta channel fallback', async () => {
     let callCount = 0
     globalThis.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes('/latest.json')) {
+        return Promise.resolve({ ok: false, status: 404 })
+      }
       callCount++
       if (url.startsWith('https://api.github.com')) {
         return Promise.resolve({ ok: false, status: 403 })

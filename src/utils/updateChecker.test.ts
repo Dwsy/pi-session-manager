@@ -40,18 +40,23 @@ describe('updateChecker', () => {
 
   it('checks stable channel against GitHub latest release and stores channel-specific timestamp', async () => {
     const fetchMock = vi.mocked(globalThis.fetch)
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        tag_name: 'v0.6.4',
-        html_url: 'https://github.com/Dwsy/pi-session-manager/releases/tag/v0.6.4',
-        name: 'Pi Session Manager 0.6.4',
-        body: 'Stable notes',
-        published_at: '2026-05-26T00:00:00Z',
-        prerelease: false,
-        draft: false,
-      }),
-    } as Response)
+    fetchMock.mockImplementation(async (url) => {
+      if (url.includes('/releases/latest')) {
+        return {
+          ok: true,
+          json: async () => ({
+            tag_name: 'v0.6.4',
+            html_url: 'https://github.com/Dwsy/pi-session-manager/releases/tag/v0.6.4',
+            name: 'Pi Session Manager 0.6.4',
+            body: 'Stable notes',
+            published_at: '2026-05-26T00:00:00Z',
+            prerelease: false,
+            draft: false,
+          }),
+        } as Response
+      }
+      return { ok: false, status: 404 } as Response
+    })
 
     const { checkForUpdates, getLastUpdateCheckAt } = await import('./updateChecker')
 
@@ -75,29 +80,34 @@ describe('updateChecker', () => {
 
   it('checks beta channel against GitHub prerelease list and keeps dismissed versions isolated per channel', async () => {
     const fetchMock = vi.mocked(globalThis.fetch)
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ([
-        {
-          tag_name: 'v0.7.0-beta.2',
-          html_url: 'https://github.com/Dwsy/pi-session-manager/releases/tag/v0.7.0-beta.2',
-          name: 'Pi Session Manager 0.7.0-beta.2',
-          body: 'Beta notes',
-          published_at: '2026-05-26T00:00:00Z',
-          prerelease: true,
-          draft: false,
-        },
-        {
-          tag_name: 'v0.6.4',
-          html_url: 'https://github.com/Dwsy/pi-session-manager/releases/tag/v0.6.4',
-          name: 'Pi Session Manager 0.6.4',
-          body: 'Stable notes',
-          published_at: '2026-05-20T00:00:00Z',
-          prerelease: false,
-          draft: false,
-        },
-      ]),
-    } as Response)
+    fetchMock.mockImplementation(async (url) => {
+      if (url.includes('/releases?per_page=')) {
+        return {
+          ok: true,
+          json: async () => ([
+            {
+              tag_name: 'v0.7.0-beta.2',
+              html_url: 'https://github.com/Dwsy/pi-session-manager/releases/tag/v0.7.0-beta.2',
+              name: 'Pi Session Manager 0.7.0-beta.2',
+              body: 'Beta notes',
+              published_at: '2026-05-26T00:00:00Z',
+              prerelease: true,
+              draft: false,
+            },
+            {
+              tag_name: 'v0.6.4',
+              html_url: 'https://github.com/Dwsy/pi-session-manager/releases/tag/v0.6.4',
+              name: 'Pi Session Manager 0.6.4',
+              body: 'Stable notes',
+              published_at: '2026-05-20T00:00:00Z',
+              prerelease: false,
+              draft: false,
+            },
+          ]),
+        } as Response
+      }
+      return { ok: false, status: 404 } as Response
+    })
 
     const {
       checkForUpdates,
@@ -123,5 +133,32 @@ describe('updateChecker', () => {
     }
     expect(getDismissedUpdateVersion('stable')).toBe('0.6.4')
     expect(getDismissedUpdateVersion('beta')).toBe('0.7.0-beta.1')
+  })
+
+  it('checks updates using the Tauri update manifest successfully', async () => {
+    const fetchMock = vi.mocked(globalThis.fetch)
+    fetchMock.mockImplementation(async (url) => {
+      if (url.includes('/stable/latest.json')) {
+        return {
+          ok: true,
+          json: async () => ({
+            version: '0.6.5',
+            notes: 'Manifest notes',
+            pub_date: '2026-06-01T00:00:00Z',
+          }),
+        } as Response
+      }
+      return { ok: false, status: 404 } as Response
+    })
+
+    const { checkForUpdates } = await import('./updateChecker')
+    const result = await checkForUpdates('stable', '0.6.3')
+
+    expect(result.status).toBe('update')
+    if (result.status === 'update') {
+      expect(result.update.latestVersion).toBe('0.6.5')
+      expect(result.update.releaseName).toBe('Pi Session Manager v0.6.5')
+      expect(result.update.releaseNotes).toBe('Manifest notes')
+    }
   })
 })

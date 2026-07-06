@@ -41,7 +41,6 @@ tokio-tungstenite = "0.21"
 futures-util = "0.3"
 log = "0.4"
 axum = { version = "0.7", features = ["ws"] }
-tower-http = { version = "0.5", features = ["fs", "cors"] }
 rust-embed = "8"
 mime_guess = "2"
 portable-pty = "0.9"

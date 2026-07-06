@@ -6,6 +6,7 @@ import {
   getGithubReleasesProxyApiUrl,
   getReleaseUrl,
   normalizeUpdateChannel,
+  getChannelManifestUrls,
   type UpdateChannel,
 } from './updateChannel'
 
@@ -146,7 +147,19 @@ function isPreferredBetaRelease(release: GithubRelease): boolean {
   return release.prerelease === true
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
+async function fetchJson<T>(url: string, headers?: HeadersInit): Promise<T> {
+  const response = await fetch(url, {
+    headers,
+  })
+
+  if (!response.ok) {
+    throw new Error(`Fetch error: ${response.status}`)
+  }
+
+  return response.json() as Promise<T>
+}
+
+async function fetchGithubJson<T>(url: string): Promise<T> {
   const headers: HeadersInit = {
     Accept: 'application/vnd.github+json',
   }
@@ -155,26 +168,52 @@ async function fetchJson<T>(url: string): Promise<T> {
     Object.assign(headers as Record<string, string>, getGithubProxyRequestHeaders())
   }
 
-  const response = await fetch(url, {
-    headers,
-  })
+  return fetchJson<T>(url, headers)
+}
 
-  if (!response.ok) {
-    throw new Error(`GitHub API error: ${response.status}`)
+interface TauriManifest {
+  version: string
+  notes?: string
+  pub_date?: string
+}
+
+async function fetchReleaseFromManifest(channel: UpdateChannel): Promise<GithubRelease & { tag_name: string }> {
+  const urls = getChannelManifestUrls(channel)
+  // Try JSdelivr CDN first (urls[1]) because it's cached, fast, and does not hit GitHub rate limits.
+  // Then try GitHub Raw (urls[0]).
+  const urlsToTry = [urls[1], urls[0]].filter(Boolean)
+  let lastError: Error | null = null
+
+  for (const url of urlsToTry) {
+    try {
+      const manifest = await fetchJson<TauriManifest>(url)
+      if (manifest && manifest.version) {
+        return {
+          tag_name: `v${manifest.version}`,
+          html_url: getReleaseUrl(manifest.version),
+          name: `Pi Session Manager v${manifest.version}`,
+          body: manifest.notes || '',
+          published_at: manifest.pub_date || undefined,
+          prerelease: channel === 'beta',
+        }
+      }
+    } catch (e) {
+      lastError = e as Error
+    }
   }
 
-  return response.json() as Promise<T>
+  throw lastError || new Error(`Failed to fetch manifest for channel ${channel}`)
 }
 
 async function fetchStableRelease(): Promise<GithubRelease & { tag_name: string }> {
   try {
-    const payload = await fetchJson<Partial<GithubRelease>>(getGithubLatestReleaseApiUrl())
+    const payload = await fetchGithubJson<Partial<GithubRelease>>(getGithubLatestReleaseApiUrl())
     if (!isValidRelease(payload)) {
       throw new Error('Missing tag_name in GitHub latest release payload')
     }
     return payload
   } catch (error) {
-    const payload = await fetchJson<Partial<GithubRelease>>(getGithubLatestReleaseProxyApiUrl())
+    const payload = await fetchGithubJson<Partial<GithubRelease>>(getGithubLatestReleaseProxyApiUrl())
     if (!isValidRelease(payload)) {
       throw new Error('Missing tag_name in GitHub latest release proxy payload')
     }
@@ -184,7 +223,7 @@ async function fetchStableRelease(): Promise<GithubRelease & { tag_name: string 
 
 async function fetchBetaRelease(): Promise<GithubRelease & { tag_name: string }> {
   try {
-    const releases = await fetchJson<Array<Partial<GithubRelease>>>(getGithubReleasesApiUrl())
+    const releases = await fetchGithubJson<Array<Partial<GithubRelease>>>(getGithubReleasesApiUrl())
     const validReleases = releases.filter(isValidRelease)
     const preferred = validReleases.find(isPreferredBetaRelease)
     const fallback = validReleases.find((release) => !release.prerelease)
@@ -194,7 +233,7 @@ async function fetchBetaRelease(): Promise<GithubRelease & { tag_name: string }>
     }
     return chosen
   } catch (error) {
-    const releases = await fetchJson<Array<Partial<GithubRelease>>>(getGithubReleasesProxyApiUrl())
+    const releases = await fetchGithubJson<Array<Partial<GithubRelease>>>(getGithubReleasesProxyApiUrl())
     const validReleases = releases.filter(isValidRelease)
     const preferred = validReleases.find(isPreferredBetaRelease)
     const fallback = validReleases.find((release) => !release.prerelease)
@@ -207,7 +246,12 @@ async function fetchBetaRelease(): Promise<GithubRelease & { tag_name: string }>
 }
 
 async function fetchReleaseForChannel(channel: UpdateChannel): Promise<GithubRelease & { tag_name: string }> {
-  return channel === 'beta' ? fetchBetaRelease() : fetchStableRelease()
+  try {
+    return await fetchReleaseFromManifest(channel)
+  } catch (error) {
+    // Fallback to GitHub API if manifest fetching fails
+    return channel === 'beta' ? fetchBetaRelease() : fetchStableRelease()
+  }
 }
 
 export function getCurrentAppVersion(): string {
