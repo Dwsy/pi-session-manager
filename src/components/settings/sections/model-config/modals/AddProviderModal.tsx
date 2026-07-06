@@ -46,7 +46,7 @@ export function AddProviderModal({
           <button
             type="button"
             onClick={onConfirm}
-            className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm text-white hover:bg-info/90 motion-color motion-press focus-ring"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all motion-press focus-ring"
           >
             <Plus className="h-4 w-4" />
             {t(

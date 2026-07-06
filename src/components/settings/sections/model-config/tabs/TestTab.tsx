@@ -1,4 +1,13 @@
-import { AlertCircle, Check, Copy, FileJson, FlaskConical, Loader2, Play } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Copy,
+  FileJson,
+  FlaskConical,
+  Loader2,
+  Play,
+  Terminal,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import SettingsCard from "@/components/settings/SettingsCard";
 import SettingsField from "@/components/settings/SettingsField";
@@ -46,42 +55,42 @@ export function TestTab({
         "Makes real request with currently selected Provider + Model to verify configuration.",
       )}
     >
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div className="rounded-xl border border-border/70 bg-background/35 px-4 py-3">
-            <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+          <div className="rounded-xl border border-border/60 bg-card/50 px-4 py-3 shadow-sm backdrop-blur-sm">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               {t(
                 "settings.modelConfigCenter.fields.selectedProvider",
                 "Current Provider",
               )}
             </div>
-            <div className="mt-2 truncate text-sm font-medium text-foreground">
+            <div className="mt-1 truncate text-base font-bold text-foreground">
               {selectedProvider || "-"}
             </div>
           </div>
-          <div className="rounded-xl border border-border/70 bg-background/35 px-4 py-3">
-            <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="rounded-xl border border-border/60 bg-card/50 px-4 py-3 shadow-sm backdrop-blur-sm">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               {t(
                 "settings.modelConfigCenter.fields.selectedModel",
                 "Current Model",
               )}
             </div>
-            <div className="mt-2 truncate text-sm font-medium text-foreground">
+            <div className="mt-1 truncate text-base font-bold text-foreground">
               {selectedModelEntry?.id?.trim() || activeModelLabel || "-"}
             </div>
           </div>
-          <div className="rounded-xl border border-border/70 bg-background/35 px-4 py-3">
-            <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="rounded-xl border border-border/60 bg-card/50 px-4 py-3 shadow-sm backdrop-blur-sm">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               API
             </div>
-            <div className="mt-2 truncate text-sm font-medium text-foreground">
+            <div className="mt-1 truncate text-base font-bold text-primary font-mono">
               {selectedProviderEntry?.api ?? "-"}
             </div>
           </div>
         </div>
 
         {!selectedProviderEntry && (
-          <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+          <div className="rounded-xl border border-dashed border-border/60 p-8 text-center text-sm text-muted-foreground bg-card/20">
             {t(
               "settings.modelConfigCenter.empty.testEmpty",
               "Go to config page to select Provider and model first, then come back to run test.",
@@ -90,161 +99,178 @@ export function TestTab({
         )}
 
         {!selectedModelEntry?.id?.trim() && selectedProviderEntry && (
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-            {t(
-              "settings.modelConfigCenter.help.noModelId",
-              "Current model has no ID filled, cannot make HTTP test.",
-            )}
+          <div className="flex items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 py-3.5 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 shadow-sm">
+            <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-500" />
+            <span>
+              {t(
+                "settings.modelConfigCenter.help.noModelId",
+                "Current model has no ID filled, cannot make HTTP test.",
+              )}
+            </span>
           </div>
         )}
 
-        <SettingsField
-          label={t(
-            "settings.modelConfigCenter.fields.prompt",
-            "Test Prompt",
-          )}
-        >
-          <SettingsInput
-            value={testPrompt}
-            onChange={(event) => onTestPromptChange(event.target.value)}
-            placeholder={t(
-              "settings.modelConfigCenter.placeholders.testPrompt",
-              "Please reply only with OK",
+        <div className="rounded-xl border border-border/60 bg-card/40 p-5 shadow-sm space-y-4">
+          <SettingsField
+            label={t(
+              "settings.modelConfigCenter.fields.prompt",
+              "Test Prompt",
             )}
-          />
-        </SettingsField>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void onRunTest()}
-            disabled={
-              !selectedProvider ||
-              !selectedModelEntry?.id?.trim() ||
-              busy === "http-test"
-            }
-            className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm font-medium text-white hover:bg-info/90 motion-color motion-press focus-ring disabled:opacity-60"
           >
-            {busy === "http-test" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Play className="h-4 w-4" />
-            )}
-            {t(
-              "settings.modelConfigCenter.actions.runTest",
-              "Run Test",
-            )}
-          </button>
-          {testResult && (
+            <SettingsInput
+              value={testPrompt}
+              onChange={(event) => onTestPromptChange(event.target.value)}
+              placeholder={t(
+                "settings.modelConfigCenter.placeholders.testPrompt",
+                "Please reply only with OK",
+              )}
+            />
+          </SettingsField>
+
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
             <button
               type="button"
-              onClick={() => void onCopyCurlCommand()}
-              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
+              onClick={() => void onRunTest()}
+              disabled={
+                !selectedProvider ||
+                !selectedModelEntry?.id?.trim() ||
+                busy === "http-test"
+              }
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all duration-150 active:scale-95 focus-ring disabled:opacity-60"
             >
-              <Copy className="h-4 w-4" />
+              {busy === "http-test" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
               {t(
-                "settings.modelConfigCenter.actions.copyCurl",
-                "Copy cURL",
+                "settings.modelConfigCenter.actions.runTest",
+                "Run Test",
               )}
             </button>
-          )}
-          <button
-            type="button"
-            onClick={onBackToConfigure}
-            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
-          >
-            <FileJson className="h-4 w-4" />
-            {t(
-              "settings.modelConfigCenter.actions.backToConfigure",
-              "Back to Config",
+            {testResult && (
+              <button
+                type="button"
+                onClick={() => void onCopyCurlCommand()}
+                className="inline-flex items-center gap-2 rounded-xl border border-border/70 bg-surface/60 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-surface hover:border-border transition-all duration-150 active:scale-95 focus-ring"
+              >
+                <Copy className="h-4 w-4" />
+                {t(
+                  "settings.modelConfigCenter.actions.copyCurl",
+                  "Copy cURL",
+                )}
+              </button>
             )}
-          </button>
+            <button
+              type="button"
+              onClick={onBackToConfigure}
+              className="inline-flex items-center gap-2 rounded-xl border border-border/70 bg-background/50 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-surface hover:border-border transition-all duration-150 active:scale-95 focus-ring"
+            >
+              <FileJson className="h-4 w-4" />
+              {t(
+                "settings.modelConfigCenter.actions.backToConfigure",
+                "Back to Config",
+              )}
+            </button>
+          </div>
         </div>
 
         {testResult && (
-          <div className="rounded-xl border border-border/70 bg-background/30 p-4 text-sm">
-            <div className="flex flex-wrap items-center gap-3">
-              <span
-                className={`inline-flex items-center gap-1.5 font-medium ${testResult.ok ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}
-              >
-                {testResult.ok ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  <AlertCircle className="h-4 w-4" />
-                )}
-                {testResult.ok ? "OK" : "FAILED"}
-              </span>
-              <span className="text-muted-foreground">
-                {testResult.method} {testResult.url}
-              </span>
-              <span className="text-muted-foreground">
-                status: {testResult.statusCode ?? "-"}
-              </span>
-              <span className="text-muted-foreground">
-                latency: {testResult.latencyMs} ms
-              </span>
+          <div className="rounded-2xl border border-border/60 bg-card/60 p-5 shadow-lg backdrop-blur-md space-y-5 animate-in fade-in duration-200">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-3">
+              <div className="flex items-center gap-3">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold shadow-sm ${
+                    testResult.ok
+                      ? "border border-green-500/30 bg-green-500/15 text-green-700 dark:text-green-300"
+                      : "border border-red-500/30 bg-red-500/15 text-red-700 dark:text-red-300"
+                  }`}
+                >
+                  {testResult.ok ? (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <AlertCircle className="h-3.5 w-3.5" />
+                  )}
+                  {testResult.ok ? "200 OK" : "FAILED"}
+                </span>
+                <span className="font-mono text-sm font-semibold text-foreground">
+                  {testResult.method} {testResult.url}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
+                <span>
+                  Status: <strong className="text-foreground">{testResult.statusCode ?? "-"}</strong>
+                </span>
+                <span>
+                  Latency: <strong className="text-primary">{testResult.latencyMs} ms</strong>
+                </span>
+              </div>
             </div>
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3 text-xs">
-              <div className="rounded-lg border border-border/70 bg-background/40 px-3 py-2">
-                <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                  API
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-xs">
+              <div className="rounded-xl border border-border/50 bg-background/40 px-3.5 py-2.5">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  API Protocol
                 </div>
-                <div className="mt-1 font-medium text-foreground">
+                <div className="mt-1 font-bold text-foreground font-mono">
                   {testResult.api}
                 </div>
               </div>
-              <div className="rounded-lg border border-border/70 bg-background/40 px-3 py-2">
-                <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+              <div className="rounded-xl border border-border/50 bg-background/40 px-3.5 py-2.5">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Request Style
                 </div>
-                <div className="mt-1 font-medium text-foreground">
+                <div className="mt-1 font-bold text-foreground">
                   {testResult.requestStyle}
                 </div>
               </div>
-              <div className="rounded-lg border border-border/70 bg-background/40 px-3 py-2">
-                <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+              <div className="rounded-xl border border-border/50 bg-background/40 px-3.5 py-2.5">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Attempts
                 </div>
-                <div className="mt-1 font-medium text-foreground">
+                <div className="mt-1 font-bold text-foreground">
                   {testResult.attemptCount}
-                  {testResult.usedFallback
-                    ? " (fallback used)"
-                    : ""}
+                  {testResult.usedFallback ? " (fallback used)" : ""}
                 </div>
               </div>
             </div>
+
             {testResult.responsePreview && (
-              <div className="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-200">
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-sm font-medium text-emerald-800 dark:text-emerald-200 shadow-sm">
                 {testResult.responsePreview}
               </div>
             )}
             {testResult.error && (
-              <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-sm font-medium text-red-800 dark:text-red-300 shadow-sm">
                 {testResult.error}
               </div>
             )}
-            <div className="mt-4 space-y-3 text-xs">
-              <details>
-                <summary className="cursor-pointer font-medium text-foreground">
-                  cURL
+
+            <div className="space-y-3 pt-1">
+              <details className="group">
+                <summary className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
+                  <Terminal className="h-3.5 w-3.5" />
+                  <span>cURL Command</span>
                 </summary>
-                <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg border border-border/70 bg-background/40 p-3 text-muted-foreground">
+                <pre className="mt-2.5 whitespace-pre-wrap break-all rounded-xl border border-border/60 bg-background/80 p-4 font-mono text-xs text-foreground/90 shadow-inner overflow-x-auto">
                   {testResult.curlCommand}
                 </pre>
               </details>
-              <details>
-                <summary className="cursor-pointer font-medium text-foreground">
-                  Request Body
+              <details className="group">
+                <summary className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
+                  <Terminal className="h-3.5 w-3.5" />
+                  <span>Request Body</span>
                 </summary>
-                <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg border border-border/70 bg-background/40 p-3 text-muted-foreground">
+                <pre className="mt-2.5 whitespace-pre-wrap break-all rounded-xl border border-border/60 bg-background/80 p-4 font-mono text-xs text-foreground/90 shadow-inner overflow-x-auto">
                   {testResult.requestBody}
                 </pre>
               </details>
-              <details open>
-                <summary className="cursor-pointer font-medium text-foreground">
-                  Response Body
+              <details open className="group">
+                <summary className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
+                  <Terminal className="h-3.5 w-3.5" />
+                  <span>Response Body</span>
                 </summary>
-                <pre className="mt-2 max-h-[280px] overflow-y-auto whitespace-pre-wrap break-all rounded-lg border border-border/70 bg-background/40 p-3 text-muted-foreground">
+                <pre className="mt-2.5 max-h-[320px] overflow-y-auto whitespace-pre-wrap break-all rounded-xl border border-border/60 bg-background/80 p-4 font-mono text-xs text-foreground/90 shadow-inner">
                   {testResult.responseBody || "(empty)"}
                 </pre>
               </details>

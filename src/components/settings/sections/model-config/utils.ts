@@ -1,5 +1,15 @@
-import type { ModelConfigShape, ProviderEntry, ModelEntry } from "./types";
-import { EMPTY_CONFIG } from "./types";
+import type {
+  ModelConfigShape,
+  ProviderEntry,
+  ModelEntry,
+  ModelInputType,
+  ThinkingLevelMap,
+} from "./types";
+import {
+  EMPTY_CONFIG,
+  MODEL_INPUT_TYPE_OPTIONS,
+  MODEL_THINKING_LEVEL_OPTIONS,
+} from "./types";
 
 export function asModelConfigShape(raw: unknown): ModelConfigShape {
   if (!raw || typeof raw !== "object") return EMPTY_CONFIG;
@@ -32,6 +42,28 @@ export function normalizeHeaders(
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
+export function normalizeModelInputTypes(input?: readonly string[]): ModelInputType[] {
+  const allowed = new Set<string>(MODEL_INPUT_TYPE_OPTIONS);
+  const values = (input ?? ["text"]).filter((item) => allowed.has(item));
+  return values.includes("image") ? ["text", "image"] : ["text"];
+}
+
+export function normalizeThinkingLevelMap(map?: ThinkingLevelMap): ThinkingLevelMap | undefined {
+  if (!map) return undefined;
+
+  const normalized: ThinkingLevelMap = {};
+  for (const level of MODEL_THINKING_LEVEL_OPTIONS) {
+    const value = map[level];
+    if (value === null) {
+      normalized[level] = null;
+    } else if (typeof value === "string" && value.trim()) {
+      normalized[level] = value.trim();
+    }
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
 export function normalizeConfig(config: ModelConfigShape): ModelConfigShape {
   const providers: Record<string, ProviderEntry> = {};
 
@@ -45,27 +77,25 @@ export function normalizeConfig(config: ModelConfigShape): ModelConfigShape {
       apiKey: provider.apiKey ?? "",
       authHeader: provider.authHeader === true,
       headers: normalizeHeaders(provider.headers),
-      models: (provider.models ?? []).map((model) => ({
-        id: model.id ?? "",
-        name: model.name ?? "",
-        api: model.api ?? "",
-        reasoning: model.reasoning === true,
-        input: [
-          ...new Set(
-            (model.input ?? ["text"])
-              .map((item) => item.trim())
-              .filter(Boolean),
-          ),
-        ],
-        contextWindow: model.contextWindow ?? 128000,
-        maxTokens: model.maxTokens ?? 16384,
-        cost: {
-          input: model.cost?.input ?? 0,
-          output: model.cost?.output ?? 0,
-          cacheRead: model.cost?.cacheRead ?? 0,
-          cacheWrite: model.cost?.cacheWrite ?? 0,
-        },
-      })),
+      models: (provider.models ?? []).map((model) => {
+        const thinkingLevelMap = normalizeThinkingLevelMap(model.thinkingLevelMap);
+        return {
+          id: model.id ?? "",
+          name: model.name ?? "",
+          api: model.api ?? "",
+          reasoning: model.reasoning === true,
+          ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+          input: normalizeModelInputTypes(model.input),
+          contextWindow: model.contextWindow ?? 128000,
+          maxTokens: model.maxTokens ?? 16384,
+          cost: {
+            input: model.cost?.input ?? 0,
+            output: model.cost?.output ?? 0,
+            cacheRead: model.cost?.cacheRead ?? 0,
+            cacheWrite: model.cost?.cacheWrite ?? 0,
+          },
+        };
+      }),
     };
   }
 
@@ -78,17 +108,6 @@ export function serializeConfig(config: ModelConfigShape): string {
 
 export function prettyConfig(config: ModelConfigShape): string {
   return JSON.stringify(normalizeConfig(config), null, 2);
-}
-
-export function splitInputTypes(raw: string): string[] {
-  return Array.from(
-    new Set(
-      raw
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
-    ),
-  );
 }
 
 export function createDefaultModel(): ModelEntry {

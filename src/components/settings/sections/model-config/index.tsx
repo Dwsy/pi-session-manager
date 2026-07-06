@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FileJson,
@@ -6,15 +7,12 @@ import {
   Loader2,
   RefreshCw,
   Save,
-  Server,
+  Sparkles,
   Upload,
 } from "lucide-react";
-import SettingsCard from "@/components/settings/SettingsCard";
-import SettingsTabs from "@/components/settings/SettingsTabs";
-
 import { MODEL_CONFIG_PATH } from "./types";
+import type { ModelConfigMainTab } from "./types";
 import { useModelConfig } from "./useModelConfig";
-import { StatTile } from "./ui/StatTile";
 import { StatusBanner } from "./ui/StatusBanner";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { AddProviderModal } from "./modals/AddProviderModal";
@@ -97,178 +95,156 @@ export default function ModelConfigCenter() {
     copyCurlCommand,
   } = vm;
 
+  const tabItems: Array<{
+    id: ModelConfigMainTab;
+    icon: ReactNode;
+    label: string;
+  }> = [
+    {
+      id: "configure",
+      icon: <FileJson className="h-3 w-3" />,
+      label: t("settings.modelConfigCenter.tabs.configure", "Configure"),
+    },
+    {
+      id: "test",
+      icon: <FlaskConical className="h-3 w-3" />,
+      label: t("settings.modelConfigCenter.tabs.test", "Test"),
+    },
+    {
+      id: "tools",
+      icon: <Upload className="h-3 w-3" />,
+      label: t("settings.modelConfigCenter.tabs.tools", "Import & Export"),
+    },
+    {
+      id: "history",
+      icon: <History className="h-3 w-3" />,
+      label: t("settings.modelConfigCenter.tabs.history", "History"),
+    },
+  ];
 
   if (loading) {
     return (
-      <div className="flex h-[420px] items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-info" />
+      <div className="flex h-[360px] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
     <>
-      <div className="space-y-4">
-        <SettingsCard
-          icon={<Server className="h-5 w-5" />}
-          title={t("settings.modelConfigCenter.title", "Model Config Center")}
-          description={t(
-            "settings.modelConfigCenter.description",
-            "Visually edit ~/.pi/agent/models.json, with backup/version/import-export and online HTTP testing support.",
-          )}
-        >
-          <div className="space-y-4">
-            {feedback && (
-              <StatusBanner
-                tone={feedback.tone}
-                message={feedback.message}
-                onClose={() => setFeedback(null)}
-              />
-            )}
+      <div className="flex h-full min-h-0 flex-col space-y-2.5">
+        {feedback && (
+          <StatusBanner
+            tone={feedback.tone}
+            message={feedback.message}
+            onClose={() => setFeedback(null)}
+          />
+        )}
 
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
-                      isDirty
-                        ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                        : "bg-green-500/10 text-green-700 dark:text-green-300"
+        <div
+          className={`flex-none rounded-lg border px-2.5 py-1.5 shadow-2xs transition-colors ${
+            isDirty
+              ? "border-amber-500/45 bg-amber-500/10"
+              : "border-border/50 bg-card/30"
+          }`}
+        >
+          <div className="flex min-h-8 flex-wrap items-center gap-2">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 shrink-0 settings-accent-fg" />
+              <h2 className="truncate text-sm font-semibold tracking-tight text-foreground">
+                {t("settings.modelConfigCenter.title", "模型配置中心")}
+              </h2>
+              <span
+                className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${
+                  isDirty
+                    ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                    : "border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-300"
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    isDirty ? "bg-amber-500 animate-pulse" : "bg-green-500"
+                  }`}
+                />
+                {isDirty
+                  ? t("settings.modelConfigCenter.status.dirty", "未保存")
+                  : t("settings.modelConfigCenter.status.saved", "已同步")}
+              </span>
+            </div>
+
+            <div className="flex h-8 items-center gap-0.5 rounded-md bg-surface/70 p-0.5">
+              {tabItems.map((item) => {
+                const active = mainTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setMainTab(item.id)}
+                    className={`inline-flex h-7 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium transition-colors focus-ring ${
+                      active
+                        ? "settings-accent-bg-strong text-primary-foreground shadow-xs"
+                        : "text-muted-foreground hover:bg-accent/10 hover:text-foreground"
                     }`}
                   >
-                    {isDirty
-                      ? t(
-                          "settings.modelConfigCenter.status.dirty",
-                          "Unsaved changes",
-                        )
-                      : t(
-                          "settings.modelConfigCenter.status.saved",
-                          "Synced with disk",
-                        )}
-                  </span>
-                  {selectedProvider && (
-                    <span className="inline-flex items-center rounded-full bg-surface px-2.5 py-1 text-xs text-foreground">
-                      {t(
-                        "settings.modelConfigCenter.status.activeProvider",
-                        "Provider: {{name}}",
-                        {
-                          name: selectedProvider,
-                        },
-                      )}
-                    </span>
-                  )}
-                  {selectedModelEntry && (
-                    <span className="inline-flex items-center rounded-full bg-surface px-2.5 py-1 text-xs text-foreground">
-                      {t(
-                        "settings.modelConfigCenter.status.activeModel",
-                        "Model: {{name}}",
-                        {
-                          name: activeModelLabel,
-                        },
-                      )}
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {t("settings.modelConfigCenter.pathLabel", "Config file")}:{" "}
-                  <span className="font-mono text-foreground/80">
-                    {MODEL_CONFIG_PATH}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void saveConfig()}
-                  disabled={saving}
-                  className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm font-medium text-white hover:bg-info/90 motion-color motion-press focus-ring disabled:opacity-60"
-                >
-                  {saving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  {t(
-                    "settings.modelConfigCenter.actions.save",
-                    "Save Configuration",
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={refreshConfig}
-                  disabled={busy === "refresh"}
-                  className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring disabled:opacity-60"
-                >
-                  {busy === "refresh" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                  {t("settings.modelConfigCenter.actions.refresh", "Refresh")}
-                </button>
-              </div>
+                    {item.icon}
+                    {item.label}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <StatTile
-                label={t(
-                  "settings.modelConfigCenter.summary.providers",
-                  "Providers",
+            <div className="ml-auto flex min-w-0 items-center gap-1.5">
+              <span className="hidden items-center gap-1 rounded border border-border/40 bg-surface/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground lg:inline-flex">
+                <span className="text-foreground">{providerNames.length}</span>P
+                <span className="text-foreground">{totalModels}</span>M
+                <span className="text-foreground">{versions.length}</span>V
+              </span>
+              {selectedProvider && (
+                <span className="hidden max-w-[220px] truncate rounded border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary xl:inline-block">
+                  {selectedProvider}
+                  {selectedModelEntry && ` / ${activeModelLabel}`}
+                </span>
+              )}
+              <span className="hidden max-w-[240px] truncate rounded border border-border/30 bg-surface/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground 2xl:inline-block">
+                {MODEL_CONFIG_PATH}
+              </span>
+              <button
+                type="button"
+                onClick={refreshConfig}
+                disabled={busy === "refresh"}
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 text-[11px] font-medium text-foreground hover:border-border hover:bg-surface transition-colors active:scale-95 focus-ring disabled:opacity-60"
+              >
+                {busy === "refresh" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
                 )}
-                value={providerNames.length}
-              />
-              <StatTile
-                label={t("settings.modelConfigCenter.summary.models", "Models")}
-                value={totalModels}
-              />
-              <StatTile
-                label={t(
-                  "settings.modelConfigCenter.summary.versions",
-                  "Versions",
+                {t("settings.modelConfigCenter.actions.refresh", "刷新")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveConfig()}
+                disabled={saving}
+                className={`inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[11px] font-semibold text-primary-foreground shadow-xs transition-colors active:scale-95 focus-ring disabled:opacity-60 ${
+                  isDirty
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-primary hover:bg-primary/90"
+                }`}
+              >
+                {saving ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Save className="h-3 w-3" />
                 )}
-                value={versions.length}
-              />
+                {isDirty
+                  ? t("settings.modelConfigCenter.actions.saveUnsaved", "Save changes")
+                  : t("settings.modelConfigCenter.actions.save", "Save")}
+              </button>
             </div>
           </div>
-        </SettingsCard>
+        </div>
 
-        <SettingsTabs
-          items={[
-            {
-              id: "configure",
-              icon: <FileJson className="h-3.5 w-3.5" />,
-              label: t(
-                "settings.modelConfigCenter.tabs.configure",
-                "Configure",
-              ),
-            },
-            {
-              id: "test",
-              icon: <FlaskConical className="h-3.5 w-3.5" />,
-              label: t("settings.modelConfigCenter.tabs.test", "Test"),
-            },
-            {
-              id: "tools",
-              icon: <Upload className="h-3.5 w-3.5" />,
-              label: t(
-                "settings.modelConfigCenter.tabs.tools",
-                "Import/Export",
-              ),
-            },
-            {
-              id: "history",
-              icon: <History className="h-3.5 w-3.5" />,
-              label: t(
-                "settings.modelConfigCenter.tabs.history",
-                "History & Restore",
-              ),
-            },
-          ]}
-          active={mainTab}
-          onChange={setMainTab}
-        />
-
+        {/* Main Workspace Area */}
         {mainTab === "configure" && (
           <ConfigureTab
             providerNames={providerNames}
@@ -297,7 +273,7 @@ export default function ModelConfigCenter() {
         )}
 
         {mainTab !== "configure" && (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="min-h-0 flex-1 overflow-y-auto grid grid-cols-1 gap-4">
             {(mainTab === "tools" || mainTab === "test") && (
               <div className="space-y-4">
                 {mainTab === "tools" && (
@@ -371,7 +347,7 @@ export default function ModelConfigCenter() {
         <ConfirmDialog
           dialog={confirmDialog}
           confirming={confirmingDialog}
-          cancelLabel={t("settings.modelConfigCenter.actions.cancel", "Cancel")}
+          cancelLabel={t("settings.modelConfigCenter.actions.cancel", "取消")}
           onCancel={() => {
             if (!confirmingDialog) {
               setConfirmDialog(null);

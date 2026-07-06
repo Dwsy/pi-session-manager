@@ -3,7 +3,7 @@
  */
 
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { Check, ChevronDown, Search, X, Sparkles, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, Search, X, Sparkles, Trash2, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import SettingsCard from '@/components/settings/SettingsCard'
 import SettingsField from '@/components/settings/SettingsField'
@@ -325,8 +325,8 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
   const [piThemes, setPiThemes] = useState<string[]>([])
   const [systemFonts, setSystemFonts] = useState<DetectedFont[]>([])
   const [systemMonoFonts, setSystemMonoFonts] = useState<DetectedFont[]>([])
-  const [uiFontsLoading, setUiFontsLoading] = useState(true)
-  const [monoFontsLoading, setMonoFontsLoading] = useState(true)
+  const [uiFontsLoading, setUiFontsLoading] = useState(false)
+  const [monoFontsLoading, setMonoFontsLoading] = useState(false)
   const [themePickerOpen, setThemePickerOpen] = useState(false)
   const [uiFontPickerOpen, setUiFontPickerOpen] = useState(false)
   const [fontPickerOpen, setFontPickerOpen] = useState(false)
@@ -462,6 +462,18 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
       if (active) setPiThemes(themes)
     })
 
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // Lazily load UI fonts only when the picker is opened
+  useEffect(() => {
+    if (!uiFontPickerOpen || systemFonts.length > 0 || uiFontsLoading) return
+
+    let active = true
+    setUiFontsLoading(true)
+
     listAllSystemFonts()
       .then((fonts) => {
         if (active) {
@@ -472,6 +484,18 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
       .catch(() => {
         if (active) setUiFontsLoading(false)
       })
+
+    return () => {
+      active = false
+    }
+  }, [uiFontPickerOpen, systemFonts.length, uiFontsLoading])
+
+  // Lazily load Mono fonts only when the picker is opened
+  useEffect(() => {
+    if (!fontPickerOpen || systemMonoFonts.length > 0 || monoFontsLoading) return
+
+    let active = true
+    setMonoFontsLoading(true)
 
     listSystemMonospaceFonts()
       .then((fonts) => {
@@ -487,7 +511,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
     return () => {
       active = false
     }
-  }, [])
+  }, [fontPickerOpen, systemMonoFonts.length, monoFontsLoading])
 
   useEffect(() => {
     if (!themePickerOpen) {
@@ -1261,6 +1285,12 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
           placeholder={t('settings.appearance.searchFonts', 'Search fonts')}
         >
           <div className="space-y-3">
+            {uiFontsLoading && (
+              <div className="flex items-center justify-center py-3 text-sm text-foreground/55 gap-2 border border-dashed border-border/70 rounded-[10px] bg-background/20">
+                <Loader2 className="h-4 w-4 animate-spin settings-accent-fg" />
+                <span>{t('settings.appearance.detecting', 'Detecting system fonts...')}</span>
+              </div>
+            )}
             {filteredUiFonts.map((font) => {
               const isSelected = currentUiFont === font.value
               return (
@@ -1322,6 +1352,12 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
           placeholder={t('settings.appearance.searchFonts', 'Search fonts')}
         >
           <div className="space-y-3">
+            {monoFontsLoading && (
+              <div className="flex items-center justify-center py-3 text-sm text-foreground/55 gap-2 border border-dashed border-border/70 rounded-[10px] bg-background/20">
+                <Loader2 className="h-4 w-4 animate-spin settings-accent-fg" />
+                <span>{t('settings.appearance.detecting', 'Detecting system fonts...')}</span>
+              </div>
+            )}
             {filteredMonoFonts.map((font) => {
               const isSelected = currentMonoFont === font.value
               return (

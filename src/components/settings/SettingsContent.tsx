@@ -36,6 +36,16 @@ export default function SettingsContent({
   const statusLabel = saving
     ? t("settings.saving", "Saving…")
     : t("settings.savedJustNow", "Saved");
+  const isModelConfig = activeSection === "models";
+  const inlineSaveHint = isModelConfig
+    ? t(
+        "settings.modelConfigCenter.status.manualSaveHint",
+        "Manual save required. Click Save Config to persist changes.",
+      )
+    : t(
+        "settings.inlineSaveHint",
+        "This page saves changes in its own controls.",
+      );
 
   return (
     <div className="flex-1 flex flex-col bg-surface-dark/20">
@@ -66,10 +76,7 @@ export default function SettingsContent({
           )}
           {saveMode === "inline" && (
             <span className="hidden sm:inline text-xs text-muted-foreground">
-              {t(
-                "settings.inlineSaveHint",
-                "This page saves changes in its own controls.",
-              )}
+              {inlineSaveHint}
             </span>
           )}
           {saveMode === "read-only" && (
@@ -87,13 +94,25 @@ export default function SettingsContent({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 min-h-0">
+      <div
+        className={
+          isModelConfig
+            ? "flex-1 overflow-hidden p-4 min-h-0"
+            : "flex-1 overflow-y-auto p-6 min-h-0"
+        }
+      >
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-6 w-6 animate-spin settings-accent-fg" />
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-7xl space-y-6">
+          <div
+            className={
+              isModelConfig
+                ? "h-full min-h-0 w-full max-w-none"
+                : "mx-auto w-full max-w-7xl space-y-6"
+            }
+          >
             {renderSettingsSection(activeSection, settings, onUpdate)}
           </div>
         )}

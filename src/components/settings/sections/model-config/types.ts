@@ -6,6 +6,12 @@ export type HistoryTab = "backups" | "versions";
 export type ConfirmTone = "danger" | "warning" | "info";
 export type ModelConfigMainTab = "configure" | "test" | "tools" | "history";
 export type ConfigDetailTab = "provider" | "model";
+export type ModelInputType = "text" | "image";
+export type ModelThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ThinkingLevelMap = Partial<Record<ModelThinkingLevel, string | null>>;
+
+export const MODEL_INPUT_TYPE_OPTIONS = ["text", "image"] as const;
+export const MODEL_THINKING_LEVEL_OPTIONS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
 
 export interface ModelCost {
   input?: number;
@@ -19,7 +25,8 @@ export interface ModelEntry {
   name?: string;
   api?: string;
   reasoning?: boolean;
-  input?: string[];
+  thinkingLevelMap?: ThinkingLevelMap;
+  input?: ModelInputType[];
   contextWindow?: number;
   maxTokens?: number;
   cost?: ModelCost;

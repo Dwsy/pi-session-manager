@@ -61,7 +61,7 @@ export function ImportModal({
             type="button"
             onClick={onImport}
             disabled={isImporting}
-            className="inline-flex items-center gap-2 rounded-lg bg-info px-4 py-2 text-sm text-white hover:bg-info/90 motion-color motion-press focus-ring disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all motion-press focus-ring disabled:opacity-60"
           >
             {isImporting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -134,7 +134,7 @@ export function ImportModal({
             "settings.modelConfigCenter.placeholders.importContent",
             "Paste complete models.json content",
           )}
-          className="min-h-[320px] w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-info focus:outline-none motion-color motion-surface"
+          className="min-h-[320px] w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 focus:outline-none transition-all"
         />
       </div>
     </ModalShell>
