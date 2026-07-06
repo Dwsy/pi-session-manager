@@ -369,11 +369,7 @@ fn main() {
                 let builder = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into())).title("Pi Session Manager").inner_size(initial_width, initial_height).min_inner_size(min_width, min_height).center().resizable(true).fullscreen(false).zoom_hotkeys_enabled(true);
 
                 #[cfg(target_os = "macos")]
-                let builder = builder
-                    .decorations(true)
-                    .title_bar_style(tauri::TitleBarStyle::Overlay)
-                    .hidden_title(true)
-                    .traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 22.0)));
+                let builder = builder.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true).traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 22.0)));
 
                 #[cfg(not(target_os = "macos"))]
                 let builder = builder.decorations(false);

@@ -90,11 +90,7 @@ fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        builder = builder
-            .decorations(true)
-            .title_bar_style(tauri::TitleBarStyle::Overlay)
-            .hidden_title(true)
-            .traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 22.0)));
+        builder = builder.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true).traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 22.0)));
     }
     #[cfg(not(target_os = "macos"))]
     {

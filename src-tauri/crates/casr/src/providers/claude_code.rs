@@ -247,11 +247,7 @@ impl Provider for ClaudeCode {
             let content = claude_extract_text_content(content_value);
             let tool_calls = extract_tool_calls(content_value);
             let tool_results = extract_tool_results(content_value);
-            let role = if role_str == "user" && content.trim().is_empty() && !tool_results.is_empty() {
-                MessageRole::Tool
-            } else {
-                normalize_role(role_str)
-            };
+            let role = if role_str == "user" && content.trim().is_empty() && !tool_results.is_empty() { MessageRole::Tool } else { normalize_role(role_str) };
 
             // Skip messages that have neither text nor tool payloads.
             if content.trim().is_empty() && tool_calls.is_empty() && tool_results.is_empty() {
