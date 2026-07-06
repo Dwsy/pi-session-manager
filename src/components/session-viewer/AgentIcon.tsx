@@ -1,3 +1,4 @@
+import { ClaudeCode, Codex, GeminiCLI, OpenCode } from "@lobehub/icons";
 import { Bot, Boxes } from "lucide-react";
 import type { CSSProperties, SVGProps } from "react";
 
@@ -5,6 +6,7 @@ interface AgentIconProps {
   source: string;
   className?: string;
   size?: number | string;
+  style?: CSSProperties;
 }
 
 function svgStyle(style: CSSProperties | undefined): CSSProperties {
@@ -133,20 +135,70 @@ function PiMono({
   );
 }
 
+function PiColor({
+  size = "1em",
+  style,
+  ...rest
+}: SVGProps<SVGSVGElement> & { size?: number | string }) {
+  return (
+    <svg
+      viewBox="0 0 800 800"
+      height={size}
+      width={size}
+      xmlns="http://www.w3.org/2000/svg"
+      style={svgStyle(style)}
+      {...rest}
+    >
+      <rect x="120" y="120" width="560" height="560" rx="96" fill="#0A0A0A" />
+      <path
+        fill="#FFFFFF"
+        fillRule="evenodd"
+        d="M220 220H500V400H400V500H300V600H220ZM300 300V400H400V300Z"
+      />
+      <path fill="#FFFFFF" d="M500 400H600V600H500Z" />
+    </svg>
+  );
+}
+
 function normalizeSource(value: string): string {
   return value.trim().replace(/_/g, "-").toLowerCase();
+}
+
+export function getAgentIconColor(source: string): string {
+  switch (normalizeSource(source)) {
+    case "pi":
+    case "pi-agent":
+      return "#0A0A0A";
+    case "claude-code":
+      return ClaudeCode.colorPrimary;
+    case "codex":
+      return "#7A9DFF";
+    case "opencode":
+      return OpenCode.colorPrimary;
+    case "gemini":
+    case "gemini-cli":
+      return "#207CFE";
+    case "factory":
+      return "rgb(var(--color-success))";
+    case "clawdbot":
+      return "rgb(var(--color-purple))";
+    default:
+      return "var(--accent)";
+  }
 }
 
 export function AgentIcon({
   source,
   className = "",
   size = 12,
+  style,
 }: AgentIconProps) {
   const normalized = normalizeSource(source);
-  const iconProps = { className, size } as const;
+  const iconProps = { className, size, style } as const;
 
   switch (normalized) {
     case "pi":
+    case "pi-agent":
       return <PiMono {...iconProps} />;
     case "claude-code":
       return <ClaudeCodeMono {...iconProps} />;
@@ -158,10 +210,41 @@ export function AgentIcon({
     case "gemini-cli":
       return <GeminiCLIMono {...iconProps} />;
     case "factory":
-      return <Boxes className={className} size={size} />;
+      return <Boxes className={className} size={size} style={style} />;
     case "clawdbot":
-      return <Bot className={className} size={size} />;
+      return <Bot className={className} size={size} style={style} />;
     default:
-      return <Bot className={className} size={size} />;
+      return <Bot className={className} size={size} style={style} />;
+  }
+}
+
+export function AgentColorIcon({
+  source,
+  className = "",
+  size = 12,
+  style,
+}: AgentIconProps) {
+  const normalized = normalizeSource(source);
+  const iconProps = { className, size, style } as const;
+
+  switch (normalized) {
+    case "pi":
+    case "pi-agent":
+      return <PiColor {...iconProps} />;
+    case "claude-code":
+      return <ClaudeCode.Color {...iconProps} />;
+    case "codex":
+      return <Codex.Color {...iconProps} />;
+    case "opencode":
+      return <OpenCode {...iconProps} />;
+    case "gemini":
+    case "gemini-cli":
+      return <GeminiCLI.Color {...iconProps} />;
+    case "factory":
+      return <Boxes className={className} size={size} style={style} />;
+    case "clawdbot":
+      return <Bot className={className} size={size} style={style} />;
+    default:
+      return <Bot className={className} size={size} style={style} />;
   }
 }

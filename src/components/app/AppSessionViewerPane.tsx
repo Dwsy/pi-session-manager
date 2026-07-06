@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, cloneElement, isValidElement } from "react";
 import type { ComponentProps, PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { PanelRightOpen, Terminal as TerminalIcon, Pin } from "lucide-react";
@@ -437,7 +437,11 @@ function AppSessionViewerPane({
             aria-label={singleBottomItem.title}
             title={singleBottomItem.title}
           >
-            {singleBottomItem.icon}
+            {isValidElement(singleBottomItem.icon)
+              ? cloneElement(singleBottomItem.icon, {
+                  className: "h-3.5 w-3.5",
+                } as any)
+              : singleBottomItem.icon}
           </button>
         )}
         {bottomFeatureItems.length > 1 && (

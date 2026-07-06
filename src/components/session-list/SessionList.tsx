@@ -607,9 +607,12 @@ export default function SessionList({
     if (!onDeleteSessions) {
       return;
     }
-    if (!isSelectionMode) {
-      handleEnterSelectionMode();
+    if (isSelectionMode) {
+      handleExitSelectionMode();
+      return;
     }
+
+    handleEnterSelectionMode();
   }, [
     handleExitSelectionMode,
     handleEnterSelectionMode,
@@ -985,7 +988,10 @@ export default function SessionList({
                             )}
 
                             {showDirectory && (
-                              <span className="text-[10px] text-muted-foreground/70 font-mono truncate min-w-0 ml-0.5 group-hover:hidden">
+                              <span
+                                className="text-[10px] text-muted-foreground/70 font-mono truncate min-w-0 ml-0.5 group-hover:hidden"
+                                title={session.cwd || t("session.list.unknownDirectory")}
+                              >
                                 {formatDirectory(session.cwd) ||
                                   t("session.list.unknownDirectory")}
                               </span>

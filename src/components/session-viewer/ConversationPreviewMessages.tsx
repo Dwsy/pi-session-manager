@@ -375,6 +375,7 @@ function ConversationPreviewTurnView({
               searchQuery={searchQuery}
               isStreaming={entry.id === streamingId}
               previewMode={false}
+              processEntries={turn.processEntries}
             />
           ))}
         </div>
@@ -387,6 +388,7 @@ function ConversationPreviewTurnView({
           searchQuery={searchQuery}
           isStreaming={turn.assistantEntry.id === streamingId}
           previewMode
+          processEntries={turn.processEntries}
         />
       )}
     </div>

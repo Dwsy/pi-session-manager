@@ -2,7 +2,7 @@ import type { Content } from '@/types'
 import { useTranslation } from 'react-i18next'
 import MarkdownContent from '@/components/ui/MarkdownContent'
 import { formatDate } from '@/utils/format'
-import { Copy, Check, Maximize2, X } from 'lucide-react'
+import { Copy, Check, Maximize2, X, FileText, Eye } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { memo, useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { useClipboard } from '@/hooks/useClipboard'
@@ -18,6 +18,7 @@ interface UserMessageProps {
 function UserMessage({ id, timestamp, content, className = '', searchQuery = '' }: UserMessageProps) {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
+  const [showRaw, setShowRaw] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { copyText } = useClipboard()
 
@@ -73,28 +74,56 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
           </div>
           <div className="flex items-center gap-1">
             {text.trim() && (
-              <button
-                onClick={e => {
-                  e.stopPropagation()
-                  void handleCopy()
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
+              <>
+                <button
+                  onClick={e => {
+                    e.stopPropagation()
+                    setShowRaw(!showRaw)
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setShowRaw(!showRaw)
+                    }
+                  }}
+                  className={`tool-copy-button user-message-copy-button ${showRaw ? 'active' : ''}`}
+                  aria-label={
+                    showRaw
+                      ? t('components.userMessage.viewRendered') || 'View Rendered'
+                      : t('components.userMessage.viewRaw') || 'View Raw'
+                  }
+                  title={
+                    showRaw
+                      ? t('components.userMessage.viewRendered') || 'View Rendered'
+                      : t('components.userMessage.viewRaw') || 'View Raw'
+                  }
+                >
+                  {showRaw ? <Eye className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={e => {
                     e.stopPropagation()
                     void handleCopy()
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      void handleCopy()
+                    }
+                  }}
+                  className="tool-copy-button user-message-copy-button"
+                  aria-label={
+                    copied
+                      ? t('components.userMessage.copied') || 'Copied'
+                      : t('components.userMessage.copyText') || 'Copy text'
                   }
-                }}
-                className="tool-copy-button user-message-copy-button"
-                aria-label={
-                  copied
-                    ? t('components.userMessage.copied') || 'Copied'
-                    : t('components.userMessage.copyText') || 'Copy text'
-                }
-                title={copied ? t('components.userMessage.copied') || 'Copied!' : t('components.userMessage.copyText') || 'Copy text'}
-              >
-                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              </button>
+                  title={copied ? t('components.userMessage.copied') || 'Copied!' : t('components.userMessage.copyText') || 'Copy text'}
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </>
             )}
             <button
               onClick={e => {
@@ -136,7 +165,11 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
               ref={bodyRef}
               className={`user-message-body-truncated ${isTruncated ? 'is-truncated' : ''}`}
             >
-              <MarkdownContent content={text} className="user-message-body" searchQuery={searchQuery} />
+              {showRaw ? (
+                <pre className="user-message-body-raw">{text}</pre>
+              ) : (
+                <MarkdownContent content={text} className="user-message-body" searchQuery={searchQuery} />
+              )}
             </div>
           )}
         </div>
@@ -148,6 +181,7 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
           images={images}
           timestamp={timestamp}
           searchQuery={searchQuery}
+          initialShowRaw={showRaw}
           onClose={handleCloseModal}
         />
       )}
@@ -156,15 +190,29 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
 }
 
 // Modal component - rendered via portal to avoid stacking context issues
-function UserMessageModal({ text, images, timestamp, searchQuery, onClose }: {
+function UserMessageModal({ text, images, timestamp, searchQuery, initialShowRaw = false, onClose }: {
   text: string
   images: { type: string; data?: string; mimeType?: string }[]
   timestamp?: string
   searchQuery?: string
+  initialShowRaw?: boolean
   onClose: () => void
 }) {
   const { t } = useTranslation()
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const [copied, setCopied] = useState(false)
+  const [showRaw, setShowRaw] = useState(initialShowRaw)
+  const { copyText } = useClipboard()
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await copyText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy message text:', err)
+    }
+  }, [copyText, text])
 
   // Global ESC handler
   useEffect(() => {
@@ -218,16 +266,52 @@ function UserMessageModal({ text, images, timestamp, searchQuery, onClose }: {
               <p className="user-message-modal-subtitle">{formatDate(timestamp)}</p>
             )}
           </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            onClick={onClose}
-            className="user-message-modal-close-btn"
-            title={t('components.userMessage.close') || 'Close'}
-            aria-label={t('components.userMessage.close') || 'Close'}
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {text.trim() && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowRaw(!showRaw)}
+                  className={`user-message-modal-close-btn ${showRaw ? 'active' : ''}`}
+                  aria-label={
+                    showRaw
+                      ? t('components.userMessage.viewRendered') || 'View Rendered'
+                      : t('components.userMessage.viewRaw') || 'View Raw'
+                  }
+                  title={
+                    showRaw
+                      ? t('components.userMessage.viewRendered') || 'View Rendered'
+                      : t('components.userMessage.viewRaw') || 'View Raw'
+                  }
+                >
+                  {showRaw ? <Eye className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="user-message-modal-close-btn"
+                  aria-label={
+                    copied
+                      ? t('components.userMessage.copied') || 'Copied'
+                      : t('components.userMessage.copyText') || 'Copy text'
+                  }
+                  title={copied ? t('components.userMessage.copied') || 'Copied!' : t('components.userMessage.copyText') || 'Copy text'}
+                >
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </button>
+              </>
+            )}
+            <button
+              ref={closeButtonRef}
+              type="button"
+              onClick={onClose}
+              className="user-message-modal-close-btn"
+              title={t('components.userMessage.close') || 'Close'}
+              aria-label={t('components.userMessage.close') || 'Close'}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
         <div className="user-message-modal-body">
           {images.length > 0 && (
@@ -242,7 +326,11 @@ function UserMessageModal({ text, images, timestamp, searchQuery, onClose }: {
               ))}
             </div>
           )}
-          <MarkdownContent content={text} className="user-message-body" searchQuery={searchQuery} />
+          {showRaw ? (
+            <pre className="user-message-body-raw">{text}</pre>
+          ) : (
+            <MarkdownContent content={text} className="user-message-body" searchQuery={searchQuery} />
+          )}
         </div>
       </div>
     </div>

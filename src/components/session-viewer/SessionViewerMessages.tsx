@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
   type Dispatch,
@@ -196,10 +197,34 @@ const SessionViewerMessages = forwardRef<
     setPointerInTopZone(false);
   }, []);
 
-  useEffect(() => {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const [parentLeft, setParentLeft] = useState(0);
+
+  useLayoutEffect(() => {
+    const parent = parentRef.current;
+    if (!parent) return;
+
+    const updateLeft = () => {
+      const rect = parent.getBoundingClientRect();
+      setParentLeft(rect.left);
+    };
+
+    updateLeft();
+
+    window.addEventListener("resize", updateLeft);
+
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => {
+        updateLeft();
+      });
+      observer.observe(parent);
+    }
+
     return () => {
-      if (hoverRafRef.current !== null) {
-        cancelAnimationFrame(hoverRafRef.current);
+      window.removeEventListener("resize", updateLeft);
+      if (observer) {
+        observer.disconnect();
       }
     };
   }, []);
@@ -324,7 +349,7 @@ const SessionViewerMessages = forwardRef<
   }
 
   return (
-    <div className="flex-1 relative min-h-0 overflow-hidden">
+    <div ref={parentRef} className="flex-1 relative min-h-0 overflow-hidden">
       {!isAtBottom && hasNewMessages && (
         <NewMessagesButton
           onClick={() => {
@@ -341,6 +366,7 @@ const SessionViewerMessages = forwardRef<
         onClick={() => scrollToTop()}
         onMouseEnter={() => setOverScrollToTopButton(true)}
         onMouseLeave={() => setOverScrollToTopButton(false)}
+        style={{ left: `${window.innerWidth / 2 - parentLeft}px` }}
       />
       <ScrollToBottomButton
         title={t("session.scrollToBottom", "Scroll to bottom")}
@@ -348,6 +374,7 @@ const SessionViewerMessages = forwardRef<
         onClick={() => scrollToBottom(true)}
         onMouseEnter={() => setOverScrollToBottomButton(true)}
         onMouseLeave={() => setOverScrollToBottomButton(false)}
+        style={{ left: `${window.innerWidth / 2 - parentLeft}px` }}
       />
       <div
         className="h-full overflow-y-auto session-viewer"

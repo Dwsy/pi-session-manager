@@ -109,7 +109,7 @@ function formatTokens(count: number): string {
   return `${Math.round(count / 1_000_000)}M`;
 }
 
-function formatNumber(n: number): string {
+export function formatNumber(n: number): string {
   if (n === 0) return "-";
   return n.toLocaleString();
 }

@@ -20,7 +20,7 @@ import {
 import type { Tag as TagType, SessionTag, DateRange } from "@/types";
 import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
 import CompositionInput from "@/components/ui/CompositionInput";
-import { AgentIcon } from "@/components/session-viewer/AgentIcon";
+import { AgentColorIcon, getAgentIconColor } from "@/components/session-viewer/AgentIcon";
 
 const COLOR_CSS: Record<string, string> = {
   info: "#3b82f6",
@@ -601,7 +601,12 @@ export default function LabelFilter({
                               className="flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
                               style={{ width: "calc(100% - 8px)" }}
                             >
-                              <AgentIcon source={source.slug} size={13} className="text-foreground/80 shrink-0" />
+                              <AgentColorIcon
+                                source={source.slug}
+                                size={13}
+                                className="shrink-0"
+                                style={{ color: getAgentIconColor(source.slug) }}
+                              />
                               <span className="flex-1 text-left">{source.label}</span>
                               {selected && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
                             </button>

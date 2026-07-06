@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { X, Calendar, Bot, Folder } from "lucide-react";
+import { X, Calendar, Bot } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { AgentColorIcon, getAgentIconColor } from "@/components/session-viewer/AgentIcon";
 import type { Tag as TagType, DateRange } from "@/types";
 
 interface ActiveFilterChipsProps {
@@ -88,6 +89,34 @@ function Chip({ icon, label, color, onRemove }: ChipProps) {
   );
 }
 
+function SourceIconChip({
+  slug,
+  label,
+  onRemove,
+}: {
+  slug: string;
+  label: string;
+  onRemove: () => void;
+}) {
+  const color = getAgentIconColor(slug);
+
+  return (
+    <button
+      onClick={onRemove}
+      className="chip-enter inline-flex h-6 w-6 items-center justify-center rounded-md transition-all duration-150 hover:brightness-110 active:scale-[0.97] focus-ring"
+      style={{
+        backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`,
+        color,
+        border: `1px solid color-mix(in srgb, ${color} 24%, transparent)`,
+      }}
+      title={label}
+      aria-label={label}
+    >
+      <AgentColorIcon source={slug} size={14} className="shrink-0" />
+    </button>
+  );
+}
+
 export default function ActiveFilterChips({
   filterTagIds,
   tags,
@@ -143,12 +172,12 @@ export default function ActiveFilterChips({
 
         {selectedSourceSlugs.map((slug) => {
           const source = sourceMap.get(slug);
+          const label = source?.label || slug;
           return (
-            <Chip
+            <SourceIconChip
               key={`source-${slug}`}
-              icon={<Folder className="h-2.5 w-2.5 shrink-0" />}
-              label={source?.label || slug}
-              color="#06b6d4"
+              slug={slug}
+              label={label}
               onRemove={() => onRemoveSource(slug)}
             />
           );

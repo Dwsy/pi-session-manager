@@ -96,6 +96,13 @@ export function SessionBadge(props: SessionBadgeProps) {
   }
 
   const isNew = props.type === "new";
+  const updatedStyle = !isNew
+    ? {
+        borderColor: "rgba(var(--accent-rgb), 0.2)",
+        backgroundColor: "rgba(var(--accent-rgb), 0.1)",
+        color: "var(--accent)",
+      }
+    : undefined;
 
   return (
     <span
@@ -103,12 +110,13 @@ export function SessionBadge(props: SessionBadgeProps) {
           inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium
           flex-shrink-0 leading-none border
           ${
-            !isNew
-              ? "border-blue-500/20 bg-blue-500/10 text-blue-500/90"
-              : "border-border/60 bg-muted/30 text-muted-foreground"
+            isNew
+              ? "border-border/60 bg-muted/30 text-muted-foreground"
+              : ""
           }
           ${props.className ?? ""}
         `}
+      style={updatedStyle}
     >
       {isNew ? "N" : "U"}
     </span>

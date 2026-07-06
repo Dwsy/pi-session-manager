@@ -173,7 +173,10 @@ export default function ProjectList({
                     </div>
                   </div>
 
-                  <div className="text-[11px] sm:text-xs text-muted-foreground/80 truncate mb-2 font-mono">
+                  <div
+                    className="text-[11px] sm:text-xs text-muted-foreground/80 truncate mb-2 font-mono"
+                    title={project.dir}
+                  >
                     {formatDirectory(project.dir)}
                   </div>
 

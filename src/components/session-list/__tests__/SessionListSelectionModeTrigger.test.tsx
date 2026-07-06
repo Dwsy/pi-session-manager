@@ -55,6 +55,10 @@ vi.mock('@/components/session-preview/SessionPreviewModal', () => ({
   default: () => null,
 }))
 
+vi.mock('@/components/session-viewer/SessionBadge', () => ({
+  SessionBadge: ({ label }: { label?: string }) => (label ? <span>{label}</span> : null),
+}))
+
 import SessionList from '../SessionList'
 import type { SessionInfo } from '@/types'
 
@@ -70,7 +74,7 @@ const session: SessionInfo = {
 }
 
 describe('SessionList selectionModeTrigger', () => {
-  it('enters selection mode without toggling it off on repeated select triggers', async () => {
+  it('toggles selection mode off on repeated select triggers', async () => {
     const props = {
       sessions: [session],
       selectedSession: session,
@@ -87,6 +91,6 @@ describe('SessionList selectionModeTrigger', () => {
     expect(await screen.findByText('1 selected')).toBeTruthy()
 
     rerender(<SessionList {...props} selectionModeTrigger={2} />)
-    expect(await screen.findByText('1 selected')).toBeTruthy()
+    expect(screen.queryByText('1 selected')).toBeNull()
   })
 })

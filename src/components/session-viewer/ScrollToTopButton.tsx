@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { ArrowUp } from "lucide-react";
 
 export interface ScrollToTopButtonProps {
@@ -7,6 +8,7 @@ export interface ScrollToTopButtonProps {
   onClick: () => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  style?: CSSProperties;
 }
 
 /**
@@ -20,6 +22,7 @@ export default function ScrollToTopButton({
   onClick,
   onMouseEnter,
   onMouseLeave,
+  style,
 }: ScrollToTopButtonProps) {
   return (
     <button
@@ -27,6 +30,7 @@ export default function ScrollToTopButton({
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      style={style}
       className={`absolute left-1/2 top-4 z-10 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-secondary text-foreground shadow-lg transition-all duration-150 hover:bg-secondary-hover ${
         visible
           ? "pointer-events-auto opacity-100 translate-y-0"

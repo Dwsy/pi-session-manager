@@ -31,6 +31,7 @@ export interface SessionEntryRendererProps {
   searchQuery?: string;
   isStreaming?: boolean;
   previewMode?: boolean;
+  processEntries?: SessionEntry[];
 }
 
 export function renderSessionEntry(
@@ -39,6 +40,7 @@ export function renderSessionEntry(
   searchQuery = "",
   isStreaming = false,
   previewMode = false,
+  processEntries?: SessionEntry[],
 ): JSX.Element | null {
   switch (entry.type) {
     case "message": {
@@ -68,6 +70,7 @@ export function renderSessionEntry(
             searchQuery={searchQuery}
             isStreaming={isStreaming}
             previewMode={previewMode}
+            processEntries={processEntries}
           />
         );
       }
@@ -166,14 +169,16 @@ export const SessionEntryRenderer = memo(
     searchQuery = "",
     isStreaming = false,
     previewMode = false,
+    processEntries,
   }: SessionEntryRendererProps): JSX.Element | null {
-    return renderSessionEntry(entry, toolResultByCallId, searchQuery, isStreaming, previewMode);
+    return renderSessionEntry(entry, toolResultByCallId, searchQuery, isStreaming, previewMode, processEntries);
   },
   (prev, next) =>
     prev.entry === next.entry &&
     prev.toolResultByCallId === next.toolResultByCallId &&
     prev.searchQuery === next.searchQuery &&
-    prev.previewMode === next.previewMode,
+    prev.previewMode === next.previewMode &&
+    prev.processEntries === next.processEntries,
 );
 
 export default SessionEntryRenderer;

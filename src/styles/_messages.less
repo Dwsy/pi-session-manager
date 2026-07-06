@@ -57,6 +57,12 @@
 .user-message-copy-button {
   flex-shrink: 0;
   opacity: 0.72;
+
+  &.active {
+    color: var(--accent) !important;
+    background: rgba(var(--accent-rgb), 0.15);
+    opacity: 1 !important;
+  }
 }
 
 .user-message:hover .user-message-copy-button,
@@ -111,17 +117,9 @@
   border-radius: 16px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   color: var(--userMessageText);
-  --text: var(--userMessageText);
-  --mdHeading: var(--userMessageText);
-  --mdQuote: color-mix(in srgb, var(--userMessageText) 78%, transparent);
-  --mdLink: color-mix(in srgb, var(--accent) 70%, white 30%);
-  --mdLinkUrl: color-mix(in srgb, var(--userMessageText) 56%, transparent);
-  --mdCode: color-mix(in srgb, var(--accent) 72%, white 28%);
-  --mdCodeBlockBorder: color-mix(in srgb, var(--accent) 26%, transparent);
-  --mdHr: color-mix(in srgb, var(--userMessageText) 18%, transparent);
 
   // Background matches user-message styling, with higher opacity for text readability
-  background: var(--color-background);
+  background: var(--userMessageBg);
   background-image: linear-gradient(135deg, rgba(var(--accent-rgb), 0.08), rgba(var(--accent-rgb), 0.12), rgba(var(--accent-rgb), 0.08));
   border: 1px solid rgba(var(--accent-rgb), 0.22);
   backdrop-filter: blur(25px);
@@ -173,10 +171,25 @@
     border-color: rgba(var(--accent-rgb), 0.2);
   }
 
+  &.active {
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.15);
+    border-color: rgba(var(--accent-rgb), 0.25);
+  }
+
   &:focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.5);
   }
+}
+
+.user-message-body-raw {
+  white-space: pre-wrap;
+  font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  user-select: text;
+  color: inherit;
 }
 
 .user-message-modal-body {

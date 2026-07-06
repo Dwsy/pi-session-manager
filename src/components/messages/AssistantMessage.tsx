@@ -13,6 +13,8 @@ import { formatDate } from '@/utils/format'
 import { ansiToMarkdown } from '@/utils/assistantContent'
 import { memo, useMemo, useState } from 'react'
 import { Copy, Check } from 'lucide-react'
+import { psmPluginHost } from '@/plugins/runtime-host'
+import { requestToolReview } from '@/contexts/toolReviewBus'
 
 /**
  * Assistant Message Renderer
@@ -30,6 +32,7 @@ interface AssistantMessageProps {
   searchQuery?: string
   isStreaming?: boolean
   previewMode?: boolean
+  processEntries?: SessionEntry[]
 }
 
 function AssistantMessage({
@@ -40,6 +43,7 @@ function AssistantMessage({
   searchQuery = '',
   isStreaming = false,
   previewMode = false,
+  processEntries,
 }: AssistantMessageProps) {
   const { t } = useTranslation()
   const { showThinking } = useSessionView()
@@ -111,6 +115,7 @@ function AssistantMessage({
               t={t}
               copyText={copyText}
               disableSuccessStyle={disableSuccessStyle}
+              processEntries={processEntries}
             />
           ))}
         </div>
@@ -169,6 +174,7 @@ interface DirectToolCallProps {
   t: ReturnType<typeof useTranslation>['t']
   copyText: (text: string) => Promise<void>
   disableSuccessStyle: boolean
+  processEntries?: SessionEntry[]
 }
 
 function DirectToolCall({
@@ -181,6 +187,7 @@ function DirectToolCall({
   t,
   copyText,
   disableSuccessStyle,
+  processEntries,
 }: DirectToolCallProps) {
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const plugin = toolRenderRegistry.findPlugin(toolCall)
@@ -189,6 +196,34 @@ function DirectToolCall({
   const Component = plugin.component
   const entryId = resolvedData.entryId
 
+  const codeReviewPlugin = psmPluginHost.listPlugins().find(p => p.id === 'builtin.code-review')
+  const isCodeReviewActive = codeReviewPlugin && codeReviewPlugin.enabled && codeReviewPlugin.state === 'active'
+  const isInterceptEnabled = isCodeReviewActive && (codeReviewPlugin.settings?.interceptExpand ?? true)
+
+  const reviewableToolNames = ["write", "write_file", "edit", "edit_file", "multiedit", "apply_patch", "read", "read_file", "bash", "shell", "exec", "task"]
+  const isSupportedByReview = toolCall.name && reviewableToolNames.includes(toolCall.name.toLowerCase())
+
+  const handleToggleExpanded = () => {
+    const expanded = isToolExpanded(entryId)
+    if (!expanded && isInterceptEnabled && isSupportedByReview) {
+      const fallbackEntry: SessionEntry = {
+        id: entryId,
+        type: 'message',
+        message: {
+          role: 'assistant',
+          content: [toolCall]
+        },
+        timestamp: new Date().toISOString()
+      }
+      requestToolReview({
+        entries: processEntries && processEntries.length > 0 ? processEntries : [fallbackEntry],
+        toolResultByCallId,
+      })
+    } else {
+      toggleToolExpanded(entryId)
+    }
+  }
+
   return (
     <Component
       toolCall={toolCall}
@@ -196,7 +231,7 @@ function DirectToolCall({
       searchQuery={searchQuery}
       context={{
         isExpanded: isToolExpanded(entryId),
-        toggleExpanded: () => toggleToolExpanded(entryId),
+        toggleExpanded: handleToggleExpanded,
         ensureExpanded: () => {},
         theme,
         isMobile,

@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { ArrowDown } from "lucide-react";
 
 export interface ScrollToBottomButtonProps {
@@ -7,6 +8,7 @@ export interface ScrollToBottomButtonProps {
   onClick: () => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  style?: CSSProperties;
 }
 
 /**
@@ -21,6 +23,7 @@ export default function ScrollToBottomButton({
   onClick,
   onMouseEnter,
   onMouseLeave,
+  style,
 }: ScrollToBottomButtonProps) {
   return (
     <button
@@ -28,6 +31,7 @@ export default function ScrollToBottomButton({
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      style={style}
       className={`absolute left-1/2 bottom-4 z-10 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-secondary text-foreground shadow-lg transition-all duration-150 hover:bg-secondary-hover ${
         visible
           ? "pointer-events-auto opacity-100 translate-y-0"

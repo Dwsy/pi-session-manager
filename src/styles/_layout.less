@@ -581,6 +581,21 @@
   padding-left: calc(var(--macos-traffic-clearance) + 1.75rem); /* 72px + 28px = 100px */
 }
 
+// Keep the top headers height constant in screen-space regardless of zoom level
+// to ensure macOS traffic lights remain perfectly aligned in the center.
+[data-runtime="tauri"][data-os="macos"] {
+  .app-desktop-sidebar__chrome {
+    height: calc(40px / var(--zoom-level, 1)) !important;
+  }
+
+  [data-session-toolbar] {
+    height: calc(40px / var(--zoom-level, 1)) !important;
+    min-height: calc(40px / var(--zoom-level, 1)) !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+}
+
 .app-desktop-sidebar {
   background: rgb(var(--color-card));
 }

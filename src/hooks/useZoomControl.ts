@@ -45,6 +45,10 @@ export function useZoomControl() {
     loadZoomLevel()
   }, [])
 
+  useEffect(() => {
+    document.documentElement.style.setProperty('--zoom-level', zoomLevel.toString())
+  }, [zoomLevel])
+
   // Hotkey handlers
   const handleZoomIn = async () => {
     try {

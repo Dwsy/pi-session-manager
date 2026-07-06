@@ -17,11 +17,7 @@ export function formatShortTime(date: string, t: TFunction): string {
 
 export function formatDirectory(path: string): string {
   if (!path) return "";
-
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  if (parts.length <= 2) return path;
-
-  return ".../" + parts.slice(2).join("/");
+  return getDirectoryName(path);
 }
 
 export function getDirectoryName(cwd: string): string {

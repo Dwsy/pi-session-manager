@@ -29,6 +29,7 @@ import { useToolStyles } from "./hooks/useToolStyles";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useClipboard } from "./hooks/useClipboard";
 import { useContextMenuOverride } from "./hooks/useContextMenuOverride";
+import { useZoomControl } from "./hooks/useZoomControl";
 import { useAppBootstrap } from "./hooks/app/useAppBootstrap";
 import { useAppUiEffects } from "./hooks/app/useAppUiEffects";
 import { useUpdateChecker } from "./hooks/app/useUpdateChecker";
@@ -192,6 +193,9 @@ function App() {
 
   // Override WebKit context menu for native feel
   useContextMenuOverride();
+
+  // Zoom control
+  useZoomControl();
 
   // Delayed scanning page: only show if loading takes >500ms (avoids flash on fast DB loads)
   const [showScanningPage, setShowScanningPage] = useState(false);

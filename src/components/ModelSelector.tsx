@@ -25,6 +25,7 @@ interface ModelSelectorProps {
   onSelect: (model: RPCModel) => void
   loading?: boolean
   disabled?: boolean
+  className?: string
 }
 
 const RECENT_MODELS_KEY = 'pi-session-manager-recent-models'
@@ -109,6 +110,7 @@ export default function ModelSelector({
   onSelect,
   loading = false,
   disabled = false,
+  className,
 }: ModelSelectorProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -191,7 +193,7 @@ export default function ModelSelector({
   }, [currentModel, filteredModels, searchQuery, visibleOtherModels, visibleRecentModels])
 
   const currentLabel = currentModel
-    ? `${currentModel.provider}/${currentModel.name || currentModel.id}`
+    ? (currentModel.provider ? `${currentModel.provider}/${currentModel.name || currentModel.id}` : (currentModel.name || currentModel.id))
     : t('session.modelControls.selectModel', 'Select model')
 
   const updateMenuPosition = useCallback(() => {
@@ -332,7 +334,7 @@ export default function ModelSelector({
         onClick={() => handleSelect(model)}
       >
         <div className="min-w-0">
-          <div className="truncate font-medium">{model.provider}/{model.name || model.id}</div>
+          <div className="truncate font-medium">{model.provider ? `${model.provider}/${model.name || model.id}` : (model.name || model.id)}</div>
           {model.name && model.name !== model.id && (
             <div className="truncate text-[10px] text-muted-foreground/80">{model.id}</div>
           )}
@@ -430,7 +432,7 @@ export default function ModelSelector({
             setOpen((prev) => !prev)
           }
         }}
-        className="inline-flex max-w-[210px] items-center gap-1.5 rounded-md border border-border/70 bg-secondary px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-secondary-hover active:bg-secondary-hover disabled:cursor-not-allowed disabled:opacity-50"
+        className={`inline-flex items-center gap-1.5 rounded-md border border-border/70 bg-secondary px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-secondary-hover active:bg-secondary-hover disabled:cursor-not-allowed disabled:opacity-50 ${className || "max-w-[210px]"}`}
       >
         {loading ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
