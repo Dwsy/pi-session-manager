@@ -11,12 +11,16 @@ import {
   Sparkles,
   Server,
   Bot,
+  Puzzle,
 } from 'lucide-react'
 import { invoke } from '@/transport'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import type { AppSubagentSettings, ForcedSubagentProvider } from '@/components/settings/types'
 import type { PiSettingsFull } from '@/types'
 import { detectConfiguredSubagentProviders } from '@/utils/subagentCompatibility'
+import { psmPluginHost, setPsmPluginSettings } from '@/plugins/runtime-host'
+import type { PsmPluginStatus } from '@/plugins/runtime-host'
+import type { PsmPluginSettingValue } from '@pi-session-manager/plugin-sdk'
 
 interface OnboardingProps {
   onComplete: () => void
@@ -27,7 +31,7 @@ interface StepConfig {
   titleKey: string
   descriptionKey: string
   hintKey?: string
-  interactiveKind?: 'services' | 'subagents'
+  interactiveKind?: 'services' | 'subagents' | 'plugins'
 }
 
 interface ServerSettings {
@@ -66,6 +70,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   })
   const [recommendedProvider, setRecommendedProvider] = useState<Exclude<ForcedSubagentProvider, 'none'>>('nicobailon/pi-subagents')
   const [detectedSubagentText, setDetectedSubagentText] = useState('')
+  const [plugins, setPlugins] = useState<PsmPluginStatus[]>([])
+  const [pluginSettings, setPluginSettings] = useState<Record<string, Record<string, PsmPluginSettingValue>>>({})
 
   useEffect(() => {
     invoke<ServerSettings>('load_server_settings').then(setServerSettings).catch(() => {})
@@ -117,6 +123,24 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           : prev
       ))
     }).catch(() => {})
+
+    const loadedPlugins = psmPluginHost.listPlugins()
+    setPlugins(loadedPlugins)
+    const initialSettings: Record<string, Record<string, PsmPluginSettingValue>> = {}
+    for (const p of loadedPlugins) {
+      if (p.manifest?.configuration?.properties) {
+        const settingsForP: Record<string, PsmPluginSettingValue> = {}
+        for (const prop of p.manifest.configuration.properties) {
+          if (prop.onboarding) {
+            settingsForP[prop.key] = p.settings?.[prop.key] ?? prop.default ?? ''
+          }
+        }
+        if (Object.keys(settingsForP).length > 0) {
+          initialSettings[p.id] = settingsForP
+        }
+      }
+    }
+    setPluginSettings(initialSettings)
   }, [t])
 
   const steps: StepConfig[] = [
@@ -156,6 +180,12 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       interactiveKind: 'subagents',
     },
     {
+      icon: <Puzzle className="h-12 w-12 text-pink-400" />,
+      titleKey: 'onboarding.steps.plugins.title',
+      descriptionKey: 'onboarding.steps.plugins.description',
+      interactiveKind: 'plugins',
+    },
+    {
       icon: <Settings className="h-12 w-12 text-amber-400" />,
       titleKey: 'onboarding.steps.settings.title',
       descriptionKey: 'onboarding.steps.settings.description',
@@ -188,11 +218,33 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         },
       }
       await invoke('save_app_settings', { settings: merged })
+
+      // Save plugin onboarding configurations
+      for (const [pluginId, settingsMap] of Object.entries(pluginSettings)) {
+        const plugin = psmPluginHost.listPlugins().find((p) => p.id === pluginId)
+        if (plugin) {
+          const mergedSettings = {
+            ...(plugin.settings ?? {}),
+            ...settingsMap,
+          }
+          await setPsmPluginSettings({
+            pluginId,
+            settings: mergedSettings,
+            source: plugin.source,
+            packageName: plugin.packageName,
+            entryPath: plugin.entryPath,
+            projectPath: plugin.projectPath,
+          }).catch((err) => {
+            console.error(`Failed to save onboarding settings for plugin ${pluginId}:`, err)
+          })
+        }
+      }
+      await psmPluginHost.reload().catch(() => {})
     } catch (e) {
       console.error('Failed to save onboarding settings:', e)
     }
     onComplete()
-  }, [serverSettings, terminalEnabled, openPosition, subagentSettings, onComplete])
+  }, [serverSettings, terminalEnabled, openPosition, subagentSettings, pluginSettings, onComplete])
 
   const handleNext = useCallback(() => {
     if (isLast) {
@@ -373,6 +425,109 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                   })}
                 </p>
               </div>
+            </div>
+          )}
+
+          {step.interactiveKind === 'plugins' && (
+            <div className="mt-4 space-y-3 text-left max-w-sm mx-auto overflow-y-auto max-h-[220px] pr-1 scrollbar-thin">
+              {plugins.filter(p => p.manifest?.configuration?.properties?.some(prop => prop.onboarding)).map(plugin => {
+                const onboardingProps = plugin.manifest?.configuration?.properties?.filter(prop => prop.onboarding) || [];
+                return (
+                  <div key={plugin.id} className="space-y-3 rounded-lg border border-border bg-surface p-3">
+                    <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 border-b border-border/50 pb-1.5 mb-1">
+                      <Puzzle className="h-3.5 w-3.5 text-pink-400" />
+                      <span>{t(`plugins.${plugin.id}.configuration.title`, plugin.manifest?.configuration?.title ?? plugin.name)}</span>
+                    </div>
+                    {onboardingProps.map(prop => {
+                      const value = pluginSettings[plugin.id]?.[prop.key] ?? prop.default ?? '';
+                      const base = `plugins.${plugin.id}`;
+                      const title = t(`${base}.settings.${prop.key}.title`, prop.title);
+                      const description = prop.description ? t(`${base}.settings.${prop.key}.description`, prop.description) : "";
+
+                      return (
+                        <div key={prop.key} className="space-y-1">
+                          {prop.type === 'boolean' ? (
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <span className="text-sm font-medium text-foreground">{title}</span>
+                                {description && <p className="text-[11px] text-muted-foreground leading-normal mt-0.5">{description}</p>}
+                              </div>
+                              <label className="relative inline-flex items-center flex-shrink-0 ml-3 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(value)}
+                                  onChange={(e) => {
+                                    setPluginSettings(prev => ({
+                                      ...prev,
+                                      [plugin.id]: {
+                                        ...(prev[plugin.id] || {}),
+                                        [prop.key]: e.target.checked
+                                      }
+                                    }));
+                                  }}
+                                  className="sr-only peer"
+                                />
+                                <div className="w-10 h-5 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-info" />
+                              </label>
+                            </div>
+                          ) : prop.type === 'select' ? (
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <span className="text-sm font-medium text-foreground">{title}</span>
+                                {description && <p className="text-[11px] text-muted-foreground leading-normal mt-0.5">{description}</p>}
+                              </div>
+                              <select
+                                value={String(value)}
+                                onChange={(e) => {
+                                  setPluginSettings(prev => ({
+                                    ...prev,
+                                    [plugin.id]: {
+                                      ...(prev[plugin.id] || {}),
+                                      [prop.key]: e.target.value
+                                    }
+                                  }));
+                                }}
+                                className="px-2 py-1 bg-background border border-border rounded text-xs text-foreground max-w-[150px]"
+                              >
+                                {(prop.options ?? []).map(opt => (
+                                  <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <div>
+                                <span className="text-sm font-medium text-foreground">{title}</span>
+                                {description && <p className="text-[11px] text-muted-foreground leading-normal mt-0.5">{description}</p>}
+                              </div>
+                              <input
+                                type={prop.type === 'number' ? 'number' : 'text'}
+                                value={String(value)}
+                                onChange={(e) => {
+                                  const val = prop.type === 'number' ? Number(e.target.value) : e.target.value;
+                                  setPluginSettings(prev => ({
+                                    ...prev,
+                                    [plugin.id]: {
+                                      ...(prev[plugin.id] || {}),
+                                      [prop.key]: val
+                                    }
+                                  }));
+                                }}
+                                className="w-full px-2 py-1 bg-background border border-border rounded text-xs text-foreground"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+              {plugins.filter(p => p.manifest?.configuration?.properties?.some(prop => prop.onboarding)).length === 0 && (
+                <p className="text-sm text-center text-muted-foreground py-4">
+                  {t('onboarding.steps.plugins.empty', 'No plug-in configuration is available for onboarding.')}
+                </p>
+              )}
             </div>
           )}
         </div>

@@ -54,5 +54,10 @@ export const onboarding = {
       noDetection: 'No known subagent extension detected from Pi settings.',
       recommended: 'Recommended provider: {{provider}}',
     },
+    plugins: {
+      title: 'Built-in Plugins Configuration',
+      description: 'Configure options for built-in plugins. Toggle or adjust core extension features directly during the onboarding guide.',
+      empty: 'No plug-in configuration is available for onboarding.',
+    },
   },
 } as const

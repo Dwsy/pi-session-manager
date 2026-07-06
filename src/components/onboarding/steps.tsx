@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react'
-import { FolderOpen, Search, GitBranch, Settings, Sparkles, Server, Bot } from 'lucide-react'
+import { FolderOpen, Search, GitBranch, Settings, Sparkles, Server, Bot, Puzzle } from 'lucide-react'
 
 export interface OnboardingStepConfig {
   icon: ReactNode
   titleKey: string
   descriptionKey: string
   hintKey?: string
-  interactiveKind?: 'services' | 'subagents'
+  interactiveKind?: 'services' | 'subagents' | 'plugins'
 }
 
 export const ONBOARDING_STEPS: readonly OnboardingStepConfig[] = [
@@ -44,6 +44,12 @@ export const ONBOARDING_STEPS: readonly OnboardingStepConfig[] = [
     titleKey: 'onboarding.steps.subagents.title',
     descriptionKey: 'onboarding.steps.subagents.description',
     interactiveKind: 'subagents',
+  },
+  {
+    icon: <Puzzle className="h-12 w-12 text-pink-400" />,
+    titleKey: 'onboarding.steps.plugins.title',
+    descriptionKey: 'onboarding.steps.plugins.description',
+    interactiveKind: 'plugins',
   },
   {
     icon: <Settings className="h-12 w-12 text-amber-400" />,

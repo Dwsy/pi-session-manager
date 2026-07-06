@@ -54,5 +54,10 @@ export const onboarding = {
       noDetection: '未从 Pi 配置中检测到已知子代理扩展。',
       recommended: '推荐 provider：{{provider}}',
     },
+    plugins: {
+      title: '内置插件功能配置',
+      description: '配置内置插件的功能选项。您可以根据喜好在引导中直接开闭或调整插件的核心特性。',
+      empty: '当前没有可用的插件配置项。',
+    },
   },
 } as const
