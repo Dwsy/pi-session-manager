@@ -1,21 +1,23 @@
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { SearchPluginResult } from "@/plugins/types";
+import type { SearchContext, SearchPluginResult } from "@/plugins/types";
 import SessionViewer from "@/components/SessionViewer";
+import SessionPreviewCodeReviewHost from "@/components/session-preview/SessionPreviewCodeReviewHost";
 import type { SessionInfo } from "@/types";
 import { getRuntimeSessionByPath } from "@/runtime-data/sessionSource";
+import type { TerminalType } from "@/components/settings/types";
 
 interface SessionPreviewPanelProps {
   result: SearchPluginResult | null;
-  context: any;
+  context: SearchContext;
   onClose: () => void;
   onNavigate: () => void;
 }
 
 export default function SessionPreviewPanel({
   result,
-  context: _context,
+  context,
   onClose,
   onNavigate: _onNavigate,
 }: SessionPreviewPanelProps) {
@@ -86,11 +88,22 @@ export default function SessionPreviewPanel({
       <div className="flex-1 min-h-0 overflow-hidden">
         <SessionViewer
           session={fullSession}
-          onExport={() => {}}
-          onRename={() => {}}
+          slots={{
+            right: <SessionPreviewCodeReviewHost session={fullSession} />,
+          }}
+          onExport={() => context.onPreviewExportSession?.(fullSession)}
+          onRename={() => context.onOpenPreviewRenameDialog?.(fullSession)}
+          onRenameSession={(newName) =>
+            context.onPreviewRenameSession?.(fullSession, newName)
+          }
+          onFork={() => context.onPreviewForkSession?.(fullSession)}
           onBack={onClose}
+          onResumeSession={context.onPreviewResumeSession}
+          terminal={context.terminal as TerminalType | undefined}
+          piPath={context.piPath}
+          customCommand={context.customCommand}
+          resumeCommand={context.resumeCommand}
           initialEntryId={targetEntryId || undefined}
-          previewMode
           previewVariant="conversation"
         />
       </div>

@@ -6,6 +6,7 @@ import type { SessionInfo } from "@/types";
 import type { TerminalType } from "@/components/settings/types";
 import SessionViewer from "@/components/SessionViewer";
 import type { SessionViewerToolbarSlots } from "@/components/session-viewer/SessionViewerToolbarTypes";
+import SessionPreviewCodeReviewHost from "./SessionPreviewCodeReviewHost";
 
 export type SessionPreviewAnimationMode = "stable" | "origin-point";
 
@@ -18,6 +19,8 @@ export interface SessionPreviewModalProps {
   onExport?: () => void;
   onConvert?: () => void;
   onRename?: () => void;
+  onRenameSession?: (newName: string) => void | Promise<void>;
+  onFork?: () => void;
   onResumeSession?: (session: SessionInfo) => Promise<void> | void;
   terminal?: TerminalType;
   piPath?: string;
@@ -37,6 +40,8 @@ export default function SessionPreviewModal({
   onExport = () => {},
   onConvert,
   onRename = () => {},
+  onRenameSession,
+  onFork,
   onResumeSession,
   terminal,
   piPath,
@@ -83,6 +88,7 @@ export default function SessionPreviewModal({
   const toolbarSlots: SessionViewerToolbarSlots = {
     right: (
       <>
+        <SessionPreviewCodeReviewHost session={session} />
         {onResumeSession && (
           <KbdTooltip shortcut="Cmd+R">
             <button
@@ -218,12 +224,13 @@ export default function SessionPreviewModal({
         <div className="flex-1 overflow-hidden bg-background">
           <SessionViewer
             session={session}
-            previewMode
             previewVariant="conversation"
             slots={toolbarSlots}
             onExport={onExport}
             onConvert={onConvert}
             onRename={onRename}
+            onRenameSession={onRenameSession}
+            onFork={onFork}
             onBack={handleCloseWithAnimation}
             onResumeSession={onResumeSession}
             terminal={terminal}
