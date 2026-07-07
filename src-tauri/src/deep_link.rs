@@ -2,7 +2,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
 };
-use tauri::{AppHandle, Emitter, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 #[derive(Clone, Default)]
 pub struct DeepLinkState {
@@ -20,6 +20,22 @@ pub fn handle_deep_link_payload<R: Runtime>(app: &AppHandle<R>, state: &DeepLink
     crate::tray::show_or_create_window(app);
     for url in parse_deep_link_payload(payload) {
         emit_or_queue(app, state, url);
+    }
+}
+
+pub fn queue_current_deep_links<R: Runtime>(app: &AppHandle<R>, state: &DeepLinkState) {
+    let Some(deep_link) = app.try_state::<tauri_plugin_deep_link::DeepLink<R>>() else {
+        return;
+    };
+
+    match deep_link.get_current() {
+        Ok(Some(urls)) => {
+            for url in urls {
+                emit_or_queue(app, state, url.to_string());
+            }
+        }
+        Ok(None) => {}
+        Err(error) => log::warn!("Failed to read current deep links: {error}"),
     }
 }
 
@@ -45,7 +61,11 @@ fn emit_or_queue<R: Runtime>(app: &AppHandle<R>, state: &DeepLinkState, url: Str
     }
 
     match state.pending_urls.lock() {
-        Ok(mut pending) => pending.push(url),
+        Ok(mut pending) => {
+            if !pending.contains(&url) {
+                pending.push(url);
+            }
+        }
         Err(error) => log::warn!("Failed to queue pending deep link: {error}"),
     }
 }

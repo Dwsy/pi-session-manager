@@ -384,6 +384,7 @@ fn main() {
                     let _ = window_clone.show();
                     #[cfg(not(target_os = "macos"))]
                     let _ = window_clone.set_focus();
+                    pi_session_manager::deep_link::queue_current_deep_links(&app_handle_ready, &deep_link_ready_state);
                     pi_session_manager::deep_link::mark_frontend_ready(&app_handle_ready, &deep_link_ready_state);
                 });
 

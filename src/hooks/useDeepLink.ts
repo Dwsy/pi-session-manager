@@ -15,17 +15,25 @@ import { listen } from '@tauri-apps/api/event';
  */
 export function useDeepLink({
   onNavigate,
+  onReady,
 }: {
   onNavigate: (path: string) => void;
+  onReady?: () => void;
 }) {
-  // Stabilize callback ref to avoid re-registering listener every render
+  // Stabilize callback refs to avoid re-registering listener every render
   const onNavigateRef = useRef(onNavigate);
+  const onReadyRef = useRef(onReady);
   onNavigateRef.current = onNavigate;
+  onReadyRef.current = onReady;
 
   useEffect(() => {
     // Guard: skip in non-Tauri environments (browser dev)
-    if (!(window as any).__TAURI_INTERNALS__) return;
+    if (!(window as any).__TAURI_INTERNALS__) {
+      onReadyRef.current?.();
+      return;
+    }
 
+    let disposed = false;
     let unlisten: (() => void) | undefined;
 
     listen<string>('deep-link://navigate', (event) => {
@@ -38,10 +46,19 @@ export function useDeepLink({
         onNavigateRef.current('/');
       }
     }).then((fn) => {
+      if (disposed) {
+        fn();
+        return;
+      }
       unlisten = fn;
+      onReadyRef.current?.();
+    }).catch((error) => {
+      console.error('Failed to register deep link listener:', error);
+      onReadyRef.current?.();
     });
 
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, []);

@@ -202,6 +202,7 @@ function App() {
   const [, setPluginRenderVersion] = useState(0);
   const loadingRef = useRef(true);
   const frontendReadyEmittedRef = useRef(false);
+  const [deepLinkListenerReady, setDeepLinkListenerReady] = useState(!isTauriRuntime);
 
   // Register core tool renderers; extension renderers are loaded by the PSM plugin host.
   useEffect(() => {
@@ -544,7 +545,10 @@ function App() {
     (path: string) => navigateToPath(path),
     [navigateToPath],
   );
-  useDeepLink({ onNavigate: handleDeepLink });
+  const handleDeepLinkReady = useCallback(() => {
+    setDeepLinkListenerReady(true);
+  }, []);
+  useDeepLink({ onNavigate: handleDeepLink, onReady: handleDeepLinkReady });
 
   useSwipe(mobileViewerRef, {
     onSwipeRight: () => {
@@ -680,6 +684,7 @@ function App() {
     if (
       isInitialized &&
       !settingsLoading &&
+      deepLinkListenerReady &&
       isTauri() &&
       !frontendReadyEmittedRef.current
     ) {
@@ -688,7 +693,7 @@ function App() {
         emit('frontend://ready');
       });
     }
-  }, [isInitialized, settingsLoading]);
+  }, [deepLinkListenerReady, isInitialized, settingsLoading]);
   const {
     favorites,
     loadingFavorites,
