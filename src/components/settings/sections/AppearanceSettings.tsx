@@ -9,6 +9,7 @@ import SettingsCard from '@/components/settings/SettingsCard'
 import SettingsField from '@/components/settings/SettingsField'
 import SettingsInput from '@/components/settings/SettingsInput'
 import SettingsOptionGroup from '@/components/settings/SettingsOptionGroup'
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
 import SettingsSelect from '@/components/settings/SettingsSelect'
 import {
   getBuiltInBase46Themes,
@@ -913,130 +914,48 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
             </SettingsField>
           </div>
 
-          <SettingsField
-            label={t('settings.appearance.codeLigatures', 'Code Ligatures')}
-            description={t('settings.appearance.codeLigaturesDesc', 'Render font ligatures like =>, ->, !== in code blocks')}
+          <SettingsToggleRow
+            className="px-0 py-1.5"
+            toggleSize="sm"
+            title={t('settings.appearance.codeLigatures', 'Code Ligatures')}
+            description={<span className="font-mono text-foreground/50">{'=> != -> ==='}</span>}
+            checked={settings.appearance.codeLigatures !== false}
+            onChange={(v) => onUpdate('appearance', 'codeLigatures', v)}
             searchKey="appearance-codeLigatures"
-          >
-            <label className="flex items-center gap-3 cursor-pointer rounded-[10px] border border-border/70 bg-background/35 px-3 py-2.5">
-              <span className="relative h-5 w-9 flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={settings.appearance.codeLigatures !== false}
-                  onChange={(e) => onUpdate('appearance', 'codeLigatures', e.target.checked)}
-                  className="sr-only"
-                />
-                <span
-                  className={`absolute inset-0 rounded-full motion-color ${
-                    settings.appearance.codeLigatures !== false ? 'settings-accent-bg-strong' : 'bg-secondary'
-                  }`}
-                />
-                <span
-                  className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white motion-transform ${
-                    settings.appearance.codeLigatures !== false ? 'translate-x-4' : ''
-                  }`}
-                />
-              </span>
-              <div>
-                <div className="text-sm font-medium text-foreground">
-                  {settings.appearance.codeLigatures !== false
-                    ? t('settings.appearance.enabled', 'Enabled')
-                    : t('settings.appearance.disabled', 'Disabled')}
-                </div>
-                <div className="text-xs text-foreground/55">=&gt;  !=  -&gt;  ===</div>
-              </div>
-            </label>
-          </SettingsField>
+          />
         </SettingsCard>
 
-        <SettingsCard contentClassName="p-3.5">
-          <SettingsField
-            label={t('settings.appearance.disableToolSuccessStyle', 'Disable tool success style')}
+        <SettingsCard contentClassName="divide-y divide-border/40">
+          <SettingsToggleRow
+            className="px-3 py-2"
+            toggleSize="sm"
+            title={t('settings.appearance.disableToolSuccessStyle', 'Disable tool success style')}
             description={t(
               'settings.appearance.disableToolSuccessStyleDesc',
               'Disable green background and border on successful tool execution for cleaner tool cards'
             )}
+            checked={settings.appearance.disableToolSuccessStyle}
+            onChange={(v) => onUpdate('appearance', 'disableToolSuccessStyle', v)}
             searchKey="appearance-disableToolSuccessStyle"
-          >
-            <label className="flex items-center gap-3 cursor-pointer rounded-[10px] border border-border/70 bg-background/35 px-3 py-3">
-              <span className="relative h-5 w-9 flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={settings.appearance.disableToolSuccessStyle}
-                  onChange={(e) => onUpdate('appearance', 'disableToolSuccessStyle', e.target.checked)}
-                  className="sr-only"
-                />
-                <span
-                  className={`absolute inset-0 rounded-full motion-color ${
-                    settings.appearance.disableToolSuccessStyle ? 'settings-accent-bg-strong' : 'bg-secondary'
-                  }`}
-                />
-                <span
-                  className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white motion-transform ${
-                    settings.appearance.disableToolSuccessStyle ? 'translate-x-4' : ''
-                  }`}
-                />
-              </span>
-              <div>
-                <div className="text-sm font-medium text-foreground">
-                  {settings.appearance.disableToolSuccessStyle
-                    ? t('settings.appearance.enabled', 'Enabled')
-                    : t('settings.appearance.disabled', 'Disabled')}
-                </div>
-                <div className="text-xs text-foreground/55">
-                  {t('settings.appearance.disableToolSuccessStyleDesc', 'Disable green background and border on successful tool execution for cleaner tool cards')}
-                </div>
-              </div>
-            </label>
-          </SettingsField>
-        </SettingsCard>
-
-        <SettingsCard contentClassName="p-3.5">
-          <SettingsField
-            label={t('settings.appearance.disableToolCallStyle', 'Disable tool call style')}
+          />
+          <SettingsToggleRow
+            className="px-3 py-2"
+            toggleSize="sm"
+            title={t('settings.appearance.disableToolCallStyle', 'Disable tool call style')}
             description={t(
               'settings.appearance.disableToolCallStyleDesc',
               'Disable background, border and shadow on tool call cards'
             )}
+            checked={settings.appearance.disableToolCallStyle}
+            onChange={(v) => onUpdate('appearance', 'disableToolCallStyle', v)}
             searchKey="appearance-disableToolCallStyle"
-          >
-            <label className="flex items-center gap-3 cursor-pointer rounded-[10px] border border-border/70 bg-background/35 px-3 py-3">
-              <span className="relative h-5 w-9 flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={settings.appearance.disableToolCallStyle}
-                  onChange={(e) => onUpdate('appearance', 'disableToolCallStyle', e.target.checked)}
-                  className="sr-only"
-                />
-                <span
-                  className={`absolute inset-0 rounded-full motion-color ${
-                    settings.appearance.disableToolCallStyle ? 'settings-accent-bg-strong' : 'bg-secondary'
-                  }`}
-                />
-                <span
-                  className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white motion-transform ${
-                    settings.appearance.disableToolCallStyle ? 'translate-x-4' : ''
-                  }`}
-                />
-              </span>
-              <div>
-                <div className="text-sm font-medium text-foreground">
-                  {settings.appearance.disableToolCallStyle
-                    ? t('settings.appearance.enabled', 'Enabled')
-                    : t('settings.appearance.disabled', 'Disabled')}
-                </div>
-                <div className="text-xs text-foreground/55">
-                  {t('settings.appearance.disableToolCallStyleDesc', 'Disable background, border and shadow on tool call cards')}
-                </div>
-              </div>
-            </label>
-          </SettingsField>
+          />
         </SettingsCard>
 
         <SettingsCard
           title={t('settings.appearance.diffView', 'Diff View')}
           description={t('settings.appearance.diffViewDesc', 'Configure how code diffs are displayed in tool execution and review panels')}
-          contentClassName="p-3.5 space-y-4"
+          contentClassName="p-3.5 space-y-3"
         >
           <SettingsField
             label={t('settings.appearance.diffViewStyle', 'View Style')}
@@ -1078,138 +997,50 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
             />
           </SettingsField>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <SettingsField
-              label={t('settings.appearance.diffLineNumbers', 'Show Line Numbers')}
-              description={t('settings.appearance.diffLineNumbersDesc', 'Display line numbers in diff views')}
-              searchKey="appearance-diffLineNumbers"
-            >
-              <label className="flex items-center gap-3 cursor-pointer rounded-[10px] border border-border/70 bg-background/35 px-3 py-3">
-                <span className="relative h-5 w-9 flex-shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={settings.appearance.diffLineNumbers ?? true}
-                    onChange={(e) => onUpdate('appearance', 'diffLineNumbers', e.target.checked)}
-                    className="sr-only"
-                  />
-                  <span
-                    className={`absolute inset-0 rounded-full motion-color ${
-                      (settings.appearance.diffLineNumbers ?? true) ? 'settings-accent-bg-strong' : 'bg-secondary'
-                    }`}
-                  />
-                  <span
-                    className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white motion-transform ${
-                      (settings.appearance.diffLineNumbers ?? true) ? 'translate-x-4' : ''
-                    }`}
-                  />
-                </span>
-                <div className="text-sm font-medium text-foreground">
-                  {(settings.appearance.diffLineNumbers ?? true)
-                    ? t('settings.appearance.enabled', 'Enabled')
-                    : t('settings.appearance.disabled', 'Disabled')}
-                </div>
-              </label>
-            </SettingsField>
 
-            <SettingsField
-              label={t('settings.appearance.diffWrap', 'Wrap Long Lines')}
+          <div className="grid grid-cols-2 divide-x divide-border/40">
+            <SettingsToggleRow
+              className="px-3 py-2 pr-4"
+              toggleSize="sm"
+              title={t('settings.appearance.diffLineNumbers', 'Show Line Numbers')}
+              description={t('settings.appearance.diffLineNumbersDesc', 'Display line numbers in diff views')}
+              checked={settings.appearance.diffLineNumbers ?? true}
+              onChange={(v) => onUpdate('appearance', 'diffLineNumbers', v)}
+              searchKey="appearance-diffLineNumbers"
+            />
+            <SettingsToggleRow
+              className="px-3 py-2 pl-4"
+              toggleSize="sm"
+              title={t('settings.appearance.diffWrap', 'Wrap Long Lines')}
               description={t('settings.appearance.diffWrapDesc', 'Wrap long lines instead of horizontal scrolling')}
+              checked={settings.appearance.diffWrap ?? false}
+              onChange={(v) => onUpdate('appearance', 'diffWrap', v)}
               searchKey="appearance-diffWrap"
-            >
-              <label className="flex items-center gap-3 cursor-pointer rounded-[10px] border border-border/70 bg-background/35 px-3 py-3">
-                <span className="relative h-5 w-9 flex-shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={settings.appearance.diffWrap ?? false}
-                    onChange={(e) => onUpdate('appearance', 'diffWrap', e.target.checked)}
-                    className="sr-only"
-                  />
-                  <span
-                    className={`absolute inset-0 rounded-full motion-color ${
-                      (settings.appearance.diffWrap ?? false) ? 'settings-accent-bg-strong' : 'bg-secondary'
-                    }`}
-                  />
-                  <span
-                    className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white motion-transform ${
-                      (settings.appearance.diffWrap ?? false) ? 'translate-x-4' : ''
-                    }`}
-                  />
-                </span>
-                <div className="text-sm font-medium text-foreground">
-                  {(settings.appearance.diffWrap ?? false)
-                    ? t('settings.appearance.enabled', 'Enabled')
-                    : t('settings.appearance.disabled', 'Disabled')}
-                </div>
-              </label>
-            </SettingsField>
+            />
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <SettingsField
-              label={t('settings.appearance.diffIndicators', 'Show Diff Indicators')}
+          <div className="grid grid-cols-2 divide-x divide-border/40 border-t border-border/40">
+            <SettingsToggleRow
+              className="px-3 py-2 pr-4"
+              toggleSize="sm"
+              title={t('settings.appearance.diffIndicators', 'Show Diff Indicators')}
               description={t('settings.appearance.diffIndicatorsDesc', 'Show +/− indicators for added and removed lines')}
+              checked={settings.appearance.diffIndicators ?? true}
+              onChange={(v) => onUpdate('appearance', 'diffIndicators', v)}
               searchKey="appearance-diffIndicators"
-            >
-              <label className="flex items-center gap-3 cursor-pointer rounded-[10px] border border-border/70 bg-background/35 px-3 py-3">
-                <span className="relative h-5 w-9 flex-shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={settings.appearance.diffIndicators ?? true}
-                    onChange={(e) => onUpdate('appearance', 'diffIndicators', e.target.checked)}
-                    className="sr-only"
-                  />
-                  <span
-                    className={`absolute inset-0 rounded-full motion-color ${
-                      (settings.appearance.diffIndicators ?? true) ? 'settings-accent-bg-strong' : 'bg-secondary'
-                    }`}
-                  />
-                  <span
-                    className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white motion-transform ${
-                      (settings.appearance.diffIndicators ?? true) ? 'translate-x-4' : ''
-                    }`}
-                  />
-                </span>
-                <div className="text-sm font-medium text-foreground">
-                  {(settings.appearance.diffIndicators ?? true)
-                    ? t('settings.appearance.enabled', 'Enabled')
-                    : t('settings.appearance.disabled', 'Disabled')}
-                </div>
-              </label>
-            </SettingsField>
-
-            <SettingsField
-              label={t('settings.appearance.diffExpandUnchanged', 'Expand Unchanged Lines')}
+            />
+            <SettingsToggleRow
+              className="px-3 py-2 pl-4"
+              toggleSize="sm"
+              title={t('settings.appearance.diffExpandUnchanged', 'Expand Unchanged Lines')}
               description={t('settings.appearance.diffExpandUnchangedDesc', 'Expand unchanged regions in diff views')}
+              checked={settings.appearance.diffExpandUnchanged ?? true}
+              onChange={(v) => onUpdate('appearance', 'diffExpandUnchanged', v)}
               searchKey="appearance-diffExpandUnchanged"
-            >
-              <label className="flex items-center gap-3 cursor-pointer rounded-[10px] border border-border/70 bg-background/35 px-3 py-3">
-                <span className="relative h-5 w-9 flex-shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={settings.appearance.diffExpandUnchanged ?? true}
-                    onChange={(e) => onUpdate('appearance', 'diffExpandUnchanged', e.target.checked)}
-                    className="sr-only"
-                  />
-                  <span
-                    className={`absolute inset-0 rounded-full motion-color ${
-                      (settings.appearance.diffExpandUnchanged ?? true) ? 'settings-accent-bg-strong' : 'bg-secondary'
-                    }`}
-                  />
-                  <span
-                    className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white motion-transform ${
-                      (settings.appearance.diffExpandUnchanged ?? true) ? 'translate-x-4' : ''
-                    }`}
-                  />
-                </span>
-                <div className="text-sm font-medium text-foreground">
-                  {(settings.appearance.diffExpandUnchanged ?? true)
-                    ? t('settings.appearance.enabled', 'Enabled')
-                    : t('settings.appearance.disabled', 'Disabled')}
-                </div>
-              </label>
-            </SettingsField>
+            />
           </div>
         </SettingsCard>
+
       </div>
 
       {themePickerOpen && (

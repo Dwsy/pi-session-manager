@@ -131,6 +131,8 @@ export interface AppSettings {
     previewLines: number;
     colorizeToolCalls: boolean;
     openPosition: "top" | "bottom";
+    /** Whether thinking blocks are expanded in the session viewer */
+    showThinking: boolean;
     /** Cmd+F behavior: 'inSessionSearch' = search in current session, 'toggleSidebar' = toggle session tree */
     cmdFBehavior: "inSessionSearch" | "toggleSidebar";
     /** Scroll markers feature enabled */
@@ -231,6 +233,7 @@ export const defaultSettings: AppSettings = {
     previewLines: 2,
     colorizeToolCalls: true,
     openPosition: "top",
+    showThinking: false,
     cmdFBehavior: "inSessionSearch",
     scrollMarkersEnabled: false,
     scrollMarkersGuideSeen: false,

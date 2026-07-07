@@ -49,7 +49,7 @@ export default function SettingsContent({
 
   return (
     <div className="flex-1 flex flex-col bg-surface-dark/20">
-      <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-border/60">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border/60">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-foreground tracking-tight">
             {t(activeItem?.labelKey || "", activeItem?.fallbackLabel || "")}
@@ -98,7 +98,7 @@ export default function SettingsContent({
         className={
           isModelConfig
             ? "flex-1 overflow-hidden p-4 min-h-0"
-            : "flex-1 overflow-y-auto p-6 min-h-0"
+            : "flex-1 overflow-y-auto p-4 min-h-0"
         }
       >
         {loading ? (
@@ -110,7 +110,7 @@ export default function SettingsContent({
             className={
               isModelConfig
                 ? "h-full min-h-0 w-full max-w-none"
-                : "mx-auto w-full max-w-7xl space-y-6"
+                : "mx-auto w-full max-w-7xl space-y-3"
             }
           >
             {renderSettingsSection(activeSection, settings, onUpdate)}

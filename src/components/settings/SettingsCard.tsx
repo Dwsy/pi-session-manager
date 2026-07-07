@@ -19,16 +19,16 @@ export default function SettingsCard({
   icon,
   children,
   className = '',
-  contentClassName = 'p-4',
+  contentClassName = 'px-3 py-2',
   searchKey,
 }: SettingsCardProps) {
   return (
     <div
-      className={`rounded-[10px] border border-border/50 bg-card/30 overflow-hidden ${className}`}
+      className={`rounded-lg border border-border/40 bg-card/20 overflow-hidden ${className}`}
       {...(searchKey ? { 'data-settings-search': searchKey } : {})}
     >
       {(title || description) && (
-        <div className="px-4 py-2.5 border-b border-border/40">
+        <div className="px-3 py-1.5 border-b border-border/40">
           <div className="flex items-start gap-2.5">
             {icon && (
               <span className="mt-0.5 rounded-md bg-secondary/50 p-1 text-muted-foreground [&>svg]:h-3.5 [&>svg]:w-3.5">

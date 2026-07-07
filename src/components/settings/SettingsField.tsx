@@ -25,7 +25,7 @@ export default function SettingsField({
 }: SettingsFieldProps) {
   return (
     <div
-      className={`space-y-3 ${className}`}
+      className={`space-y-1.5 ${className}`}
       {...(searchKey ? { 'data-settings-search': searchKey } : {})}
     >
       <div className={labelClassName}>{label}</div>
