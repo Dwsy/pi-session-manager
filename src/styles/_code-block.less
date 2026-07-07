@@ -261,6 +261,115 @@
   }
 }
 
+.tool-review-shell-snippet {
+  position: relative;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  min-width: 0;
+
+  &--copyable {
+    padding-top: 8px;
+    padding-right: 12px;
+  }
+
+  &__toolbar {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    z-index: 2;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+
+  &--copyable:hover &__toolbar,
+  &--copyable:focus-within &__toolbar {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  &__copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 26px;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: rgb(var(--color-muted-foreground));
+    background: rgb(var(--color-background) / 0.92);
+    border: 1px solid rgb(var(--color-border) / 0.45);
+    border-radius: 5px;
+    box-shadow: 0 4px 14px rgb(var(--shadow-rgb) / 0.12);
+    transition: color 0.15s ease, background 0.15s ease;
+
+    &:hover {
+      color: rgb(var(--color-foreground));
+      background: rgb(var(--color-surface) / 0.95);
+    }
+  }
+
+  &__body {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    min-width: 0;
+  }
+
+  &__gutter {
+    flex-shrink: 0;
+    padding-right: 10px;
+    text-align: right;
+    font-family: var(--font-family-mono);
+    font-size: 10px;
+    line-height: 1.5;
+    color: rgb(var(--color-muted-foreground) / 0.75);
+    user-select: none;
+  }
+
+  &__line-no {
+    min-height: 1.5em;
+  }
+
+  &__code {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    min-width: 0;
+    flex: 1;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    font-size: 11px;
+    line-height: 1.5;
+
+    code {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+  }
+
+  &--compact {
+    padding: 4px 0;
+  }
+
+  &--compact &__code {
+    font-size: 10px;
+    line-height: 1.45;
+  }
+
+  &--scrollable {
+    overflow: auto;
+    min-height: 0;
+    scrollbar-gutter: stable;
+  }
+}
+
 .tool-review-inspector-code {
   .code-block-wrapper {
     border: 1px solid rgb(var(--color-border) / 0.34);

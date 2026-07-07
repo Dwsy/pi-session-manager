@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Terminal, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import type { FileOperation } from "./model";
+import ShellCodeSnippet from "./ShellCodeSnippet";
 
 interface ReviewShellListProps {
   operations: FileOperation[];
@@ -15,9 +16,11 @@ interface ShellListItemProps {
   onClick: () => void;
 }
 
+const SHELL_LIST_COLLAPSED_MAX_PX = 72;
+
 function ShellListItem({ operation, isSelected, onClick }: ShellListItemProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
+  const snippetWrapRef = useRef<HTMLDivElement>(null);
   const command = operation.filePath;
   const [expanded, setExpanded] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
@@ -29,11 +32,10 @@ function ShellListItem({ operation, isSelected, onClick }: ShellListItemProps) {
   }, [isSelected]);
 
   useEffect(() => {
-    if (contentRef.current) {
-      // Check if text exceeds threshold height (e.g. 72px)
-      setIsOverflowing(contentRef.current.scrollHeight > 76);
+    if (snippetWrapRef.current) {
+      setIsOverflowing(snippetWrapRef.current.scrollHeight > SHELL_LIST_COLLAPSED_MAX_PX + 4);
     }
-  }, [command]);
+  }, [command, expanded]);
 
   return (
     <div
@@ -49,12 +51,12 @@ function ShellListItem({ operation, isSelected, onClick }: ShellListItemProps) {
         <Terminal className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
           <div
-            ref={contentRef}
-            className={`font-mono text-xs text-foreground break-all whitespace-pre-wrap ${
+            ref={snippetWrapRef}
+            className={
               !expanded && isOverflowing ? "max-h-[72px] overflow-hidden" : ""
-            }`}
+            }
           >
-            {command}
+            <ShellCodeSnippet code={command} language="bash" compact />
           </div>
           {!expanded && isOverflowing && (
             <div className="pointer-events-none absolute inset-x-0 bottom-7 h-6 bg-gradient-to-t from-background/90 to-transparent" />

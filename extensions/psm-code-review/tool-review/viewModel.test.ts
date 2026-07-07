@@ -9,6 +9,7 @@ function operation(overrides: Partial<FileOperation>): FileOperation {
   return {
     id: "op-1",
     entryId: "entry-1",
+    toolCallId: "call-1",
     sequence: 1,
     toolName: "edit",
     filePath: "src/App.tsx",

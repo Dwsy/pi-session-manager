@@ -51,10 +51,12 @@ function renderModal({
   entries,
   toolResultByCallId = new Map(),
   onClose = vi.fn(),
+  initialToolCallId,
 }: {
   entries: SessionEntry[];
   toolResultByCallId?: Map<string, SessionEntry>;
   onClose?: () => void;
+  initialToolCallId?: string;
 }) {
   render(
     createElement(ToolCallReviewModal, {
@@ -62,6 +64,7 @@ function renderModal({
       onClose,
       entries,
       toolResultByCallId,
+      initialToolCallId,
     }),
   );
   return { onClose };
@@ -395,6 +398,60 @@ describe("ToolCallReviewModal UI behavior", () => {
     });
   });
 
+  it("opens on the requested tool call", async () => {
+    const firstResult: SessionEntry = {
+      type: "message",
+      id: "tool-result-first",
+      timestamp: "2026-05-19T10:00:02.000Z",
+      message: {
+        role: "tool",
+        toolCallId: "call-read-first",
+        toolName: "read",
+        content: [{ type: "text", text: "export const first = true;" }],
+      },
+    };
+    const secondResult: SessionEntry = {
+      type: "message",
+      id: "tool-result-second",
+      timestamp: "2026-05-19T10:00:03.000Z",
+      message: {
+        role: "tool",
+        toolCallId: "call-read-second",
+        toolName: "read",
+        content: [{ type: "text", text: "export const second = true;" }],
+      },
+    };
+
+    renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-read-first",
+            name: "read",
+            arguments: { path: "src/First.ts" },
+          },
+          {
+            type: "toolCall",
+            id: "call-read-second",
+            name: "read",
+            arguments: { path: "src/Second.ts" },
+          },
+        ]),
+      ],
+      toolResultByCallId: new Map([
+        ["call-read-first", firstResult],
+        ["call-read-second", secondResult],
+      ]),
+      initialToolCallId: "call-read-second",
+    });
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("export const second = true;");
+    });
+    expect(document.body.textContent).not.toContain("export const first = true;");
+  });
+
   it("keeps Inspector and read output on the CodeBlock fallback path", async () => {
     const toolResult: SessionEntry = {
       type: "message",
@@ -537,10 +594,10 @@ describe("ToolCallReviewModal UI behavior", () => {
       ],
     });
 
-    expect(screen.getByRole("radio", { name: /Files\s*1/ }).getAttribute("aria-checked")).toBe(
+    expect(screen.getByRole("radio", { name: /All\s*1/ }).getAttribute("aria-checked")).toBe(
       "true",
     );
-    expect(screen.getByRole("radio", { name: /All\s*1/ })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /Shell\s*1/ })).toBeTruthy();
     // The path may be rendered both as a heading and inside the detail preview;
     // assert presence rather than uniqueness.
     expect((await screen.findAllByText("src/App.tsx")).length).toBeGreaterThan(0);
@@ -552,13 +609,13 @@ describe("ToolCallReviewModal UI behavior", () => {
       expect(defaultShadowRoot.textContent).not.toContain("pnpm build --filter api");
     });
 
-    fireEvent.click(screen.getByRole("radio", { name: /Shell\s*1/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /^Shell\s*1$/ }));
 
     const shellNode = await findShellListItem(/pnpm build --filter api/);
     fireEvent.click(shellNode);
 
-    // After selecting, the command shows up in both the list item and the detail panel.
-    expect(screen.getAllByText("pnpm build --filter api").length).toBeGreaterThan(0);
+    // Highlighted bash/log output splits text across spans; assert merged text.
+    expect(document.body.textContent).toContain("pnpm build --filter api");
   });
 
   it("renders Pierre file tree icons and shows metrics in the Inspector popover", async () => {

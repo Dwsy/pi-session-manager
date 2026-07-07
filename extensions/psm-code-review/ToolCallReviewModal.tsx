@@ -13,7 +13,6 @@ import {
   FileEdit,
   FilePlus,
   FileText,
-  Files,
   Loader2,
   Maximize2,
   Minimize2,
@@ -46,10 +45,13 @@ import {
 } from "./tool-review/model";
 import ReviewFileTree from "./tool-review/ReviewFileTree";
 import ReviewShellList from "./tool-review/ReviewShellList";
+import ShellCodeSnippet from "./tool-review/ShellCodeSnippet";
 import {
   buildCodeViewItems,
   buildReviewTreeModel,
   getReviewTreePath,
+  isFileReviewOperation,
+  isShellReviewOperation,
   normalizeReviewPath,
 } from "./tool-review/viewModel";
 
@@ -76,6 +78,7 @@ interface ToolCallReviewModalProps {
   loading?: boolean;
   error?: string | null;
   diffConfig?: DiffConfig;
+  initialToolCallId?: string;
 }
 
 const TOOL_CONFIG: Record<
@@ -155,6 +158,14 @@ const FILTER_OPTIONS: Array<{
     predicate: () => true,
   },
   {
+    id: "shell",
+    icon: Terminal,
+    labelKey: "components.toolCallReview.filters.shell",
+    fallbackLabel: "Shell",
+    predicate: (operation) => operation.toolName === "bash",
+    iconClass: "text-[var(--tool-color-bash)]",
+  },
+  {
     id: "writes",
     icon: FilePlus,
     labelKey: "components.toolCallReview.filters.writes",
@@ -176,6 +187,7 @@ const FILTER_OPTIONS: Array<{
     labelKey: "components.toolCallReview.filters.reads",
     fallbackLabel: "Reads",
     predicate: (operation) => operation.toolName === "read",
+    iconClass: "text-[var(--tool-color-read)]",
   },
   {
     id: "errors",
@@ -183,33 +195,17 @@ const FILTER_OPTIONS: Array<{
     labelKey: "components.toolCallReview.filters.errors",
     fallbackLabel: "Errors",
     predicate: (operation) => operation.isError,
+    iconClass: "text-destructive",
   },
 ];
 
-type ReviewMode = "files" | "shell";
-
-const REVIEW_MODE_OPTIONS: Array<{
-  id: ReviewMode;
-  icon: typeof FileText;
-  labelKey: string;
-  fallbackLabel: string;
-  predicate: (operation: FileOperation) => boolean;
-}> = [
-  {
-    id: "files",
-    icon: Files,
-    labelKey: "components.toolCallReview.modes.files",
-    fallbackLabel: "Files",
-    predicate: (operation) => operation.toolName !== "bash",
-  },
-  {
-    id: "shell",
-    icon: Terminal,
-    labelKey: "components.toolCallReview.modes.shell",
-    fallbackLabel: "Shell",
-    predicate: (operation) => operation.toolName === "bash",
-  },
-];
+const FILTER_ACTIVE_ICON_COLOR: Partial<Record<ReviewFilter, string>> = {
+  shell: "var(--tool-color-bash)",
+  writes: "var(--tool-color-write)",
+  edits: "var(--tool-color-edit)",
+  reads: "var(--tool-color-read)",
+  errors: "rgb(var(--color-destructive))",
+};
 
 const REVIEW_CODE_VIEW_STYLE = {
   "--diffs-light-bg": "rgb(var(--color-background))",
@@ -373,7 +369,7 @@ function FilterBar({
 
   return (
     <div
-      className="flex min-w-0 items-center gap-1 overflow-x-auto rounded-lg border border-border/40 bg-background/50 p-1 custom-scrollbar"
+      className="flex min-w-0 flex-wrap items-center gap-1 rounded-lg border border-border/40 bg-background/50 p-1"
       role="radiogroup"
       aria-label={t("components.toolCallReview.filterLabel", "Review filter")}
     >
@@ -382,9 +378,10 @@ function FilterBar({
         const disabled = counts[option.id] === 0 && option.id !== "all";
         const Icon = option.icon;
         const label = t(option.labelKey, option.fallbackLabel);
-        const iconClass = active
-          ? option.iconClass ?? "text-accent"
-          : "text-muted-foreground group-hover:text-foreground";
+        const activeIconColor = active ? FILTER_ACTIVE_ICON_COLOR[option.id] : undefined;
+        const inactiveIconClass =
+          "text-muted-foreground group-hover:text-foreground group-disabled:text-muted-foreground";
+        const activeLabelStyle = activeIconColor ? { color: activeIconColor } : undefined;
         return (
           <button
             key={option.id}
@@ -394,77 +391,45 @@ function FilterBar({
             aria-checked={active}
             disabled={disabled}
             title={`${label} (${counts[option.id]})`}
-            className={`group flex h-7 flex-shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium transition-all ${
+            className={`group flex h-7 max-w-full items-center gap-1 rounded-md px-2 text-[11px] font-medium transition-all ${
               active
-                ? "bg-surface text-foreground shadow-sm ring-1 ring-border/50"
+                ? "bg-surface shadow-sm ring-1 ring-border/50"
                 : disabled
                   ? "opacity-40 cursor-not-allowed text-muted-foreground"
                   : "text-muted-foreground hover:bg-surface/50 hover:text-foreground"
             }`}
           >
             <Icon
-              className={`h-3.5 w-3.5 flex-shrink-0 transition-colors ${iconClass}`}
+              className={`h-3.5 w-3.5 flex-shrink-0 transition-colors ${
+                active
+                  ? activeIconColor
+                    ? ""
+                    : "text-accent"
+                  : inactiveIconClass
+              }`}
+              style={activeIconColor ? { color: activeIconColor } : undefined}
               aria-hidden="true"
             />
-            <span className="whitespace-nowrap">{label}</span>
             <span
-              className={`inline-flex h-4 min-w-[1.125rem] items-center justify-center rounded-full px-1 font-mono text-[10px] tabular-nums ${
+              className={`truncate ${active && !activeIconColor ? "text-foreground" : ""}`}
+              style={activeLabelStyle}
+            >
+              {label}
+            </span>
+            <span
+              className={`inline-flex h-4 min-w-[1.125rem] flex-shrink-0 items-center justify-center rounded-full px-1 font-mono text-[10px] tabular-nums ${
                 active
-                  ? "bg-accent/15 text-accent font-semibold"
+                  ? "bg-background/70 font-semibold"
                   : "bg-background/60 text-muted-foreground"
               }`}
+              style={
+                active && activeIconColor
+                  ? { color: activeIconColor }
+                  : active
+                    ? { color: "rgb(var(--color-foreground))" }
+                    : undefined
+              }
             >
-              {counts[option.id]}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function ReviewModeSwitch({
-  activeMode,
-  counts,
-  onChange,
-}: {
-  activeMode: ReviewMode;
-  counts: Record<ReviewMode, number>;
-  onChange: (mode: ReviewMode) => void;
-}) {
-  const { t } = useTranslation();
-
-  return (
-    <div
-      className="grid min-w-0 grid-cols-2 gap-1 rounded-[8px] border border-border/40 bg-background/38 p-1"
-      role="radiogroup"
-      aria-label={t("components.toolCallReview.modeLabel", "Review mode")}
-    >
-      {REVIEW_MODE_OPTIONS.map((option) => {
-        const active = activeMode === option.id;
-        const Icon = option.icon;
-        const label = t(option.labelKey, option.fallbackLabel);
-
-        return (
-          <button
-            key={option.id}
-            type="button"
-            onClick={() => onChange(option.id)}
-            role="radio"
-            aria-checked={active}
-            className={`flex h-9 min-w-0 items-center justify-between gap-2 rounded-[6px] border px-3 text-[11px] font-medium motion-surface focus-ring ${
-              active
-                ? "border-border/65 bg-background text-foreground shadow-[0_1px_2px_rgba(var(--shadow-rgb),0.14)]"
-                : "border-transparent text-muted-foreground hover:border-border/35 hover:bg-surface/45 hover:text-foreground"
-            }`}
-          >
-            <span className="flex min-w-0 items-center gap-1.5">
-              <Icon className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
-              <span className="truncate">{label}</span>
-            </span>
-            <span className={`inline-flex h-4 min-w-[1.25rem] items-center justify-center rounded-full px-1 font-mono text-[10px] tabular-nums ${
-              active ? "bg-surface text-foreground" : "bg-background/45 text-muted-foreground/85"
-            }`}>
               {counts[option.id]}
             </span>
           </button>
@@ -730,6 +695,73 @@ function ViewControlsToolbar({ controls }: { controls: CodeViewControls }) {
   );
 }
 
+function ShellSplitPanel({
+  commandText,
+  output,
+  isError,
+}: {
+  commandText: string;
+  output?: string;
+  isError: boolean;
+}) {
+  const { t } = useTranslation();
+  const hasOutput = Boolean(output?.trim());
+  const emptyLabel = t(
+    "components.toolCallReview.noRenderableOutput",
+    "No renderable output was captured for this operation.",
+  );
+
+  return (
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-3 p-3">
+      <section className="flex min-h-0 max-h-[min(300px,44dvh)] flex-shrink-0 flex-col overflow-hidden rounded-[8px] border border-border/45 bg-background">
+        <header className="flex flex-shrink-0 items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.52)] px-3 py-2.5">
+          <Terminal
+            className="h-3.5 w-3.5 text-[var(--tool-color-bash)]"
+            aria-hidden="true"
+          />
+          <span className="text-[11px] font-semibold text-foreground">
+            {t("components.bashExecution.command", "Command")}
+          </span>
+        </header>
+        <div className="min-h-0 flex-1 overflow-auto bg-[rgb(var(--color-surface-dark)/0.18)]">
+          <ShellCodeSnippet
+            code={commandText.trim() || emptyLabel}
+            language="bash"
+            showLineNumbers
+            scrollable
+            copyOnHover
+          />
+        </div>
+      </section>
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[8px] border border-border/45 bg-background">
+        <header className="flex flex-shrink-0 items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.52)] px-3 py-2.5">
+          <Code2 className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+          <span className="text-[11px] font-semibold text-foreground">
+            {isError
+              ? t("components.toolCallReview.errorOutput", "Error output")
+              : t("components.bashExecution.output", "Output")}
+          </span>
+        </header>
+        <div className="min-h-0 flex-1 overflow-auto bg-[rgb(var(--color-surface-dark)/0.18)]">
+          {hasOutput ? (
+            <ShellCodeSnippet
+              code={output!}
+              language="log"
+              showLineNumbers
+              scrollable
+              copyOnHover
+            />
+          ) : (
+            <div className="flex h-full min-h-[140px] items-center justify-center px-5 py-6 text-center text-xs text-muted-foreground">
+              {emptyLabel}
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function DetailPanel({
   operation,
   codeViewItems,
@@ -851,14 +883,22 @@ function DetailPanel({
           <span className="rounded-[4px] flex-shrink-0 border border-border/40 bg-background/45 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
             {t(config.labelKey, config.fallbackLabel)}
           </span>
-          <button
-            type="button"
-            onClick={() => onNavigateToPath?.(displayPath)}
-            title="点击自动在左侧树结构中定位导航"
-            className="group flex min-w-0 items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-xs font-medium text-foreground hover:bg-surface/60 transition-colors"
-          >
-            <span className="truncate group-hover:text-accent group-hover:underline">{displayPath}</span>
-          </button>
+          {operation.toolName === "bash" ? (
+            <span className="truncate font-mono text-xs text-muted-foreground">
+              #{operation.sequence}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onNavigateToPath?.(displayPath)}
+              title="点击自动在左侧树结构中定位导航"
+              className="group flex min-w-0 items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-xs font-medium text-foreground hover:bg-surface/60 transition-colors"
+            >
+              <span className="truncate group-hover:text-accent group-hover:underline">
+                {displayPath}
+              </span>
+            </button>
+          )}
           {operation.isError && (
             <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-[4px] border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.1em] text-destructive">
               <AlertTriangle className="h-3 w-3" aria-hidden="true" />
@@ -867,6 +907,31 @@ function DetailPanel({
           )}
         </div>
         {showsDiffControls && <ViewControlsToolbar controls={controls} />}
+        {operation.toolName === "read" &&
+          displayPath.toLowerCase().endsWith(".md") &&
+          (operation.content || operation.output) && (
+            <button
+              type="button"
+              onClick={() => setMarkdownPreview((v) => !v)}
+              className={`inline-flex h-8 items-center gap-1 rounded-[5px] border px-2.5 py-1.5 text-xs motion-surface focus-ring ${
+                markdownPreview
+                  ? "border-border-hover bg-surface text-foreground"
+                  : "border-border/45 bg-background/60 text-muted-foreground hover:border-border-hover hover:bg-surface hover:text-foreground"
+              }`}
+              title={
+                markdownPreview
+                  ? t("components.toolCallReview.previewMode.code", "View code")
+                  : t("components.toolCallReview.previewMode.preview", "Preview markdown")
+              }
+            >
+              <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="font-medium">
+                {markdownPreview
+                  ? t("components.toolCallReview.code", "Code")
+                  : t("components.toolCallReview.preview", "Preview")}
+              </span>
+            </button>
+          )}
         <div className="relative flex-shrink-0">
           <button
             type="button"
@@ -911,10 +976,22 @@ function DetailPanel({
         <button
           type="button"
           onClick={() => onCopy(operation)}
-          aria-label={t(
-            "components.toolCallReview.copyOperation",
-            "Copy operation details",
-          )}
+          aria-label={
+            operation.toolName === "bash"
+              ? t("components.toolCallReview.copyCommand", "Copy command")
+              : t(
+                  "components.toolCallReview.copyOperation",
+                  "Copy operation details",
+                )
+          }
+          title={
+            operation.toolName === "bash"
+              ? t("components.toolCallReview.copyCommand", "Copy command")
+              : t(
+                  "components.toolCallReview.copyOperation",
+                  "Copy operation details",
+                )
+          }
           className="inline-flex items-center gap-1.5 rounded-[5px] border border-border/45 bg-background/60 px-2.5 py-1.5 text-xs text-muted-foreground motion-surface focus-ring hover:border-border-hover hover:bg-surface hover:text-foreground"
         >
           {copied ? (
@@ -924,20 +1001,26 @@ function DetailPanel({
           )}
           {copied
             ? t("components.codeBlock.copied", "Copied!")
-            : t("components.codeBlock.copy", "Copy")}
+            : operation.toolName === "bash"
+              ? t("components.toolCallReview.copyCommand", "Copy command")
+              : t("components.codeBlock.copy", "Copy")}
         </button>
       </div>
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div
           className={`custom-scrollbar min-h-0 min-w-0 flex-1 overscroll-contain ${
-            usesCodeView ? "overflow-hidden" : "overflow-auto"
+            usesCodeView || operation.toolName === "bash"
+              ? "overflow-hidden"
+              : "overflow-auto"
           }`}
           style={{ scrollbarGutter: "stable" }}
         >
           <div
             className={`min-h-0 bg-[rgb(var(--color-surface-dark)/0.24)] ${
-              usesCodeView ? "flex h-full flex-col gap-2" : "space-y-2"
+              usesCodeView || operation.toolName === "bash"
+                ? "flex h-full min-h-0 flex-col"
+                : "space-y-2"
             }`}
           >
             {isChangeOperation(operation) && !usesCodeView && (
@@ -987,68 +1070,25 @@ function DetailPanel({
                 />
               </div>
             ) : operation.toolName === "bash" ? (
-              <div className="space-y-3">
-                <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
-                  <div className="flex items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.52)] px-3 py-2 text-xs font-medium text-foreground">
-                    <Terminal className="h-3.5 w-3.5" aria-hidden="true" />
-                    {t("components.bashExecution.command", "Command")}
-                  </div>
-                  <CodeBlock
-                    code={commandText}
-                    language="bash"
-                  />
-                </div>
-                {operation.output && (
-                  <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
-                    <div className="flex items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.52)] px-3 py-2 text-xs font-medium text-foreground">
-                      <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      {operation.isError
-                        ? t(
-                            "components.toolCallReview.errorOutput",
-                            "Error output",
-                          )
-                        : t("components.bashExecution.output", "Output")}
-                    </div>
-                    <CodeBlock
-                      code={operation.output}
-                      language="text"
-                    />
-                  </div>
-                )}
-              </div>
+              <ShellSplitPanel
+                commandText={commandText}
+                output={operation.output}
+                isError={operation.isError}
+              />
             ) : operation.toolName === "read" ? (
               <div className="space-y-3">
                 {(operation.content || operation.output) ? (
                   <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
-                    <div className="flex items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.52)] px-3 py-2 text-xs font-medium text-foreground">
-                      <FileText className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-                      <span className="flex-1 truncate text-muted-foreground">{t("components.toolCallReview.fileContent", "File Content")}</span>
-                      {displayPath.toLowerCase().endsWith('.md') && (
-                        <button
-                          type="button"
-                          onClick={() => setMarkdownPreview((v) => !v)}
-                          className={`inline-flex h-6 items-center gap-1 rounded-[4px] border px-2 text-[11px] motion-surface focus-ring ${
-                            markdownPreview
-                              ? 'border-border-hover bg-surface text-foreground'
-                              : 'border-border/45 bg-background/60 text-muted-foreground hover:border-border-hover hover:bg-surface hover:text-foreground'
-                          }`}
-                          title={markdownPreview ? t('components.toolCallReview.previewMode.code', 'View code') : t('components.toolCallReview.previewMode.preview', 'Preview markdown')}
-                        >
-                          <Eye className="h-3 w-3" aria-hidden="true" />
-                          <span>{markdownPreview ? t('components.toolCallReview.code', 'Code') : t('components.toolCallReview.preview', 'Preview')}</span>
-                        </button>
-                      )}
-                    </div>
-                    {markdownPreview && displayPath.toLowerCase().endsWith('.md') ? (
+                    {markdownPreview && displayPath.toLowerCase().endsWith(".md") ? (
                       <div className="max-h-[60vh] overflow-auto p-4">
                         <MarkdownContent
-                          content={operation.content || operation.output || ''}
+                          content={operation.content || operation.output || ""}
                           className="text-sm"
                         />
                       </div>
                     ) : (
                       <CodeBlock
-                        code={operation.content || operation.output || ''}
+                        code={operation.content || operation.output || ""}
                         language={language}
                         showLineNumbers
                       />
@@ -1139,15 +1179,16 @@ export default function ToolCallReviewModal({
   loading = false,
   error = null,
   diffConfig,
+  initialToolCallId,
 }: ToolCallReviewModalProps) {
   const { t } = useTranslation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<ReviewFilter>(DEFAULT_REVIEW_FILTER);
-  const [activeMode, setActiveMode] = useState<ReviewMode>("files");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [contentExpanded, setContentExpanded] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const appliedInitialToolCallRef = useRef<string | null>(null);
 
   // Initialize from plugin settings config if provided, otherwise use defaults
   const [splitView, setSplitView] = useState(diffConfig?.splitView ?? true);
@@ -1182,37 +1223,51 @@ export default function ToolCallReviewModal({
     () => extractFileOperations(entries, toolResultByCallId),
     [entries, toolResultByCallId],
   );
-  const modeCounts = useMemo(() => {
-    return REVIEW_MODE_OPTIONS.reduce(
-      (acc, option) => {
-        acc[option.id] = allOperations.filter(option.predicate).length;
-        return acc;
-      },
-      { files: 0, shell: 0 } as Record<ReviewMode, number>,
-    );
-  }, [allOperations]);
-  const resolvedMode =
-    activeMode === "files" && modeCounts.files === 0 && modeCounts.shell > 0
-      ? "shell"
-      : activeMode;
-  const modeOperations = useMemo(() => {
-    const option = REVIEW_MODE_OPTIONS.find((item) => item.id === resolvedMode);
-    return option ? allOperations.filter(option.predicate) : allOperations;
-  }, [allOperations, resolvedMode]);
+  const pendingInitialOperation = useMemo(() => {
+    if (!isOpen || !initialToolCallId) return null;
+    if (appliedInitialToolCallRef.current === initialToolCallId) return null;
+    return allOperations.find(
+      (operation) =>
+        operation.toolCallId === initialToolCallId ||
+        operation.id === initialToolCallId,
+    ) || null;
+  }, [allOperations, initialToolCallId, isOpen]);
+  const fileOperations = useMemo(
+    () => allOperations.filter(isFileReviewOperation),
+    [allOperations],
+  );
+  const shellOperations = useMemo(
+    () => allOperations.filter(isShellReviewOperation),
+    [allOperations],
+  );
+
+  const isShellView = activeFilter === "shell";
+
   const filterCounts = useMemo(() => {
     return FILTER_OPTIONS.reduce(
       (acc, option) => {
-        acc[option.id] = modeOperations.filter(option.predicate).length;
+        if (option.id === "shell") {
+          acc.shell = shellOperations.length;
+        } else if (option.id === "all") {
+          acc.all = fileOperations.length;
+        } else {
+          acc[option.id] = fileOperations.filter(option.predicate).length;
+        }
         return acc;
       },
       {} as Record<ReviewFilter, number>,
     );
-  }, [modeOperations]);
+  }, [fileOperations, shellOperations]);
 
   const filteredOperations = useMemo(() => {
+    if (isShellView) return shellOperations;
+    if (activeFilter === "all") return fileOperations;
     const option = FILTER_OPTIONS.find((item) => item.id === activeFilter);
-    return option ? modeOperations.filter(option.predicate) : modeOperations;
-  }, [activeFilter, modeOperations]);
+    if (!option) return fileOperations;
+    return fileOperations.filter(option.predicate);
+  }, [activeFilter, fileOperations, isShellView, shellOperations]);
+
+  const listShowsShell = isShellView;
 
   const searchedOperations = useMemo(() => {
     if (!searchQuery.trim()) return filteredOperations;
@@ -1236,21 +1291,26 @@ export default function ToolCallReviewModal({
   );
 
   const selectedFileOperations = useMemo(() => {
-    if (!selectedOperation) return [];
+    if (isShellView || !selectedOperation || isShellReviewOperation(selectedOperation)) {
+      return [];
+    }
     const selectedPath = getReviewTreePath(selectedOperation);
     return searchedOperations.filter(
-      (operation) => getReviewTreePath(operation) === selectedPath,
+      (operation) =>
+        isFileReviewOperation(operation) &&
+        getReviewTreePath(operation) === selectedPath,
     );
-  }, [searchedOperations, selectedOperation]);
+  }, [isShellView, searchedOperations, selectedOperation]);
 
   const selectedCodeViewItems = useMemo(
     () => buildCodeViewItems(selectedFileOperations),
     [selectedFileOperations],
   );
 
-  const selectedTreePath = selectedOperation
-    ? getReviewTreePath(selectedOperation)
-    : null;
+  const selectedTreePath =
+    !isShellView && selectedOperation && isFileReviewOperation(selectedOperation)
+      ? getReviewTreePath(selectedOperation)
+      : null;
 
   const totals = useMemo(() => {
     return allOperations.reduce(
@@ -1266,11 +1326,25 @@ export default function ToolCallReviewModal({
   }, [allOperations]);
 
   useEffect(() => {
+    if (!isOpen) {
+      appliedInitialToolCallRef.current = null;
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!pendingInitialOperation) return;
+    setSearchQuery("");
+    setActiveFilter(
+      pendingInitialOperation.toolName === "bash" ? "shell" : DEFAULT_REVIEW_FILTER,
+    );
+  }, [pendingInitialOperation]);
+
+  useEffect(() => {
     if (!isOpen) return;
-    if (filterCounts[activeFilter] === 0 && modeOperations.length > 0) {
+    if (filterCounts[activeFilter] === 0 && allOperations.length > 0) {
       setActiveFilter("all");
     }
-  }, [activeFilter, filterCounts, isOpen, modeOperations.length]);
+  }, [activeFilter, filterCounts, isOpen, allOperations.length]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1279,13 +1353,25 @@ export default function ToolCallReviewModal({
       return;
     }
 
-    if (
-      !selectedId ||
-      !searchedOperations.some((operation) => operation.id === selectedId)
-    ) {
-      setSelectedId(searchedOperations[0].id);
+    if (pendingInitialOperation) {
+      const initialOperation = searchedOperations.find(
+        (operation) => operation.id === pendingInitialOperation.id,
+      );
+      if (!initialOperation) return;
+      appliedInitialToolCallRef.current = initialToolCallId ?? initialOperation.toolCallId;
+      if (selectedId !== initialOperation.id) {
+        setSelectedId(initialOperation.id);
+      }
+      return;
     }
-  }, [searchedOperations, isOpen, selectedId]);
+
+    const selectionStillVisible = searchedOperations.some(
+      (operation) => operation.id === selectedId,
+    );
+    if (selectionStillVisible) return;
+
+    setSelectedId(searchedOperations[0].id);
+  }, [searchedOperations, isOpen, selectedId, pendingInitialOperation, initialToolCallId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1357,6 +1443,11 @@ export default function ToolCallReviewModal({
     setInspectorOpen(false);
   }, []);
 
+  const handleFilterChange = useCallback((filter: ReviewFilter) => {
+    setSearchQuery("");
+    setActiveFilter(filter);
+  }, []);
+
   const handleTreeSelect = useCallback(
     (path: string) => {
       const operation = filteredOperations.find(
@@ -1369,7 +1460,11 @@ export default function ToolCallReviewModal({
 
   const handleCopy = useCallback(async (operation: FileOperation) => {
     try {
-      await navigator.clipboard.writeText(getClipboardText(operation));
+      const text =
+        operation.toolName === "bash"
+          ? operation.filePath
+          : getClipboardText(operation);
+      await navigator.clipboard.writeText(text);
       setCopiedId(operation.id);
       window.setTimeout(() => setCopiedId(null), 1600);
     } catch (error) {
@@ -1381,7 +1476,7 @@ export default function ToolCallReviewModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/45 p-2 backdrop-blur-md ui-enter-fade sm:p-3"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-background/45 p-2 backdrop-blur-md ui-enter-fade sm:p-3"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -1394,7 +1489,7 @@ export default function ToolCallReviewModal({
         aria-labelledby="tool-call-review-title"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="relative flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.66)] pl-4 pr-4 py-2 sm:pl-10 lg:pl-12">
+        <div className="relative flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.66)] px-4 py-2">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <Wrench
@@ -1487,15 +1582,10 @@ export default function ToolCallReviewModal({
             {!contentExpanded && (
               <aside className="flex h-[min(300px,38dvh)] min-h-0 flex-shrink-0 flex-col border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.42)] ui-enter-fade md:h-auto md:w-[360px] md:border-b-0 md:border-r xl:w-[400px]">
                 <div className="flex flex-col gap-2 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.55)] p-2">
-                  <ReviewModeSwitch
-                    activeMode={resolvedMode}
-                    counts={modeCounts}
-                    onChange={setActiveMode}
-                  />
                   <FilterBar
                     activeFilter={activeFilter}
                     counts={filterCounts}
-                    onChange={setActiveFilter}
+                    onChange={handleFilterChange}
                   />
                   <div className="relative flex items-center">
                     <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -1503,7 +1593,9 @@ export default function ToolCallReviewModal({
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder={resolvedMode === "files" ? "搜索文件名或路径..." : "搜索Shell命令..."}
+                      placeholder={
+                        listShowsShell ? "搜索命令..." : "搜索文件名、路径或内容..."
+                      }
                       className="w-full rounded-md border border-border/40 bg-background/50 py-1 pl-8 pr-7 text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                     />
                     {searchQuery && (
@@ -1533,7 +1625,7 @@ export default function ToolCallReviewModal({
                         </div>
                       </div>
                     </div>
-                  ) : resolvedMode === "shell" ? (
+                  ) : listShowsShell ? (
                     <ReviewShellList
                       operations={searchedOperations}
                       selectedId={selectedId}
@@ -1555,29 +1647,7 @@ export default function ToolCallReviewModal({
                     />
                   )}
                 </div>
-                {resolvedMode === "shell" ? (
-                  <div className="grid grid-cols-3 divide-x divide-border/35 border-t border-border/45 bg-[rgb(var(--color-surface-dark)/0.62)]">
-                    <SummaryItem
-                      label="components.toolCallReview.summary.shell"
-                      fallbackLabel="Shell"
-                      value={modeCounts.shell}
-                      tone="blue"
-                    />
-                    <SummaryItem
-                      label="components.toolCallReview.summary.executed"
-                      fallbackLabel="Executed"
-                      value={totals.changes}
-                      tone="green"
-                    />
-                    <SummaryItem
-                      label="components.toolCallReview.summary.err"
-                      fallbackLabel="Err"
-                      value={totals.errors}
-                      tone="red"
-                    />
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-4 divide-x divide-border/35 border-t border-border/45 bg-[rgb(var(--color-surface-dark)/0.62)]">
+                <div className="grid grid-cols-4 divide-x divide-border/35 border-t border-border/45 bg-[rgb(var(--color-surface-dark)/0.62)]">
                     <SummaryItem
                       label="components.toolCallReview.summary.changes"
                       fallbackLabel="Changes"
@@ -1602,8 +1672,7 @@ export default function ToolCallReviewModal({
                       value={totals.errors}
                       tone="red"
                     />
-                  </div>
-                )}
+                </div>
               </aside>
             )}
 

@@ -1,4 +1,13 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import type { FileTreeIconConfig } from "@pierre/trees";
 import { Copy, ExternalLink, FileText, FolderOpen } from "lucide-react";
@@ -133,6 +142,27 @@ function getDeltaText(node: ReviewFileNode) {
   return `+${node.additions} -${node.deletions}`;
 }
 
+const REVIEW_TREE_MENU_WIDTH = 192;
+const REVIEW_TREE_MENU_ROW_HEIGHT = 36;
+const REVIEW_TREE_MENU_VIEWPORT_PADDING = 10;
+
+function clampReviewTreeMenuPosition(
+  x: number,
+  y: number,
+  rowCount: number,
+): { x: number; y: number } {
+  const menuHeight = rowCount * REVIEW_TREE_MENU_ROW_HEIGHT + 8;
+  let nextX = x;
+  let nextY = y;
+  const maxX = window.innerWidth - REVIEW_TREE_MENU_WIDTH - REVIEW_TREE_MENU_VIEWPORT_PADDING;
+  const maxY = window.innerHeight - menuHeight - REVIEW_TREE_MENU_VIEWPORT_PADDING;
+  if (nextX > maxX) nextX = Math.max(REVIEW_TREE_MENU_VIEWPORT_PADDING, maxX);
+  if (nextY > maxY) nextY = Math.max(REVIEW_TREE_MENU_VIEWPORT_PADDING, maxY);
+  if (nextX < REVIEW_TREE_MENU_VIEWPORT_PADDING) nextX = REVIEW_TREE_MENU_VIEWPORT_PADDING;
+  if (nextY < REVIEW_TREE_MENU_VIEWPORT_PADDING) nextY = REVIEW_TREE_MENU_VIEWPORT_PADDING;
+  return { x: nextX, y: nextY };
+}
+
 function getDirectoryPaths(paths: string[]) {
   const directories = new Set<string>();
 
@@ -165,6 +195,7 @@ export default function ReviewFileTree({
   onSelectPathRef.current = onSelectPath;
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const hoveredPathRef = useRef<string | null>(null);
 
   const { model } = useFileTree({
@@ -198,8 +229,18 @@ export default function ReviewFileTree({
   const handleContextMenu = useCallback((e: React.MouseEvent, path: string, isDir: boolean) => {
     e.preventDefault();
     e.stopPropagation();
+    const rowCount = isDir ? 3 : 4;
+    const { x, y } = clampReviewTreeMenuPosition(e.clientX, e.clientY, rowCount);
+    setMenuPosition({ x, y });
     setContextMenu({ x: e.clientX, y: e.clientY, path, isDir });
   }, []);
+
+  useLayoutEffect(() => {
+    if (!contextMenu) return;
+    const rowCount = contextMenu.isDir ? 3 : 4;
+    const { x, y } = clampReviewTreeMenuPosition(contextMenu.x, contextMenu.y, rowCount);
+    setMenuPosition({ x, y });
+  }, [contextMenu]);
 
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu(null);
@@ -314,48 +355,51 @@ export default function ReviewFileTree({
         className="h-full min-h-0 w-full"
         style={reviewTreeStyle}
       />
-      {contextMenu && (
-        <div
-          id="review-file-tree-context-menu"
-          className="fixed z-[9999] w-48 rounded-lg border border-border bg-card shadow-xl overflow-hidden py-1"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-        >
-          <button
-            type="button"
-            onClick={() => handleCopyPath(contextMenu.path)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-secondary"
+      {contextMenu &&
+        createPortal(
+          <div
+            id="review-file-tree-context-menu"
+            className="fixed z-[10050] w-48 rounded-lg border border-border bg-card shadow-xl overflow-hidden py-1"
+            style={{ left: menuPosition.x, top: menuPosition.y }}
+            onContextMenu={(e) => e.preventDefault()}
           >
-            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>复制路径</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCopyRelativePath(contextMenu.path)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-secondary"
-          >
-            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>复制相对路径</span>
-          </button>
-          {!contextMenu.isDir && (
             <button
               type="button"
-              onClick={() => handleOpenDefault(contextMenu.path)}
+              onClick={() => handleCopyPath(contextMenu.path)}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-secondary"
             >
-              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>打开 (默认程序)</span>
+              <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>复制路径</span>
             </button>
-          )}
-          <button
-            type="button"
-            onClick={handleCloseContextMenu}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground hover:bg-secondary border-t border-border/50 mt-1"
-          >
-            <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>取消</span>
-          </button>
-        </div>
-      )}
+            <button
+              type="button"
+              onClick={() => handleCopyRelativePath(contextMenu.path)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-secondary"
+            >
+              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>复制相对路径</span>
+            </button>
+            {!contextMenu.isDir && (
+              <button
+                type="button"
+                onClick={() => handleOpenDefault(contextMenu.path)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-secondary"
+              >
+                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>打开 (默认程序)</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleCloseContextMenu}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground hover:bg-secondary border-t border-border/50 mt-1"
+            >
+              <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>取消</span>
+            </button>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

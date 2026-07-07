@@ -16,6 +16,7 @@ import ini from '@shikijs/langs/ini'
 import java from '@shikijs/langs/java'
 import javascript from '@shikijs/langs/javascript'
 import kotlin from '@shikijs/langs/kotlin'
+import log from '@shikijs/langs/log'
 import lua from '@shikijs/langs/lua'
 import json from '@shikijs/langs/json'
 import jsx from '@shikijs/langs/jsx'
@@ -75,6 +76,7 @@ type ShikiLanguage =
   | 'dart'
   | 'graphql'
   | 'kotlin'
+  | 'log'
   | 'lua'
   | 'json'
   | 'markdown'
@@ -134,6 +136,7 @@ const shikiHighlighter = createHighlighterCoreSync({
     xml,
     graphql,
     kotlin,
+    log,
     lua,
     json,
     markdown,
@@ -177,6 +180,8 @@ const shikiLanguageAliases: Record<string, ShikiLanguage> = {
   md: 'markdown',
   yml: 'yaml',
   makefile: 'make',
+  log: 'log',
+  txt: 'log',
   docker: 'dockerfile',
   dockerfile: 'dockerfile',
 }

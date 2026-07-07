@@ -63,6 +63,7 @@ function CodeReviewToolbarButton({
   const [hasReviewableOps, setHasReviewableOps] = useState(false)
   const [overrideEntries, setOverrideEntries] = useState<SessionEntry[] | null>(null)
   const [overrideMap, setOverrideMap] = useState<Map<string, SessionEntry> | null>(null)
+  const [initialToolCallId, setInitialToolCallId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -118,12 +119,14 @@ function CodeReviewToolbarButton({
       if (request.entries && request.toolResultByCallId) {
         setOverrideEntries(request.entries)
         setOverrideMap(request.toolResultByCallId)
+        setInitialToolCallId(request.initialToolCallId ?? null)
         setError(null)
         setLoading(false)
         setOpen(true)
       } else if (request.sessionPath) {
         setOverrideEntries(null)
         setOverrideMap(null)
+        setInitialToolCallId(request.initialToolCallId ?? null)
         setOpen(true)
       }
     })
@@ -133,6 +136,7 @@ function CodeReviewToolbarButton({
     setOpen(false)
     setOverrideEntries(null)
     setOverrideMap(null)
+    setInitialToolCallId(null)
   }, [])
 
   const title = i18n.t('session.codeReview.title', 'Code review')
@@ -145,6 +149,7 @@ function CodeReviewToolbarButton({
         onClick={() => {
           setOverrideEntries(null)
           setOverrideMap(null)
+          setInitialToolCallId(null)
           setOpen(true)
         }}
         disabled={!hasReviewableOps || loading}
@@ -168,6 +173,7 @@ function CodeReviewToolbarButton({
         toolResultByCallId={activeToolResultByCallId}
         loading={loading}
         error={error}
+        initialToolCallId={initialToolCallId ?? undefined}
         diffConfig={{
           splitView: settings.get('diffView', 'split') === 'split',
           wrap: settings.get('diffWrap', false),

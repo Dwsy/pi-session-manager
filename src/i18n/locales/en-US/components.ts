@@ -21,6 +21,7 @@ export const components = {
     noFilterResults: 'No operations match this filter',
     noRenderableOutput: 'No renderable output was captured for this operation.',
     copyOperation: 'Copy operation details',
+    copyCommand: 'Copy command',
     contentFullscreen: 'Fullscreen content',
     exitContentFullscreen: 'Exit content fullscreen',
     error: 'Error',
@@ -48,12 +49,19 @@ export const components = {
       captured: 'Captured output',
       metadata: 'Metadata only',
     },
+    modeLabel: 'Review mode',
     summary: {
       ops: 'Ops',
       changes: 'Changes',
       add: 'Add',
       del: 'Del',
       err: 'Err',
+      shell: 'Shell',
+      executed: 'Executed',
+    },
+    modes: {
+      files: 'Files',
+      shell: 'Shell',
     },
     filters: {
       all: 'All',
@@ -77,6 +85,15 @@ export const components = {
       wrap: 'Wrap lines',
       expandUnchanged: 'Expand context',
     },
+    fileContent: 'File content',
+    previewMode: {
+      code: 'View code',
+      preview: 'Preview markdown',
+    },
+    code: 'Code',
+    preview: 'Preview',
+    loading: 'Loading reviewable operations',
+    loadError: 'Failed to load reviewable operations',
   },
   bashExecution: {
     command: 'Command',

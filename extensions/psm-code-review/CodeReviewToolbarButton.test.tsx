@@ -9,6 +9,7 @@ vi.mock('@/hooks/useAppearance', () => ({
 }))
 
 import type { SessionEntry } from '@/types'
+import { requestToolReview } from '@/contexts/toolReviewBus'
 import activate, { manifest } from './index'
 
 function assistantToolEntry(content: NonNullable<SessionEntry['message']>['content']): SessionEntry {
@@ -77,6 +78,72 @@ afterEach(() => {
 })
 
 describe('CodeReviewToolbarButton', () => {
+  it('opens tool review bus requests on the requested tool call', async () => {
+    const firstResult: SessionEntry = {
+      type: 'message',
+      id: 'tool-result-first',
+      timestamp: '2026-05-19T10:00:02.000Z',
+      message: {
+        role: 'toolResult',
+        toolCallId: 'call-read-first',
+        toolName: 'read',
+        content: [{ type: 'text', text: 'export const first = true;' }],
+      },
+    }
+    const secondResult: SessionEntry = {
+      type: 'message',
+      id: 'tool-result-second',
+      timestamp: '2026-05-19T10:00:03.000Z',
+      message: {
+        role: 'toolResult',
+        toolCallId: 'call-read-second',
+        toolName: 'read',
+        content: [{ type: 'text', text: 'export const second = true;' }],
+      },
+    }
+    const entries = [
+      assistantToolEntry([
+        {
+          type: 'toolCall',
+          id: 'call-read-first',
+          name: 'read',
+          arguments: { path: 'src/First.ts' },
+        },
+        {
+          type: 'toolCall',
+          id: 'call-read-second',
+          name: 'read',
+          arguments: { path: 'src/Second.ts' },
+        },
+      ]),
+    ]
+    const { toolbarItems } = createHostContext([])
+    const toolbar = toolbarItems.find((item) => item.id === 'builtin.code-review.toolbar')
+    expect(toolbar).toBeTruthy()
+
+    render(
+      toolbar!.render({
+        session: { path: '/tmp/session.jsonl' },
+      }) as never,
+    )
+
+    await waitFor(() => {
+      expect(requestToolReview({
+        entries,
+        toolResultByCallId: new Map([
+          ['call-read-first', firstResult],
+          ['call-read-second', secondResult],
+        ]),
+        initialToolCallId: 'call-read-second',
+      })).toBe(true)
+    })
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('export const second = true;')
+    })
+    expect(document.body.textContent).not.toContain('export const first = true;')
+  })
+
   it('renders read output when session results use the toolResult role', async () => {
     const { toolbarItems } = createHostContext([
       assistantToolEntry([

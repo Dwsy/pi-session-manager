@@ -39,6 +39,14 @@ const SOURCE_ROOT_MARKERS = [
   "/packages/",
 ];
 
+export function isShellReviewOperation(operation: FileOperation) {
+  return operation.toolName === "bash";
+}
+
+export function isFileReviewOperation(operation: FileOperation) {
+  return !isShellReviewOperation(operation);
+}
+
 export function normalizeReviewPath(path: string) {
   const trimmed = path.trim();
   if (!trimmed || trimmed === "Unknown target") return "";

@@ -5,6 +5,7 @@ export interface ToolReviewRequest {
   toolResultByCallId?: Map<string, SessionEntry>;
   sessionPath?: string;
   scopeLabel?: string;
+  initialToolCallId?: string;
 }
 
 type Listener = (request: ToolReviewRequest) => void;

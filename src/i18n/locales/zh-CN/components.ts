@@ -21,6 +21,7 @@ export const components = {
     noFilterResults: '没有匹配当前筛选的操作',
     noRenderableOutput: '该操作没有捕获到可渲染输出。',
     copyOperation: '复制操作详情',
+    copyCommand: '复制命令',
     contentFullscreen: '全屏内容区',
     exitContentFullscreen: '退出内容全屏',
     error: '错误',
@@ -48,12 +49,19 @@ export const components = {
       captured: '已捕获输出',
       metadata: '仅元数据',
     },
+    modeLabel: '审查模式',
     summary: {
       ops: '操作',
       changes: '变更',
       add: '新增',
       del: '删除',
       err: '错误',
+      shell: '命令',
+      executed: '已执行',
+    },
+    modes: {
+      files: '文件',
+      shell: '命令',
     },
     filters: {
       all: '全部',
@@ -77,6 +85,15 @@ export const components = {
       wrap: '自动换行',
       expandUnchanged: '展开未变更行',
     },
+    fileContent: '文件内容',
+    previewMode: {
+      code: '查看代码',
+      preview: '预览 Markdown',
+    },
+    code: '代码',
+    preview: '预览',
+    loading: '正在加载可审查操作',
+    loadError: '加载可审查操作失败',
   },
   bashExecution: {
     command: '命令',

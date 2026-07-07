@@ -14,6 +14,7 @@ export interface OperationMetrics {
 export interface FileOperation {
   id: string;
   entryId: string;
+  toolCallId: string;
   sequence: number;
   toolName: string;
   filePath: string;
@@ -448,9 +449,11 @@ export function extractFileOperations(
       const toolCall = item as Content & {
         type: "toolCall";
         id?: string;
+        toolCallId?: string;
         name?: string;
         arguments?: Record<string, unknown>;
       };
+      const toolCallId = toolCall.id || toolCall.toolCallId || "";
       const toolName = normalizeReviewToolName(toolCall.name || "unknown");
       if (!["write", "edit", "read", "bash", "task"].includes(toolName)) return;
 
@@ -479,8 +482,9 @@ export function extractFileOperations(
       );
 
       operations.push({
-        id: `${entry.id}-${toolCall.id || operations.length}`,
+        id: `${entry.id}-${toolCallId || operations.length}`,
         entryId: entry.id,
+        toolCallId,
         sequence: operations.length + 1,
         toolName,
         filePath,
