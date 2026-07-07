@@ -24,6 +24,7 @@ export interface AppSessionViewerPaneProps extends Pick<
   | "onExport"
   | "onConvert"
   | "onRename"
+  | "onRenameSession"
   | "onFork"
   | "onBack"
   | "onWebResume"
@@ -45,6 +46,7 @@ function AppSessionViewerPane({
   onExport,
   onConvert,
   onRename,
+  onRenameSession,
   onFork,
   onBack,
   onWebResume,
@@ -727,6 +729,7 @@ function AppSessionViewerPane({
       onExport={onExport}
       onConvert={onConvert}
       onRename={onRename}
+      onRenameSession={onRenameSession}
       onFork={onFork}
       onBack={onBack}
       onWebResume={onWebResume}

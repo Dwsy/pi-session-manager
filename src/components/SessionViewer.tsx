@@ -41,6 +41,7 @@ interface SessionViewerProps {
   onExport: () => void;
   onConvert?: () => void;
   onRename?: () => void;
+  onRenameSession?: (newName: string) => void | Promise<void>;
   onFork?: () => void;
   onBack?: () => void;
   onWebResume?: () => void;
@@ -92,6 +93,7 @@ function SessionViewerContent({
   onExport,
   onConvert,
   onRename,
+  onRenameSession,
   onFork,
   onBack,
   onWebResume,
@@ -367,6 +369,7 @@ function SessionViewerContent({
     onOpenSystemPromptDialog: openSystemPromptDialog,
     onScrollToTop: handleScrollToTop,
     onScrollToBottom: handleScrollToBottom,
+    onRenameSession,
     onRename,
     onFork,
     onExport,

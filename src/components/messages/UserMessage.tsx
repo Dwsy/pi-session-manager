@@ -214,16 +214,17 @@ function UserMessageModal({ text, images, timestamp, searchQuery, initialShowRaw
     }
   }, [copyText, text])
 
-  // Global ESC handler
+  // Capture-phase ESC: close modal only, do not bubble to SessionViewer / search hotkeys
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onClose()
-      }
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
+      onClose()
     }
-    document.addEventListener('keydown', handleKey)
-    return () => document.removeEventListener('keydown', handleKey)
+    window.addEventListener('keydown', handleKey, true)
+    return () => window.removeEventListener('keydown', handleKey, true)
   }, [onClose])
 
   // Lock body scroll while modal is open
@@ -252,11 +253,21 @@ function UserMessageModal({ text, images, timestamp, searchQuery, initialShowRaw
       onClick={e => {
         if (e.target === e.currentTarget) onClose()
       }}
+      onKeyDown={e => {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          e.stopPropagation()
+          onClose()
+        }
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="user-message-modal-title"
     >
-      <div className="user-message-modal-container motion-overlay-surface-enter">
+      <div
+        className="user-message-modal-container motion-overlay-surface-enter"
+        onKeyDown={e => e.stopPropagation()}
+      >
         <div className="user-message-modal-header">
           <div className="user-message-modal-title-area">
             <h3 id="user-message-modal-title" className="user-message-modal-title">

@@ -25,6 +25,7 @@ import KbdTooltip from "@/components/ui/KbdTooltip";
 import { isTauri } from "@/transport";
 import { appendShortcutLabel, shouldUseTauriDragRegion, stripShortcutSuffix } from "@/utils/platformShortcuts";
 import type { SessionViewerToolbarProps } from "./SessionViewerToolbarTypes";
+import SessionViewerToolbarTitle from "./SessionViewerToolbarTitle";
 import SessionViewerOnlineStatusBar from "./SessionViewerOnlineStatusBar";
 import SessionViewerModelControls from "./SessionViewerModelControls";
 
@@ -51,6 +52,7 @@ export default function SessionViewerToolbar({
   onOpenSystemPromptDialog,
   onScrollToTop,
   onScrollToBottom,
+  onRenameSession,
   onRename,
   onFork,
   onExport,
@@ -154,9 +156,10 @@ export default function SessionViewerToolbar({
             <div
               className={`flex items-center gap-1.5 min-w-0 ${!isMobile ? "tauri-drag-handle" : ""}`}
             >
-              <span className="text-base font-semibold tracking-tight truncate">
-                {title}
-              </span>
+              <SessionViewerToolbarTitle
+                title={title}
+                onRename={onRenameSession}
+              />
               {liveSession && (
                 <SessionViewerOnlineStatusBar liveSession={liveSession} />
               )}

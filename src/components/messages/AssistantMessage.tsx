@@ -205,6 +205,7 @@ function DirectToolCall({
 
   const handleToggleExpanded = () => {
     const expanded = isToolExpanded(entryId)
+    const initialToolCallId = toolCall.id || toolCall.toolCallId
     if (!expanded && isInterceptEnabled && isSupportedByReview) {
       const fallbackEntry: SessionEntry = {
         id: entryId,
@@ -218,6 +219,7 @@ function DirectToolCall({
       requestToolReview({
         entries: processEntries && processEntries.length > 0 ? processEntries : [fallbackEntry],
         toolResultByCallId,
+        initialToolCallId,
       })
     } else {
       toggleToolExpanded(entryId)

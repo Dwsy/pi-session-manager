@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react'
+import { useSettings as useAppSettings } from '@/contexts/SettingsContext'
+import { saveAppSettings } from '@/utils/settingsApi'
 
 interface SessionViewContextType {
   showThinking: boolean
@@ -19,7 +21,10 @@ interface SessionViewContextType {
 const SessionViewContext = createContext<SessionViewContextType | undefined>(undefined)
 
 export function SessionViewProvider({ children }: { children: ReactNode }) {
-  const [showThinking, setShowThinking] = useState(true)
+  const { settings, updateSetting } = useAppSettings()
+  const [showThinking, setShowThinking] = useState(
+    settings.session.showThinking ?? false,
+  )
   const [showToolExpandIndicator] = useState(false)
   const [toolsExpanded, setToolsExpanded] = useState(false)
   // When toolsExpanded=true, store tools manually collapsed here
@@ -31,7 +36,26 @@ export function SessionViewProvider({ children }: { children: ReactNode }) {
     searchExpandedToolIdsRef.current = new Set()
   }, [])
 
-  const toggleThinking = () => setShowThinking(prev => !prev)
+  useEffect(() => {
+    setShowThinking(settings.session.showThinking ?? false)
+  }, [settings.session.showThinking])
+
+  const toggleThinking = useCallback(() => {
+    const nextShowThinking = !showThinking
+    const nextSettings = {
+      ...settings,
+      session: {
+        ...settings.session,
+        showThinking: nextShowThinking,
+      },
+    }
+
+    setShowThinking(nextShowThinking)
+    updateSetting('session', 'showThinking', nextShowThinking)
+    void saveAppSettings(nextSettings).catch((error) => {
+      console.error('Failed to save thinking visibility setting:', error)
+    })
+  }, [settings, showThinking, updateSetting])
   const toggleToolsExpanded = () => {
     setToolsExpanded(prev => !prev)
     setExpandedToolIds(new Set()) // Clear overrides when switching global state

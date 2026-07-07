@@ -3,7 +3,7 @@
 // =====================================================
 
 .tool-execution {
-  margin: 16px 0;
+  margin: 4px 0;
   border-radius: 8px;
   background: var(--toolExecutionBg, var(--bg-subtle));
   overflow: hidden;
@@ -49,7 +49,7 @@ html.tool-call-style-disabled {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 1px 12px;
   font-size: calc(var(--font-size-base, 16px) * 0.6875);
   min-width: 0;
 }
@@ -249,8 +249,8 @@ html.tool-call-style-disabled {
 }
 
 .tool-output-wrapper.collapsible.expanded {
-  margin-top: var(--toolOutputExpandedMargin, 8px);
-  margin-bottom: var(--toolOutputExpandedMargin, 8px);
+  margin-top: var(--toolOutputExpandedMargin, 0px);
+  margin-bottom: var(--toolOutputExpandedMargin, 0px);
 }
 
 // Tool Expand Content
@@ -335,7 +335,8 @@ html.tool-call-style-disabled {
 
 // Tool Output
 .tool-output {
-  padding: 8px 0;
+  padding: 0;
+
   font-family: var(
     --font-family-mono,
     ui-monospace,

@@ -39,6 +39,8 @@ export interface SessionViewerToolbarProps {
   onOpenSystemPromptDialog: () => void;
   onScrollToTop: () => void;
   onScrollToBottom: () => void;
+  /** Inline rename on toolbar title blur */
+  onRenameSession?: (newName: string) => void | Promise<void>;
   onRename?: () => void;
   onFork?: () => void;
   onExport: () => void;

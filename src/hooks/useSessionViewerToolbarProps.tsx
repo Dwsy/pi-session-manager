@@ -34,6 +34,7 @@ export interface UseSessionViewerToolbarPropsOptions {
   onOpenSystemPromptDialog: () => void;
   onScrollToTop: () => void;
   onScrollToBottom: () => void;
+  onRenameSession?: (newName: string) => void | Promise<void>;
   onRename?: () => void;
   onFork?: () => void;
   onExport: () => void;
@@ -73,6 +74,7 @@ export function useSessionViewerToolbarProps({
   onOpenSystemPromptDialog,
   onScrollToTop,
   onScrollToBottom,
+  onRenameSession,
   onRename,
   onFork,
   onExport,
@@ -112,6 +114,7 @@ export function useSessionViewerToolbarProps({
     onOpenSystemPromptDialog,
     onScrollToTop,
     onScrollToBottom,
+    onRenameSession,
     onRename,
     onFork,
     onExport,
