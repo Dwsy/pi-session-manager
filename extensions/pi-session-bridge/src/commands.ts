@@ -55,10 +55,14 @@ async function getTagsWithStatus(sid: string): Promise<{ tag: TagItem; assigned:
   return allTags.map((tag) => ({ tag, assigned: assignedIds.has(tag.id) }));
 }
 
+function getActiveSessionId(ctx: ExtensionContext): string {
+  return ctx.sessionManager?.getSessionId?.() || connMgr.getSessionId();
+}
+
 // ── /open-in-pms — Open current session in PSM ───────
 
 async function openInPsmCommand(args: string, ctx: ExtensionContext) {
-  const sid = connMgr.getSessionId();
+  const sid = getActiveSessionId(ctx);
   if (!sid) {
     ctx.ui.notify("No session", "error");
     return;
@@ -114,7 +118,7 @@ register("psm", "PSM bridge panel", async (_args, ctx) => {
 
   // ── Manage Tags (nested select, has its own loop with break) ──
   if (choice.includes("Manage Tags")) {
-    const sid = connMgr.getSessionId();
+    const sid = getActiveSessionId(ctx);
     if (!sid) { ctx.ui.notify("No session", "error"); return; }
 
     while (true) {
@@ -149,7 +153,7 @@ register("psm", "PSM bridge panel", async (_args, ctx) => {
 
   // ── Clear All Tags ──
   if (choice.includes("Clear All")) {
-    const sid = connMgr.getSessionId();
+    const sid = getActiveSessionId(ctx);
     if (!sid) { ctx.ui.notify("No session", "error"); return; }
     const tagsWithStatus = await getTagsWithStatus(sid);
     const assigned = tagsWithStatus.filter((t) => t.assigned);

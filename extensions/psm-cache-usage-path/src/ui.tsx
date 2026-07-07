@@ -74,8 +74,8 @@ function tabButtonClass(active: boolean) {
 }
 
 function statCardTone(value: number) {
-  if (value > 0) return 'text-success border-success/30 bg-success/10'
-  if (value < 0) return 'text-warning border-warning/30 bg-warning/10'
+  if (value > 0) return 'text-foreground border-primary/30 bg-primary/8'
+  if (value < 0) return 'text-foreground border-warning/30 bg-warning/10'
   return 'text-foreground border-border bg-card'
 }
 
@@ -155,7 +155,7 @@ function insightTitle(insight: CacheUsageInsight, t: PsmPluginI18nClient['t']) {
 
 function insightTone(severity: CacheUsageInsight['severity']) {
   if (severity === 'warning') return 'border-warning/30 bg-warning/10'
-  if (severity === 'success') return 'border-success/20 bg-success/10'
+  if (severity === 'success') return 'border-primary/25 bg-primary/10'
   return 'border-info/25 bg-info/10'
 }
 
@@ -247,7 +247,7 @@ function PercentBarChart({ values, width, locale }: { values: number[]; width: n
             width={barWidth}
             height={Math.max(2, height)}
             rx="2"
-            className="fill-success"
+            className="fill-primary/70"
           />
         )
       })}
@@ -271,14 +271,14 @@ function PercentLineChart({ values, width, locale }: { values: number[]; width: 
       <polyline
         points={points.join(' ')}
         fill="none"
-        className="stroke-success"
+        className="stroke-primary/70"
         strokeWidth="2"
         strokeLinejoin="round"
         strokeLinecap="round"
       />
       {points.map((point, index) => {
         const [cx, cy] = point.split(',')
-        return <circle key={`dot-${index}`} cx={cx} cy={cy} r="2.5" className="fill-success" />
+        return <circle key={`dot-${index}`} cx={cx} cy={cy} r="2.5" className="fill-primary/70" />
       })}
       <line x1={14} x2={chartWidth - 8} y1={geometry.bottom} y2={geometry.bottom} className="stroke-muted/30" strokeWidth="1" />
     </svg>
@@ -314,7 +314,7 @@ function StackedTotalsChart({ input, cacheWrite, cacheRead, width, locale }: {
           <g key={`stack-${index}`}>
             <rect x={x} y={inputY} width={barWidth} height={Math.max(2, inputHeight)} className="fill-muted" rx="2" />
             <rect x={x} y={writeY} width={barWidth} height={Math.max(2, writeHeight)} className="fill-warning" rx="2" />
-            <rect x={x} y={readY} width={barWidth} height={Math.max(2, readHeight)} className="fill-success" rx="2" />
+            <rect x={x} y={readY} width={barWidth} height={Math.max(2, readHeight)} className="fill-primary/70" rx="2" />
           </g>
         )
       })}
@@ -472,13 +472,13 @@ function ModelStatsTable({ models, locale, t }: { models: CacheUsageModelStat[];
                 </div>
               </div>
               <div className="shrink-0 text-right">
-                <div className="font-mono text-sm text-success">{formatPercent(model.hitRate, locale)}</div>
+                <div className="font-mono text-sm text-foreground">{formatPercent(model.hitRate, locale)}</div>
                 <div className="mt-1 text-[11px] text-muted-foreground">{formatInt(model.assistantMessages, locale)} {t('session.cacheUsage.summary.turns', 'Turns')}</div>
               </div>
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
               <span>{t('session.cacheUsage.stats.promptTotal', 'Prompt total')}: <span className="font-mono text-foreground">{formatInt(model.promptTotal, locale)}</span></span>
-              <span>{t('session.cacheUsage.stats.cacheRead', 'Cache hit')}: <span className="font-mono text-success">{formatInt(model.cacheRead, locale)}</span></span>
+              <span>{t('session.cacheUsage.stats.cacheRead', 'Cache hit')}: <span className="font-mono text-foreground">{formatInt(model.cacheRead, locale)}</span></span>
               <span>{t('session.cacheUsage.cost.recorded', 'Recorded cost')}: <CostValue value={model.cost.total} knownMessages={model.cost.knownMessages} unknownMessages={model.cost.unknownMessages} locale={locale} t={t} /></span>
             </div>
           </div>
@@ -684,7 +684,7 @@ export function CacheUsagePanel({
     <div className="relative flex h-full min-h-0 flex-col bg-surface-dark/75" data-no-window-drag>
       <div
         onPointerDown={handleResizeStart}
-        className={`absolute -left-[3px] top-0 h-full w-[6px] cursor-ew-resize ${isResizing ? 'bg-info/40' : 'hover:bg-info/20'}`}
+        className={`absolute -left-[3px] top-0 h-full w-[6px] cursor-ew-resize ${isResizing ? 'bg-primary/30' : 'hover:bg-primary/15'}`}
         role="separator"
         aria-orientation="vertical"
         aria-label={t('session.cacheUsage.title', 'Cache usage')}
@@ -812,7 +812,7 @@ export function CacheUsagePanel({
                   <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
                     <span><span className="mr-1 inline-block h-2.5 w-2.5 bg-muted" />{t('session.cacheUsage.stats.input', 'Input (uncached)')}</span>
                     <span><span className="mr-1 inline-block h-2.5 w-2.5 bg-warning" />{t('session.cacheUsage.stats.cacheWrite', 'Cache write')}</span>
-                    <span><span className="mr-1 inline-block h-2.5 w-2.5 bg-success" />{t('session.cacheUsage.stats.cacheRead', 'Cache hit')}</span>
+                    <span><span className="mr-1 inline-block h-2.5 w-2.5 bg-primary/70" />{t('session.cacheUsage.stats.cacheRead', 'Cache hit')}</span>
                   </div>
                 </>
               ) : null}
@@ -867,14 +867,14 @@ export function CacheUsagePanel({
                         <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
                           <span>{t('session.cacheUsage.stats.input', 'Input (uncached)')}: <span className="font-mono text-foreground">{formatInt(message.input, language)}</span></span>
                           <span>{t('session.cacheUsage.stats.output', 'Output')}: <span className="font-mono text-foreground">{formatInt(message.output, language)}</span></span>
-                          <span>{t('session.cacheUsage.stats.cacheRead', 'Cache hit')}: <span className="font-mono text-success">{formatInt(message.cacheRead, language)}</span></span>
+                          <span>{t('session.cacheUsage.stats.cacheRead', 'Cache hit')}: <span className="font-mono text-foreground">{formatInt(message.cacheRead, language)}</span></span>
                           <span>{t('session.cacheUsage.stats.cacheWrite', 'Cache write')}: <span className="font-mono text-foreground">{formatInt(message.cacheWrite, language)}</span></span>
                           <span>{t('session.cacheUsage.insights.hitRateDelta', 'Hit delta')}: <span className="font-mono text-foreground">{formatSignedPercent(message.hitRateDelta, language)}</span></span>
                           <span>{t('session.cacheUsage.cost.recorded', 'Recorded cost')}: <span className="font-mono text-foreground">{message.costKnown ? formatCost(message.cost.total, language) : t('session.cacheUsage.cost.unknown', 'Unknown')}</span></span>
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        <div className="text-lg font-semibold text-success">{formatPercent(message.hitRate, language)}</div>
+                        <div className="text-lg font-semibold text-foreground">{formatPercent(message.hitRate, language)}</div>
                         <div className="mt-1 text-[11px] text-muted-foreground">{t('session.cacheUsage.stats.promptTotal', 'Prompt total')}: {formatInt(message.promptTotal, language)}</div>
                       </div>
                     </div>

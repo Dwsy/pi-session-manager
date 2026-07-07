@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 
 const openPsmSession = vi.fn();
+const getSessionId = vi.fn();
 
 vi.mock("./open-psm.js", () => ({ openPsmSession }));
 vi.mock("./connection-manager.js", () => ({
   getConnection: () => null,
   isLiveEnabled: () => false,
-  getSessionId: () => "sid",
+  getSessionId,
   doDisconnect: vi.fn(),
   doConnect: vi.fn(),
   disableLiveMode: vi.fn(),
@@ -19,6 +20,8 @@ describe("pi-session-bridge commands", () => {
   beforeEach(() => {
     vi.resetModules();
     openPsmSession.mockReset();
+    getSessionId.mockReset();
+    getSessionId.mockReturnValue("sid");
     openPsmSession.mockResolvedValue({ url: "pi-session://sessions/sid", mode: "desktop" });
   });
 
@@ -54,5 +57,26 @@ describe("pi-session-bridge commands", () => {
 
     expect(openPsmSession).toHaveBeenCalledWith("sid", "web");
     expect(ctx.ui.notify).toHaveBeenCalledWith("Opened PSM web session", "info");
+  });
+
+  it("uses command context session id when cached bridge session is empty", async () => {
+    getSessionId.mockReturnValue("");
+    const handlers = new Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>();
+    const pi = {
+      registerCommand(name: string, opts: { handler: (args: string, ctx: ExtensionContext) => Promise<void> }) {
+        handlers.set(name, opts.handler);
+      },
+    } as ExtensionAPI;
+    const ctx = {
+      sessionManager: { getSessionId: () => "ctx-session-id" },
+      ui: { notify: vi.fn() },
+    } as unknown as ExtensionContext;
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+
+    await handlers.get("open-in-psm")!("", ctx);
+
+    expect(openPsmSession).toHaveBeenCalledWith("ctx-session-id", "");
+    expect(ctx.ui.notify).toHaveBeenCalledWith("Opened PSM desktop session", "info");
   });
 });
