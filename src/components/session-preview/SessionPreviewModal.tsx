@@ -88,7 +88,7 @@ export default function SessionPreviewModal({
   const toolbarSlots: SessionViewerToolbarSlots = {
     right: (
       <>
-        <SessionPreviewCodeReviewHost session={session} />
+        {session ? <SessionPreviewCodeReviewHost session={session} /> : null}
         {onResumeSession && (
           <KbdTooltip shortcut="Cmd+R">
             <button
