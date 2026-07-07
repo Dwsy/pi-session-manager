@@ -1073,31 +1073,6 @@ function App() {
     [setSelectedSession, navigateToSession],
   );
 
-  const commandContext = useMemo<SearchContext>(
-    () => ({
-      sessions,
-      selectedProject,
-      selectedSession,
-      setSelectedSession: selectSessionAndNavigate,
-      setSelectedProject,
-      setViewMode: setSidebarMode,
-      openAppView: openPluginAppViewById,
-      closeCommandMenu: () => {},
-      setPendingScrollEntryId,
-      searchCurrentProjectOnly: false,
-      t,
-    }),
-    [
-      sessions,
-      selectedProject,
-      selectedSession,
-      t,
-      selectSessionAndNavigate,
-      openPluginAppViewById,
-      setPendingScrollEntryId,
-    ],
-  );
-
   const {
     filteredSessions,
     sidebarSessions,
@@ -1137,10 +1112,30 @@ function App() {
       setSelectedSession(session);
       setShowForkDialog(true);
     },
+    onPreviewExportSession: (session) => {
+      setSelectedSession(session);
+      setShowExportDialog(true);
+    },
+    onOpenPreviewRenameDialog: (session) => {
+      setSelectedSession(session);
+      setShowRenameDialog(true);
+    },
+    onPreviewRenameSession: (session, newName) =>
+      handleRenameSession(session, newName),
+    onPreviewForkSession: (session) => {
+      setSelectedSession(session);
+      setShowForkDialog(true);
+    },
+    onPreviewConvertSession: (session) => {
+      navigateToSession(session.id);
+      setSelectedSession(session);
+      setShowConvertDialog(true);
+    },
     getBadgeType,
     terminal,
     piPath,
     customCommand,
+    resumeCommand,
     sortBy: sessionSortBy,
     sortOrder: sessionSortOrder,
     favorites,
@@ -1172,6 +1167,77 @@ function App() {
           }
         : sessionListCommonProps,
     [sessionListCommonProps, standaloneDatasetRuntime],
+  );
+
+  const sessionPreviewHandlers = useMemo(
+    () =>
+      standaloneDatasetRuntime
+        ? {}
+        : {
+            onPreviewExportSession: (session: SessionInfo) => {
+              setSelectedSession(session);
+              setShowExportDialog(true);
+            },
+            onOpenPreviewRenameDialog: (session: SessionInfo) => {
+              setSelectedSession(session);
+              setShowRenameDialog(true);
+            },
+            onPreviewRenameSession: (
+              session: SessionInfo,
+              newName: string,
+            ) => handleRenameSession(session, newName),
+            onPreviewForkSession: (session: SessionInfo) => {
+              setSelectedSession(session);
+              setShowForkDialog(true);
+            },
+            onPreviewConvertSession: (session: SessionInfo) => {
+              navigateToSession(session.id);
+              setSelectedSession(session);
+              setShowConvertDialog(true);
+            },
+            onPreviewResumeSession: requestResumeSession,
+            terminal,
+            piPath,
+            customCommand,
+            resumeCommand,
+          },
+    [
+      standaloneDatasetRuntime,
+      handleRenameSession,
+      navigateToSession,
+      requestResumeSession,
+      terminal,
+      piPath,
+      customCommand,
+      resumeCommand,
+    ],
+  );
+
+  const commandContext = useMemo<SearchContext>(
+    () => ({
+      sessions,
+      selectedProject,
+      selectedSession,
+      setSelectedSession: selectSessionAndNavigate,
+      setSelectedProject,
+      setViewMode: setSidebarMode,
+      openAppView: openPluginAppViewById,
+      closeCommandMenu: () => {},
+      setPendingScrollEntryId,
+      searchCurrentProjectOnly: false,
+      t,
+      ...sessionPreviewHandlers,
+    }),
+    [
+      sessions,
+      selectedProject,
+      selectedSession,
+      t,
+      selectSessionAndNavigate,
+      openPluginAppViewById,
+      setPendingScrollEntryId,
+      sessionPreviewHandlers,
+    ],
   );
 
   const onRenameSession = async (newName: string) => {
@@ -1450,6 +1516,7 @@ function App() {
       onProjectSelect={handleDatasetOverviewProjectSelect}
       loading={loading}
       liveSessionIds={liveSessionIds}
+      {...sessionPreviewHandlers}
     />
   );
 
@@ -1462,6 +1529,11 @@ function App() {
       }
       onRename={
         standaloneDatasetRuntime ? undefined : () => setShowRenameDialog(true)
+      }
+      onRenameSession={
+        standaloneDatasetRuntime || !selectedSession
+          ? undefined
+          : (newName) => handleRenameSession(selectedSession, newName)
       }
       onFork={
         standaloneDatasetRuntime ? undefined : () => setShowForkDialog(true)

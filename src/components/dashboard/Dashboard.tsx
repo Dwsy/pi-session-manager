@@ -33,11 +33,26 @@ import {
   getRuntimeStats,
 } from "@/runtime-data/sessionSource";
 import { getPathBasename, hasPathSeparator, pathsEqual } from "@/utils/path";
+import { buildSessionPreviewModalActions } from "@/utils/sessionPreviewActions";
+import type { TerminalType } from "@/components/settings/types";
 
 interface DashboardProps {
   sessions: SessionInfo[];
   onSessionSelect?: (session: SessionInfo) => void;
   onProjectSelect?: (projectPath: string) => void;
+  onPreviewExportSession?: (session: SessionInfo) => void;
+  onOpenPreviewRenameDialog?: (session: SessionInfo) => void;
+  onPreviewRenameSession?: (
+    session: SessionInfo,
+    newName: string,
+  ) => void | Promise<void>;
+  onPreviewForkSession?: (session: SessionInfo) => void;
+  onPreviewConvertSession?: (session: SessionInfo) => void;
+  onPreviewResumeSession?: (session: SessionInfo) => void | Promise<void>;
+  terminal?: TerminalType;
+  piPath?: string;
+  customCommand?: string;
+  resumeCommand?: string;
   projectName?: string;
   loading?: boolean;
   liveSessionIds?: Set<string>;
@@ -52,6 +67,16 @@ export default function Dashboard({
   sessions,
   onSessionSelect,
   onProjectSelect,
+  onPreviewExportSession,
+  onOpenPreviewRenameDialog,
+  onPreviewRenameSession,
+  onPreviewForkSession,
+  onPreviewConvertSession,
+  onPreviewResumeSession,
+  terminal,
+  piPath,
+  customCommand,
+  resumeCommand,
   projectName,
   loading: parentLoading = false,
   liveSessionIds,
@@ -459,12 +484,38 @@ export default function Dashboard({
         />
       )}
 
-      <SessionPreviewModal
-        session={previewSession}
-        isOpen={Boolean(previewSession)}
-        onClose={() => setPreviewSession(null)}
-        onExpand={handleExpandPreviewSession}
-      />
+      {previewSession && (() => {
+        const previewActions =
+          onPreviewExportSession &&
+          onOpenPreviewRenameDialog &&
+          onPreviewRenameSession
+            ? buildSessionPreviewModalActions(previewSession, {
+                onPreviewExportSession,
+                onOpenPreviewRenameDialog,
+                onPreviewRenameSession,
+                onPreviewForkSession,
+                onPreviewConvertSession,
+              })
+            : null;
+        return (
+          <SessionPreviewModal
+            session={previewSession}
+            isOpen
+            onClose={() => setPreviewSession(null)}
+            onExpand={handleExpandPreviewSession}
+            onExport={previewActions?.onExport ?? (() => {})}
+            onConvert={previewActions?.onConvert}
+            onRename={previewActions?.onRename ?? (() => {})}
+            onRenameSession={previewActions?.onRenameSession}
+            onFork={previewActions?.onFork}
+            onResumeSession={onPreviewResumeSession}
+            terminal={terminal}
+            piPath={piPath}
+            customCommand={customCommand}
+            resumeCommand={resumeCommand}
+          />
+        );
+      })()}
 
       {insightModalMode && (
         <DashboardInsightModal

@@ -30,6 +30,7 @@ import TagBadge from "@/components/tags/TagBadge";
 import TagPicker from "@/components/tags/TagPicker";
 import SessionContextMenu from "@/components/session-viewer/SessionContextMenu";
 import SessionPreviewModal from "@/components/session-preview/SessionPreviewModal";
+import { buildSessionPreviewModalActions } from "@/utils/sessionPreviewActions";
 import type { DeleteSessionRequestOptions } from "@/components/dialogs/deleteSessionTypes";
 import DeleteConfirmButton from "@/components/ui/DeleteConfirmButton";
 import {
@@ -72,6 +73,14 @@ interface SessionListProps {
   onResumeSession?: (session: SessionInfo) => void | Promise<void>;
   onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>;
   onForkSession?: (session: SessionInfo) => void | Promise<void>;
+  onPreviewExportSession?: (session: SessionInfo) => void;
+  onOpenPreviewRenameDialog?: (session: SessionInfo) => void;
+  onPreviewRenameSession?: (
+    session: SessionInfo,
+    newName: string,
+  ) => void | Promise<void>;
+  onPreviewForkSession?: (session: SessionInfo) => void;
+  onPreviewConvertSession?: (session: SessionInfo) => void;
   loading: boolean;
   hasMore?: boolean;
   loadingMore?: boolean;
@@ -109,6 +118,11 @@ export default function SessionList({
   onResumeSession,
   onCopyResumeSession,
   onForkSession,
+  onPreviewExportSession,
+  onOpenPreviewRenameDialog,
+  onPreviewRenameSession,
+  onPreviewForkSession,
+  onPreviewConvertSession,
   loading,
   hasMore = false,
   loadingMore = false,
@@ -1227,7 +1241,24 @@ export default function SessionList({
         />
       )}
 
-      {previewSession && (
+      {previewSession && (() => {
+        const previewActions =
+          onPreviewExportSession &&
+          onOpenPreviewRenameDialog &&
+          onPreviewRenameSession
+            ? buildSessionPreviewModalActions(previewSession, {
+                onPreviewExportSession,
+                onOpenPreviewRenameDialog,
+                onPreviewRenameSession,
+                onPreviewForkSession,
+                onPreviewConvertSession:
+                  onPreviewConvertSession ??
+                  (onConvertSession
+                    ? (session) => onConvertSession(session)
+                    : undefined),
+              })
+            : null;
+        return (
         <SessionPreviewModal
           session={previewSession}
           isOpen={!!previewSession}
@@ -1242,15 +1273,11 @@ export default function SessionList({
             setPreviewSession(null);
             setPreviewClickPoint(null);
           }}
-          onExport={() => {}}
-          onConvert={
-            onConvertSession
-              ? () => {
-                  if (previewSession) onConvertSession(previewSession);
-                }
-              : undefined
-          }
-          onRename={() => {}}
+          onExport={previewActions?.onExport ?? (() => {})}
+          onConvert={previewActions?.onConvert}
+          onRename={previewActions?.onRename ?? (() => {})}
+          onRenameSession={previewActions?.onRenameSession}
+          onFork={previewActions?.onFork}
           onResumeSession={onResumeSession}
           terminal={terminal}
           piPath={piPath}
@@ -1259,7 +1286,8 @@ export default function SessionList({
           initialClickPoint={previewClickPoint}
           animationMode="origin-point"
         />
-      )}
+        );
+      })()}
 
       {/* ── Hover title overlay ── */}
       {hoveredCard && createPortal(

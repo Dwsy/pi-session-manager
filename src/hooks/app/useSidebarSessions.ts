@@ -40,10 +40,19 @@ export interface UseSidebarSessionsOptions {
   onResumeSession: (session: SessionInfo) => void | Promise<void>;
   onCopyResumeSession: (session: SessionInfo) => void | Promise<void>;
   onForkSession?: (session: SessionInfo) => void | Promise<void>;
+  onPreviewExportSession?: (session: SessionInfo) => void;
+  onOpenPreviewRenameDialog?: (session: SessionInfo) => void;
+  onPreviewRenameSession?: (
+    session: SessionInfo,
+    newName: string,
+  ) => void | Promise<void>;
+  onPreviewForkSession?: (session: SessionInfo) => void;
+  onPreviewConvertSession?: (session: SessionInfo) => void;
   getBadgeType: (sessionId: string) => "new" | "updated" | null;
   terminal: TerminalType;
   piPath: string;
   customCommand: string;
+  resumeCommand?: string;
   sortBy: SessionSortBy;
   sortOrder: SessionSortOrder;
   favorites: FavoriteItem[];
@@ -102,10 +111,16 @@ export function useSidebarSessions({
   onResumeSession,
   onCopyResumeSession,
   onForkSession,
+  onPreviewExportSession,
+  onOpenPreviewRenameDialog,
+  onPreviewRenameSession,
+  onPreviewForkSession,
+  onPreviewConvertSession,
   getBadgeType,
   terminal,
   piPath,
   customCommand,
+  resumeCommand,
   sortBy,
   sortOrder,
   favorites,
@@ -269,11 +284,17 @@ export function useSidebarSessions({
       onResumeSession,
       onCopyResumeSession,
       onForkSession,
+      onPreviewExportSession,
+      onOpenPreviewRenameDialog,
+      onPreviewRenameSession,
+      onPreviewForkSession,
+      onPreviewConvertSession,
       loading,
       getBadgeType,
       terminal,
       piPath,
       customCommand,
+      resumeCommand,
       favorites,
       onToggleFavorite,
       tags,
@@ -293,11 +314,18 @@ export function useSidebarSessions({
       onConvertSession,
       onResumeSession,
       onCopyResumeSession,
+      onForkSession,
+      onPreviewExportSession,
+      onOpenPreviewRenameDialog,
+      onPreviewRenameSession,
+      onPreviewForkSession,
+      onPreviewConvertSession,
       loading,
       getBadgeType,
       terminal,
       piPath,
       customCommand,
+      resumeCommand,
       favorites,
       onToggleFavorite,
       tags,

@@ -114,6 +114,20 @@ export interface SearchContext {
   /** Set pending entry to scroll in viewer (optional) */
   setPendingScrollEntryId?: (entryId: string | null) => void
 
+  /** Full-feature session preview in command palette (optional) */
+  onPreviewExportSession?: (session: SessionInfo) => void
+  onOpenPreviewRenameDialog?: (session: SessionInfo) => void
+  onPreviewRenameSession?: (
+    session: SessionInfo,
+    newName: string,
+  ) => void | Promise<void>
+  onPreviewForkSession?: (session: SessionInfo) => void
+  onPreviewResumeSession?: (session: SessionInfo) => void | Promise<void>
+  terminal?: import('@/components/settings/types').TerminalType
+  piPath?: string
+  customCommand?: string
+  resumeCommand?: string
+
   // ========== Utilities ==========
 
   /** i18n translation function */

@@ -11,7 +11,22 @@ type DashboardProps = ComponentProps<typeof Dashboard>;
 
 export type AppDashboardPaneProps = Pick<
   DashboardProps,
-  "sessions" | "onSessionSelect" | "onProjectSelect" | "projectName" | "loading" | "liveSessionIds"
+  | "sessions"
+  | "onSessionSelect"
+  | "onProjectSelect"
+  | "onPreviewExportSession"
+  | "onOpenPreviewRenameDialog"
+  | "onPreviewRenameSession"
+  | "onPreviewForkSession"
+  | "onPreviewConvertSession"
+  | "onPreviewResumeSession"
+  | "terminal"
+  | "piPath"
+  | "customCommand"
+  | "resumeCommand"
+  | "projectName"
+  | "loading"
+  | "liveSessionIds"
 > & {
   DashboardComponent: LazyExoticComponent<ComponentType<DashboardProps>>;
   fallback: ReactNode;
