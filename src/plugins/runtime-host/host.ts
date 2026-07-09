@@ -30,6 +30,7 @@ import {
   createPsmAgentHostModelResolver,
 } from './agentBridge'
 import { psmRuntimeEventBus } from './eventBus'
+import { sessionEntryTransformers } from './sessionEntryTransformers'
 
 import { builtinPsmPluginEntries } from './builtins'
 import {
@@ -137,7 +138,7 @@ function moduleFromUnknown(input: unknown): PsmPluginModule {
 }
 
 function pluginEnabled(config: PsmPluginsConfig, manifest: PsmPluginManifest) {
-  return config.plugins[manifest.id]?.enabled ?? true
+  return config.plugins[manifest.id]?.enabled ?? manifest.defaultEnabled ?? true
 }
 
 function configEntryFor(
@@ -799,6 +800,7 @@ export class PsmPluginHost {
     const commandNames: string[] = []
     const toolNames: string[] = []
     const toolRendererIds: string[] = []
+    const sessionEntryTransformerIds: string[] = []
     const appViewIds: string[] = []
     const appSidebarViewIds: string[] = []
     const toolbarItemIds: string[] = []
@@ -914,6 +916,11 @@ export class PsmPluginHost {
         this.tools.set(name, { ...tool, pluginId: manifest.id })
         toolNames.push(name)
       },
+      registerSessionEntryTransformer: (transformer) => {
+        sessionEntryTransformers.register({ ...transformer, pluginId: manifest.id })
+        sessionEntryTransformerIds.push(transformer.id)
+        cleanup.push(() => sessionEntryTransformers.unregister(transformer.id))
+      },
     }
 
     try {
@@ -957,6 +964,7 @@ export class PsmPluginHost {
       for (const name of commandNames) this.commands.delete(name)
       for (const name of toolNames) this.tools.delete(name)
       this.unregisterToolRenderers(toolRendererIds)
+      for (const id of sessionEntryTransformerIds) sessionEntryTransformers.unregister(id)
       for (const id of appViewIds) this.appViews.delete(id)
       for (const id of appSidebarViewIds) this.appSidebarViews.delete(id)
       for (const id of toolbarItemIds) this.sessionToolbarItems.delete(id)

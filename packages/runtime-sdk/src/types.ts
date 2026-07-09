@@ -103,6 +103,7 @@ export interface PsmPluginManifest {
   id: string
   name: string
   version: string
+  defaultEnabled?: boolean
   runtime?: PsmPluginRuntimeCompatibility
   package?: PsmPluginPackageBoundary
   permissions?: PsmPermission[]
@@ -254,6 +255,14 @@ export interface PsmToolRendererRegistration<TData extends PsmToolRenderBaseData
   onUnmount?: () => void
 }
 
+export interface PsmSessionEntryTransformerRegistration {
+  id: string
+  name: string
+  description?: string
+  priority?: number
+  transform(entries: unknown[]): unknown[]
+}
+
 export interface PsmSessionReference {
   path: string
   id?: string
@@ -396,6 +405,7 @@ export interface PsmPluginHostContext {
   ui: PsmPluginUiRegistry
   registerCommand(command: string | PsmPluginCommandRegistration, handler?: PsmPluginCommandHandler): void
   registerTool(name: string, tool: PsmPluginToolRegistration): void
+  registerSessionEntryTransformer(transformer: PsmSessionEntryTransformerRegistration): void
 }
 
 export type PsmPluginActivateResult = void | PsmPluginDisposable

@@ -2,6 +2,7 @@ import { invoke as baseInvoke, isTauri } from '@/transport'
 import { invoke as tauriInvoke } from '@tauri-apps/api/core'
 import { listen as tauriListen } from '@tauri-apps/api/event'
 import type { PsmTransport } from '@pi-session-manager/plugin-sdk'
+import { applySessionEntryTransformers } from './sessionEntryTransformers'
 
 async function invokeRuntimeSessionCommand<T>(command: string, payload?: Record<string, unknown>): Promise<T | undefined> {
   const {
@@ -29,17 +30,27 @@ async function invokeRuntimeSessionCommand<T>(command: string, payload?: Record<
 
 export const appPsmTransport: PsmTransport = {
   async invoke<T>(command: string, payload?: Record<string, unknown>): Promise<T> {
+    let result: T
     if (isTauri()) {
-      return tauriInvoke<T>('plugin_dispatch_command', {
+      result = await tauriInvoke<T>('plugin_dispatch_command', {
         command,
         payload: (payload ?? {}) as Record<string, unknown>,
       })
+    } else {
+      if (command === 'read_session_file_chunk' || command === 'get_session_labels') {
+        const runtimeResult = await invokeRuntimeSessionCommand<T>(command, payload)
+        if (runtimeResult !== undefined) result = runtimeResult
+        else result = await baseInvoke<T>(command, payload)
+      } else {
+        result = await baseInvoke<T>(command, payload)
+      }
     }
-    if (command === 'read_session_file_chunk' || command === 'get_session_labels') {
-      const runtimeResult = await invokeRuntimeSessionCommand<T>(command, payload)
-      if (runtimeResult !== undefined) return runtimeResult
+
+    if (command === 'get_session_entries' && Array.isArray(result)) {
+      return applySessionEntryTransformers(result) as T
     }
-    return baseInvoke<T>(command, payload)
+
+    return result
   },
   stream(command, payload, handlers) {
     if (!isTauri() || command !== 'invoke_model_text_stream') {

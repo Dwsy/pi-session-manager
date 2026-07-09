@@ -65,6 +65,7 @@ export function validatePsmPluginManifest(input: unknown): ManifestValidationRes
   if (!isNonEmptyString(input.id)) errors.push('id is required')
   if (!isNonEmptyString(input.name)) errors.push('name is required')
   if (!isNonEmptyString(input.version)) errors.push('version is required')
+  if (input.defaultEnabled !== undefined && typeof input.defaultEnabled !== 'boolean') errors.push('defaultEnabled must be a boolean')
 
   if (input.manifestVersion !== undefined && !SUPPORTED_MANIFEST_VERSIONS.has(input.manifestVersion as number)) {
     errors.push('manifestVersion is not supported')

@@ -1,5 +1,6 @@
 import type { SessionEntry, LegacySessionStats, Content, Message } from '@/types'
 import { parseQuotedQuery } from './search'
+import { applySessionEntryTransformers } from '@/plugins/runtime-host/sessionEntryTransformers'
 
 export const SHORT_SESSION_ID_LENGTH = 12
 export const MIN_SESSION_ID_PREFIX_LENGTH = 3
@@ -48,7 +49,7 @@ export function parseSessionEntriesWithLineCount(jsonlContent: string): {
           entries.push(normalized)
         }
 
-        return { entries: groupProviderAssistantFragments(entries), lineCount: rawItems.length }
+        return { entries: applySessionEntryTransformers(groupProviderAssistantFragments(entries)), lineCount: rawItems.length }
       }
     } catch {
       // Fall through to line-based parsing.
@@ -95,7 +96,7 @@ export function parseSessionEntriesWithLineCount(jsonlContent: string): {
     }
   }
 
-  return { entries: groupProviderAssistantFragments(entries), lineCount }
+  return { entries: applySessionEntryTransformers(groupProviderAssistantFragments(entries)), lineCount }
 }
 
 /**
