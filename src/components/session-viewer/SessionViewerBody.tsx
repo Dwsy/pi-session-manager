@@ -74,6 +74,8 @@ export interface SessionViewerBodyScrollMarkersProps {
   scrollMarkers: ScrollMarker[];
   activeMarkerId: string | null;
   markersPanelRef: RefObject<HTMLDivElement>;
+  scrollContainerRef: RefObject<HTMLDivElement>;
+  scrollContentRef: RefObject<HTMLDivElement>;
   onPointerDown: (event: ReactPointerEvent) => void;
   onPointerMove: (event: ReactPointerEvent) => void;
   onPointerUp: (event: ReactPointerEvent) => void;
@@ -127,6 +129,10 @@ export default function SessionViewerBody({
   isLive,
   onChatSent,
 }: SessionViewerBodyProps) {
+  const {
+    scrollContainerRef,
+    scrollContentRef,
+  } = scrollMarkers;
   const shouldShowSidebar = !previewMode && !mainViewSlot && sidebar.showSidebar;
   const shouldMountSidebar = useDeferredPresence(shouldShowSidebar);
   const sidebarNode = shouldMountSidebar ? (
@@ -209,6 +215,8 @@ export default function SessionViewerBody({
                   scrollMarkers={scrollMarkers.scrollMarkers}
                   activeMarkerId={scrollMarkers.activeMarkerId}
                   markersPanelRef={scrollMarkers.markersPanelRef}
+                  scrollContainerRef={scrollContainerRef}
+                  scrollContentRef={scrollContentRef}
                   onMarkerClick={messages.setScrollTargetId}
                   onPointerDown={scrollMarkers.onPointerDown}
                   onPointerMove={scrollMarkers.onPointerMove}

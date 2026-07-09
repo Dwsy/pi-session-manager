@@ -199,6 +199,7 @@ export function useSidebarSessions({
     hasMore: pagedSidebarHasMore,
     loadMore: loadMoreSidebarSessions,
     refresh: refreshSidebarSessions,
+    patchSession: patchSidebarSession,
   } = usePaginatedSessions({
     enabled: shouldEnablePagedSidebar,
     pageSize: 100,
@@ -209,6 +210,32 @@ export function useSidebarSessions({
     sortBy,
     sortOrder,
   });
+
+  const canonicalSessionsRef = useRef<Map<string, SessionInfo>>(new Map());
+
+  useEffect(() => {
+    if (!shouldEnablePagedSidebar) {
+      canonicalSessionsRef.current = new Map();
+      return;
+    }
+
+    for (const session of sessions) {
+      const previous = canonicalSessionsRef.current.get(session.id);
+      if (
+        previous &&
+        (previous.name !== session.name ||
+          previous.modified !== session.modified ||
+          previous.path !== session.path)
+      ) {
+        patchSidebarSession(session.id, {
+          name: session.name,
+          modified: session.modified,
+          path: session.path,
+        });
+      }
+      canonicalSessionsRef.current.set(session.id, session);
+    }
+  }, [sessions, shouldEnablePagedSidebar, patchSidebarSession]);
 
   // Track the last refresh trigger to avoid redundant full refreshes.
   // The file watcher already patches sessions incrementally via patchSessions;

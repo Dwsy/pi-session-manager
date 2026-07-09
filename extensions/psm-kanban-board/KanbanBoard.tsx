@@ -60,6 +60,7 @@ interface KanbanBoardProps {
   onConvertSession?: (session: SessionInfo) => void
   onResumeSession?: (session: SessionInfo) => void | Promise<void>
   onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>
+  onOpenPreviewRenameDialog?: (session: SessionInfo) => void
   onNewSession?: (cwd: string) => void | Promise<void> // New session in terminal
   favorites?: FavoriteItem[]
   onToggleFavorite?: (item: Omit<FavoriteItem, 'addedAt'>) => void
@@ -164,6 +165,7 @@ export default function KanbanBoard({
   onConvertSession,
   onResumeSession,
   onCopyResumeSession,
+  onOpenPreviewRenameDialog,
   onNewSession,
   favorites,
   onToggleFavorite,
@@ -615,6 +617,7 @@ export default function KanbanBoard({
                     onDeleteSession={onDeleteSession}
                     onResumeSession={onResumeSession}
                     onCopyResumeSession={onCopyResumeSession}
+                    onOpenPreviewRenameDialog={onOpenPreviewRenameDialog}
                     isMobile
                     liveSessionIds={liveSessionIds}
                     hideProjectInfo={!!projectFilter}
@@ -659,6 +662,7 @@ export default function KanbanBoard({
                         onDeleteSession={onDeleteSession}
                         onResumeSession={onResumeSession}
                         onCopyResumeSession={onCopyResumeSession}
+                        onOpenPreviewRenameDialog={onOpenPreviewRenameDialog}
                         liveSessionIds={liveSessionIds}
                         hideProjectInfo={!!projectFilter}
                         isDropTarget={activeOverColumnId === col.id && activeId !== null}

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Play, Terminal, Globe, Star, Trash2, Tag, X, Copy } from 'lucide-react'
+import { Play, Terminal, Globe, Star, Trash2, Tag, X, Copy, Pencil } from 'lucide-react'
 import type { SessionInfo, Tag as TagType, FavoriteItem } from '@/types'
 import type { DeleteSessionAnchorPoint } from '@/components/dialogs/deleteSessionTypes'
 import TagBadge from '@/components/tags/TagBadge'
@@ -29,6 +29,7 @@ interface ContextMenuProps {
   onToggleFavorite: () => void
   onResume?: () => void
   onCopyResume?: () => void
+  onRename?: () => void
   onToggleTag: (tagId: string, assigned: boolean) => void
   onDelete: (anchorPoint: DeleteSessionAnchorPoint) => void
 }
@@ -45,6 +46,7 @@ export default function KanbanContextMenu({
   onToggleFavorite,
   onResume,
   onCopyResume,
+  onRename,
   onToggleTag,
   onDelete,
 }: ContextMenuProps) {
@@ -144,6 +146,12 @@ export default function KanbanContextMenu({
       label: t('tags.contextMenu.copyResume'),
       icon: <Copy size={14} />,
       onClick: onCopyResume,
+    }] : []),
+    ...(onRename ? [{
+      id: 'rename' as const,
+      label: t('tags.contextMenu.rename', { defaultValue: t('common.rename') }),
+      icon: <Pencil size={14} />,
+      onClick: onRename,
     }] : []),
     { id: 'separator1', label: '', onClick: () => {} },
   ]

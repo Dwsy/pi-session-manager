@@ -3,7 +3,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { FileOperation } from "./model";
-import { buildCodeViewItems, buildReviewTreeModel, getReviewTreePath } from "./viewModel";
+import {
+  buildCodeViewItems,
+  buildReviewTreeModel,
+  getReviewTreePath,
+  resolveFileTreeDisplayPaths,
+} from "./viewModel";
 
 function operation(overrides: Partial<FileOperation>): FileOperation {
   return {
@@ -48,6 +53,7 @@ describe("tool review view model", () => {
     ]);
 
     expect(tree.paths).toEqual(["Shell/#3 pnpm test", "src/new.ts"]);
+    expect(tree.displayPathByCanonical.get("src/new.ts")).toBe("src/new.ts");
     const sourceNode = tree.nodes.find((node) => node.path === "src/new.ts");
     expect(sourceNode).toMatchObject({
       path: "src/new.ts",
@@ -142,6 +148,37 @@ describe("tool review view model", () => {
     ]);
 
     expect(items.map((item) => item.id)).toEqual(["write-1", "edit-1"]);
+  });
+
+  it("renames prefix-only leaves when a deeper path shares the same segment", () => {
+    const tree = buildReviewTreeModel([
+      operation({
+        id: "file-root",
+        sequence: 1,
+        toolName: "write",
+        filePath: "payment-core",
+        content: "root marker",
+      }),
+      operation({
+        id: "nested",
+        sequence: 2,
+        toolName: "edit",
+        filePath: "payment-core/lib/App.tsx",
+        args: { old_string: "a", new_string: "b" },
+      }),
+    ]);
+
+    expect(tree.paths).toEqual([
+      "payment-core (file)",
+      "payment-core/lib/App.tsx",
+    ]);
+    expect(tree.canonicalPathByDisplay.get("payment-core (file)")).toBe(
+      "payment-core",
+    );
+    expect(
+      resolveFileTreeDisplayPaths(["payment-core", "payment-core/lib/App.tsx"])
+        .displayPaths,
+    ).toEqual(["payment-core (file)", "payment-core/lib/App.tsx"]);
   });
 
   it("ignores non-change operations for CodeView", () => {

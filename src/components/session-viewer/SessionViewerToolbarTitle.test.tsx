@@ -21,6 +21,29 @@ describe("SessionViewerToolbarTitle", () => {
     fireEvent.blur(input);
 
     expect(onRename).toHaveBeenCalledWith("Beta");
+    expect(screen.getByRole("button", { name: "Beta" })).toBeTruthy();
+  });
+
+  it("shows optimistic title while rename is pending", async () => {
+    let resolveRename: (() => void) | undefined;
+    const onRename = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRename = resolve;
+        }),
+    );
+    render(<SessionViewerToolbarTitle title="Alpha" onRename={onRename} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Alpha" }));
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "Beta" } });
+    fireEvent.blur(input);
+
+    expect(screen.getByRole("button", { name: "Beta" })).toBeTruthy();
+    resolveRename?.();
+    await vi.waitFor(() => {
+      expect(screen.getByRole("button", { name: "Beta" })).toBeTruthy();
+    });
   });
 
   it("does not call rename when value unchanged", () => {

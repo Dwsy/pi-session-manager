@@ -27,6 +27,7 @@ export const tags = {
     favorite: 'Favorite',
     copyResume: 'Copy Resume Command',
     fork: 'Duplicate Session',
+    rename: 'Rename',
     delete: 'Delete',
   },
   filter: {

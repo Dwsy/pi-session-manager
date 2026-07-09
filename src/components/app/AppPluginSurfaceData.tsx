@@ -17,6 +17,7 @@ export interface AppPluginSurfaceData {
   onDeleteSession?: (session: SessionInfo, options?: DeleteSessionRequestOptions) => void;
   onDeleteSessions?: (sessions: SessionInfo[], options?: DeleteSessionRequestOptions) => void;
   onConvertSession?: (session: SessionInfo) => void;
+  onOpenPreviewRenameDialog?: (session: SessionInfo) => void;
   onResumeSession?: (session: SessionInfo) => void | Promise<void>;
   onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>;
   onNewSession?: (cwd: string) => void | Promise<void>;

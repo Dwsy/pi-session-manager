@@ -149,6 +149,10 @@ function SessionViewerContent({
   const messagesRef = useRef<SessionViewerMessagesRef>(null);
   const renderableEntriesRef = useRef<SessionEntry[]>([]);
   const viewerControllerRef = useRef<PsmSessionViewerController | null>(null);
+  // Refs to the messages scroll container/content so scroll markers can be
+  // measured against the real layout (and stay aligned when turns collapse).
+  const scrollMarkersContainerRef = useRef<HTMLDivElement>(null);
+  const scrollMarkersContentRef = useRef<HTMLDivElement>(null);
 
   const handleResume = useCallback(() => {
     if (onResumeSession) {
@@ -342,6 +346,8 @@ function SessionViewerContent({
     enabled: scrollMarkersEnabled,
     onSelectEntry: setScrollTargetId,
     previewFallback: t("session.userMessage", "User message"),
+    scrollContainerRef: scrollMarkersContainerRef,
+    scrollContentRef: scrollMarkersContentRef,
   });
 
 
@@ -442,6 +448,8 @@ function SessionViewerContent({
         scrollMarkers,
         activeMarkerId,
         markersPanelRef,
+        scrollContainerRef: scrollMarkersContainerRef,
+        scrollContentRef: scrollMarkersContentRef,
         onPointerDown: handleMarkersPointerDown,
         onPointerMove: handleMarkersPointerMove,
         onPointerUp: handleMarkersPointerUp,

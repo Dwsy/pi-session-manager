@@ -1347,6 +1347,12 @@ function App() {
       onDeleteSession: standaloneDatasetRuntime ? undefined : handleDeleteSession,
       onDeleteSessions: standaloneDatasetRuntime ? undefined : handleDeleteSessionsWithRef,
       onConvertSession: standaloneDatasetRuntime ? undefined : handleStartConvertSession,
+      onOpenPreviewRenameDialog: standaloneDatasetRuntime
+        ? undefined
+        : (session: SessionInfo) => {
+            setSelectedSession(session);
+            setShowRenameDialog(true);
+          },
       onResumeSession: standaloneDatasetRuntime ? undefined : requestResumeSession,
       onCopyResumeSession: standaloneDatasetRuntime ? undefined : requestCopyResumeCommand,
       onNewSession: standaloneDatasetRuntime ? undefined : handleNewSession,
@@ -1376,6 +1382,7 @@ function App() {
       handleDeleteSession,
       handleDeleteSessionsWithRef,
       handleStartConvertSession,
+      setShowRenameDialog,
       requestResumeSession,
       requestCopyResumeCommand,
       handleNewSession,

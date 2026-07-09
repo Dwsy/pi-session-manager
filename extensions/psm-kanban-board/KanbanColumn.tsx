@@ -38,6 +38,7 @@ interface KanbanColumnProps {
   ) => void
   onResumeSession?: (session: SessionInfo) => void | Promise<void>
   onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>
+  onOpenPreviewRenameDialog?: (session: SessionInfo) => void
   terminal?: string
   piPath?: string
   customCommand?: string
@@ -77,6 +78,7 @@ export default function KanbanColumn({
   onDeleteSession,
   onResumeSession,
   onCopyResumeSession,
+  onOpenPreviewRenameDialog,
   terminal: propTerminal,
   piPath: propPiPath,
   customCommand: propCustomCommand,
@@ -389,6 +391,13 @@ export default function KanbanColumn({
                     piPath: propPiPath,
                     resumeCommand: propResumeCommand,
                   }).then((command) => copyText(command).catch(console.error))
+                }
+              : undefined
+          }
+          onRename={
+            onOpenPreviewRenameDialog
+              ? () => {
+                  onOpenPreviewRenameDialog(contextMenu.session)
                 }
               : undefined
           }

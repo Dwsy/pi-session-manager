@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { PointerEvent, RefObject } from "react";
 import type { SessionEntry } from "@/types";
 
@@ -7,6 +14,11 @@ const MAX_MARKERS_MOBILE = 120;
 const SCRUB_START_DELAY_MS = 110;
 const SCRUB_START_DISTANCE_PX = 10;
 const ACTIVE_MARKER_VISIBILITY_MS = 680;
+
+function clampRatio(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return value < 0 ? 0 : value > 1 ? 1 : value;
+}
 
 export interface ScrollMarker {
   entry: SessionEntry;
@@ -21,6 +33,17 @@ interface UseSessionScrollMarkersOptions {
   enabled: boolean;
   onSelectEntry: (entryId: string) => void;
   previewFallback: string;
+  /**
+   * The scrollable messages container. Used to measure each marker entry's
+   * real vertical position so markers stay aligned even when turns are
+   * collapsed/expanded (aria-expanded) or the layout reflows.
+   */
+  scrollContainerRef?: RefObject<HTMLElement | null>;
+  /**
+   * The scroll content wrapper. Observed with a ResizeObserver so positions
+   * are recomputed whenever the content height changes (collapse/expand/resize).
+   */
+  scrollContentRef?: RefObject<HTMLElement | null>;
 }
 
 interface UseSessionScrollMarkersResult {
@@ -100,9 +123,14 @@ export function useSessionScrollMarkers({
   enabled,
   onSelectEntry,
   previewFallback,
+  scrollContainerRef,
+  scrollContentRef,
 }: UseSessionScrollMarkersOptions): UseSessionScrollMarkersResult {
   const [showMarkers, setShowMarkers] = useState(false);
   const [activeMarkerId, setActiveMarkerId] = useState<string | null>(null);
+  const [measuredTops, setMeasuredTops] = useState<Map<string, number>>(
+    () => new Map(),
+  );
 
   const markersPanelRef = useRef<HTMLDivElement>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -135,6 +163,77 @@ export function useSessionScrollMarkers({
       })
       .filter((item): item is MarkerEntryPosition => Boolean(item));
   }, [entries, shouldComputeMarkers]);
+
+  const measureMarkerTops = useCallback((): Map<string, number> | null => {
+    const container = scrollContainerRef?.current;
+    const content = scrollContentRef?.current;
+    if (!container || !content || !shouldComputeMarkers) return null;
+
+    const total = container.scrollHeight;
+    if (total <= 0) return null;
+
+    const containerTop = container.getBoundingClientRect().top;
+    const offsetById = new Map<string, number>();
+    const nodes = content.querySelectorAll<HTMLElement>("[data-entry-id]");
+    nodes.forEach((node) => {
+      const id = node.getAttribute("data-entry-id");
+      if (!id) return;
+      // Distance from the top of the scrollable content, independent of the
+      // current scroll offset (both rects shift together while scrolling).
+      offsetById.set(
+        id,
+        node.getBoundingClientRect().top - containerTop + container.scrollTop,
+      );
+    });
+
+    const tops = new Map<string, number>();
+    for (const position of markerEntryPositions) {
+      const offset = offsetById.get(position.entry.id);
+      if (offset != null) {
+        tops.set(position.entry.id, clampRatio(offset / total));
+      }
+    }
+    return tops;
+  }, [
+    scrollContainerRef,
+    scrollContentRef,
+    shouldComputeMarkers,
+    markerEntryPositions,
+  ]);
+
+  // Recompute measured positions on layout changes. ResizeObserver does not
+  // fire on scroll, so this stays cheap and is only triggered by real layout
+  // shifts (collapse/expand of turns, window resize, image load, etc.).
+  useLayoutEffect(() => {
+    const runMeasure = () => {
+      const tops = measureMarkerTops();
+      if (tops) setMeasuredTops(tops);
+    };
+
+    runMeasure();
+
+    const content = scrollContentRef?.current;
+    if (!content) return;
+
+    let rafId = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(runMeasure);
+    });
+    observer.observe(content);
+
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(rafId);
+    };
+  }, [scrollContainerRef, scrollContentRef, measureMarkerTops]);
+
+  // Drop stale measurements when markers are disabled/hidden.
+  useEffect(() => {
+    if (!shouldComputeMarkers && measuredTops.size > 0) {
+      setMeasuredTops(new Map());
+    }
+  }, [shouldComputeMarkers, measuredTops.size]);
 
   const getMessagePreview = useCallback(
     (entry: SessionEntry) => {
@@ -175,7 +274,10 @@ export function useSessionScrollMarkers({
     const maxMarkers = isMobile ? MAX_MARKERS_MOBILE : MAX_MARKERS_DESKTOP;
     const sampledEntries = sampleMarkerEntries(markerEntryPositions, maxMarkers);
     const sampledMarkers = sampledEntries.map(({ entry, index, markerType }) => {
-      const top = Math.min(Math.max(index / indexDenominator, 0), 1);
+      const baseline = clampRatio(index / indexDenominator);
+      // Prefer the measured position when available (handles collapsed/expanded
+      // turns and variable row heights); fall back to the index-based estimate.
+      const top = measuredTops.get(entry.id) ?? baseline;
       return {
         entry,
         top,
@@ -191,6 +293,7 @@ export function useSessionScrollMarkers({
     entries.length,
     getMessagePreview,
     isMobile,
+    measuredTops,
   ]);
 
   const clearLongPressTimer = useCallback(() => {

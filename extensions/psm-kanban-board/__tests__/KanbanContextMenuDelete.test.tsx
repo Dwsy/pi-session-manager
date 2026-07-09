@@ -15,6 +15,8 @@ vi.mock('react-i18next', () => ({
       if (key === 'session.openInTerminal') return 'Open in Terminal'
       if (key === 'session.openInBrowser') return 'Open in Browser'
       if (key === 'tags.contextMenu.copyResume') return 'Copy resume'
+      if (key === 'tags.contextMenu.rename') return 'Rename'
+      if (key === 'common.rename') return 'Rename'
       if (key === 'common.back') return 'Back'
       if (key === 'tags.empty') return 'Empty'
       return key
@@ -37,6 +39,32 @@ const session: SessionInfo = {
 }
 
 describe('KanbanContextMenu delete action', () => {
+  it('invokes onRename when rename item is clicked', () => {
+    const onRename = vi.fn()
+    const onClose = vi.fn()
+
+    render(
+      <KanbanContextMenu
+        session={session}
+        tags={[]}
+        allTags={[]}
+        favorites={[]}
+        position={{ x: 100, y: 100 }}
+        onClose={onClose}
+        onOpenInTerminal={() => {}}
+        onOpenInBrowser={() => {}}
+        onToggleFavorite={() => {}}
+        onToggleTag={() => {}}
+        onDelete={() => {}}
+        onRename={onRename}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /rename/i }))
+    expect(onRename).toHaveBeenCalledTimes(1)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('requires a second click before deleting and passes an anchor point', () => {
     const onDelete = vi.fn()
     const onClose = vi.fn()

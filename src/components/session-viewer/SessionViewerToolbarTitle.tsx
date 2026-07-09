@@ -14,6 +14,7 @@ export default function SessionViewerToolbarTitle({
   const editable = Boolean(onRename);
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(title);
+  const [pendingTitle, setPendingTitle] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const savingRef = useRef(false);
   const titleRef = useRef(title);
@@ -23,7 +24,10 @@ export default function SessionViewerToolbarTitle({
     if (!isEditing) {
       setDraft(title);
     }
-  }, [title, isEditing]);
+    if (pendingTitle !== null && title.trim() === pendingTitle) {
+      setPendingTitle(null);
+    }
+  }, [title, isEditing, pendingTitle]);
 
   const commit = useCallback(async () => {
     if (!onRename || savingRef.current) {
@@ -32,16 +36,21 @@ export default function SessionViewerToolbarTitle({
 
     const next = draft.trim();
     const previous = titleRef.current.trim();
-    setIsEditing(false);
 
     if (next === previous) {
+      setIsEditing(false);
       setDraft(titleRef.current);
       return;
     }
 
+    setPendingTitle(next);
+    setIsEditing(false);
     savingRef.current = true;
     try {
       await onRename(next);
+    } catch {
+      setPendingTitle(null);
+      setDraft(titleRef.current);
     } finally {
       savingRef.current = false;
     }
@@ -67,10 +76,12 @@ export default function SessionViewerToolbarTitle({
     return () => cancelAnimationFrame(frame);
   }, [isEditing]);
 
+  const displayTitle = pendingTitle ?? title;
+
   if (!editable) {
     return (
       <span className={`text-base font-semibold tracking-tight truncate ${className}`}>
-        {title}
+        {displayTitle}
       </span>
     );
   }
@@ -115,9 +126,9 @@ export default function SessionViewerToolbarTitle({
       onMouseDown={(event) => event.stopPropagation()}
       data-no-window-drag
       className={`min-w-0 max-w-full text-left text-base font-semibold tracking-tight truncate rounded px-0.5 py-0.5 text-foreground transition-colors hover:bg-secondary/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${className}`}
-      title={title}
+      title={displayTitle}
     >
-      {title}
+      {displayTitle}
     </button>
   );
 }

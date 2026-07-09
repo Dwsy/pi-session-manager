@@ -3,7 +3,6 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useLayoutEffect,
   useRef,
   useState,
   type Dispatch,
@@ -86,6 +85,8 @@ export interface SessionViewerMessagesProps {
   isScrollMarkersFeatureEnabled: boolean;
   previewMode?: boolean;
   previewVariant?: SessionPreviewVariant;
+  scrollContainerRef?: RefObject<HTMLDivElement>;
+  scrollContentRef?: RefObject<HTMLDivElement>;
 }
 
 const SessionViewerMessages = forwardRef<
@@ -126,6 +127,8 @@ const SessionViewerMessages = forwardRef<
   isScrollMarkersFeatureEnabled,
   previewMode = false,
   previewVariant = "conversation",
+  scrollContainerRef,
+  scrollContentRef,
 }: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
   const { ensureToolExpandedForSearch } = useSessionView();
@@ -197,43 +200,39 @@ const SessionViewerMessages = forwardRef<
     setPointerInTopZone(false);
   }, []);
 
-  const parentRef = useRef<HTMLDivElement>(null);
-  const [parentLeft, setParentLeft] = useState(0);
 
-  useLayoutEffect(() => {
-    const parent = parentRef.current;
-    if (!parent) return;
-
-    const updateLeft = () => {
-      const rect = parent.getBoundingClientRect();
-      setParentLeft(rect.left);
-    };
-
-    updateLeft();
-
-    window.addEventListener("resize", updateLeft);
-
-    let observer: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined") {
-      observer = new ResizeObserver(() => {
-        updateLeft();
-      });
-      observer.observe(parent);
-    }
-
-    return () => {
-      window.removeEventListener("resize", updateLeft);
-      if (observer) {
-        observer.disconnect();
-      }
-    };
-  }, []);
 
   const showScrollToBottomHover =
     !isAtBottom && (pointerInBottomZone || overScrollToBottomButton);
 
   const showScrollToTopHover =
     !isAtTop && (pointerInTopZone || overScrollToTopButton);
+
+  // Merge the internal virtualizer refs with the externally-provided refs so
+  // scroll markers can measure real positions without owning the elements.
+  const setContainerRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      (messagesContainerRef as MutableRefObject<HTMLDivElement | null>).current =
+        el;
+      if (scrollContainerRef) {
+        (scrollContainerRef as MutableRefObject<HTMLDivElement | null>).current =
+          el;
+      }
+    },
+    [scrollContainerRef, messagesContainerRef],
+  );
+
+  const setContentRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      (messagesWrapperRef as MutableRefObject<HTMLDivElement | null>).current =
+        el;
+      if (scrollContentRef) {
+        (scrollContentRef as MutableRefObject<HTMLDivElement | null>).current =
+          el;
+      }
+    },
+    [scrollContentRef, messagesWrapperRef],
+  );
 
   useSessionViewerSearchHighlight({
     container: messagesContainerRef.current,
@@ -349,7 +348,7 @@ const SessionViewerMessages = forwardRef<
   }
 
   return (
-    <div ref={parentRef} className="flex-1 relative min-h-0 overflow-hidden">
+    <div className="flex-1 relative min-h-0 overflow-hidden">
       {!isAtBottom && hasNewMessages && (
         <NewMessagesButton
           onClick={() => {
@@ -366,7 +365,6 @@ const SessionViewerMessages = forwardRef<
         onClick={() => scrollToTop()}
         onMouseEnter={() => setOverScrollToTopButton(true)}
         onMouseLeave={() => setOverScrollToTopButton(false)}
-        style={{ left: `${window.innerWidth / 2 - parentLeft}px` }}
       />
       <ScrollToBottomButton
         title={t("session.scrollToBottom", "Scroll to bottom")}
@@ -374,11 +372,10 @@ const SessionViewerMessages = forwardRef<
         onClick={() => scrollToBottom(true)}
         onMouseEnter={() => setOverScrollToBottomButton(true)}
         onMouseLeave={() => setOverScrollToBottomButton(false)}
-        style={{ left: `${window.innerWidth / 2 - parentLeft}px` }}
       />
       <div
         className="h-full overflow-y-auto session-viewer"
-        ref={messagesContainerRef}
+        ref={setContainerRef}
         onMouseMove={handleContainerPointerMove}
         onMouseLeave={handleContainerPointerLeave}
       >
@@ -389,7 +386,7 @@ const SessionViewerMessages = forwardRef<
           previewMode={previewMode}
           sessionPath={sessionPath}
         />
-        <div className="messages" ref={messagesWrapperRef}>
+        <div className="messages" ref={setContentRef}>
           {renderableEntries.length > 0 ? (
             previewVariant === "conversation" ? (
               <ConversationPreviewMessages

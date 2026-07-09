@@ -186,12 +186,19 @@ export default function ReviewFileTree({
   onSelectPath,
   ariaLabel,
 }: ReviewFileTreeProps) {
-  const nodeByPath = useMemo(() => {
-    return new Map(tree.nodes.map((node) => [node.path, node]));
-  }, [tree.nodes]);
-  const nodeByPathRef = useRef(nodeByPath);
+  const nodeByDisplayPath = useMemo(() => {
+    return new Map(
+      tree.nodes.map((node) => [
+        tree.displayPathByCanonical.get(node.path) ?? node.path,
+        node,
+      ]),
+    );
+  }, [tree.nodes, tree.displayPathByCanonical]);
+  const nodeByDisplayPathRef = useRef(nodeByDisplayPath);
+  const canonicalPathByDisplayRef = useRef(tree.canonicalPathByDisplay);
   const onSelectPathRef = useRef(onSelectPath);
-  nodeByPathRef.current = nodeByPath;
+  nodeByDisplayPathRef.current = nodeByDisplayPath;
+  canonicalPathByDisplayRef.current = tree.canonicalPathByDisplay;
   onSelectPathRef.current = onSelectPath;
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -203,18 +210,25 @@ export default function ReviewFileTree({
     gitStatus: tree.status,
     icons: REVIEW_TREE_ICONS,
     initialExpansion: "open",
-    initialSelectedPaths: selectedPath ? [selectedPath] : [],
+    initialSelectedPaths: selectedPath
+      ? [
+          tree.displayPathByCanonical.get(selectedPath) ?? selectedPath,
+        ]
+      : [],
     itemHeight: 26,
     onSelectionChange: (paths) => {
       const path = paths[paths.length - 1];
-      if (path && nodeByPathRef.current.has(path)) {
-        onSelectPathRef.current(path);
+      if (!path) return;
+      const canonical =
+        canonicalPathByDisplayRef.current.get(path) ?? path;
+      if (nodeByDisplayPathRef.current.has(path)) {
+        onSelectPathRef.current(canonical);
       }
     },
     paths: tree.paths,
     renderRowDecoration: ({ item }) => {
       hoveredPathRef.current = item.path;
-      const node = nodeByPathRef.current.get(item.path);
+      const node = nodeByDisplayPathRef.current.get(item.path);
       if (!node) return null;
 
       const deltaText = getDeltaText(node);
@@ -321,19 +335,22 @@ export default function ReviewFileTree({
   }, [model, tree.paths, tree.status]);
 
   useEffect(() => {
+    const selectedDisplayPath = selectedPath
+      ? tree.displayPathByCanonical.get(selectedPath) ?? selectedPath
+      : null;
     for (const path of model.getSelectedPaths()) {
-      if (path !== selectedPath) model.getItem(path)?.deselect();
+      if (path !== selectedDisplayPath) model.getItem(path)?.deselect();
     }
 
-    if (!selectedPath) return;
+    if (!selectedDisplayPath) return;
 
-    const item = model.getItem(selectedPath);
+    const item = model.getItem(selectedDisplayPath);
     if (!item) return;
 
     if (!item.isSelected()) item.select();
     item.focus();
-    model.scrollToPath(selectedPath, { focus: false, offset: "nearest" });
-  }, [model, selectedPath]);
+    model.scrollToPath(selectedDisplayPath, { focus: false, offset: "nearest" });
+  }, [model, selectedPath, tree.displayPathByCanonical]);
 
   if (tree.paths.length === 0) return null;
 
@@ -343,7 +360,7 @@ export default function ReviewFileTree({
       onContextMenu={(e) => {
         const path = hoveredPathRef.current;
         if (path) {
-          const node = nodeByPathRef.current.get(path);
+          const node = nodeByDisplayPathRef.current.get(path);
           const isDir = !node || node.operations.length === 0;
           handleContextMenu(e, path, isDir);
         }

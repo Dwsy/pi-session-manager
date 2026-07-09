@@ -22,9 +22,46 @@ export interface ReviewFileNode {
 }
 
 export interface ReviewTreeModel {
+  /** Display paths safe for @pierre/trees (no file/directory segment collisions). */
   paths: string[];
   nodes: ReviewFileNode[];
   status: GitStatusEntry[];
+  /** Maps canonical review path → tree display path. */
+  displayPathByCanonical: Map<string, string>;
+  /** Maps tree display path → canonical review path. */
+  canonicalPathByDisplay: Map<string, string>;
+}
+
+const FILE_TREE_LEAF_SUFFIX = " (file)";
+
+/**
+ * When a short path is also a prefix of a longer path (e.g. file `payment-core` vs
+ * `payment-core/foo.ts`), Pierre trees treat the segment as a file and later refuse
+ * to create a directory with the same name. Rename prefix-only leaves for the tree.
+ */
+export function resolveFileTreeDisplayPaths(paths: string[]) {
+  const sorted = [...paths].sort((a, b) => a.localeCompare(b));
+  const displayPathByCanonical = new Map<string, string>();
+
+  for (const path of sorted) {
+    const collidesWithDeeperPath = sorted.some(
+      (other) => other !== path && other.startsWith(`${path}/`),
+    );
+    displayPathByCanonical.set(
+      path,
+      collidesWithDeeperPath ? `${path}${FILE_TREE_LEAF_SUFFIX}` : path,
+    );
+  }
+
+  const displayPaths = sorted.map((path) => displayPathByCanonical.get(path)!);
+  const canonicalPathByDisplay = new Map(
+    [...displayPathByCanonical.entries()].map(([canonical, display]) => [
+      display,
+      canonical,
+    ]),
+  );
+
+  return { displayPaths, displayPathByCanonical, canonicalPathByDisplay };
 }
 
 const SOURCE_ROOT_MARKERS = [
@@ -103,15 +140,24 @@ export function buildReviewTreeModel(operations: FileOperation[]): ReviewTreeMod
   }
 
   const nodes = Array.from(byPath.values()).sort((a, b) => a.path.localeCompare(b.path));
+  const canonicalPaths = nodes.map((node) => node.path);
+  const { displayPaths, displayPathByCanonical, canonicalPathByDisplay } =
+    resolveFileTreeDisplayPaths(canonicalPaths);
+
   return {
     nodes,
-    paths: nodes.map((node) => node.path),
+    paths: displayPaths,
+    displayPathByCanonical,
+    canonicalPathByDisplay,
     status: nodes
       .filter(
         (node): node is ReviewFileNode & { status: GitStatusEntry["status"] } =>
           Boolean(node.status),
       )
-      .map((node) => ({ path: node.path, status: node.status })),
+      .map((node) => ({
+        path: displayPathByCanonical.get(node.path) ?? node.path,
+        status: node.status,
+      })),
   };
 }
 

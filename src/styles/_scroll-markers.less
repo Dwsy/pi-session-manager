@@ -97,6 +97,10 @@
   pointer-events: auto;
   transform: translate(-50%, -50%);
   transition: transform 0.16s ease, opacity 0.16s ease;
+  // Isolate each marker's layout/style from siblings so rendering stays cheap
+  // with many markers. `paint` is intentionally omitted because it would clip
+  // the absolutely-positioned tooltip that overflows this 18px-wide button.
+  contain: layout style;
 }
 
 .session-scroll-markers.mobile .session-scroll-marker {

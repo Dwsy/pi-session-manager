@@ -16,6 +16,7 @@ import {
   BROWSER_DATASET_REFRESHED_EVENT,
   isBrowserDatasetModeEnabled,
 } from "@/browser-dataset";
+import { patchPaginatedSessionList } from "@/hooks/usePaginatedSessions";
 import {
   canResolveRuntimeSession,
   deleteRuntimeSessionItems,
@@ -555,35 +556,38 @@ export function useSessions(): UseSessionsReturn {
         });
         const beforeName = getSessionDisplayName(session, fallbackName);
         const afterName = newName.trim() || fallbackName;
+        const trimmedName = newName.trim();
+
+        const applyRenameToState = (modified?: string, path?: string) => {
+          setSessions((prev) => {
+            const next = patchPaginatedSessionList(prev, session.id, {
+              name: trimmedName,
+              modified: modified || session.modified,
+              path: path || session.path,
+            });
+            sessionsRef.current = next;
+            return next;
+          });
+
+          if (selectedSessionRef.current?.id === session.id) {
+            setSelectedSession((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    name: trimmedName,
+                    modified: modified || prev.modified,
+                    path: path || prev.path,
+                  }
+                : null,
+            );
+          }
+        };
+
+        applyRenameToState();
+
         const updated = await renameRuntimeSessionItem(session.path, newName);
         const updatedPath = updated?.path || session.path;
-        setSessions((prev) => {
-          const next = prev.map((s) =>
-            s.id === session.id
-              ? {
-                  ...s,
-                  name: newName,
-                  modified: updated?.modified || s.modified,
-                  path: updated?.path || s.path,
-                }
-              : s,
-          );
-          sessionsRef.current = next;
-          return next;
-        });
-
-        if (selectedSession?.id === session.id) {
-          setSelectedSession((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  name: newName,
-                  modified: updated?.modified || prev.modified,
-                  path: updated?.path || prev.path,
-                }
-              : null,
-          );
-        }
+        applyRenameToState(updated?.modified, updatedPath);
 
         if (normalizeSessionName(session) !== newName.trim()) {
           notifySessionRenamed(beforeName, afterName, updatedPath);

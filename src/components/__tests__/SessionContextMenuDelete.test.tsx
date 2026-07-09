@@ -41,6 +41,28 @@ describe('SessionContextMenu delete action', () => {
     expect(onDelete).toHaveBeenCalledWith()
   })
 
+  it('invokes onRename and closes when rename is chosen', () => {
+    const onRename = vi.fn()
+    const onClose = vi.fn()
+
+    render(
+      <SessionContextMenu
+        x={0}
+        y={0}
+        sessionId="session-1"
+        tags={[]}
+        sessionTagIds={[]}
+        onToggleTag={() => {}}
+        onRename={onRename}
+        onClose={onClose}
+      />,
+    )
+
+    fireEvent.click(screen.getByText('tags.contextMenu.rename'))
+    expect(onRename).toHaveBeenCalledTimes(1)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('cancels the delete when the cancel (X) button is pressed', () => {
     const onDelete = vi.fn()
 

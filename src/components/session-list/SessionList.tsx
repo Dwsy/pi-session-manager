@@ -1226,6 +1226,13 @@ export default function SessionList({
                 }
               : undefined
           }
+          onRename={
+            onOpenPreviewRenameDialog
+              ? () => {
+                  onOpenPreviewRenameDialog(contextMenuSession);
+                }
+              : undefined
+          }
           isFavorite={favoriteSessionIds.has(contextMenuSession.id)}
           onDeleteDirect={
             onDeleteSession

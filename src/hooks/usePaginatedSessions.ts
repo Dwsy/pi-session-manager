@@ -39,6 +39,7 @@ interface UsePaginatedSessionsReturn {
   hasLoadedOnce: boolean;
   refresh: (options?: RefreshOptions) => Promise<void>;
   loadMore: () => Promise<void>;
+  patchSession: (sessionId: string, patch: Partial<SessionInfo>) => void;
 }
 
 interface RefreshOptions {
@@ -133,6 +134,26 @@ function mergePaginatedSessions(
   }
 
   return changed ? next : prev;
+}
+
+export function patchPaginatedSessionList(
+  sessions: SessionInfo[],
+  sessionId: string,
+  patch: Partial<SessionInfo>,
+): SessionInfo[] {
+  let changed = false;
+  const next = sessions.map((session) => {
+    if (session.id !== sessionId) {
+      return session;
+    }
+    const updated = { ...session, ...patch };
+    if (isSameSessionInfo(session, updated)) {
+      return session;
+    }
+    changed = true;
+    return updated;
+  });
+  return changed ? next : sessions;
 }
 
 export function usePaginatedSessions({
@@ -343,6 +364,13 @@ export function usePaginatedSessions({
     await requestPage(sessionsRef.current.length, { append: true });
   }, [enabled, hasMore, loading, loadingMore, requestPage]);
 
+  const patchSession = useCallback(
+    (sessionId: string, patch: Partial<SessionInfo>) => {
+      setSessions((prev) => patchPaginatedSessionList(prev, sessionId, patch));
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!enabled) {
       setSessions([]);
@@ -452,5 +480,6 @@ export function usePaginatedSessions({
     hasLoadedOnce,
     refresh,
     loadMore,
+    patchSession,
   };
 }
