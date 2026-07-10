@@ -1,0 +1,52 @@
+import { describe, expect, it } from 'vitest'
+
+import { crossAgentToolRenderer } from './index'
+
+describe('crossAgentToolRenderer', () => {
+  it('keeps matching legacy cross-agent tool names', () => {
+    for (const name of ['Bash', 'bash', 'shell', 'Read', 'read_file', 'Write', 'write_file', 'Edit', 'MultiEdit', 'edit_file', 'apply_patch']) {
+      expect(crossAgentToolRenderer.match({ type: 'toolCall', name })).toBe(true)
+    }
+  })
+
+  it('keeps legacy structured shell arguments in the preview', () => {
+    const toolCall = {
+      type: 'toolCall' as const,
+      id: 'legacy-call',
+      name: 'bash',
+      arguments: { command: 'cargo test' },
+    }
+    const data = crossAgentToolRenderer.resolveData!(toolCall, 0, new Map())
+
+    expect(crossAgentToolRenderer.getPreview!(toolCall, data)).toBe('Shell: cargo test')
+  })
+
+  it('recognizes Codex collaboration and wait tools', () => {
+    for (const name of ['spawn_agent', 'list_agents', 'wait', 'wait_agent']) {
+      expect(crossAgentToolRenderer.match({ type: 'toolCall', name })).toBe(true)
+    }
+  })
+
+  it('uses raw Codex exec input as the collapsed preview', () => {
+    const script = 'const result = await tools.exec_command({ cmd: "cargo test" });'
+    const data = crossAgentToolRenderer.resolveData!(
+      { type: 'toolCall', id: 'call-1', name: 'exec', arguments: script },
+      0,
+      new Map(),
+    )
+
+    expect(crossAgentToolRenderer.getPreview!({ type: 'toolCall', name: 'exec' }, data)).toBe(`Shell: ${script}`)
+  })
+
+  it('summarizes Codex wait durations', () => {
+    const toolCall = {
+      type: 'toolCall' as const,
+      id: 'call-2',
+      name: 'wait',
+      arguments: { yield_time_ms: 10_000 },
+    }
+    const data = crossAgentToolRenderer.resolveData!(toolCall, 0, new Map())
+
+    expect(crossAgentToolRenderer.getPreview!(toolCall, data)).toBe('Wait: 10000 ms')
+  })
+})

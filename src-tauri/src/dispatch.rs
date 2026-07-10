@@ -527,26 +527,35 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let path = extract(payload, "path")?;
             let enabled = payload.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
             let scope = extract(payload, "scope").unwrap_or_else(|_| "user".to_string());
-            crate::toggle_resource_internal(resource_type, path, enabled, scope).await?;
+            let cwd = extract_optional_string(payload, "cwd");
+            let origin = extract_optional_string(payload, "origin");
+            let source = extract_optional_string(payload, "source");
+            crate::toggle_resource_internal(resource_type, path, enabled, scope, cwd, origin, source).await?;
             Ok(Value::Null)
         }
         "read_resource_file" => {
             let path = extract(payload, "path")?;
             let scope = extract(payload, "scope").unwrap_or_else(|_| "user".to_string());
-            let result = crate::read_resource_file_internal(path, scope).await?;
+            let cwd = extract_optional_string(payload, "cwd");
+            let base_dir = extract_optional_string(payload, "base_dir").or_else(|| extract_optional_string(payload, "baseDir"));
+            let result = crate::read_resource_file_internal(path, scope, cwd, base_dir).await?;
             Ok(Value::String(result))
         }
         "write_resource_file" => {
             let path = extract(payload, "path")?;
             let content = extract(payload, "content")?;
             let scope = extract(payload, "scope").unwrap_or_else(|_| "user".to_string());
-            crate::write_resource_file_internal(path, content, scope).await?;
+            let cwd = extract_optional_string(payload, "cwd");
+            let base_dir = extract_optional_string(payload, "base_dir").or_else(|| extract_optional_string(payload, "baseDir"));
+            crate::write_resource_file_internal(path, content, scope, cwd, base_dir).await?;
             Ok(Value::Null)
         }
         "delete_resource_file" => {
             let path = extract(payload, "path")?;
             let scope = extract(payload, "scope").unwrap_or_else(|_| "user".to_string());
-            crate::delete_resource_file_internal(path, scope).await?;
+            let cwd = extract_optional_string(payload, "cwd");
+            let base_dir = extract_optional_string(payload, "base_dir").or_else(|| extract_optional_string(payload, "baseDir"));
+            crate::delete_resource_file_internal(path, scope, cwd, base_dir).await?;
             Ok(Value::Null)
         }
 

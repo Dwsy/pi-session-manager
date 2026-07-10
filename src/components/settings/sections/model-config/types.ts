@@ -7,11 +7,31 @@ export type ConfirmTone = "danger" | "warning" | "info";
 export type ModelConfigMainTab = "configure" | "test" | "tools" | "history";
 export type ConfigDetailTab = "provider" | "model";
 export type ModelInputType = "text" | "image";
-export type ModelThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
-export type ThinkingLevelMap = Partial<Record<ModelThinkingLevel, string | null>>;
+/** Known Pi thinking levels; custom keys (max/ultra/...) are also allowed. */
+export type ModelThinkingLevel =
+  | "off"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | (string & {});
+
+/** Map Pi/custom thinking level -> provider value (string) or unsupported (null). */
+export type ThinkingLevelMap = Record<string, string | null>;
 
 export const MODEL_INPUT_TYPE_OPTIONS = ["text", "image"] as const;
-export const MODEL_THINKING_LEVEL_OPTIONS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+/** Suggested presets shown when adding a mapping row. */
+export const MODEL_THINKING_LEVEL_OPTIONS = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "ultra",
+] as const;
 
 export interface ModelCost {
   input?: number;

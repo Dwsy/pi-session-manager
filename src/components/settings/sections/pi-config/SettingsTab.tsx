@@ -5,7 +5,11 @@ import { Loader2 } from "lucide-react";
 import { invoke } from "@/transport";
 import type { PiSettingsFull } from "@/types";
 import SettingRow from "./SettingRow";
-import { SETTINGS, getNestedValue, type SettingDef } from "./settingsDefinitions";
+import {
+  SETTINGS,
+  getNestedValue,
+  type SettingDef,
+} from "./settingsDefinitions";
 import { useModelOptions } from "./useModelOptions";
 
 export default function SettingsTab() {
@@ -49,7 +53,7 @@ export default function SettingsTab() {
   if (loading || !piSettings) {
     return (
       <div className="flex items-center justify-center h-48">
-        <Loader2 className="h-6 w-6 animate-spin text-info" />
+        <Loader2 className="h-6 w-6 animate-spin settings-accent-fg" />
       </div>
     );
   }

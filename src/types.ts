@@ -1,490 +1,513 @@
 export interface SessionInfo {
-  path: string
-  id: string
-  cwd: string
-  name?: string
-  isDraft?: boolean
-  created: string
-  modified: string
-  message_count: number
-  first_message: string
-  user_messages_text?: string
-  assistant_messages_text?: string
-  last_message: string
-  last_message_role: string
-  isFavorite?: boolean
-  parent_session_path?: string
-  isLive?: boolean
-  pid?: number
-  model?: string
-  models?: string[]
+  path: string;
+  id: string;
+  cwd: string;
+  name?: string;
+  isDraft?: boolean;
+  created: string;
+  modified: string;
+  message_count: number;
+  first_message: string;
+  user_messages_text?: string;
+  assistant_messages_text?: string;
+  last_message: string;
+  last_message_role: string;
+  isFavorite?: boolean;
+  parent_session_path?: string;
+  isLive?: boolean;
+  pid?: number;
+  model?: string;
+  models?: string[];
 }
 
 export interface DateRange {
-  start: Date
-  end: Date
+  start: Date;
+  end: Date;
 }
 
 export interface SessionsDiff {
-  updated: SessionInfo[]
-  removed: string[]
+  updated: SessionInfo[];
+  removed: string[];
 }
 
 export interface FavoriteItem {
-  type: 'session' | 'project'
-  id: string
-  name: string
-  path: string
-  addedAt: string
+  type: "session" | "project";
+  id: string;
+  name: string;
+  path: string;
+  addedAt: string;
 }
 
 export interface SessionStatsInput {
-  path: string
-  cwd: string
-  modified: string
-  message_count: number
+  path: string;
+  cwd: string;
+  modified: string;
+  message_count: number;
 }
 
 export interface ToolResult {
-  content: Content[]
-  isError?: boolean
+  content: Content[];
+  isError?: boolean;
   details?: {
-    diff?: string
-  }
+    diff?: string;
+  };
 }
 
 export interface TokenUsage {
-  input: number
-  output: number
-  cacheRead: number
-  cacheWrite: number
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
   cost?: {
-    input: number
-    output: number
-    cacheRead: number
-    cacheWrite: number
-  }
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+  };
 }
 
 export interface SessionStats {
-  total_sessions: number
-  total_messages: number
-  user_messages: number
-  assistant_messages: number
-  total_tokens: number
-  sessions_by_project: Record<string, number>
-  sessions_by_model: Record<string, number>
-  model_usage_by_project: Record<string, Record<string, number>>
-  messages_by_date: Record<string, number>
-  messages_by_hour: Record<string, number>
-  messages_by_day_of_week: Record<string, number>
-  average_messages_per_session: number
-  heatmap_data: HeatmapPoint[]
-  time_distribution: TimeDistributionPoint[]
-  token_details: TokenDetails
-  subagent_summary?: SubagentSummary
+  total_sessions: number;
+  total_messages: number;
+  user_messages: number;
+  assistant_messages: number;
+  total_tokens: number;
+  sessions_by_project: Record<string, number>;
+  sessions_by_model: Record<string, number>;
+  model_usage_by_project: Record<string, Record<string, number>>;
+  messages_by_date: Record<string, number>;
+  messages_by_hour: Record<string, number>;
+  messages_by_day_of_week: Record<string, number>;
+  average_messages_per_session: number;
+  heatmap_data: HeatmapPoint[];
+  time_distribution: TimeDistributionPoint[];
+  token_details: TokenDetails;
+  subagent_summary?: SubagentSummary;
 }
 
 export interface TokenDetails {
-  total_input: number
-  total_output: number
-  total_cache_read: number
-  total_cache_write: number
-  total_cost: number
-  tokens_by_model: Record<string, ModelTokenStats>
+  total_input: number;
+  total_output: number;
+  total_cache_read: number;
+  total_cache_write: number;
+  total_cost: number;
+  tokens_by_model: Record<string, ModelTokenStats>;
 }
 
 export interface ModelTokenStats {
-  messages: number
-  input: number
-  output: number
-  cache_read: number
-  cache_write: number
-  cost: number
+  messages: number;
+  input: number;
+  output: number;
+  cache_read: number;
+  cache_write: number;
+  cost: number;
 }
 
 export interface AgentStats {
-  runs: number
-  cost: number
-  tokens: number
+  runs: number;
+  cost: number;
+  tokens: number;
 }
 
 export interface SubagentSummary {
-  total_cost: number
-  total_runs: number
-  total_tokens: number
-  runs_by_agent: Record<string, AgentStats>
-  runs_by_model: Record<string, number>
+  total_cost: number;
+  total_runs: number;
+  total_tokens: number;
+  runs_by_agent: Record<string, AgentStats>;
+  runs_by_model: Record<string, number>;
 }
 
 // Legacy SessionStats for backward compatibility
 export interface LegacySessionStats {
-  userMessages: number
-  assistantMessages: number
-  toolResults: number
-  customMessages: number
-  compactions: number
-  branchSummaries: number
-  toolCalls: number
+  userMessages: number;
+  assistantMessages: number;
+  toolResults: number;
+  customMessages: number;
+  compactions: number;
+  branchSummaries: number;
+  toolCalls: number;
   tokens: {
-    input: number
-    output: number
-    cacheRead: number
-    cacheWrite: number
-  }
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+  };
   cost: {
-    input: number
-    output: number
-    cacheRead: number
-    cacheWrite: number
-  }
-  models: string[]
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+  };
+  models: string[];
 }
 
 export interface SessionEntry {
-  type: string
-  id: string
-  parentId?: string
-  timestamp: string
-  message?: Message
-  provider?: string
-  modelId?: string
-  thinkingLevel?: string
-  tokensBefore?: number
-  summary?: string
-  display?: boolean
-  customType?: string
-  details?: unknown
-  content?: any
-  name?: string
-  label?: string
-  targetId?: string
+  type: string;
+  id: string;
+  parentId?: string;
+  timestamp: string;
+  message?: Message;
+  provider?: string;
+  modelId?: string;
+  thinkingLevel?: string;
+  tokensBefore?: number;
+  summary?: string;
+  display?: boolean;
+  customType?: string;
+  details?: unknown;
+  content?: any;
+  name?: string;
+  label?: string;
+  targetId?: string;
 }
 
 export interface SessionChunk {
-  content: string
-  next_offset: number
-  file_size: number
-  has_more: boolean
+  content: string;
+  next_offset: number;
+  file_size: number;
+  has_more: boolean;
 }
 
-export type FullTextSearchSourceFilter = 'all' | 'labels_only' | 'content_only'
+export type FullTextSearchSourceFilter = "all" | "labels_only" | "content_only";
 
 export type SessionConvertTarget =
-  | 'pi'
-  | 'claude-code'
-  | 'codex'
-  | 'opencode'
-  | 'gemini'
-  | 'factory'
-  | 'clawdbot'
-  | 'cursor'
-  | 'cline'
-  | 'aider'
-  | 'amp'
-  | 'chatgpt'
-  | 'openclaw'
-  | 'vibe'
+  | "pi"
+  | "claude-code"
+  | "codex"
+  | "opencode"
+  | "gemini"
+  | "factory"
+  | "clawdbot"
+  | "cursor"
+  | "cline"
+  | "aider"
+  | "amp"
+  | "chatgpt"
+  | "openclaw"
+  | "vibe";
 
 export interface SessionProviderCapabilities {
-  canScan: boolean
-  canConvertTarget: boolean
+  canScan: boolean;
+  canConvertTarget: boolean;
 }
 
 export interface SessionProviderInfo {
-  slug: SessionConvertTarget
-  display_name: string
-  capabilities: SessionProviderCapabilities
+  slug: SessionConvertTarget;
+  display_name: string;
+  capabilities: SessionProviderCapabilities;
 }
 
 export interface SessionConvertResult {
-  source_provider: string
-  target_provider: string
-  source_session_id: string
-  target_session_id: string
-  written_paths: string[]
-  resume_command: string
-  dry_run: boolean
-  warnings: string[]
+  source_provider: string;
+  target_provider: string;
+  source_session_id: string;
+  target_session_id: string;
+  written_paths: string[];
+  resume_command: string;
+  dry_run: boolean;
+  warnings: string[];
 }
 
 export interface Message {
-  role: string
-  content: Content[]
-  model?: string
-  provider?: string
-  usage?: TokenUsage
-  stopReason?: string
+  role: string;
+  content: Content[];
+  model?: string;
+  provider?: string;
+  usage?: TokenUsage;
+  stopReason?: string;
   /**
    * Underlying response id (e.g. Claude Code's `message.id` like `resp_xxx`).
    * Multiple JSONL lines from a single assistant turn share this id; the
    * frontend parser groups them into one message. Undefined for providers
    * that never fragment a turn across lines.
    */
-  responseId?: string
-  errorMessage?: string
-  cancelled?: boolean
-  exitCode?: number
-  command?: string
-  output?: string
-  toolCallId?: string
-  toolName?: string
-  isError?: boolean
+  responseId?: string;
+  errorMessage?: string;
+  cancelled?: boolean;
+  exitCode?: number;
+  command?: string;
+  output?: string;
+  toolCallId?: string;
+  toolName?: string;
+  isError?: boolean;
   // Support both our format and @tintinweb/pi-subagents format
-  details?: SubagentDetails | TintinwebAgentDetails | { diff?: string }
+  details?: SubagentDetails | TintinwebAgentDetails | { diff?: string };
 }
 
 // --- Subagent types ---
 
 // Our format: multiple agents with mode
 export interface SubagentDetails {
-  mode: 'single' | 'parallel' | 'chain' | 'management'
-  results: SubagentResult[]
-  artifacts?: { dir: string; files: SubagentArtifactPaths[] }
+  mode: "single" | "parallel" | "chain" | "management";
+  results: SubagentResult[];
+  artifacts?: { dir: string; files: SubagentArtifactPaths[] };
 }
 
 // @tintinweb/pi-subagents format: single agent details
 export interface TintinwebAgentDetails {
-  displayName: string
-  description: string
-  subagentType: string
-  toolUses: number
-  tokens: string
-  turnCount?: number
-  maxTurns?: number
-  durationMs: number
-  status: 'queued' | 'running' | 'completed' | 'steered' | 'aborted' | 'stopped' | 'error' | 'background'
-  agentId?: string
-  error?: string
-  modelName?: string
-  tags?: string[]
-  activity?: string
-  spinnerFrame?: number
+  displayName: string;
+  description: string;
+  subagentType: string;
+  toolUses: number;
+  tokens: string;
+  turnCount?: number;
+  maxTurns?: number;
+  durationMs: number;
+  status:
+    | "queued"
+    | "running"
+    | "completed"
+    | "steered"
+    | "aborted"
+    | "stopped"
+    | "error"
+    | "background";
+  agentId?: string;
+  error?: string;
+  modelName?: string;
+  tags?: string[];
+  activity?: string;
+  spinnerFrame?: number;
 }
 
 export interface SubagentResult {
-  agent: string
-  task: string
-  exitCode: number
-  model?: string
-  error?: string
-  usage?: { input: number; output: number; cacheRead: number; cacheWrite: number; cost: number; turns: number }
-  progressSummary?: { toolCount: number; tokens: number; durationMs: number }
-  artifactPaths?: SubagentArtifactPaths
-  sessionFile?: string
-  messages?: any[]
-  progress?: any
+  agent: string;
+  task: string;
+  exitCode: number;
+  model?: string;
+  error?: string;
+  usage?: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    cost: number;
+    turns: number;
+  };
+  progressSummary?: { toolCount: number; tokens: number; durationMs: number };
+  artifactPaths?: SubagentArtifactPaths;
+  sessionFile?: string;
+  messages?: any[];
+  progress?: any;
   // @tintinweb/pi-subagents compatibility fields
-  agentId?: string
-  outputFile?: string
-  isSidechain?: boolean
+  agentId?: string;
+  outputFile?: string;
+  isSidechain?: boolean;
 }
 
 export interface SubagentArtifactPaths {
-  inputPath: string
-  outputPath: string
-  jsonlPath: string
-  metadataPath: string
+  inputPath: string;
+  outputPath: string;
+  jsonlPath: string;
+  metadataPath: string;
 }
 
-
 export interface Content {
-  type: 'text' | 'thinking' | 'image' | 'toolCall'
-  text?: string
-  thinking?: string
-  mimeType?: string
-  data?: string
-  name?: string
-  id?: string
-  toolCallId?: string
-  arguments?: Record<string, any>
+  type: "text" | "thinking" | "image" | "toolCall";
+  text?: string;
+  thinking?: string;
+  mimeType?: string;
+  data?: string;
+  name?: string;
+  id?: string;
+  toolCallId?: string;
+  arguments?: Record<string, any>;
 }
 
 export interface SearchResult {
-  session_id: string
-  session_path: string
-  session_name?: string
-  first_message: string
-  matches: Match[]
-  score: number
+  session_id: string;
+  session_path: string;
+  session_name?: string;
+  first_message: string;
+  matches: Match[];
+  score: number;
 }
 
 export interface Match {
-  entry_id: string
-  role: string
-  snippet: string
-  timestamp: string
+  entry_id: string;
+  role: string;
+  snippet: string;
+  timestamp: string;
 }
 
 export interface FullTextSearchHit {
-  session_id: string
-  session_path: string
-  session_name?: string
-  entry_id: string
-  role: string
-  source_type: 'user' | 'assistant' | 'thinking' | 'label'
-  content: string
-  timestamp: string
-  score: number
-  match_reason?: 'content' | 'label' | 'session_id_exact' | 'session_id_prefix'
+  session_id: string;
+  session_path: string;
+  session_name?: string;
+  entry_id: string;
+  role: string;
+  source_type: "user" | "assistant" | "thinking" | "label";
+  content: string;
+  timestamp: string;
+  score: number;
+  match_reason?: "content" | "label" | "session_id_exact" | "session_id_prefix";
 }
 
 export interface FullTextSearchResponse {
-  hits: FullTextSearchHit[]
-  total_hits: number
-  has_more: boolean
+  hits: FullTextSearchHit[];
+  total_hits: number;
+  has_more: boolean;
 }
 
 export interface HeatmapPoint {
-  date: string
-  level: number // 0-5, 0 = no data, 5 = most active
+  date: string;
+  level: number; // 0-5, 0 = no data, 5 = most active
   // Enhanced fields for tooltip and modal
-  total_messages: number
-  total_tokens: number
-  total_cost: number
-  session_count: number
-  top_project?: string
+  total_messages: number;
+  total_tokens: number;
+  total_cost: number;
+  session_count: number;
+  top_project?: string;
 }
 
 export interface DayProjectBreakdown {
-  project_path: string
-  project_name: string
-  session_count: number
-  message_count: number
-  token_count: number
+  project_path: string;
+  project_name: string;
+  session_count: number;
+  message_count: number;
+  token_count: number;
 }
 
 export interface DaySession {
-  path: string
-  cwd: string
-  name?: string
-  first_message: string
-  message_count: number
-  token_count: number
-  model: string
-  timestamp: string
+  path: string;
+  cwd: string;
+  name?: string;
+  first_message: string;
+  message_count: number;
+  token_count: number;
+  model: string;
+  timestamp: string;
 }
 
 export interface DayStats {
-  date: string
-  total_messages: number
-  total_tokens: number
-  session_count: number
-  project_count: number
-  project_breakdown: DayProjectBreakdown[]
-  sessions: DaySession[]
-  hourly_distribution: number[] // 24 hours
-  models_used: Record<string, number>
-  token_details: TokenDetails
+  date: string;
+  total_messages: number;
+  total_tokens: number;
+  session_count: number;
+  project_count: number;
+  project_breakdown: DayProjectBreakdown[];
+  sessions: DaySession[];
+  hourly_distribution: number[]; // 24 hours
+  models_used: Record<string, number>;
+  token_details: TokenDetails;
 }
 
 export interface TimeDistributionPoint {
-  hour: number
-  message_count: number
+  hour: number;
+  message_count: number;
 }
-
 
 // Pi Settings types
 
-
 export interface PiSettings {
-  skills: string[]
-  prompts: string[]
-  extensions: string[]
+  skills: string[];
+  prompts: string[];
+  extensions: string[];
 }
 
 // --- Pi Config TUI types (aligned with pi source) ---
 
 export interface ResourceMetadata {
-  source: string
-  scope: 'user' | 'project'
-  origin: 'package' | 'top-level'
+  source: string;
+  scope: "user" | "project";
+  origin: "package" | "top-level";
+  /** Absolute package root for package resources. */
+  baseDir?: string;
 }
 
-export type ResourceType = 'skills' | 'extensions' | 'prompts' | 'themes'
+export type ResourceType = "skills" | "extensions" | "prompts" | "themes";
 
 export interface ResourceInfo {
-  name: string
-  path: string
-  description: string
-  enabled: boolean
-  resourceType: ResourceType
-  metadata: ResourceMetadata
+  name: string;
+  path: string;
+  description: string;
+  enabled: boolean;
+  resourceType: ResourceType;
+  metadata: ResourceMetadata;
 }
 
 export interface PiSettingsFull {
   // Model
-  defaultProvider?: string
-  defaultModel?: string
-  defaultThinkingLevel?: string
-  enabledModels?: string[]
+  defaultProvider?: string;
+  defaultModel?: string;
+  defaultThinkingLevel?: string;
+  enabledModels?: string[];
   // Behavior
-  steeringMode?: string
-  followUpMode?: string
-  hideThinkingBlock?: boolean
-  quietStartup?: boolean
-  collapseChangelog?: boolean
-  enableSkillCommands?: boolean
-  doubleEscapeAction?: string
-  shellPath?: string
-  shellCommandPrefix?: string
+  steeringMode?: string;
+  followUpMode?: string;
+  hideThinkingBlock?: boolean;
+  quietStartup?: boolean;
+  collapseChangelog?: boolean;
+  enableSkillCommands?: boolean;
+  doubleEscapeAction?: string;
+  shellPath?: string;
+  shellCommandPrefix?: string;
   // Nested
-  compaction?: { enabled?: boolean; reserveTokens?: number; keepRecentTokens?: number }
-  retry?: { enabled?: boolean; maxRetries?: number; baseDelayMs?: number; maxDelayMs?: number }
-  terminal?: { showImages?: boolean; clearOnShrink?: boolean }
-  images?: { autoResize?: boolean; blockImages?: boolean }
-  markdown?: { codeBlockIndent?: string }
-  branchSummary?: { reserveTokens?: number }
+  compaction?: {
+    enabled?: boolean;
+    reserveTokens?: number;
+    keepRecentTokens?: number;
+  };
+  retry?: {
+    enabled?: boolean;
+    maxRetries?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+  };
+  terminal?: { showImages?: boolean; clearOnShrink?: boolean };
+  images?: { autoResize?: boolean; blockImages?: boolean };
+  markdown?: { codeBlockIndent?: string };
+  branchSummary?: { reserveTokens?: number };
   // Appearance
-  theme?: string
-  showHardwareCursor?: boolean
-  editorPaddingX?: number
-  autocompleteMaxVisible?: number
+  theme?: string;
+  showHardwareCursor?: boolean;
+  editorPaddingX?: number;
+  autocompleteMaxVisible?: number;
   // Resources
-  packages: unknown[]
-  extensions: string[]
-  skills: string[]
-  prompts: string[]
-  themes: string[]
+  packages: unknown[];
+  extensions: string[];
+  skills: string[];
+  prompts: string[];
+  themes: string[];
 }
 
 export interface ModelOption {
-  provider: string
-  model: string
+  provider: string;
+  model: string;
 }
 
 export interface ConfigVersionMeta {
-  id: number
-  filePath: string
-  createdAt: string
-  sizeBytes: number
+  id: number;
+  filePath: string;
+  createdAt: string;
+  sizeBytes: number;
 }
 
 export interface ConfigVersion extends ConfigVersionMeta {
-  content: string
+  content: string;
 }
 
 export interface Tag {
-  id: string
-  name: string
-  color: string
-  icon?: string
-  sortOrder: number
-  isBuiltin: boolean
-  createdAt: string
-  autoRules?: string
-  parentId?: string | null
+  id: string;
+  name: string;
+  color: string;
+  icon?: string;
+  sortOrder: number;
+  isBuiltin: boolean;
+  createdAt: string;
+  autoRules?: string;
+  parentId?: string | null;
 }
 
 export interface SessionTag {
-  sessionId: string
-  tagId: string
-  position: number
-  assignedAt: string
+  sessionId: string;
+  tagId: string;
+  position: number;
+  assignedAt: string;
 }
 
 export interface AutoRule {
-  pattern: string
-  enabled: boolean
-  description?: string
+  pattern: string;
+  enabled: boolean;
+  description?: string;
 }

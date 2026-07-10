@@ -96,7 +96,7 @@ export default function ConfigVersionsTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
-        <Loader2 className="h-6 w-6 animate-spin text-info" />
+        <Loader2 className="h-6 w-6 animate-spin settings-accent-fg" />
       </div>
     );
   }
@@ -116,10 +116,10 @@ export default function ConfigVersionsTab() {
   }
 
   return (
-    <div className="max-h-[450px] overflow-y-auto divide-y divide-border rounded-lg border border-border">
+    <div className="max-h-[450px] overflow-y-auto divide-y divide-border/40 rounded-lg border border-border/50 bg-card/20 shadow-2xs">
       {versions.map((v) => (
         <div key={v.id}>
-          <div className="flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-surface/30 motion-surface motion-color">
+          <div className="flex items-center gap-2 px-3 py-2.5 text-xs transition-colors hover:bg-surface/70 motion-surface motion-color">
             <span className="text-muted-foreground font-mono w-8 text-right flex-shrink-0">
               #{v.id}
             </span>
@@ -131,7 +131,7 @@ export default function ConfigVersionsTab() {
             </span>
             <button
               onClick={() => handlePreview(v.id)}
-              className={`p-1 rounded motion-surface motion-color motion-press focus-ring ${previewId === v.id ? "text-info bg-info/10" : "text-muted-foreground hover:text-foreground"}`}
+              className={`rounded p-1 motion-surface motion-color motion-press focus-ring ${previewId === v.id ? "settings-accent-bg-soft settings-accent-fg" : "text-muted-foreground hover:bg-surface/80 hover:text-foreground"}`}
               title={t("settings.piConfig.preview", "Preview")}
             >
               <Eye className="h-3.5 w-3.5" />
@@ -139,7 +139,7 @@ export default function ConfigVersionsTab() {
             <button
               onClick={() => handleRestore(v.id)}
               disabled={restoring === v.id}
-              className="p-1 rounded text-muted-foreground hover:text-warning motion-surface motion-color motion-press focus-ring"
+              className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface/80 hover:text-warning motion-surface motion-color motion-press focus-ring disabled:opacity-50"
               title={t("settings.piConfig.restore", "Restore")}
             >
               {restoring === v.id ? (

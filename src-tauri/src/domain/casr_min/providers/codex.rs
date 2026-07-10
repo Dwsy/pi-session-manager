@@ -344,12 +344,20 @@ fn extract_payload_tool_calls(payload: &Value) -> Vec<ToolCall> {
     if !matches!(payload_type, "function_call" | "custom_tool_call") {
         return vec![];
     }
-    let arguments = payload.get("arguments").or_else(|| payload.get("input")).or_else(|| payload.get("args")).cloned().unwrap_or(Value::Null);
+    let arguments = payload.get("arguments").or_else(|| payload.get("input")).or_else(|| payload.get("args")).map(parse_arguments_value).unwrap_or(Value::Null);
     vec![ToolCall {
         id: payload.get("call_id").or_else(|| payload.get("id")).or_else(|| payload.get("tool_use_id")).and_then(|v| v.as_str()).map(String::from),
         name: payload.get("name").or_else(|| payload.pointer("/function/name")).and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
         arguments,
     }]
+}
+
+fn parse_arguments_value(value: &Value) -> Value {
+    let Some(text) = value.as_str() else {
+        return value.clone();
+    };
+
+    serde_json::from_str(text).unwrap_or_else(|_| Value::String(text.to_string()))
 }
 
 fn extract_payload_tool_results(payload: &Value) -> Vec<ToolResult> {
@@ -521,4 +529,47 @@ fn merge_codex_group(fragments: Vec<CanonicalMessage>) -> CanonicalMessage {
         }
     }
     head
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn payload_tool_call_parses_json_arguments() {
+        let calls = extract_payload_tool_calls(&json!({
+            "type": "function_call",
+            "call_id": "call-1",
+            "name": "spawn_agent",
+            "arguments": "{\"task_name\":\"parser\"}"
+        }));
+
+        assert_eq!(calls[0].arguments["task_name"], "parser");
+    }
+
+    #[test]
+    fn payload_tool_call_preserves_legacy_object_arguments() {
+        let calls = extract_payload_tool_calls(&json!({
+            "type": "function_call",
+            "call_id": "call-legacy",
+            "name": "Read",
+            "arguments": {"file_path": "src/main.rs"}
+        }));
+
+        assert_eq!(calls[0].arguments["file_path"], "src/main.rs");
+    }
+
+    #[test]
+    fn payload_custom_tool_call_preserves_raw_input() {
+        let script = "const result = await tools.exec_command({ cmd: \"cargo test\" });";
+        let calls = extract_payload_tool_calls(&json!({
+            "type": "custom_tool_call",
+            "call_id": "call-2",
+            "name": "exec",
+            "input": script
+        }));
+
+        assert_eq!(calls[0].arguments, Value::String(script.to_string()));
+    }
 }

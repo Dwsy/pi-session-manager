@@ -399,18 +399,21 @@ pub struct PiSettingsFull {
     pub themes: Vec<String>,
 }
 
-fn settings_path_for_scope(scope: &str) -> Result<PathBuf, String> {
+fn settings_path_for_scope(scope: &str, cwd: Option<&str>) -> Result<PathBuf, String> {
     match scope {
         "project" => {
-            let cwd = std::env::current_dir().map_err(|e| format!("Failed to get cwd: {e}"))?;
-            Ok(crate::paths::project_pi_dir(&cwd).join("settings.json"))
+            let cwd_path = match cwd {
+                Some(value) if !value.trim().is_empty() => PathBuf::from(value),
+                _ => std::env::current_dir().map_err(|e| format!("Failed to get cwd: {e}"))?,
+            };
+            Ok(crate::paths::project_pi_dir(&cwd_path).join("settings.json"))
         }
         _ => crate::paths::pi_agent_settings_path().map_err(|e| format!("Failed to get home directory: {e}")),
     }
 }
 
 fn user_settings_path() -> Result<PathBuf, String> {
-    settings_path_for_scope("user")
+    settings_path_for_scope("user", None)
 }
 
 fn read_settings_json(path: &Path) -> Result<Value, String> {
@@ -502,17 +505,63 @@ pub async fn save_pi_setting(key: String, value: Value) -> Result<(), String> {
     save_pi_setting_internal(key, value).await
 }
 
-pub async fn toggle_resource_internal(resource_type: String, path: String, enabled: bool, scope: String) -> Result<(), String> {
-    let settings_path = settings_path_for_scope(&scope)?;
+pub async fn toggle_resource_internal(resource_type: String, path: String, enabled: bool, scope: String, cwd: Option<String>, origin: Option<String>, source: Option<String>) -> Result<(), String> {
+    let settings_path = settings_path_for_scope(&scope, cwd.as_deref())?;
     let mut json = read_settings_json(&settings_path)?;
 
-    let arr = json.get(&resource_type).and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let is_package = origin.as_deref() == Some("package") || source.as_ref().is_some_and(|s| !s.is_empty() && s != "auto" && s != "local");
 
+    if is_package {
+        let package_source = source.as_deref().map(str::trim).filter(|s| !s.is_empty()).ok_or_else(|| "Missing package source for package resource toggle".to_string())?;
+        toggle_package_resource_filter(&mut json, package_source, &resource_type, &path, enabled)?;
+    } else {
+        let arr = json.get(&resource_type).and_then(|v| v.as_array()).cloned().unwrap_or_default();
+
+        let mut new_arr: Vec<String> = arr
+            .iter()
+            .filter_map(|v| v.as_str().map(String::from))
+            .filter(|entry| {
+                let clean = entry.trim_start_matches('+').trim_start_matches('-').trim_start_matches('!');
+                clean != path
+            })
+            .collect();
+
+        if enabled {
+            new_arr.push(format!("+{path}"));
+        } else {
+            new_arr.push(format!("-{path}"));
+        }
+
+        json[&resource_type] = serde_json::json!(new_arr);
+    }
+
+    write_settings_json(&settings_path, &json, true)
+}
+
+fn toggle_package_resource_filter(json: &mut Value, package_source: &str, resource_type: &str, path: &str, enabled: bool) -> Result<(), String> {
+    let packages = json.get_mut("packages").and_then(|v| v.as_array_mut()).ok_or_else(|| "No packages array in settings.json".to_string())?;
+
+    let target = packages.iter_mut().find(|pkg| {
+        let source = if let Some(s) = pkg.as_str() { s.trim_start_matches(['+', '-']) } else { pkg.get("source").and_then(|v| v.as_str()).unwrap_or("").trim_start_matches(['+', '-']) };
+        source == package_source
+    });
+
+    let pkg = target.ok_or_else(|| format!("Package not found in settings: {package_source}"))?;
+
+    // Promote string package entry to object form.
+    if pkg.is_string() {
+        *pkg = serde_json::json!({ "source": package_source });
+    }
+
+    let obj = pkg.as_object_mut().ok_or_else(|| "Invalid package entry".to_string())?;
+    obj.entry("source").or_insert_with(|| serde_json::json!(package_source));
+
+    let arr = obj.get(resource_type).and_then(|v| v.as_array()).cloned().unwrap_or_default();
     let mut new_arr: Vec<String> = arr
         .iter()
         .filter_map(|v| v.as_str().map(String::from))
         .filter(|entry| {
-            let clean = entry.trim_start_matches('+').trim_start_matches('-');
+            let clean = entry.trim_start_matches('+').trim_start_matches('-').trim_start_matches('!');
             clean != path
         })
         .collect();
@@ -523,13 +572,24 @@ pub async fn toggle_resource_internal(resource_type: String, path: String, enabl
         new_arr.push(format!("-{path}"));
     }
 
-    json[&resource_type] = serde_json::json!(new_arr);
-    write_settings_json(&settings_path, &json, true)
+    if new_arr.is_empty() {
+        obj.remove(resource_type);
+    } else {
+        obj.insert(resource_type.to_string(), serde_json::json!(new_arr));
+    }
+
+    // Collapse empty filter object back to string source.
+    let has_filters = ["extensions", "skills", "prompts", "themes"].iter().any(|k| obj.get(*k).is_some());
+    if !has_filters {
+        *pkg = serde_json::json!(package_source);
+    }
+
+    Ok(())
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn toggle_resource(resource_type: String, path: String, enabled: bool, scope: String) -> Result<(), String> {
-    toggle_resource_internal(resource_type, path, enabled, scope).await
+pub async fn toggle_resource(resource_type: String, path: String, enabled: bool, scope: String, cwd: Option<String>, origin: Option<String>, source: Option<String>) -> Result<(), String> {
+    toggle_resource_internal(resource_type, path, enabled, scope, cwd, origin, source).await
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]

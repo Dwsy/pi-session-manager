@@ -2,7 +2,10 @@ import { useTranslation } from "react-i18next";
 import { Check, Loader2, X } from "lucide-react";
 
 import type { AppSettings, SettingsSaveMode, SettingsSection } from "./types";
-import type { SettingsSections, SettingsUpdateHandler } from "./SettingsPanelTypes";
+import type {
+  SettingsSections,
+  SettingsUpdateHandler,
+} from "./SettingsPanelTypes";
 import { renderSettingsSection } from "./settingsRegistry";
 
 interface SettingsContentProps {
@@ -36,16 +39,18 @@ export default function SettingsContent({
   const statusLabel = saving
     ? t("settings.saving", "Saving…")
     : t("settings.savedJustNow", "Saved");
-  const isModelConfig = activeSection === "models";
-  const inlineSaveHint = isModelConfig
-    ? t(
-        "settings.modelConfigCenter.status.manualSaveHint",
-        "Manual save required. Click Save Config to persist changes.",
-      )
-    : t(
-        "settings.inlineSaveHint",
-        "This page saves changes in its own controls.",
-      );
+  const isFullBleedSection =
+    activeSection === "models" || activeSection === "pi-resources";
+  const inlineSaveHint =
+    activeSection === "models"
+      ? t(
+          "settings.modelConfigCenter.status.manualSaveHint",
+          "Manual save required. Click Save Config to persist changes.",
+        )
+      : t(
+          "settings.inlineSaveHint",
+          "This page saves changes in its own controls.",
+        );
 
   return (
     <div className="flex-1 flex flex-col bg-surface-dark/20">
@@ -96,7 +101,7 @@ export default function SettingsContent({
 
       <div
         className={
-          isModelConfig
+          isFullBleedSection
             ? "flex-1 overflow-hidden p-4 min-h-0"
             : "flex-1 overflow-y-auto p-4 min-h-0"
         }
@@ -108,7 +113,7 @@ export default function SettingsContent({
         ) : (
           <div
             className={
-              isModelConfig
+              isFullBleedSection
                 ? "h-full min-h-0 w-full max-w-none"
                 : "mx-auto w-full max-w-7xl space-y-3"
             }

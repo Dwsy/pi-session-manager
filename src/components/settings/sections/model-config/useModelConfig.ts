@@ -32,6 +32,15 @@ import {
   createDefaultProvider,
   modelSelectionValue,
 } from "./utils";
+import {
+  applyPriceMatches,
+  buildModelEntryFromRemote,
+  fetchModelsDevCatalog,
+  findModelPrice,
+  mergeCatalogModelsIntoProvider,
+  mergeModelCost,
+  type CatalogModelOption,
+} from "./catalog";
 
 export function useModelConfig() {
   const { t } = useTranslation();
@@ -65,6 +74,8 @@ export function useModelConfig() {
     useState<ConfigDetailTab>("model");
 
   const [showAddProviderModal, setShowAddProviderModal] = useState(false);
+  const [showCatalogModal, setShowCatalogModal] = useState(false);
+  const [showRemoteModelsModal, setShowRemoteModelsModal] = useState(false);
   const [newProviderName, setNewProviderName] = useState("");
 
   const [showImportModal, setShowImportModal] = useState(false);
@@ -482,6 +493,340 @@ export function useModelConfig() {
         "New model draft added",
       ),
     );
+  }
+
+  function openCatalogBrowser() {
+    if (!selectedProvider) {
+      pushFeedback(
+        "warning",
+        t(
+          "settings.modelConfigCenter.feedback.selectProviderFirst",
+          "Select a provider first",
+        ),
+      );
+      return;
+    }
+    setShowCatalogModal(true);
+  }
+
+  function openRemoteModelsBrowser() {
+    if (!selectedProvider) {
+      pushFeedback(
+        "warning",
+        t(
+          "settings.modelConfigCenter.feedback.selectProviderFirst",
+          "Select a provider first",
+        ),
+      );
+      return;
+    }
+    if (!selectedProviderEntry?.baseUrl?.trim()) {
+      pushFeedback(
+        "warning",
+        t(
+          "settings.modelConfigCenter.feedback.remoteModelsNeedBaseUrl",
+          "Current provider needs a Base URL first",
+        ),
+      );
+      setConfigDetailTab("provider");
+      return;
+    }
+    setShowRemoteModelsModal(true);
+  }
+
+  async function addModelsFromRemote(
+    selected: Array<{ id: string; name?: string | null }>,
+  ) {
+    if (!selectedProvider || selected.length === 0) {
+      setShowRemoteModelsModal(false);
+      return;
+    }
+
+    setBusy("remote-models-add");
+    try {
+      let catalog = null as Awaited<
+        ReturnType<typeof fetchModelsDevCatalog>
+      > | null;
+      try {
+        catalog = await fetchModelsDevCatalog();
+      } catch (error) {
+        console.warn("models.dev enrich skipped:", error);
+      }
+
+      const existingIds = new Set(
+        selectedProviderModels
+          .map((model) => model.id.trim().toLowerCase())
+          .filter(Boolean),
+      );
+
+      const nextModels = [...selectedProviderModels];
+      let added = 0;
+      let skipped = 0;
+      let enriched = 0;
+
+      for (const item of selected) {
+        const id = item.id?.trim() ?? "";
+        if (!id) {
+          skipped += 1;
+          continue;
+        }
+        const key = id.toLowerCase();
+        if (existingIds.has(key)) {
+          skipped += 1;
+          continue;
+        }
+
+        if (catalog) {
+          const built = buildModelEntryFromRemote(
+            item,
+            catalog,
+            selectedProvider,
+          );
+          nextModels.push(built.model);
+          if (built.enriched) enriched += 1;
+        } else {
+          nextModels.push({
+            ...createDefaultModel(),
+            id,
+            name: item.name?.trim() || id,
+          });
+        }
+        existingIds.add(key);
+        added += 1;
+      }
+
+      updateSelectedProviderEntry((provider) => ({
+        ...provider,
+        models: nextModels,
+      }));
+
+      if (added > 0) {
+        const firstNewIndex = Math.max(0, nextModels.length - added);
+        setSelectedModel(modelSelectionValue(firstNewIndex));
+        setConfigDetailTab("model");
+      }
+
+      setShowRemoteModelsModal(false);
+      pushFeedback(
+        added > 0 ? "success" : "info",
+        t(
+          "settings.modelConfigCenter.feedback.remoteModelsAdded",
+          "Added {{added}} model(s) from provider API (skipped {{skipped}}, enriched {{enriched}})",
+          { added, skipped, enriched },
+        ),
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function addModelsFromCatalog(selected: CatalogModelOption[]) {
+    if (!selectedProvider || selected.length === 0) {
+      setShowCatalogModal(false);
+      return;
+    }
+
+    const { models, added, skipped } = mergeCatalogModelsIntoProvider(
+      selectedProviderModels,
+      selected,
+    );
+
+    updateSelectedProviderEntry((provider) => ({
+      ...provider,
+      models,
+    }));
+
+    if (added > 0) {
+      const firstNewIndex = Math.max(0, models.length - added);
+      setSelectedModel(modelSelectionValue(firstNewIndex));
+      setConfigDetailTab("model");
+    }
+
+    setShowCatalogModal(false);
+    pushFeedback(
+      added > 0 ? "success" : "info",
+      t(
+        "settings.modelConfigCenter.feedback.catalogModelsAdded",
+        "Added {{added}} model(s) from models.dev (skipped {{skipped}})",
+        { added, skipped },
+      ),
+    );
+  }
+
+  async function fillSelectedModelPricing() {
+    if (!selectedProvider || !selectedModelEntry?.id?.trim()) {
+      pushFeedback(
+        "warning",
+        t(
+          "settings.modelConfigCenter.feedback.pricingNeedModelId",
+          "Current model needs a valid ID before pricing can be filled",
+        ),
+      );
+      return;
+    }
+
+    const modelId = selectedModelEntry.id;
+    setBusy("pricing-model");
+    try {
+      const catalog = await fetchModelsDevCatalog();
+      let match = findModelPrice(catalog, modelId, {
+        preferredProviderId: selectedProvider,
+        allowFuzzy: false,
+      });
+
+      if (!match) {
+        const fuzzy = findModelPrice(catalog, modelId, {
+          preferredProviderId: selectedProvider,
+          allowFuzzy: true,
+        });
+        if (!fuzzy) {
+          pushFeedback(
+            "warning",
+            t(
+              "settings.modelConfigCenter.feedback.pricingNotFound",
+              "No pricing match found for {{id}}",
+              { id: modelId },
+            ),
+          );
+          return;
+        }
+
+        openConfirm({
+          title: t(
+            "settings.modelConfigCenter.dialogs.pricingFuzzyTitle",
+            "Use fuzzy pricing match?",
+          ),
+          description: t(
+            "settings.modelConfigCenter.dialogs.pricingFuzzyDesc",
+            'No exact match for "{{id}}". Apply fuzzy match "{{matched}}" ({{similarity}}% similar)?',
+            {
+              id: modelId,
+              matched: fuzzy.matchedApiId,
+              similarity: Math.round(fuzzy.similarity * 100),
+            },
+          ),
+          confirmLabel: t(
+            "settings.modelConfigCenter.actions.applyFuzzyPricing",
+            "Apply fuzzy match",
+          ),
+          tone: "warning",
+          onConfirm: () => {
+            updateSelectedModelEntry((model) => ({
+              ...model,
+              cost: mergeModelCost(model.cost, fuzzy.cost),
+            }));
+            pushFeedback(
+              "success",
+              t(
+                "settings.modelConfigCenter.feedback.pricingModelUpdated",
+                "Filled pricing for {{id}} via {{matched}} ({{matchType}})",
+                {
+                  id: modelId,
+                  matched: fuzzy.matchedApiId,
+                  matchType: fuzzy.matchType,
+                },
+              ),
+            );
+          },
+        });
+        return;
+      }
+
+      updateSelectedModelEntry((model) => ({
+        ...model,
+        cost: mergeModelCost(model.cost, match.cost),
+      }));
+      pushFeedback(
+        "success",
+        t(
+          "settings.modelConfigCenter.feedback.pricingModelUpdated",
+          "Filled pricing for {{id}} via {{matched}} ({{matchType}})",
+          {
+            id: modelId,
+            matched: match.matchedApiId,
+            matchType: match.matchType,
+          },
+        ),
+      );
+    } catch (error) {
+      console.error("Fill model pricing failed:", error);
+      pushFeedback(
+        "error",
+        t(
+          "settings.modelConfigCenter.feedback.pricingFailed",
+          "Failed to fetch pricing: {{reason}}",
+          { reason: asErrorMessage(error) },
+        ),
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function fillProviderPricing() {
+    if (!selectedProvider) {
+      pushFeedback(
+        "warning",
+        t(
+          "settings.modelConfigCenter.feedback.selectProviderFirst",
+          "Select a provider first",
+        ),
+      );
+      return;
+    }
+
+    if (selectedProviderModels.length === 0) {
+      pushFeedback(
+        "warning",
+        t(
+          "settings.modelConfigCenter.feedback.pricingNoModels",
+          "Current provider has no models to update",
+        ),
+      );
+      return;
+    }
+
+    setBusy("pricing-provider");
+    try {
+      const catalog = await fetchModelsDevCatalog();
+      // Provider batch update stays exact/normalized only to avoid silent mispricing.
+      const result = applyPriceMatches(
+        selectedProviderModels,
+        catalog,
+        selectedProvider,
+        { allowFuzzy: false },
+      );
+
+      updateSelectedProviderEntry((provider) => ({
+        ...provider,
+        models: result.models,
+      }));
+
+      pushFeedback(
+        result.updated > 0 ? "success" : "warning",
+        t(
+          "settings.modelConfigCenter.feedback.pricingProviderUpdated",
+          "Updated pricing for {{updated}}/{{total}} models (unmatched {{unmatched}}; exact/normalized only)",
+          {
+            updated: result.updated,
+            total: selectedProviderModels.length,
+            unmatched: result.unmatched.length,
+          },
+        ),
+      );
+    } catch (error) {
+      console.error("Fill provider pricing failed:", error);
+      pushFeedback(
+        "error",
+        t(
+          "settings.modelConfigCenter.feedback.pricingFailed",
+          "Failed to fetch pricing: {{reason}}",
+          { reason: asErrorMessage(error) },
+        ),
+      );
+    } finally {
+      setBusy(null);
+    }
   }
 
   function requestDeleteModel(index: number) {
@@ -1027,6 +1372,10 @@ export function useModelConfig() {
     setConfigDetailTab,
     showAddProviderModal,
     setShowAddProviderModal,
+    showCatalogModal,
+    setShowCatalogModal,
+    showRemoteModelsModal,
+    setShowRemoteModelsModal,
     newProviderName,
     setNewProviderName,
     showImportModal,
@@ -1054,6 +1403,12 @@ export function useModelConfig() {
     handleCreateProvider,
     requestDeleteProvider,
     addModel,
+    openCatalogBrowser,
+    openRemoteModelsBrowser,
+    addModelsFromCatalog,
+    addModelsFromRemote,
+    fillSelectedModelPricing,
+    fillProviderPricing,
     requestDeleteModel,
     saveConfig,
     refreshConfig,

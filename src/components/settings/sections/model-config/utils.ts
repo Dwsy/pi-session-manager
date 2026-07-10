@@ -5,11 +5,7 @@ import type {
   ModelInputType,
   ThinkingLevelMap,
 } from "./types";
-import {
-  EMPTY_CONFIG,
-  MODEL_INPUT_TYPE_OPTIONS,
-  MODEL_THINKING_LEVEL_OPTIONS,
-} from "./types";
+import { EMPTY_CONFIG, MODEL_INPUT_TYPE_OPTIONS } from "./types";
 
 export function asModelConfigShape(raw: unknown): ModelConfigShape {
   if (!raw || typeof raw !== "object") return EMPTY_CONFIG;
@@ -42,18 +38,34 @@ export function normalizeHeaders(
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
-export function normalizeModelInputTypes(input?: readonly string[]): ModelInputType[] {
+export function clampCostValue(value: unknown, fallback = 0): number {
+  const n =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : Number.NaN;
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return n;
+}
+
+export function normalizeModelInputTypes(
+  input?: readonly string[],
+): ModelInputType[] {
   const allowed = new Set<string>(MODEL_INPUT_TYPE_OPTIONS);
   const values = (input ?? ["text"]).filter((item) => allowed.has(item));
   return values.includes("image") ? ["text", "image"] : ["text"];
 }
 
-export function normalizeThinkingLevelMap(map?: ThinkingLevelMap): ThinkingLevelMap | undefined {
-  if (!map) return undefined;
+export function normalizeThinkingLevelMap(
+  map?: ThinkingLevelMap,
+): ThinkingLevelMap | undefined {
+  if (!map || typeof map !== "object") return undefined;
 
   const normalized: ThinkingLevelMap = {};
-  for (const level of MODEL_THINKING_LEVEL_OPTIONS) {
-    const value = map[level];
+  for (const [rawLevel, value] of Object.entries(map)) {
+    const level = rawLevel.trim();
+    if (!level) continue;
     if (value === null) {
       normalized[level] = null;
     } else if (typeof value === "string" && value.trim()) {
@@ -78,7 +90,9 @@ export function normalizeConfig(config: ModelConfigShape): ModelConfigShape {
       authHeader: provider.authHeader === true,
       headers: normalizeHeaders(provider.headers),
       models: (provider.models ?? []).map((model) => {
-        const thinkingLevelMap = normalizeThinkingLevelMap(model.thinkingLevelMap);
+        const thinkingLevelMap = normalizeThinkingLevelMap(
+          model.thinkingLevelMap,
+        );
         return {
           id: model.id ?? "",
           name: model.name ?? "",
@@ -89,10 +103,10 @@ export function normalizeConfig(config: ModelConfigShape): ModelConfigShape {
           contextWindow: model.contextWindow ?? 128000,
           maxTokens: model.maxTokens ?? 16384,
           cost: {
-            input: model.cost?.input ?? 0,
-            output: model.cost?.output ?? 0,
-            cacheRead: model.cost?.cacheRead ?? 0,
-            cacheWrite: model.cost?.cacheWrite ?? 0,
+            input: clampCostValue(model.cost?.input),
+            output: clampCostValue(model.cost?.output),
+            cacheRead: clampCostValue(model.cost?.cacheRead),
+            cacheWrite: clampCostValue(model.cost?.cacheWrite),
           },
         };
       }),

@@ -13,9 +13,11 @@ import {
 import { MODEL_CONFIG_PATH } from "./types";
 import type { ModelConfigMainTab } from "./types";
 import { useModelConfig } from "./useModelConfig";
-import { StatusBanner } from "./ui/StatusBanner";
+import { ModelConfigFeedbackToast } from "./ui/ModelConfigFeedbackToast";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { AddProviderModal } from "./modals/AddProviderModal";
+import { CatalogBrowserModal } from "./modals/CatalogBrowserModal";
+import { ProviderRemoteModelsModal } from "./modals/ProviderRemoteModelsModal";
 import { ImportModal } from "./modals/ImportModal";
 import { HistoryTab } from "./tabs/HistoryTab";
 import { ToolsTab } from "./tabs/ToolsTab";
@@ -55,6 +57,10 @@ export default function ModelConfigCenter() {
     setConfigDetailTab,
     showAddProviderModal,
     setShowAddProviderModal,
+    showCatalogModal,
+    setShowCatalogModal,
+    showRemoteModelsModal,
+    setShowRemoteModelsModal,
     newProviderName,
     setNewProviderName,
     showImportModal,
@@ -78,6 +84,12 @@ export default function ModelConfigCenter() {
     handleCreateProvider,
     requestDeleteProvider,
     addModel,
+    openCatalogBrowser,
+    openRemoteModelsBrowser,
+    addModelsFromCatalog,
+    addModelsFromRemote,
+    fillSelectedModelPricing,
+    fillProviderPricing,
     requestDeleteModel,
     saveConfig,
     refreshConfig,
@@ -132,9 +144,9 @@ export default function ModelConfigCenter() {
 
   return (
     <>
-      <div className="flex h-full min-h-0 flex-col space-y-2.5">
+      <div className="relative flex h-full min-h-0 flex-col space-y-2.5">
         {feedback && (
-          <StatusBanner
+          <ModelConfigFeedbackToast
             tone={feedback.tone}
             message={feedback.message}
             onClose={() => setFeedback(null)}
@@ -237,7 +249,10 @@ export default function ModelConfigCenter() {
                   <Save className="h-3 w-3" />
                 )}
                 {isDirty
-                  ? t("settings.modelConfigCenter.actions.saveUnsaved", "Save changes")
+                  ? t(
+                      "settings.modelConfigCenter.actions.saveUnsaved",
+                      "Save changes",
+                    )
                   : t("settings.modelConfigCenter.actions.save", "Save")}
               </button>
             </div>
@@ -258,6 +273,11 @@ export default function ModelConfigCenter() {
             selectedModel={selectedModel}
             setSelectedModel={setSelectedModel}
             addModel={addModel}
+            openCatalogBrowser={openCatalogBrowser}
+            openRemoteModelsBrowser={openRemoteModelsBrowser}
+            fillSelectedModelPricing={fillSelectedModelPricing}
+            fillProviderPricing={fillProviderPricing}
+            busy={busy}
             selectedProviderEntry={selectedProviderEntry}
             providerNameDraft={providerNameDraft}
             setProviderNameDraft={setProviderNameDraft}
@@ -329,6 +349,23 @@ export default function ModelConfigCenter() {
         onNewProviderNameChange={setNewProviderName}
         onClose={() => setShowAddProviderModal(false)}
         onConfirm={handleCreateProvider}
+      />
+
+      <CatalogBrowserModal
+        open={showCatalogModal}
+        targetProvider={selectedProvider}
+        existingModelIds={selectedProviderModels.map((model) => model.id)}
+        onClose={() => setShowCatalogModal(false)}
+        onConfirm={addModelsFromCatalog}
+      />
+
+      <ProviderRemoteModelsModal
+        open={showRemoteModelsModal}
+        providerName={selectedProvider}
+        providerEntry={selectedProviderEntry}
+        existingModelIds={selectedProviderModels.map((model) => model.id)}
+        onClose={() => setShowRemoteModelsModal(false)}
+        onConfirm={addModelsFromRemote}
       />
 
       <ImportModal

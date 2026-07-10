@@ -18,8 +18,8 @@ function SettingsTabButton({
       onClick={onClick}
       className={`flex-none min-w-[88px] sm:flex-1 sm:min-w-0 min-h-[40px] flex items-center justify-center gap-1.5 px-3 text-xs font-medium rounded-md motion-surface motion-color motion-press focus-ring whitespace-nowrap ${
         active
-          ? "bg-info text-white shadow-sm"
-          : "text-muted-foreground hover:text-foreground"
+          ? "settings-accent-bg-strong text-primary-foreground shadow-xs"
+          : "text-muted-foreground hover:bg-surface/70 hover:text-foreground"
       } ${className}`}
     >
       {children}
@@ -48,7 +48,7 @@ export default function SettingsTabs<T extends string>({
 }: SettingsTabsProps<T>) {
   return (
     <div
-      className={`flex gap-1 p-1 bg-surface rounded-lg overflow-x-auto [-webkit-overflow-scrolling:touch] ${className}`}
+      className={`flex gap-1 rounded-lg border border-border/50 bg-surface/60 p-1 overflow-x-auto [-webkit-overflow-scrolling:touch] ${className}`}
     >
       {items.map((item) => (
         <SettingsTabButton

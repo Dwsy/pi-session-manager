@@ -996,7 +996,7 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].package_name, "@acme/psm-sidechat");
         assert_eq!(entries[0].package_version.as_deref(), Some("1.2.3"));
-        assert!(entries[0].entry_path.ends_with("dist/index.js"));
+        assert!(Path::new(&entries[0].entry_path).ends_with(Path::new("dist").join("index.js")));
         assert!(entries[0].module_modified_ms.is_some());
         assert!(entries[0].source_hash.as_deref().is_some_and(|hash| hash.len() == 64));
 
@@ -1297,7 +1297,7 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].package_name.as_deref(), Some("@acme/dev-plugin"));
         assert_eq!(entries[0].package_version.as_deref(), Some("0.3.0"));
-        assert!(entries[0].entry_path.ends_with("dist/index.js"));
+        assert!(Path::new(&entries[0].entry_path).ends_with(Path::new("dist").join("index.js")));
         assert!(entries[0].project_path.ends_with("dev-plugin"));
         assert!(entries[0].module_modified_ms.is_some());
         assert!(entries[0].source_hash.as_deref().is_some_and(|hash| hash.len() == 64));
@@ -1305,7 +1305,7 @@ mod tests {
         fs::remove_file(project_dir.join("dist/index.js")).unwrap();
         let built = runtime.block_on(build_dev_psm_plugin(project_dir.to_string_lossy().to_string())).unwrap();
         assert_eq!(built.entries.len(), 1);
-        assert!(built.entries[0].entry_path.ends_with("dist/index.js"));
+        assert!(Path::new(&built.entries[0].entry_path).ends_with(Path::new("dist").join("index.js")));
 
         let mut stored = read_plugins_config().unwrap();
         stored.plugins.insert(

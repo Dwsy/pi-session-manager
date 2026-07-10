@@ -3,16 +3,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useTranslation } from "react-i18next";
 import { ask as askNative } from "@tauri-apps/plugin-dialog";
-import type {
-  AppSettings,
-  SettingsArea,
-  SettingsSection,
-} from "./types";
+import type { AppSettings, SettingsArea, SettingsSection } from "./types";
 import { defaultSettings } from "./types";
 import { loadAppSettings, saveAppSettings } from "@/utils/settingsApi";
 import { applyPiChatTheme, resolvePiThemeColorScheme } from "@/utils/piTheme";
 import { useSettings as useAppSettingsContext } from "@/hooks/useSettings";
-import { SETTINGS_NAVIGATE_EVENT } from "./navigation";
+import {
+  SETTINGS_NAVIGATE_EVENT,
+  resolveSettingsSectionId,
+} from "./navigation";
 import {
   getAvailableSettingsGroups,
   getAvailableSettingsAreas,
@@ -21,7 +20,10 @@ import {
 } from "./settingsRegistry";
 import { isStandaloneDatasetRuntime } from "@/browser-dataset";
 import { psmPluginHost } from "@/plugins/runtime-host";
-import { searchSettings, type SettingsSearchResult } from "./settingsSearchIndex";
+import {
+  searchSettings,
+  type SettingsSearchResult,
+} from "./settingsSearchIndex";
 import MobileSettings from "./MobileSettings";
 import SettingsSidebar from "./SettingsSidebar";
 import SettingsContent from "./SettingsContent";
@@ -52,7 +54,9 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const [activeSection, setActiveSection] =
     useState<SettingsSection>("appearance");
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SettingsSearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<SettingsSearchResult[]>(
+    [],
+  );
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -102,44 +106,41 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   }, [searchQuery, t, sectionLabels, menuItems]);
 
   // Navigate to a search result and scroll to the element
-  const navigateToResult = useCallback(
-    (result: SettingsSearchResult) => {
-      const section = getSettingsSectionMeta(result.item.section);
-      if (section) {
-        setActiveArea(section.area);
+  const navigateToResult = useCallback((result: SettingsSearchResult) => {
+    const section = getSettingsSectionMeta(result.item.section);
+    if (section) {
+      setActiveArea(section.area);
+    }
+    setActiveSection(result.item.section);
+    setSearchQuery("");
+    setSearchResults([]);
+    // Poll for the element with timeout (handles Suspense/async loading)
+    const selector = `[data-settings-search="${result.item.id}"]`;
+    let attempts = 0;
+    const tryScroll = () => {
+      const el = document.querySelector(selector) as HTMLElement | null;
+      if (el) {
+        el.scrollIntoView({ block: "center" });
+        // Flash highlight via inline style (avoids Tailwind purge issues)
+        const prev = {
+          outline: el.style.outline,
+          outlineOffset: el.style.outlineOffset,
+          borderRadius: el.style.borderRadius,
+        };
+        el.style.outline = "2px solid var(--color-info, #569cd6)";
+        el.style.outlineOffset = "2px";
+        el.style.borderRadius = "8px";
+        setTimeout(() => {
+          el.style.outline = prev.outline;
+          el.style.outlineOffset = prev.outlineOffset;
+          el.style.borderRadius = prev.borderRadius;
+        }, 2000);
+        return;
       }
-      setActiveSection(result.item.section);
-      setSearchQuery("");
-      setSearchResults([]);
-      // Poll for the element with timeout (handles Suspense/async loading)
-      const selector = `[data-settings-search="${result.item.id}"]`;
-      let attempts = 0;
-      const tryScroll = () => {
-        const el = document.querySelector(selector) as HTMLElement | null;
-        if (el) {
-          el.scrollIntoView({ block: "center" });
-          // Flash highlight via inline style (avoids Tailwind purge issues)
-          const prev = {
-            outline: el.style.outline,
-            outlineOffset: el.style.outlineOffset,
-            borderRadius: el.style.borderRadius,
-          };
-          el.style.outline = "2px solid var(--color-info, #569cd6)";
-          el.style.outlineOffset = "2px";
-          el.style.borderRadius = "8px";
-          setTimeout(() => {
-            el.style.outline = prev.outline;
-            el.style.outlineOffset = prev.outlineOffset;
-            el.style.borderRadius = prev.borderRadius;
-          }, 2000);
-          return;
-        }
-        if (++attempts < 20) setTimeout(tryScroll, 50); // 1s max
-      };
-      setTimeout(tryScroll, 100); // initial delay for section switch
-    },
-    [],
-  );
+      if (++attempts < 20) setTimeout(tryScroll, 50); // 1s max
+    };
+    setTimeout(tryScroll, 100); // initial delay for section switch
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -161,7 +162,8 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         return;
       }
     }
-    const next = menuItems.find((item) => item.area === activeArea) || menuItems[0];
+    const next =
+      menuItems.find((item) => item.area === activeArea) || menuItems[0];
     setActiveSection(next?.id || "appearance");
   }, [activeArea, activeSection, menuItems]);
 
@@ -183,16 +185,28 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     if (!isOpen) return;
 
     const handleNavigate = (event: Event) => {
-      const detail = (event as CustomEvent<{ section?: SettingsSection }>).detail;
+      const detail = (
+        event as CustomEvent<{ section?: SettingsSection | string }>
+      ).detail;
       if (!detail?.section) return;
-      const section = getSettingsSectionMeta(detail.section);
+      const resolvedId = resolveSettingsSectionId(
+        detail.section,
+      ) as SettingsSection;
+      const section = getSettingsSectionMeta(resolvedId);
       if (!section) return;
       setActiveArea(section.area);
-      setActiveSection(detail.section);
+      setActiveSection(resolvedId);
     };
 
-    window.addEventListener(SETTINGS_NAVIGATE_EVENT, handleNavigate as EventListener);
-    return () => window.removeEventListener(SETTINGS_NAVIGATE_EVENT, handleNavigate as EventListener);
+    window.addEventListener(
+      SETTINGS_NAVIGATE_EVENT,
+      handleNavigate as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        SETTINGS_NAVIGATE_EVENT,
+        handleNavigate as EventListener,
+      );
   }, [isOpen]);
 
   const settingsRef = useRef(settings);

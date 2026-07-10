@@ -13,9 +13,9 @@ mod tests {
 
         // Create a temporary session file
         let temp_session = NamedTempFile::with_suffix(".jsonl").unwrap();
-        let session_content = r#"{"type":"session","name":"Test Session","timestamp":"2024-01-01T00:00:00Z"}
-{"type":"message","message":{"role":"user","content":[{"type":"text","text":"Hello"}]},"timestamp":"2024-01-01T00:00:01Z"}
-{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Hi there!"}]},"timestamp":"2024-01-01T00:00:02Z"}"#;
+        let session_content = r#"{"type":"session","version":3,"id":"test-export-session","name":"Test Session","timestamp":"2024-01-01T00:00:00Z","cwd":"/tmp"}
+{"type":"message","id":"test-user","parentId":null,"message":{"role":"user","content":[{"type":"text","text":"Hello"}]},"timestamp":"2024-01-01T00:00:01Z"}
+{"type":"message","id":"test-assistant","parentId":"test-user","message":{"role":"assistant","content":[{"type":"text","text":"Hi there!"}]},"timestamp":"2024-01-01T00:00:02Z"}"#;
         fs::write(temp_session.path(), session_content).unwrap();
 
         let temp_output = NamedTempFile::with_suffix(".html").unwrap();
@@ -38,8 +38,8 @@ mod tests {
     #[tokio::test]
     async fn test_export_json() {
         let temp_session = NamedTempFile::with_suffix(".jsonl").unwrap();
-        let session_content = r#"{"type":"session","name":"Test Session","timestamp":"2024-01-01T00:00:00Z"}
-{"type":"message","message":{"role":"user","content":[{"type":"text","text":"Hello"}]},"timestamp":"2024-01-01T00:00:01Z"}"#;
+        let session_content = r#"{"type":"session","version":3,"id":"test-export-session","name":"Test Session","timestamp":"2024-01-01T00:00:00Z","cwd":"/tmp"}
+{"type":"message","id":"test-user","parentId":null,"message":{"role":"user","content":[{"type":"text","text":"Hello"}]},"timestamp":"2024-01-01T00:00:01Z"}"#;
         fs::write(temp_session.path(), session_content).unwrap();
 
         let temp_output = NamedTempFile::with_suffix(".json").unwrap();
@@ -58,8 +58,8 @@ mod tests {
     #[tokio::test]
     async fn test_export_markdown() {
         let temp_session = NamedTempFile::with_suffix(".jsonl").unwrap();
-        let session_content = r#"{"type":"session","name":"Test Session","timestamp":"2024-01-01T00:00:00Z"}
-{"type":"message","message":{"role":"user","content":[{"type":"text","text":"Hello"}]},"timestamp":"2024-01-01T00:00:01Z"}"#;
+        let session_content = r#"{"type":"session","version":3,"id":"test-export-session","name":"Test Session","timestamp":"2024-01-01T00:00:00Z","cwd":"/tmp"}
+{"type":"message","id":"test-user","parentId":null,"message":{"role":"user","content":[{"type":"text","text":"Hello"}]},"timestamp":"2024-01-01T00:00:01Z"}"#;
         fs::write(temp_session.path(), session_content).unwrap();
 
         let temp_output = NamedTempFile::with_suffix(".md").unwrap();

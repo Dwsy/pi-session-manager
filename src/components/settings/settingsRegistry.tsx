@@ -34,8 +34,11 @@ import DataSourcesSettings from "./sections/DataSourcesSettings";
 import DiagnosticsMaintenanceSettings from "./sections/DiagnosticsMaintenanceSettings";
 import ExternalSessionsSettings from "./sections/ExternalSessionsSettings";
 import ModelSettings from "./sections/ModelSettings";
-import PiAgentSettings from "./sections/PiAgentSettings";
+import PiLiveSettings from "./sections/PiLiveSettings";
+import PiResourcesSettings from "./sections/PiResourcesSettings";
+import PiRuntimeSettings from "./sections/PiRuntimeSettings";
 import PsmPluginsSettings from "./sections/PsmPluginsSettings";
+import SubagentCompatibilitySettings from "./sections/SubagentCompatibilitySettings";
 import { psmPluginHost, type PsmPluginStatus } from "@/plugins/runtime-host";
 import SearchExportSettings from "./sections/SearchExportSettings";
 import SessionSettings from "./sections/SessionSettings";
@@ -43,6 +46,7 @@ import ShortcutSettings from "./sections/ShortcutSettings";
 import TagManagerSettings from "./sections/TagManagerSettings";
 import TerminalSettings from "./sections/TerminalSettings";
 import LanguageSettings from "./sections/LanguageSettings";
+import { resolveSettingsSectionId } from "./navigation";
 
 export interface SettingsAreaMeta {
   id: SettingsArea;
@@ -102,24 +106,31 @@ export function psmPluginSectionId(pluginId: string): SettingsSection {
   return `${PSM_PLUGIN_SECTION_PREFIX}${pluginId}` as SettingsSection;
 }
 
-export function psmPluginIdFromSettingsSection(section: SettingsSection): string | null {
+export function psmPluginIdFromSettingsSection(
+  section: SettingsSection,
+): string | null {
   return section.startsWith(PSM_PLUGIN_SECTION_PREFIX)
     ? section.slice(PSM_PLUGIN_SECTION_PREFIX.length)
     : null;
 }
 
-function pluginSettingsSectionMeta(plugin: PsmPluginStatus): SettingsSectionMeta {
+function pluginSettingsSectionMeta(
+  plugin: PsmPluginStatus,
+): SettingsSectionMeta {
   return {
     id: psmPluginSectionId(plugin.id),
     area: "plugins",
     group: "management",
-    icon: plugin.id.includes("sidechat")
-      ? <MessageCircleQuestion className="h-4 w-4" />
-      : <Brain className="h-4 w-4" />,
+    icon: plugin.id.includes("sidechat") ? (
+      <MessageCircleQuestion className="h-4 w-4" />
+    ) : (
+      <Brain className="h-4 w-4" />
+    ),
     labelKey: `plugins.${plugin.id}.configuration.title`,
     fallbackLabel: plugin.manifest?.configuration?.title ?? plugin.name,
     descriptionKey: `plugins.${plugin.id}.configuration.description`,
-    fallbackDescription: plugin.manifest?.configuration?.description ?? plugin.name,
+    fallbackDescription:
+      plugin.manifest?.configuration?.description ?? plugin.name,
     saveMode: "inline",
   };
 }
@@ -127,7 +138,12 @@ function pluginSettingsSectionMeta(plugin: PsmPluginStatus): SettingsSectionMeta
 function getPluginSettingsSections(): SettingsSectionMeta[] {
   return psmPluginHost
     .listPlugins()
-    .filter((plugin) => (plugin.manifest?.configuration?.properties?.length ?? 0) > 0 || (plugin.permissions?.length ?? 0) > 0 || plugin.manifest?.defaultEnabled === false)
+    .filter(
+      (plugin) =>
+        (plugin.manifest?.configuration?.properties?.length ?? 0) > 0 ||
+        (plugin.permissions?.length ?? 0) > 0 ||
+        plugin.manifest?.defaultEnabled === false,
+    )
     .map(pluginSettingsSectionMeta);
 }
 
@@ -232,7 +248,8 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     labelKey: "settings.sections.dataSources",
     fallbackLabel: "Session Sources",
     descriptionKey: "settings.sectionDescriptions.dataSources",
-    fallbackDescription: "Local paths, external agent sessions and resume targets",
+    fallbackDescription:
+      "Local paths, external agent sessions and resume targets",
     saveMode: "app-settings",
   },
   {
@@ -254,7 +271,8 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     labelKey: "settings.sections.externalAgentSessions",
     fallbackLabel: "External Agent Sessions",
     descriptionKey: "settings.sectionDescriptions.externalAgentSessions",
-    fallbackDescription: "Claude Code, Codex, Gemini CLI and other local sessions",
+    fallbackDescription:
+      "Claude Code, Codex, Gemini CLI and other local sessions",
     saveMode: "app-settings",
   },
   {
@@ -269,17 +287,6 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     saveMode: "app-settings",
   },
   {
-    id: "pi-agent",
-    area: "config-center",
-    group: "agent",
-    icon: <Bot className="h-4 w-4" />,
-    labelKey: "settings.sections.piAgent",
-    fallbackLabel: "Pi Agent",
-    descriptionKey: "settings.sectionDescriptions.piAgent",
-    fallbackDescription: "Pi resources, runtime settings and live sessions",
-    saveMode: "app-settings",
-  },
-  {
     id: "models",
     area: "config-center",
     group: "agent",
@@ -289,6 +296,51 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     descriptionKey: "settings.sectionDescriptions.models",
     fallbackDescription: "Provider, model and model test configuration",
     saveMode: "inline",
+  },
+  {
+    id: "pi-resources",
+    area: "config-center",
+    group: "agent",
+    icon: <Puzzle className="h-4 w-4" />,
+    labelKey: "settings.sections.piResources",
+    fallbackLabel: "Pi Resources",
+    descriptionKey: "settings.sectionDescriptions.piResources",
+    fallbackDescription:
+      "Enable or disable Pi extensions, skills, prompts and themes",
+    saveMode: "inline",
+  },
+  {
+    id: "pi-runtime",
+    area: "config-center",
+    group: "agent",
+    icon: <Settings2 className="h-4 w-4" />,
+    labelKey: "settings.sections.piRuntime",
+    fallbackLabel: "Pi Runtime",
+    descriptionKey: "settings.sectionDescriptions.piRuntime",
+    fallbackDescription: "Pi settings.json runtime options and config versions",
+    saveMode: "inline",
+  },
+  {
+    id: "subagents",
+    area: "config-center",
+    group: "agent",
+    icon: <Brain className="h-4 w-4" />,
+    labelKey: "settings.sections.subagents",
+    fallbackLabel: "Subagent Compatibility",
+    descriptionKey: "settings.sectionDescriptions.subagents",
+    fallbackDescription: "How PSM interprets subagent extension payloads",
+    saveMode: "app-settings",
+  },
+  {
+    id: "pi-live",
+    area: "config-center",
+    group: "agent",
+    icon: <Activity className="h-4 w-4" />,
+    labelKey: "settings.sections.piLive",
+    fallbackLabel: "Pi Live",
+    descriptionKey: "settings.sectionDescriptions.piLive",
+    fallbackDescription: "Connect to running Pi agent sessions via WebSocket",
+    saveMode: "app-settings",
   },
   {
     id: "psm-plugins",
@@ -414,14 +466,18 @@ export const SETTINGS_GROUPS: SettingsGroupMeta[] = [
     area: "config-center",
     labelKey: "settings.groups.sources",
     fallbackLabel: "Sessions",
-    sections: ["local-session-paths", "external-agent-sessions", "resume-targets"],
+    sections: [
+      "local-session-paths",
+      "external-agent-sessions",
+      "resume-targets",
+    ],
   },
   {
     id: "agent",
     area: "config-center",
     labelKey: "settings.groups.agent",
     fallbackLabel: "Agent",
-    sections: ["pi-agent", "models"],
+    sections: ["models", "pi-resources", "pi-runtime", "subagents", "pi-live"],
   },
   {
     id: "management",
@@ -486,7 +542,9 @@ const STANDALONE_SETTINGS_SECTIONS = SETTINGS_SECTIONS.filter((item) =>
   STANDALONE_DATASET_SECTION_SET.has(item.id),
 );
 
-function buildAvailableAreas(sections: SettingsSectionMeta[]): SettingsAreaMeta[] {
+function buildAvailableAreas(
+  sections: SettingsSectionMeta[],
+): SettingsAreaMeta[] {
   return SETTINGS_AREAS.filter((area) =>
     sections.some((section) => section.area === area.id),
   );
@@ -501,8 +559,7 @@ function buildAvailableGroups(
     .map((section) => section.id)
     .filter((section) => section.startsWith(PSM_PLUGIN_SECTION_PREFIX));
 
-  return SETTINGS_GROUPS
-    .filter((group) => !area || group.area === area)
+  return SETTINGS_GROUPS.filter((group) => !area || group.area === area)
     .map((group) => {
       const groupSections = group.sections.flatMap((section) =>
         section === "psm-plugins" ? [section, ...pluginSections] : [section],
@@ -516,11 +573,17 @@ function buildAvailableGroups(
 }
 
 export function getAvailableSettingsAreas(): SettingsAreaMeta[] {
-  return buildAvailableAreas(isStandaloneDatasetRuntime() ? STANDALONE_SETTINGS_SECTIONS : getDefaultSettingsSections());
+  return buildAvailableAreas(
+    isStandaloneDatasetRuntime()
+      ? STANDALONE_SETTINGS_SECTIONS
+      : getDefaultSettingsSections(),
+  );
 }
 
 export function getAvailableSettingsSections(): SettingsSectionMeta[] {
-  return isStandaloneDatasetRuntime() ? STANDALONE_SETTINGS_SECTIONS : getDefaultSettingsSections();
+  return isStandaloneDatasetRuntime()
+    ? STANDALONE_SETTINGS_SECTIONS
+    : getDefaultSettingsSections();
 }
 
 export function getAvailableSettingsGroups(
@@ -534,17 +597,19 @@ export function getSettingsAreaMeta(area: SettingsArea): SettingsAreaMeta {
 }
 
 export function getSettingsSectionMeta(
-  section: SettingsSection,
+  section: SettingsSection | string,
 ): SettingsSectionMeta | undefined {
-  return getAvailableSettingsSections().find((item) => item.id === section);
+  const resolved = resolveSettingsSectionId(section) as SettingsSection;
+  return getAvailableSettingsSections().find((item) => item.id === resolved);
 }
 
 export function findSettingsGroupBySection(
   section: SettingsSection,
 ): SettingsGroupMeta {
   return (
-    getAvailableSettingsGroups().find((group) => group.sections.includes(section)) ||
-    SETTINGS_GROUPS[0]
+    getAvailableSettingsGroups().find((group) =>
+      group.sections.includes(section),
+    ) || SETTINGS_GROUPS[0]
   );
 }
 
@@ -603,10 +668,21 @@ export function renderSettingsSection(
           mode="resume"
         />
       );
-    case "pi-agent":
-      return <PiAgentSettings settings={settings} onUpdate={onUpdate} />;
     case "models":
       return <ModelSettings />;
+    case "pi-resources":
+      return <PiResourcesSettings />;
+    case "pi-runtime":
+      return <PiRuntimeSettings />;
+    case "subagents":
+      return (
+        <SubagentCompatibilitySettings
+          settings={settings}
+          onUpdate={onUpdate}
+        />
+      );
+    case "pi-live":
+      return <PiLiveSettings settings={settings.piLive} onUpdate={onUpdate} />;
     case "psm-plugins":
       return <PsmPluginsSettings mode="manage" />;
     case "psm-plugin-marketplace":

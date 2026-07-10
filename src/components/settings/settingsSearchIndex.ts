@@ -83,7 +83,10 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     section: "terminal",
     labelKey: "settings.terminal.resumeCommand",
     fallbackLabel: "Resume Command",
-    extraKeys: ["settings.terminal.resumeCommandHelp", "settings.terminal.resumeCommandDesc"],
+    extraKeys: [
+      "settings.terminal.resumeCommandHelp",
+      "settings.terminal.resumeCommandDesc",
+    ],
     keywords: ["resume", "command", "tmux", "session", "restore"],
   },
 
@@ -121,14 +124,30 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     section: "appearance",
     labelKey: "settings.appearance.codeBlockTheme",
     fallbackLabel: "Code Block Theme",
-    keywords: ["code", "block", "theme", "syntax", "highlight", "github", "monokai", "dracula"],
+    keywords: [
+      "code",
+      "block",
+      "theme",
+      "syntax",
+      "highlight",
+      "github",
+      "monokai",
+      "dracula",
+    ],
   },
   {
     id: "appearance-messageSpacing",
     section: "appearance",
     labelKey: "settings.appearance.messageSpacing",
     fallbackLabel: "Message Spacing",
-    keywords: ["message", "spacing", "compact", "comfortable", "spacious", "layout"],
+    keywords: [
+      "message",
+      "spacing",
+      "compact",
+      "comfortable",
+      "spacious",
+      "layout",
+    ],
   },
   {
     id: "appearance-customTheme",
@@ -152,7 +171,15 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     labelKey: "settings.appearance.disableToolCallStyle",
     fallbackLabel: "Disable Tool Call Style",
     extraKeys: ["settings.appearance.disableToolCallStyleDesc"],
-    keywords: ["tool", "call", "execution", "style", "background", "border", "shadow"],
+    keywords: [
+      "tool",
+      "call",
+      "execution",
+      "style",
+      "background",
+      "border",
+      "shadow",
+    ],
   },
 
   // ── Language ──
@@ -161,7 +188,17 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     section: "language",
     labelKey: "settings.language.select",
     fallbackLabel: "Select Language",
-    keywords: ["language", "locale", "i18n", "english", "chinese", "japanese", "french", "german", "spanish"],
+    keywords: [
+      "language",
+      "locale",
+      "i18n",
+      "english",
+      "chinese",
+      "japanese",
+      "french",
+      "german",
+      "spanish",
+    ],
   },
 
   // ── Session ──
@@ -201,7 +238,17 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     labelKey: "settings.session.scanOtherAgentJsonl",
     fallbackLabel: "Scan other agent JSONL",
     extraKeys: ["settings.session.scanOtherAgentJsonlHelp"],
-    keywords: ["scan", "agent", "jsonl", "external", "other", "provider", "claude", "codex", "gemini"],
+    keywords: [
+      "scan",
+      "agent",
+      "jsonl",
+      "external",
+      "other",
+      "provider",
+      "claude",
+      "codex",
+      "gemini",
+    ],
   },
   {
     id: "session-showMessagePreview",
@@ -263,7 +310,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     labelKey: "settings.session.conversationModeEnabled",
     fallbackLabel: "Conversation mode",
     extraKeys: ["settings.session.conversationModeEnabledHelp"],
-    keywords: ["conversation", "preview", "fold", "thinking", "tools", "assistant"],
+    keywords: [
+      "conversation",
+      "preview",
+      "fold",
+      "thinking",
+      "tools",
+      "assistant",
+    ],
   },
   // ── External Sessions ──
   {
@@ -272,7 +326,15 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     labelKey: "settings.externalSessions.includeInStats",
     fallbackLabel: "Include external sessions in statistics",
     extraKeys: ["settings.externalSessions.includeInStatsHelp"],
-    keywords: ["external", "agent", "provider", "stats", "statistics", "dashboard", "include"],
+    keywords: [
+      "external",
+      "agent",
+      "provider",
+      "stats",
+      "statistics",
+      "dashboard",
+      "include",
+    ],
   },
   {
     id: "external-sessions-includeInSearch",
@@ -280,7 +342,16 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     labelKey: "settings.externalSessions.includeInSearch",
     fallbackLabel: "Include external sessions in search",
     extraKeys: ["settings.externalSessions.includeInSearchHelp"],
-    keywords: ["external", "agent", "provider", "search", "include", "claude", "codex", "gemini"],
+    keywords: [
+      "external",
+      "agent",
+      "provider",
+      "search",
+      "include",
+      "claude",
+      "codex",
+      "gemini",
+    ],
   },
   {
     id: "external-sessions-showAgentIcon",
@@ -296,7 +367,18 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     labelKey: "settings.externalSessions.defaultExternalResumeTarget",
     fallbackLabel: "Default external resume target",
     extraKeys: ["settings.externalSessions.defaultExternalResumeTargetHelp"],
-    keywords: ["external", "agent", "provider", "resume", "target", "default", "cli", "claude", "codex", "gemini"],
+    keywords: [
+      "external",
+      "agent",
+      "provider",
+      "resume",
+      "target",
+      "default",
+      "cli",
+      "claude",
+      "codex",
+      "gemini",
+    ],
   },
 
   // ── Search ──
@@ -378,26 +460,55 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     section: "app-behavior",
     labelKey: "settings.update.channel.title",
     fallbackLabel: "Update Channel",
-    extraKeys: ["settings.update.channel.description", "settings.update.channel.help"],
+    extraKeys: [
+      "settings.update.channel.description",
+      "settings.update.channel.help",
+    ],
     keywords: ["update", "channel", "stable", "beta", "release"],
   },
 
-  // ── Pi Config ──
+  // ── Pi Resources ──
   {
-    id: "pi-config",
-    section: "pi-agent",
-    labelKey: "settings.sections.piConfig",
-    fallbackLabel: "Pi Config",
-    keywords: ["pi", "config", "configuration", "agent", "settings"],
+    id: "pi-resources",
+    section: "pi-resources",
+    labelKey: "settings.sections.piResources",
+    fallbackLabel: "Pi Resources",
+    keywords: [
+      "pi",
+      "resources",
+      "extensions",
+      "skills",
+      "prompts",
+      "themes",
+      "config",
+    ],
+  },
+
+  // ── Pi Runtime ──
+  {
+    id: "pi-runtime",
+    section: "pi-runtime",
+    labelKey: "settings.sections.piRuntime",
+    fallbackLabel: "Pi Runtime",
+    keywords: ["pi", "runtime", "settings.json", "versions", "configuration"],
+  },
+
+  // ── Subagents ──
+  {
+    id: "subagents",
+    section: "subagents",
+    labelKey: "settings.sections.subagents",
+    fallbackLabel: "Subagent Compatibility",
+    keywords: ["subagent", "compatibility", "protocol", "provider"],
   },
 
   // ── Pi Live ──
   {
     id: "pi-live",
-    section: "pi-agent",
+    section: "pi-live",
     labelKey: "settings.sections.piLive",
     fallbackLabel: "Pi Live",
-    keywords: ["pi", "live", "realtime", "real-time", "registry"],
+    keywords: ["pi", "live", "realtime", "real-time", "websocket", "registry"],
   },
 
   // ── Models ──
@@ -471,7 +582,16 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     labelKey: "settings.advanced.remoteEnabled",
     fallbackLabel: "Remote Mode",
     extraKeys: ["settings.advanced.remoteEnabledHelp"],
-    keywords: ["remote", "connection", "server", "websocket", "http", "transport", "远程", "连接"],
+    keywords: [
+      "remote",
+      "connection",
+      "server",
+      "websocket",
+      "http",
+      "transport",
+      "远程",
+      "连接",
+    ],
   },
   {
     id: "advanced-remoteServerUrl",
@@ -479,7 +599,16 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     labelKey: "settings.advanced.remoteServerUrl",
     fallbackLabel: "Server URL",
     extraKeys: ["settings.advanced.remoteServerUrlHelp"],
-    keywords: ["remote", "server", "url", "address", "host", "ip", "服务器", "地址"],
+    keywords: [
+      "remote",
+      "server",
+      "url",
+      "address",
+      "host",
+      "ip",
+      "服务器",
+      "地址",
+    ],
   },
   {
     id: "advanced-remoteToken",
@@ -511,7 +640,15 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     labelKey: "settings.advanced.lightweightMode",
     fallbackLabel: "Lightweight mode",
     extraKeys: ["settings.advanced.lightweightModeDesc"],
-    keywords: ["tray", "minimize", "close", "hide", "lightweight", "托盘", "最小化"],
+    keywords: [
+      "tray",
+      "minimize",
+      "close",
+      "hide",
+      "lightweight",
+      "托盘",
+      "最小化",
+    ],
   },
 
   // ── Tag Manager ──
@@ -545,7 +682,15 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     section: "psm-plugin-marketplace",
     labelKey: "settings.sections.psmPluginMarketplace",
     fallbackLabel: "Marketplace",
-    keywords: ["psm", "plugin", "market", "marketplace", "npm", "install", "update"],
+    keywords: [
+      "psm",
+      "plugin",
+      "market",
+      "marketplace",
+      "npm",
+      "install",
+      "update",
+    ],
   },
   {
     id: "psm-plugin-sources",
@@ -603,7 +748,15 @@ export function getSettingsSearchIndex(): SettingsSearchItem[] {
       section: psmPluginSectionId(plugin.id),
       labelKey: "settings.psmPlugins.authorization",
       fallbackLabel: "Authorization",
-      keywords: ["psm", "plugin", "permission", "authorization", plugin.name, plugin.id, permission.permission],
+      keywords: [
+        "psm",
+        "plugin",
+        "permission",
+        "authorization",
+        plugin.name,
+        plugin.id,
+        permission.permission,
+      ],
     }));
     return [...propertyItems, ...permissionItems];
   });
