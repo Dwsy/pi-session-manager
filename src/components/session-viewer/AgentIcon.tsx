@@ -1,5 +1,5 @@
 import { ClaudeCode, Codex, GeminiCLI, OpenCode } from "@lobehub/icons";
-import { Bot, Boxes } from "lucide-react";
+import { Bot, Boxes, Orbit, Sparkles } from "lucide-react";
 import type { CSSProperties, SVGProps } from "react";
 
 interface AgentIconProps {
@@ -182,6 +182,11 @@ export function getAgentIconColor(source: string): string {
       return "rgb(var(--color-success))";
     case "clawdbot":
       return "rgb(var(--color-purple))";
+    case "cursor":
+      return "#7C8CFF";
+    case "antigravity":
+    case "agy":
+      return "#34D399";
     default:
       return "var(--accent)";
   }
@@ -213,6 +218,11 @@ export function AgentIcon({
       return <Boxes className={className} size={size} style={style} />;
     case "clawdbot":
       return <Bot className={className} size={size} style={style} />;
+    case "cursor":
+      return <Sparkles className={className} size={size} style={style} />;
+    case "antigravity":
+    case "agy":
+      return <Orbit className={className} size={size} style={style} />;
     default:
       return <Bot className={className} size={size} style={style} />;
   }
@@ -244,6 +254,11 @@ export function AgentColorIcon({
       return <Boxes className={className} size={size} style={style} />;
     case "clawdbot":
       return <Bot className={className} size={size} style={style} />;
+    case "cursor":
+      return <Sparkles className={className} size={size} style={style} />;
+    case "antigravity":
+    case "agy":
+      return <Orbit className={className} size={size} style={style} />;
     default:
       return <Bot className={className} size={size} style={style} />;
   }

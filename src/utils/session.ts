@@ -887,6 +887,10 @@ export function getSessionSourceTag(sessionPath: string): string | null {
       return 'Factory'
     case 'clawdbot':
       return 'ClawdBot'
+    case 'cursor':
+      return 'Cursor'
+    case 'antigravity':
+      return 'Antigravity'
     default:
       return slug
   }
@@ -913,6 +917,15 @@ export function getSessionSourceSlug(sessionPath: string): string | null {
     return 'opencode'
   }
 
+  // Antigravity lives under ~/.gemini/antigravity-cli, so check it before Gemini tmp.
+  if (
+    normalized.includes('/antigravity-cli/')
+    || (normalized.includes('/.system_generated/logs/transcript.jsonl')
+      && normalized.includes('antigravity'))
+  ) {
+    return 'antigravity'
+  }
+
   if (normalized.includes('/.gemini/tmp/')) {
     return 'gemini'
   }
@@ -923,6 +936,15 @@ export function getSessionSourceSlug(sessionPath: string): string | null {
 
   if (normalized.includes('/.clawdbot/sessions/')) {
     return 'clawdbot'
+  }
+
+  if (
+    normalized.endsWith('/state.vscdb')
+    || normalized.includes('/state.vscdb/')
+    || normalized.includes('/Cursor/User/globalStorage/')
+    || normalized.includes('/Cursor/User/workspaceStorage/')
+  ) {
+    return 'cursor'
   }
 
   const parts = normalized.split('/').filter(Boolean)

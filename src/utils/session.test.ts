@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { parseSessionEntriesWithLineCount } from './session';
+import { getSessionSourceSlug, getSessionSourceTag, parseSessionEntriesWithLineCount } from './session';
 
 describe('parseSessionEntriesWithLineCount', () => {
   it('preserves raw Pi tree-advancing entries and their parent chain', () => {
@@ -443,5 +443,35 @@ describe('parseSessionEntriesWithLineCount', () => {
 
     const { entries } = parseSessionEntriesWithLineCount(content);
     expect(entries.filter((e) => e.message?.role === 'assistant')).toHaveLength(2);
+  });
+});
+
+
+describe('getSessionSourceSlug', () => {
+  it('detects cursor vscdb virtual paths', () => {
+    expect(
+      getSessionSourceSlug(
+        '/Users/demo/Library/Application Support/Cursor/User/globalStorage/state.vscdb/cmp-1',
+      ),
+    ).toBe('cursor');
+    expect(getSessionSourceTag('/tmp/Cursor/User/workspaceStorage/abc/state.vscdb')).toBe(
+      'Cursor',
+    );
+  });
+
+  it('detects antigravity transcripts before gemini tmp', () => {
+    expect(
+      getSessionSourceSlug(
+        '/Users/demo/.gemini/antigravity-cli/brain/uuid/.system_generated/logs/transcript.jsonl',
+      ),
+    ).toBe('antigravity');
+    expect(
+      getSessionSourceSlug('/Users/demo/.gemini/tmp/hash/chats/session-x.json'),
+    ).toBe('gemini');
+    expect(
+      getSessionSourceTag(
+        '/Users/demo/.gemini/antigravity-cli/brain/uuid/.system_generated/logs/transcript.jsonl',
+      ),
+    ).toBe('Antigravity');
   });
 });

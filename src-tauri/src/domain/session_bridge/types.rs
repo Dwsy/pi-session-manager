@@ -14,10 +14,22 @@ pub enum SessionBridgeSource {
     Gemini,
     Factory,
     ClawdBot,
+    Cursor,
+    Antigravity,
 }
 
 impl SessionBridgeSource {
-    pub const ALL: [Self; 7] = [Self::Pi, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot];
+    pub const ALL: [Self; 9] = [
+        Self::Pi,
+        Self::ClaudeCode,
+        Self::Codex,
+        Self::OpenCode,
+        Self::Gemini,
+        Self::Factory,
+        Self::ClawdBot,
+        Self::Cursor,
+        Self::Antigravity,
+    ];
 
     pub fn slug(self) -> &'static str {
         match self {
@@ -28,6 +40,8 @@ impl SessionBridgeSource {
             Self::Gemini => "gemini",
             Self::Factory => "factory",
             Self::ClawdBot => "clawdbot",
+            Self::Cursor => "cursor",
+            Self::Antigravity => "antigravity",
         }
     }
 
@@ -40,6 +54,8 @@ impl SessionBridgeSource {
             Self::Gemini => "Gemini CLI",
             Self::Factory => "Factory",
             Self::ClawdBot => "ClawdBot",
+            Self::Cursor => "Cursor",
+            Self::Antigravity => "Antigravity",
         }
     }
 
@@ -52,6 +68,8 @@ impl SessionBridgeSource {
             Self::Factory => crate::domain::casr_min::providers::factory::session_roots(),
             Self::ClawdBot => crate::domain::casr_min::providers::clawdbot::session_roots(),
             Self::OpenCode => crate::domain::casr_min::providers::opencode::session_roots(),
+            Self::Cursor => crate::domain::casr_min::providers::cursor::session_roots(),
+            Self::Antigravity => crate::domain::casr_min::providers::antigravity::session_roots(),
         }
     }
 
@@ -65,6 +83,8 @@ impl SessionBridgeSource {
             Self::Factory => normalized.contains("/.factory/sessions/") && path.extension().and_then(|ext| ext.to_str()) == Some("jsonl"),
             Self::ClawdBot => normalized.contains("/.clawdbot/sessions/") && path.extension().and_then(|ext| ext.to_str()) == Some("jsonl"),
             Self::OpenCode => path.file_name().and_then(|value| value.to_str()) == Some("opencode.db") || normalized.contains("/.opencode/") || normalized.contains("/opencode.db/"),
+            Self::Cursor => crate::domain::casr_min::providers::cursor::matches_path(path),
+            Self::Antigravity => crate::domain::casr_min::providers::antigravity::matches_path(path),
         }
     }
 
@@ -77,6 +97,8 @@ impl SessionBridgeSource {
             "gemini" | "gemini-cli" | "gmi" => Ok(Self::Gemini),
             "factory" | "fac" => Ok(Self::Factory),
             "clawdbot" | "clawd-bot" | "cb" => Ok(Self::ClawdBot),
+            "cursor" | "cur" => Ok(Self::Cursor),
+            "antigravity" | "agy" => Ok(Self::Antigravity),
             other => Err(format!("Unsupported session provider alias: {other}")),
         }
     }
@@ -86,7 +108,7 @@ impl SessionBridgeSource {
     }
 
     pub fn can_convert_target(self) -> bool {
-        true
+        !matches!(self, Self::Cursor | Self::Antigravity)
     }
 }
 
@@ -100,6 +122,8 @@ impl From<SessionBridgeSource> for ProviderKind {
             SessionBridgeSource::Gemini => ProviderKind::Gemini,
             SessionBridgeSource::Factory => ProviderKind::Factory,
             SessionBridgeSource::ClawdBot => ProviderKind::ClawdBot,
+            SessionBridgeSource::Cursor => ProviderKind::Cursor,
+            SessionBridgeSource::Antigravity => ProviderKind::Antigravity,
         }
     }
 }
@@ -114,6 +138,8 @@ impl From<ProviderKind> for SessionBridgeSource {
             ProviderKind::Gemini => SessionBridgeSource::Gemini,
             ProviderKind::Factory => SessionBridgeSource::Factory,
             ProviderKind::ClawdBot => SessionBridgeSource::ClawdBot,
+            ProviderKind::Cursor => SessionBridgeSource::Cursor,
+            ProviderKind::Antigravity => SessionBridgeSource::Antigravity,
         }
     }
 }

@@ -1,6 +1,8 @@
+pub mod antigravity;
 pub mod claude_code;
 pub mod clawdbot;
 pub mod codex;
+pub mod cursor;
 pub mod factory;
 pub mod gemini;
 pub mod opencode;
@@ -19,10 +21,22 @@ pub enum ProviderKind {
     Gemini,
     Factory,
     ClawdBot,
+    Cursor,
+    Antigravity,
 }
 
 impl ProviderKind {
-    pub const ALL: [Self; 7] = [Self::Pi, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot];
+    pub const ALL: [Self; 9] = [
+        Self::Pi,
+        Self::ClaudeCode,
+        Self::Codex,
+        Self::OpenCode,
+        Self::Gemini,
+        Self::Factory,
+        Self::ClawdBot,
+        Self::Cursor,
+        Self::Antigravity,
+    ];
 
     pub fn slug(self) -> &'static str {
         match self {
@@ -33,6 +47,8 @@ impl ProviderKind {
             Self::Gemini => "gemini",
             Self::Factory => "factory",
             Self::ClawdBot => "clawdbot",
+            Self::Cursor => "cursor",
+            Self::Antigravity => "antigravity",
         }
     }
 
@@ -45,6 +61,8 @@ impl ProviderKind {
             Self::Gemini => "Gemini CLI",
             Self::Factory => "Factory",
             Self::ClawdBot => "ClawdBot",
+            Self::Cursor => "Cursor",
+            Self::Antigravity => "Antigravity",
         }
     }
 
@@ -53,19 +71,21 @@ impl ProviderKind {
     }
 
     pub fn can_convert_target(self) -> bool {
-        true
+        !matches!(self, Self::Cursor | Self::Antigravity)
     }
 
     pub fn parse_alias(value: &str) -> Result<Self, String> {
-        let normalized = value.trim().to_ascii_lowercase();
+        let normalized = value.trim().to_ascii_lowercase().replace('_', "-");
         match normalized.as_str() {
-            "pi" | "pi-agent" | "pi_agent" => Ok(Self::Pi),
-            "claude" | "claude-code" | "claude_code" | "cc" => Ok(Self::ClaudeCode),
+            "pi" | "pi-agent" => Ok(Self::Pi),
+            "claude" | "claude-code" | "cc" => Ok(Self::ClaudeCode),
             "codex" | "cod" => Ok(Self::Codex),
-            "opencode" | "open-code" | "open_code" | "opc" => Ok(Self::OpenCode),
-            "gemini" | "gemini-cli" | "gemini_cli" | "gmi" => Ok(Self::Gemini),
+            "opencode" | "open-code" | "opc" => Ok(Self::OpenCode),
+            "gemini" | "gemini-cli" | "gmi" => Ok(Self::Gemini),
             "factory" | "fac" => Ok(Self::Factory),
-            "clawdbot" | "clawd-bot" | "clawd_bot" | "cwb" => Ok(Self::ClawdBot),
+            "clawdbot" | "clawd-bot" | "cwb" => Ok(Self::ClawdBot),
+            "cursor" | "cur" => Ok(Self::Cursor),
+            "antigravity" | "agy" => Ok(Self::Antigravity),
             _ => Err(format!("Unsupported target format: {value}")),
         }
     }
@@ -79,19 +99,26 @@ impl ProviderKind {
             Self::Gemini => gemini::session_roots(),
             Self::Factory => factory::session_roots(),
             Self::ClawdBot => clawdbot::session_roots(),
+            Self::Cursor => cursor::session_roots(),
+            Self::Antigravity => antigravity::session_roots(),
         }
     }
 
     pub fn matches_path(self, path: &Path) -> bool {
         let normalized = path.to_string_lossy().replace('\\', "/");
         match self {
-            Self::Pi => crate::paths::pi_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
+            Self::Pi => crate::paths::pi_agent_sessions_dir()
+                .ok()
+                .map(|path| path.to_string_lossy().replace('\\', "/"))
+                .is_some_and(|root| normalized.contains(&root)),
             Self::ClaudeCode => normalized.contains("/.claude/projects/"),
             Self::Codex => normalized.contains("/.codex/sessions/"),
             Self::OpenCode => opencode::matches_path(path),
             Self::Gemini => gemini::matches_path(path),
             Self::Factory => factory::matches_path(path),
             Self::ClawdBot => clawdbot::matches_path(path),
+            Self::Cursor => cursor::matches_path(path),
+            Self::Antigravity => antigravity::matches_path(path),
         }
     }
 
@@ -104,6 +131,8 @@ impl ProviderKind {
             Self::Gemini => gemini::read_session(path),
             Self::Factory => factory::read_session(path),
             Self::ClawdBot => clawdbot::read_session(path),
+            Self::Cursor => cursor::read_session(path),
+            Self::Antigravity => antigravity::read_session(path),
         }
     }
 
@@ -116,6 +145,8 @@ impl ProviderKind {
             Self::Gemini => gemini::read_session_from_str(path_hint, content),
             Self::Factory => factory::read_session_from_str(path_hint, content),
             Self::ClawdBot => clawdbot::read_session_from_str(path_hint, content),
+            Self::Cursor => cursor::read_session_from_str(path_hint, content),
+            Self::Antigravity => antigravity::read_session_from_str(path_hint, content),
         }
     }
 
@@ -128,6 +159,8 @@ impl ProviderKind {
             Self::Gemini => gemini::render_session(session, target_session_id),
             Self::Factory => factory::render_session(session, target_session_id),
             Self::ClawdBot => clawdbot::render_session(session, target_session_id),
+            Self::Cursor => cursor::render_session(session, target_session_id),
+            Self::Antigravity => antigravity::render_session(session, target_session_id),
         }
     }
 
@@ -140,6 +173,8 @@ impl ProviderKind {
             Self::Gemini => gemini::build_target_path(session, target_session_id, now),
             Self::Factory => factory::build_target_path(session, target_session_id),
             Self::ClawdBot => clawdbot::build_target_path(target_session_id),
+            Self::Cursor => cursor::build_target_path(session, target_session_id, now),
+            Self::Antigravity => antigravity::build_target_path(session, target_session_id, now),
         }
     }
 
@@ -152,20 +187,34 @@ impl ProviderKind {
             Self::Gemini => gemini::resume_command(target_session_id),
             Self::Factory => factory::resume_command(target_session_id),
             Self::ClawdBot => clawdbot::resume_command(target_session_id),
+            Self::Cursor => cursor::resume_command(),
+            Self::Antigravity => antigravity::resume_command(target_session_id),
         }
     }
 
     pub fn backing_store_path(self, path: &Path) -> PathBuf {
         match self {
             Self::OpenCode => opencode::backing_store_path(path),
-            Self::Pi | Self::ClaudeCode | Self::Codex | Self::Gemini | Self::Factory | Self::ClawdBot => path.to_path_buf(),
+            Self::Cursor => cursor::backing_store_path(path),
+            Self::Pi | Self::ClaudeCode | Self::Codex | Self::Gemini | Self::Factory | Self::ClawdBot | Self::Antigravity => path.to_path_buf(),
         }
     }
 }
 
 pub fn detect_provider(path_hint: Option<&Path>, content: &str) -> Option<ProviderKind> {
     if let Some(path) = path_hint {
-        for provider in [ProviderKind::Pi, ProviderKind::ClaudeCode, ProviderKind::Codex, ProviderKind::OpenCode, ProviderKind::Gemini, ProviderKind::Factory, ProviderKind::ClawdBot] {
+        // Prefer path-specific detectors before content heuristics.
+        for provider in [
+            ProviderKind::Antigravity,
+            ProviderKind::Cursor,
+            ProviderKind::Pi,
+            ProviderKind::ClaudeCode,
+            ProviderKind::Codex,
+            ProviderKind::OpenCode,
+            ProviderKind::Gemini,
+            ProviderKind::Factory,
+            ProviderKind::ClawdBot,
+        ] {
             if provider.matches_path(path) {
                 return Some(provider);
             }
@@ -177,8 +226,19 @@ pub fn detect_provider(path_hint: Option<&Path>, content: &str) -> Option<Provid
         return Some(ProviderKind::Codex);
     }
 
-    let first_value = trimmed.lines().find(|line| !line.trim().is_empty()).and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok()).or_else(|| serde_json::from_str::<serde_json::Value>(trimmed).ok())?;
+    let first_value = trimmed
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .or_else(|| serde_json::from_str::<serde_json::Value>(trimmed).ok())?;
     let entry_type = first_value.get("type").and_then(serde_json::Value::as_str);
+
+    if first_value.get("step_index").is_some()
+        && first_value.get("source").is_some()
+        && matches!(entry_type, Some("USER_INPUT") | Some("PLANNER_RESPONSE") | Some("VIEW_FILE") | Some("EDIT_FILE") | Some("RUN_COMMAND") | Some("SYSTEM_MESSAGE") | Some("EPHEMERAL_MESSAGE") | Some("CONVERSATION_HISTORY"))
+    {
+        return Some(ProviderKind::Antigravity);
+    }
     if entry_type == Some("session") {
         return Some(ProviderKind::Pi);
     }
@@ -188,7 +248,11 @@ pub fn detect_provider(path_hint: Option<&Path>, content: &str) -> Option<Provid
     if matches!(entry_type, Some("user") | Some("assistant") | Some("summary") | Some("progress")) || first_value.get("sessionId").is_some() || first_value.get("uuid").is_some() {
         return Some(ProviderKind::ClaudeCode);
     }
-    if first_value.get("session").is_some() || first_value.get("items").is_some() || matches!(entry_type, Some("session_meta") | Some("response_item") | Some("event_msg") | Some("turn_context")) || first_value.get("payload").is_some() {
+    if first_value.get("session").is_some()
+        || first_value.get("items").is_some()
+        || matches!(entry_type, Some("session_meta") | Some("response_item") | Some("event_msg") | Some("turn_context"))
+        || first_value.get("payload").is_some()
+    {
         return Some(ProviderKind::Codex);
     }
     if entry_type == Some("session_start") {

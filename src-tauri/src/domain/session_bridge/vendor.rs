@@ -19,6 +19,9 @@ fn casr_slug_from_target(target: SessionBridgeSource) -> &'static str {
         SessionBridgeSource::Gemini => "gemini",
         SessionBridgeSource::Factory => "factory",
         SessionBridgeSource::ClawdBot => "clawdbot",
+        SessionBridgeSource::Cursor => "cursor",
+        // Antigravity is not yet present in the vendored CASR registry.
+        SessionBridgeSource::Antigravity => "antigravity",
     }
 }
 
@@ -31,6 +34,8 @@ fn session_bridge_source_from_casr_slug(slug: &str) -> Result<SessionBridgeSourc
         "gemini" => Ok(SessionBridgeSource::Gemini),
         "factory" => Ok(SessionBridgeSource::Factory),
         "clawdbot" => Ok(SessionBridgeSource::ClawdBot),
+        "cursor" => Ok(SessionBridgeSource::Cursor),
+        "antigravity" => Ok(SessionBridgeSource::Antigravity),
         other => Err(format!("Unsupported CASR provider slug: {other}")),
     }
 }

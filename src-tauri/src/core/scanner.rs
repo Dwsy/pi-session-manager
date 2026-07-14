@@ -376,13 +376,25 @@ pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
         let is_jsonl = path.extension().map(|ext| ext == "jsonl").unwrap_or(false);
         let is_gemini_json = crate::domain::session_bridge::is_gemini_session_file(path);
         let is_opencode_db = crate::domain::session_bridge::is_opencode_db_path(path);
+        let is_cursor_db = crate::domain::session_bridge::is_cursor_db_path(path);
+        let is_antigravity_jsonl = crate::domain::session_bridge::is_antigravity_session_file(path);
 
-        if !is_jsonl && !is_opencode_db && !is_gemini_json {
+        if !is_jsonl && !is_opencode_db && !is_gemini_json && !is_cursor_db && !is_antigravity_jsonl {
             return;
         }
 
         if is_opencode_db {
             let paths = crate::domain::session_bridge::expand_opencode_session_paths(path);
+            if paths.is_empty() {
+                files.push(path.to_path_buf());
+            } else {
+                files.extend(paths);
+            }
+            return;
+        }
+
+        if is_cursor_db {
+            let paths = crate::domain::session_bridge::expand_cursor_session_paths(path);
             if paths.is_empty() {
                 files.push(path.to_path_buf());
             } else {
@@ -945,7 +957,14 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
             continue;
         }
 
-        let expanded_paths = if is_opencode_db { crate::domain::session_bridge::expand_opencode_session_paths(&path) } else { vec![path.clone()] };
+        let is_cursor_db = crate::domain::session_bridge::is_cursor_db_path(&path);
+        let expanded_paths = if is_opencode_db {
+            crate::domain::session_bridge::expand_opencode_session_paths(&path)
+        } else if is_cursor_db {
+            crate::domain::session_bridge::expand_cursor_session_paths(&path)
+        } else {
+            vec![path.clone()]
+        };
         let mut seen_paths = std::collections::HashSet::new();
 
         for expanded_path in expanded_paths {
@@ -1062,7 +1081,7 @@ pub async fn rescan_changed_files(changed_paths: Vec<String>) -> Result<Sessions
             }
         }
 
-        if is_opencode_db {
+        if is_opencode_db || is_cursor_db {
             let removed_paths = sessions.iter().filter(|session| crate::domain::session_bridge::backing_file_path(Path::new(&session.path)) == path && !seen_paths.contains(&session.path)).map(|session| session.path.clone()).collect::<Vec<_>>();
 
             for removed in removed_paths {

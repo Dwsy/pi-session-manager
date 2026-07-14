@@ -152,8 +152,12 @@ pub fn preview_session_for_viewer(path: &Path) -> Result<String, String> {
 }
 
 pub fn backing_file_path(path: &Path) -> PathBuf {
-    if is_opencode_db_path(path) || path.to_string_lossy().replace('\\', "/").contains("/opencode.db/") {
+    let normalized = path.to_string_lossy().replace('\\', "/");
+    if is_opencode_db_path(path) || normalized.contains("/opencode.db/") {
         return crate::domain::casr_min::providers::opencode::backing_store_path(path);
+    }
+    if is_cursor_db_path(path) || crate::domain::casr_min::providers::cursor::matches_path(path) {
+        return crate::domain::casr_min::providers::cursor::backing_store_path(path);
     }
     path.to_path_buf()
 }
@@ -162,15 +166,30 @@ pub fn is_gemini_session_file(path: &Path) -> bool {
     crate::domain::casr_min::providers::gemini::is_session_file(path)
 }
 
+pub fn is_antigravity_session_file(path: &Path) -> bool {
+    crate::domain::casr_min::providers::antigravity::is_transcript_path(path)
+}
+
 pub fn is_opencode_db_path(path: &Path) -> bool {
     path.file_name().and_then(|value| value.to_str()) == Some(crate::domain::casr_min::providers::opencode::DB_FILENAME)
+}
+
+pub fn is_cursor_db_path(path: &Path) -> bool {
+    crate::domain::casr_min::providers::cursor::is_db_path(path)
 }
 
 pub fn expand_opencode_session_paths(path: &Path) -> Vec<PathBuf> {
     crate::domain::casr_min::providers::opencode::list_session_paths_in_db(path).unwrap_or_else(|_| vec![path.to_path_buf()])
 }
 
+pub fn expand_cursor_session_paths(path: &Path) -> Vec<PathBuf> {
+    crate::domain::casr_min::providers::cursor::list_session_paths_in_db(path).unwrap_or_else(|_| vec![path.to_path_buf()])
+}
+
 pub fn convert_session_format(path: &Path, target: SessionBridgeSource, options: SessionBridgeConvertOptions) -> Result<SessionBridgeConvertResult, String> {
+    if !target.can_convert_target() {
+        return Err(format!("Provider {} is scan/source only and cannot be used as a conversion target", target.display_name()));
+    }
     if !options.dry_run && target != SessionBridgeSource::Pi {
         return super::vendor::convert_session_format(path, target, options.force);
     }
