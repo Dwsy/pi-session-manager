@@ -728,6 +728,114 @@ fn clawdbot_jsonl_previews_as_pi() {
 }
 
 #[test]
+fn antigravity_transcript_previews_as_pi() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let path = temp
+        .path()
+        .join(".gemini")
+        .join("antigravity-cli")
+        .join("brain")
+        .join("f1e2d3c4-b5a6-4789-9abc-def012345678")
+        .join(".system_generated")
+        .join("logs")
+        .join("transcript.jsonl");
+    std::fs::create_dir_all(path.parent().unwrap()).expect("mkdir");
+    let content = [
+        serde_json::json!({
+            "step_index": 1,
+            "source": "USER_EXPLICIT",
+            "type": "USER_INPUT",
+            "created_at": "2026-06-11T20:14:42Z",
+            "content": "<USER_REQUEST>hello agy</USER_REQUEST>"
+        }),
+        serde_json::json!({
+            "step_index": 2,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "created_at": "2026-06-11T20:14:43Z",
+            "content": "hi there",
+            "thinking": "plan"
+        }),
+    ]
+    .iter()
+    .map(|value| serde_json::to_string(value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&path, content).expect("write");
+
+    let (source, canonical) = read_canonical_session_from_path(&path).expect("canonical");
+    assert_eq!(source, SessionBridgeSource::Antigravity);
+    assert_eq!(canonical.session_id, "f1e2d3c4-b5a6-4789-9abc-def012345678");
+    assert_eq!(canonical.messages.len(), 2);
+    assert_eq!(canonical.messages[0].content, "hello agy");
+
+    let preview = preview_session_for_viewer(&path).expect("preview");
+    let entries = preview.lines().skip(1).map(|line| serde_json::from_str::<Value>(line).expect("json line")).collect::<Vec<_>>();
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[1]["parentId"], entries[0]["id"]);
+}
+
+#[test]
+fn cursor_virtual_session_path_reads_composer() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let db_path = temp.path().join("state.vscdb");
+    {
+        let conn = Connection::open(&db_path).expect("open db");
+        conn.execute_batch("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT);").expect("schema");
+        let composer = serde_json::json!({
+            "name": "Cursor demo",
+            "createdAt": 1_700_000_000_000i64,
+            "lastUpdatedAt": 1_700_000_100_000i64,
+            "fullConversationHeadersOnly": [
+                {"bubbleId": "b1"},
+                {"bubbleId": "b2"}
+            ]
+        });
+        let bubble_user = serde_json::json!({"type": 1, "text": "hello cursor", "timestamp": 1_700_000_000_000i64});
+        let bubble_assistant = serde_json::json!({"type": 2, "text": "hi from cursor", "timestamp": 1_700_000_100_000i64, "modelType": "gpt"});
+        conn.execute(
+            "INSERT INTO cursorDiskKV (key, value) VALUES (?1, ?2)",
+            rusqlite::params!["composerData:cmp-1", composer.to_string()],
+        )
+        .expect("insert composer");
+        conn.execute(
+            "INSERT INTO cursorDiskKV (key, value) VALUES (?1, ?2)",
+            rusqlite::params!["bubbleId:cmp-1:b1", bubble_user.to_string()],
+        )
+        .expect("insert bubble user");
+        conn.execute(
+            "INSERT INTO cursorDiskKV (key, value) VALUES (?1, ?2)",
+            rusqlite::params!["bubbleId:cmp-1:b2", bubble_assistant.to_string()],
+        )
+        .expect("insert bubble assistant");
+    }
+
+    let paths = expand_cursor_session_paths(&db_path);
+    assert_eq!(paths.len(), 1);
+    let virtual_path = &paths[0];
+    assert!(virtual_path.to_string_lossy().ends_with("cmp-1") || virtual_path.to_string_lossy().contains("cmp-1"));
+
+    let (source, canonical) = read_canonical_session_from_path(virtual_path).expect("canonical");
+    assert_eq!(source, SessionBridgeSource::Cursor);
+    assert_eq!(canonical.session_id, "cmp-1");
+    assert_eq!(canonical.messages.len(), 2);
+    assert_eq!(canonical.messages[0].content, "hello cursor");
+    assert_eq!(canonical.messages[1].content, "hi from cursor");
+    assert_eq!(backing_file_path(virtual_path), db_path);
+}
+
+#[test]
+fn convert_rejects_scan_only_targets() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let path = temp.path().join("seed.jsonl");
+    std::fs::write(&path, r#"{"type":"session_meta","payload":{"id":"x"}}"#).expect("write");
+    let cursor_err = convert_session_format(&path, SessionBridgeSource::Cursor, SessionBridgeConvertOptions { dry_run: true, force: false }).expect_err("cursor target");
+    assert!(cursor_err.contains("scan/source only"), "{cursor_err}");
+    let agy_err = convert_session_format(&path, SessionBridgeSource::Antigravity, SessionBridgeConvertOptions { dry_run: true, force: false }).expect_err("antigravity target");
+    assert!(agy_err.contains("scan/source only"), "{agy_err}");
+}
+
+#[test]
 fn pi_roundtrip_keeps_text_separate_from_tool_calls() {
     let canonical = CanonicalSession {
         session_id: "seed-pi".to_string(),
@@ -980,6 +1088,53 @@ fn claude_code_read_does_not_merge_assistant_lines_without_response_id() {
 
     let canonical = read_session_from_str(&path, &std::fs::read_to_string(&path).unwrap()).expect("read claude");
     assert_eq!(canonical.messages.len(), 2, "without message.id, lines stay separate");
+}
+
+#[test]
+fn claude_code_reads_wrapped_type_message_envelopes() {
+    use crate::domain::casr_min::providers::claude_code::read_session_from_str;
+
+    let temp = tempfile::tempdir().expect("tempdir");
+    let path = temp.path().join("claude-type-message.jsonl");
+    let lines = [
+        serde_json::json!({
+            "type": "message",
+            "sessionId": "sess-msg-1",
+            "cwd": "/repo/demo",
+            "timestamp": "2026-04-08T10:00:00.000Z",
+            "message": {
+                "role": "user",
+                "content": [{ "type": "text", "text": "hello wrapped" }]
+            }
+        }),
+        serde_json::json!({
+            "type": "message",
+            "sessionId": "sess-msg-1",
+            "timestamp": "2026-04-08T10:00:01.000Z",
+            "message": {
+                "role": "assistant",
+                "model": "claude-sonnet-4",
+                "content": [{ "type": "text", "text": "hi there" }]
+            }
+        }),
+        serde_json::json!({
+            "type": "summary",
+            "summary": "ignored non-conversation"
+        }),
+    ]
+    .iter()
+    .map(|value| serde_json::to_string(value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&path, lines).expect("write source");
+
+    let canonical = read_session_from_str(&path, &std::fs::read_to_string(&path).unwrap()).expect("read claude");
+    assert_eq!(canonical.session_id, "sess-msg-1");
+    assert_eq!(canonical.messages.len(), 2);
+    assert_eq!(canonical.messages[0].role, MessageRole::User);
+    assert_eq!(canonical.messages[0].content, "hello wrapped");
+    assert_eq!(canonical.messages[1].role, MessageRole::Assistant);
+    assert_eq!(canonical.messages[1].content, "hi there");
 }
 
 #[test]

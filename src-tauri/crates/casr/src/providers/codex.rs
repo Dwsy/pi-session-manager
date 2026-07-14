@@ -562,6 +562,26 @@ impl Codex {
                                     messages.push(CanonicalMessage { idx: 0, role: MessageRole::Assistant, content: text, timestamp: ts, author: Some("reasoning".to_string()), tool_calls: vec![], tool_results: vec![], extra: envelope });
                                 }
                             }
+                            "tool_call" => {
+                                // Legacy Codex event_msg tool calls. Modern rollouts use response_item function_call.
+                                let name = p.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+                                let call_id = p.get("call_id").or_else(|| p.get("id")).and_then(|v| v.as_str()).map(String::from);
+                                let arguments = p
+                                    .get("input")
+                                    .or_else(|| p.get("arguments"))
+                                    .map(codex_parse_arguments_value)
+                                    .unwrap_or(serde_json::Value::Null);
+                                messages.push(CanonicalMessage {
+                                    idx: 0,
+                                    role: MessageRole::Assistant,
+                                    content: String::new(),
+                                    timestamp: ts,
+                                    author: None,
+                                    tool_calls: vec![ToolCall { id: call_id, name, arguments }],
+                                    tool_results: vec![],
+                                    extra: envelope,
+                                });
+                            }
                             _ => {
                                 trace!(line = line_num, sub_type, "skipping non-conversational event_msg");
                             }

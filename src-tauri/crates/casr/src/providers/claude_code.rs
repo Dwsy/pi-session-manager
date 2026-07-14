@@ -232,15 +232,18 @@ impl Provider for ClaudeCode {
             }
 
             // Filter: only extract user/assistant conversational messages.
+            // Also accept wrapped `{type:"message", role:"user"|"assistant"}` envelopes.
             let entry_type = entry.get("type").and_then(|v| v.as_str());
-            let is_conversational = matches!(entry_type, Some("user") | Some("assistant"));
+            let role_hint = entry.pointer("/message/role").and_then(|v| v.as_str()).or_else(|| entry.get("role").and_then(|v| v.as_str()));
+            let is_conversational = matches!(entry_type, Some("user") | Some("assistant"))
+                || (entry_type == Some("message") && matches!(role_hint, Some("user") | Some("assistant")));
             if !is_conversational {
                 trace!(line = line_num, ?entry_type, "skipping non-conversational entry");
                 continue;
             }
 
-            // Extract role from message.role → top-level type.
-            let role_str = entry.pointer("/message/role").and_then(|v| v.as_str()).or(entry_type).unwrap_or("user");
+            // Extract role from message.role → top-level role → type.
+            let role_str = role_hint.or(entry_type).unwrap_or("user");
 
             // Extract content from message.content → top-level content.
             let content_value = entry.pointer("/message/content").or_else(|| entry.get("content"));

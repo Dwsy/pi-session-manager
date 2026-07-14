@@ -69,11 +69,15 @@ pub fn read_session_from_str(path: &Path, content: &str) -> Result<CanonicalSess
         }
 
         let entry_type = entry.get("type").and_then(|v| v.as_str());
-        if !matches!(entry_type, Some("user") | Some("assistant")) {
+        let role_hint = entry.pointer("/message/role").and_then(|v| v.as_str()).or_else(|| entry.get("role").and_then(|v| v.as_str()));
+        // Accept both native user/assistant lines and wrapped `{type:"message", role:...}` envelopes.
+        let is_conversational = matches!(entry_type, Some("user") | Some("assistant"))
+            || (entry_type == Some("message") && matches!(role_hint, Some("user") | Some("assistant")));
+        if !is_conversational {
             continue;
         }
 
-        let role_str = entry.pointer("/message/role").and_then(|v| v.as_str()).or(entry_type).unwrap_or("user");
+        let role_str = role_hint.or(entry_type).unwrap_or("user");
         let content_value = entry.pointer("/message/content").or_else(|| entry.get("content"));
         let content = extract_text_content(content_value);
         let tool_calls = extract_tool_calls(content_value);
