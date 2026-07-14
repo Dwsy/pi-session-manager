@@ -169,6 +169,65 @@ describe("buildConversationPreviewTurns", () => {
     expect(duplicateKeyWarning).toBe(false);
   });
 
+  it("always shows model_change outside the collapsible process summary", () => {
+    render(
+      <Providers>
+        <ConversationPreviewMessages
+          entries={[
+            {
+              type: "model_change",
+              id: "mc-1",
+              timestamp: "2026-05-19T00:00:00.000Z",
+              provider: "3838/cx",
+              modelId: "gpt-5.6-terra",
+            },
+            toolCall("tool-1", "bash"),
+            message("assistant-1", "assistant", "Done"),
+          ]}
+          toolResultByCallId={new Map()}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+        />
+      </Providers>,
+    );
+
+    // model_change is visible without expanding
+    expect(screen.getByText(/gpt-5\.6-terra/)).toBeTruthy();
+    // summary should only count foldable process work, not model_change
+    expect(screen.queryByText("model_change")).toBeNull();
+    expect(screen.getByText("bash")).toBeTruthy();
+  });
+
+  it("does not render a process fold when only model_change entries exist", () => {
+    render(
+      <Providers>
+        <ConversationPreviewMessages
+          entries={[
+            {
+              type: "model_change",
+              id: "mc-1",
+              timestamp: "2026-05-19T00:00:00.000Z",
+              provider: "3838/cx",
+              modelId: "gpt-5.6-terra",
+            },
+            message("user-1", "user", "hello"),
+          ]}
+          toolResultByCallId={new Map()}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+        />
+      </Providers>,
+    );
+
+    expect(screen.getByText(/gpt-5\.6-terra/)).toBeTruthy();
+    expect(screen.queryByText("Show")).toBeNull();
+    expect(screen.queryByText("Hide")).toBeNull();
+  });
+
   it("shows linked tool output after expanding a process entry", () => {
     const toolResult: SessionEntry = {
       type: "message",

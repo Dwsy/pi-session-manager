@@ -69,4 +69,101 @@ describe("useSessionViewerDerivedData", () => {
 
     expect(result.current.toolResultByCallId.get("call-1")?.id).toBe("tool-result-1");
   });
+
+  it("keeps only the last model_change in a consecutive run", () => {
+    const entries: SessionEntry[] = [
+      {
+        type: "model_change",
+        id: "mc-1",
+        timestamp: "2026-05-19T00:00:00.000Z",
+        provider: "3838/cx",
+        modelId: "gpt-5.6-luna",
+      },
+      {
+        type: "model_change",
+        id: "mc-2",
+        timestamp: "2026-05-19T00:00:01.000Z",
+        provider: "3838/cx",
+        modelId: "gpt-5.6-terra",
+      },
+      message("user-1", "user", "hello"),
+    ];
+
+    const { result } = renderHook(() => useSessionViewerDerivedData(entries, null));
+
+    expect(
+      result.current.renderableEntries
+        .filter((entry) => entry.type === "model_change")
+        .map((entry) => entry.id),
+    ).toEqual(["mc-2"]);
+  });
+
+  it("treats non-renderable entries as transparent for model_change runs", () => {
+    const entries: SessionEntry[] = [
+      {
+        type: "model_change",
+        id: "mc-1",
+        timestamp: "2026-05-19T00:00:00.000Z",
+        provider: "openai",
+        modelId: "gpt-a",
+      },
+      {
+        type: "thinking_level_change",
+        id: "tl-1",
+        timestamp: "2026-05-19T00:00:00.500Z",
+        thinkingLevel: "high",
+      },
+      {
+        type: "label",
+        id: "label-1",
+        timestamp: "2026-05-19T00:00:00.750Z",
+        label: "settings",
+      },
+      {
+        type: "model_change",
+        id: "mc-2",
+        timestamp: "2026-05-19T00:00:01.000Z",
+        provider: "openai",
+        modelId: "gpt-b",
+      },
+      message("user-1", "user", "hello"),
+    ];
+
+    const { result } = renderHook(() => useSessionViewerDerivedData(entries, null));
+
+    expect(
+      result.current.renderableEntries
+        .filter((entry) => entry.type === "model_change")
+        .map((entry) => entry.id),
+    ).toEqual(["mc-2"]);
+  });
+
+  it("keeps non-consecutive model_change entries separated by user messages", () => {
+    const entries: SessionEntry[] = [
+      {
+        type: "model_change",
+        id: "mc-1",
+        timestamp: "2026-05-19T00:00:00.000Z",
+        provider: "openai",
+        modelId: "gpt-a",
+      },
+      message("user-1", "user", "first"),
+      {
+        type: "model_change",
+        id: "mc-2",
+        timestamp: "2026-05-19T00:00:02.000Z",
+        provider: "openai",
+        modelId: "gpt-b",
+      },
+      message("user-2", "user", "second"),
+    ];
+
+    const { result } = renderHook(() => useSessionViewerDerivedData(entries, null));
+
+    expect(
+      result.current.renderableEntries
+        .filter((entry) => entry.type === "model_change")
+        .map((entry) => entry.id),
+    ).toEqual(["mc-1", "mc-2"]);
+  });
 });

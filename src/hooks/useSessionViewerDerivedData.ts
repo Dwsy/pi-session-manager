@@ -26,6 +26,24 @@ function isRenderableNonMessageEntry(entry: SessionEntry): boolean {
   )
 }
 
+/** True when a later model_change follows without a renderable entry between. */
+export function isFollowedByModelChange(
+  entries: SessionEntry[],
+  idx: number,
+): boolean {
+  for (let i = idx + 1; i < entries.length; i++) {
+    const next = entries[i]
+    if (!next) continue
+    if (next.type === 'model_change') return true
+    if (next.type === 'message') {
+      if (isRenderableMessageEntry(next)) return false
+      continue
+    }
+    if (isRenderableNonMessageEntry(next)) return false
+  }
+  return false
+}
+
 export function useSessionViewerDerivedData(
   entries: SessionEntry[],
   _activeEntryId: string | null,
@@ -62,27 +80,11 @@ export function useSessionViewerDerivedData(
 
       if (!previewMode && isRenderableNonMessageEntry(entry)) {
         // For model_change: only keep the last in a consecutive run.
-        // Look ahead to see if the next renderable non-message entry is also
-        // a model_change — if so, skip this one.
-        if (entry.type === 'model_change') {
-          let isFollowedByModelChange = false
-          for (let i = idx + 1; i < entries.length; i++) {
-            const next = entries[i]
-            if (!next) continue
-            if (next.type === 'message') {
-              // Renderable message roles break the consecutive run
-              if (isRenderableMessageEntry(next)) break
-              // Non-renderable message roles (toolResult, etc.) don't break it
-              continue
-            }
-            if (next.type === 'model_change') {
-              isFollowedByModelChange = true
-              break
-            }
-            // Any other renderable non-message entry breaks the run
-            break
-          }
-          if (isFollowedByModelChange) continue
+        // Non-renderable entries (label, thinking_level_change, toolResult, etc.)
+        // do not break the run — only a renderable message or another
+        // renderable non-message type does.
+        if (entry.type === 'model_change' && isFollowedByModelChange(entries, idx)) {
+          continue
         }
         renderableEntries.push(entry)
       }

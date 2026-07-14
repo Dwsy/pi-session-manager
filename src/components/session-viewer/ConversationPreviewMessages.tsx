@@ -322,6 +322,22 @@ function CollapsedProcessSummary({
   );
 }
 
+function splitProcessEntries(entries: SessionEntry[]): {
+  modelChanges: SessionEntry[];
+  foldableEntries: SessionEntry[];
+} {
+  const modelChanges: SessionEntry[] = [];
+  const foldableEntries: SessionEntry[] = [];
+  for (const entry of entries) {
+    if (entry.type === "model_change") {
+      modelChanges.push(entry);
+    } else {
+      foldableEntries.push(entry);
+    }
+  }
+  return { modelChanges, foldableEntries };
+}
+
 function ConversationPreviewTurnView({
   turn,
   toolResultByCallId,
@@ -337,6 +353,12 @@ function ConversationPreviewTurnView({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  // model_change is always visible and never folded into the process summary.
+  const { modelChanges, foldableEntries } = useMemo(
+    () => splitProcessEntries(turn.processEntries),
+    [turn.processEntries],
+  );
+
   return (
     <div className="space-y-2" data-entry-id={turn.id}>
       {turn.userEntry && (
@@ -348,26 +370,38 @@ function ConversationPreviewTurnView({
         />
       )}
 
-      {!expanded && (
+      {modelChanges.map((entry, index) => (
+        <SessionEntryRenderer
+          key={`${entry.id}:${entry.type}:${index}`}
+          entry={entry}
+          toolResultByCallId={toolResultByCallId}
+          searchQuery={searchQuery}
+          isStreaming={entry.id === streamingId}
+          previewMode={false}
+          processEntries={turn.processEntries}
+        />
+      ))}
+
+      {!expanded && foldableEntries.length > 0 && (
         <CollapsedProcessSummary
-          entries={turn.processEntries}
+          entries={foldableEntries}
           expanded={expanded}
           onToggle={onToggle}
           toolResultByCallId={toolResultByCallId}
         />
       )}
 
-      {expanded && (
+      {expanded && foldableEntries.length > 0 && (
         <div className="space-y-2">
           <div className="sticky top-2 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-2">
             <CollapsedProcessSummary
-              entries={turn.processEntries}
+              entries={foldableEntries}
               expanded={expanded}
               onToggle={onToggle}
               toolResultByCallId={toolResultByCallId}
             />
           </div>
-          {turn.processEntries.map((entry, index) => (
+          {foldableEntries.map((entry, index) => (
             <SessionEntryRenderer
               key={`${entry.id}:${entry.type}:${index}`}
               entry={entry}
