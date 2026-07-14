@@ -12,12 +12,12 @@ import type { SessionEntry } from '@/types'
 
 type ScrollAlignment = 'auto' | 'center' | 'end' | 'start'
 
-export const SESSION_MESSAGE_ITEM_GAP = 16
+export const SESSION_MESSAGE_ITEM_GAP = 24
 export const SESSION_PREVIEW_ITEM_GAP = 8
 const BOTTOM_THRESHOLD_PX = 8
 const HIGHLIGHT_DURATION_MS = 2000
 const HIGHLIGHT_RETRY_DELAY_MS = 50
-const ROW_OVERSCAN = 8
+const ROW_OVERSCAN = 12
 
 function estimateSessionEntrySize(
   entry: SessionEntry | undefined,

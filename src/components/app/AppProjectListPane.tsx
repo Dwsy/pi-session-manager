@@ -28,8 +28,6 @@ export type AppProjectListPaneSessionListCommonProps = Pick<
   | "piPath"
   | "customCommand"
   | "resumeCommand"
-  | "favorites"
-  | "onToggleFavorite"
   | "tags"
   | "getTagsForSession"
   | "onToggleTag"
@@ -55,8 +53,6 @@ export interface AppProjectListPaneProps {
   filteredSessions: SessionInfo[];
   onSelectProject: NonNullable<ProjectListProps["onSelectProject"]>;
   loading: boolean;
-  favorites: NonNullable<ProjectListProps["favorites"]>;
-  onToggleFavorite: NonNullable<ProjectListProps["onToggleFavorite"]>;
   liveSessionIds?: Set<string>;
 }
 
@@ -77,8 +73,6 @@ function AppProjectListPane({
   filteredSessions,
   onSelectProject,
   loading,
-  favorites,
-  onToggleFavorite,
   liveSessionIds,
 }: AppProjectListPaneProps) {
   return (
@@ -110,8 +104,6 @@ function AppProjectListPane({
             onSelectProject={onSelectProject}
             loading={loading}
             scrollParentRef={projectScrollRef}
-            favorites={favorites}
-            onToggleFavorite={onToggleFavorite}
             liveSessionIds={liveSessionIds}
           />
         )}

@@ -19,7 +19,6 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
   SETTINGS: '/settings',
   TERMINAL: '/terminal',
-  FAVORITES: '/favorites',
 } as const;
 
 export type RouteKey = keyof typeof ROUTES;
@@ -30,15 +29,14 @@ export type RouteKey = keyof typeof ROUTES;
 export type ParsedRoute =
   | { route: 'session'; sessionId: string }
   | { route: 'project'; projectPath: string | null }
-  | { route: 'feature'; feature: 'dashboard' | 'settings' | 'terminal' | 'favorites' }
+  | { route: 'feature'; feature: 'dashboard' | 'settings' | 'terminal' }
   | { route: 'app'; path: string }
   | { route: 'root' };
 
-const FEATURE_ROUTES: Record<string, 'dashboard' | 'settings' | 'terminal' | 'favorites'> = {
+const FEATURE_ROUTES: Record<string, 'dashboard' | 'settings' | 'terminal'> = {
   dashboard: 'dashboard',
   settings: 'settings',
   terminal: 'terminal',
-  favorites: 'favorites',
 };
 
 /**

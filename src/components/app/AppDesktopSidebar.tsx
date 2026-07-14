@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowDown, ArrowUp, FolderOpen, LayoutDashboard, List, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, Settings, Star, Terminal, Wifi } from "lucide-react";
+import { ArrowDown, ArrowUp, FolderOpen, LayoutDashboard, List, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, Settings, Terminal, Wifi } from "lucide-react";
 
 import KbdTooltip from "@/components/ui/KbdTooltip";
 import {
@@ -34,7 +34,6 @@ export interface AppDesktopSidebarProps {
   isTauriRuntime: boolean;
   startDragging: () => void;
   sidebarMode: AppDesktopSidebarMode;
-  showFavorites: boolean;
   sidebarVisible?: boolean;
   showDashboardButton?: boolean;
   terminalEnabled: boolean;
@@ -43,7 +42,6 @@ export interface AppDesktopSidebarProps {
   onSelectListView: () => void;
   onSelectProjectView: () => void;
   appViewItems?: AppDesktopSidebarAppViewItem[];
-  onToggleFavorites: () => void;
   onOpenCommandPalette: () => void;
   onToggleTerminal: () => void;
   onOpenSettings: () => void;
@@ -59,7 +57,6 @@ function AppDesktopSidebar({
   isTauriRuntime,
   startDragging,
   sidebarMode,
-  showFavorites,
   sidebarVisible = true,
   showDashboardButton = true,
   terminalEnabled,
@@ -68,7 +65,6 @@ function AppDesktopSidebar({
   onSelectListView,
   onSelectProjectView,
   appViewItems = [],
-  onToggleFavorites,
   onOpenCommandPalette,
   onToggleTerminal,
   onOpenSettings,
@@ -217,9 +213,9 @@ function AppDesktopSidebar({
                 type="button"
                 onClick={onSelectListView}
                 role="radio"
-                aria-checked={sidebarMode === "list" && !showFavorites}
+                aria-checked={sidebarMode === "list"}
                 aria-label={t("app.viewMode.list")}
-                className={`p-1 rounded motion-color motion-press focus-ring ${sidebarMode === "list" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
+                className={`p-1 rounded motion-color motion-press focus-ring ${sidebarMode === "list" ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
                 title={t("app.viewMode.list")}
               >
                 <List className="h-3.5 w-3.5" aria-hidden="true" />
@@ -230,9 +226,9 @@ function AppDesktopSidebar({
                 type="button"
                 onClick={onSelectProjectView}
                 role="radio"
-                aria-checked={sidebarMode === "project" && !showFavorites}
+                aria-checked={sidebarMode === "project"}
                 aria-label={t("app.viewMode.project")}
-                className={`p-1 rounded motion-color motion-press focus-ring ${sidebarMode === "project" && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
+                className={`p-1 rounded motion-color motion-press focus-ring ${sidebarMode === "project" ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
                 title={t("app.viewMode.project")}
               >
                 <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" />
@@ -244,9 +240,9 @@ function AppDesktopSidebar({
                   type="button"
                   onClick={item.onSelect}
                   role="radio"
-                  aria-checked={item.active && !showFavorites}
+                  aria-checked={item.active}
                   aria-label={item.label}
-                  className={`p-1 rounded motion-color motion-press focus-ring ${item.active && !showFavorites ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`p-1 rounded motion-color motion-press focus-ring ${item.active ? "text-blue-400 bg-secondary" : "text-muted-foreground hover:text-foreground"}`}
                   title={item.label}
                 >
                   <AppViewIcon icon={item.icon} />
@@ -374,16 +370,6 @@ function AppDesktopSidebar({
               )}
             </div>
           )}
-          <button
-            type="button"
-            onClick={onToggleFavorites}
-            aria-label={showFavorites ? t("favorites.back") : t("favorites.title")}
-            aria-pressed={showFavorites}
-            className={`p-1 rounded motion-color motion-press focus-ring ml-0.5 ${showFavorites ? "text-yellow-400 bg-secondary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
-            title={showFavorites ? t("favorites.back") : t("favorites.title")}
-          >
-            <Star className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
           <KbdTooltip shortcut="Cmd+Shift+F">
             <button
               type="button"
@@ -435,7 +421,7 @@ function AppDesktopSidebar({
         </div>
       </div>
 
-      {!showFavorites && searchBar && (
+      {searchBar && (
         <div className="app-desktop-sidebar__search px-3 py-1.5 border-b border-border/50">
           {searchBar}
         </div>

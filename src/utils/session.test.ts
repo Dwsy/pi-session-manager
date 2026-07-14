@@ -80,6 +80,59 @@ describe('parseSessionEntriesWithLineCount', () => {
     ).toBe(true);
   });
 
+  it('preserves Pi custom anchors and assistant fragments with response ids', () => {
+    const content = [
+      JSON.stringify({
+        type: 'message',
+        id: 'root',
+        parentId: null,
+        timestamp: '2026-07-14T00:00:00Z',
+        message: { role: 'user', content: [{ type: 'text', text: 'Start' }] },
+      }),
+      JSON.stringify({
+        type: 'custom',
+        id: 'anchor',
+        parentId: 'root',
+        timestamp: '2026-07-14T00:00:01Z',
+        content: 'branch anchor',
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'tool-call',
+        parentId: 'anchor',
+        timestamp: '2026-07-14T00:00:02Z',
+        message: {
+          role: 'assistant',
+          responseId: 'pi-response',
+          content: [{ type: 'toolCall', id: 'call-1', name: 'read' }],
+        },
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'answer',
+        parentId: 'tool-call',
+        timestamp: '2026-07-14T00:00:03Z',
+        message: {
+          role: 'assistant',
+          responseId: 'pi-response',
+          content: [{ type: 'text', text: 'Done' }],
+        },
+      }),
+    ].join('\n')
+
+    const { entries } = parseSessionEntriesWithLineCount(content)
+
+    expect(entries.map((entry) => entry.id)).toEqual([
+      'root',
+      'anchor',
+      'tool-call',
+      'answer',
+    ])
+    expect(entries.find((entry) => entry.id === 'answer')?.parentId).toBe(
+      'tool-call',
+    )
+  })
+
   it('links raw Codex function call output to its tool call id', () => {
     const content = [
       JSON.stringify({

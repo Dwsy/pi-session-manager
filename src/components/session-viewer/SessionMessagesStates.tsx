@@ -1,11 +1,8 @@
-import { Loader2 } from "lucide-react";
+import { DelayedLoadingCenter } from "@/components/ui/DelayedLoading";
 
+/** Session viewer message pane loading (shown after delayed loading threshold). */
 export function SessionMessagesLoadingState() {
-  return (
-    <div className="flex-1 flex items-center justify-center">
-      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-    </div>
-  );
+  return <DelayedLoadingCenter />;
 }
 
 export interface SessionMessagesErrorStateProps {

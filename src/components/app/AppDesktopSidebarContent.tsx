@@ -2,18 +2,16 @@ import { useMemo } from "react";
 import type { ComponentProps, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
-import FavoritesPanel from "@/components/FavoritesPanel";
 import ProjectList from "@/components/project/ProjectList";
 import SessionList from "@/components/session-list/SessionList";
 import SelectedProjectHeader from "@/components/project/SelectedProjectHeader";
 import AppPluginSidebarPane from "./AppPluginSidebarPane";
-import type { FavoriteItem, SessionInfo } from "@/types";
+import type { SessionInfo } from "@/types";
 import type { AppDesktopSidebarMode } from "./AppDesktopSidebar";
 import { pathsEqual } from "@/utils/path";
 
 type SessionListProps = ComponentProps<typeof SessionList>;
 type ProjectListProps = ComponentProps<typeof ProjectList>;
-type FavoritesPanelProps = ComponentProps<typeof FavoritesPanel>;
 
 export interface AppDesktopSelectedProjectSummary {
   projectName: string;
@@ -41,8 +39,6 @@ export type AppDesktopSidebarSessionListCommonProps = Pick<
   | "piPath"
   | "customCommand"
   | "resumeCommand"
-  | "favorites"
-  | "onToggleFavorite"
   | "tags"
   | "getTagsForSession"
   | "onToggleTag"
@@ -54,7 +50,6 @@ export type AppDesktopSidebarSessionListCommonProps = Pick<
 >;
 
 export interface AppDesktopSidebarContentProps {
-  showFavorites: boolean;
   sidebarMode: AppDesktopSidebarMode;
   activeAppViewId: string | null;
   sessions: SessionInfo[];
@@ -67,27 +62,19 @@ export interface AppDesktopSidebarContentProps {
   sidebarHasMore: boolean;
   sidebarLoadingMore: boolean;
   loading: boolean;
-  loadingFavorites: boolean;
-  favorites: FavoriteItem[];
   getBadgeType?: SessionListProps["getBadgeType"];
   listScrollRef: RefObject<HTMLDivElement>;
   sessionListCommonProps: AppDesktopSidebarSessionListCommonProps;
   onLoadMoreSidebarSessions: NonNullable<SessionListProps["onLoadMore"]>;
-  onSelectFavoriteProject: NonNullable<FavoritesPanelProps["onSelectProject"]>;
   onSelectSession: SessionListProps["onSelectSession"];
   onSelectProject: NonNullable<ProjectListProps["onSelectProject"]>;
-  onRemoveFavorite: FavoritesPanelProps["onRemoveFavorite"];
-  onToggleFavorite: NonNullable<ProjectListProps["onToggleFavorite"]>;
   liveSessionIds?: Set<string>;
 }
 
 function AppDesktopSidebarContent({
-  showFavorites,
   sidebarMode,
   activeAppViewId,
-  sessions,
   selectedProject,
-  selectedSession,
   selectedProjectSummary,
   filteredSessions,
   sidebarSessions,
@@ -95,17 +82,10 @@ function AppDesktopSidebarContent({
   sidebarHasMore,
   sidebarLoadingMore,
   loading,
-  loadingFavorites,
-  favorites,
-  getBadgeType,
   listScrollRef,
   sessionListCommonProps,
   onLoadMoreSidebarSessions,
-  onSelectFavoriteProject,
-  onSelectSession,
   onSelectProject,
-  onRemoveFavorite,
-  onToggleFavorite,
   liveSessionIds,
 }: AppDesktopSidebarContentProps) {
   const { t } = useTranslation();
@@ -119,22 +99,10 @@ function AppDesktopSidebarContent({
 
   return (
     <>
-      {!showFavorites && sidebarMode === "app" && (
+      {sidebarMode === "app" && (
         <AppPluginSidebarPane appViewId={activeAppViewId} />
       )}
-      {showFavorites ? (
-        <FavoritesPanel
-          sessions={sessions}
-          favorites={favorites}
-          selectedSession={selectedSession}
-          onSelectSession={onSelectSession}
-          onRemoveFavorite={onRemoveFavorite}
-          onSelectProject={onSelectFavoriteProject}
-          getBadgeType={getBadgeType}
-          loading={loadingFavorites}
-          liveSessionIds={liveSessionIds}
-        />
-      ) : sidebarMode === "app" ? null : sidebarMode === "project" &&
+      {sidebarMode === "project" &&
         selectedProject &&
         selectedProjectSummary ? (
         <div className="flex min-h-0 flex-col">
@@ -164,8 +132,6 @@ function AppDesktopSidebarContent({
           onSelectProject={onSelectProject}
           loading={loading}
           scrollParentRef={listScrollRef}
-          favorites={favorites}
-          onToggleFavorite={onToggleFavorite}
           liveSessionIds={liveSessionIds}
         />
       ) : (

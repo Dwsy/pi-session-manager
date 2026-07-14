@@ -72,6 +72,15 @@ describe("useRouteSync", () => {
     expect(result.current.pendingSessionRoute).toBe(false);
   });
 
+  it("does not report pending when sidebar already selected a session (state ahead of URL)", () => {
+    const selectedSession = makeSession("other-session");
+    const { result } = renderUseRouteSync("/sessions/target-session", {
+      selectedSession,
+    });
+
+    expect(result.current.pendingSessionRoute).toBe(false);
+  });
+
   it("activates a registered app route generically", async () => {
     const { spies } = renderUseRouteSync("/boards", {
       selectedSession: null,

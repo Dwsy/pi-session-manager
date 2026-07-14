@@ -225,6 +225,8 @@ export const session = {
     custom: 'custom',
     compactions: 'compactions',
     branchSummaries: 'branch summaries',
+    context: 'Session context',
+    copyId: 'Copy session ID',
     session: 'Session',
     unknown: 'Unknown',
   },

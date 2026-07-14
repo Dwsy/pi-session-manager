@@ -11,7 +11,8 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronRight, LocateFixed } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   AtlasDialog,
@@ -27,7 +28,6 @@ import {
 import type { PsmSessionTreeViewRuntimeRegistration } from "@/plugins/runtime-host/types";
 import type { SessionEntry } from "@/types";
 import {
-  buildPath,
   buildSessionBranchModel,
   buildTreeItems,
   entryRelationLabel,
@@ -70,6 +70,7 @@ interface SessionTreeProps {
   resolvedLabelsByTargetId?: Record<string, string>;
   pluginViews?: PsmSessionTreeViewRuntimeRegistration[];
   sessionPath?: string;
+  hasMoreHistory?: boolean;
   filter?: TreeFilterMode | `tool-${string}`;
   onRequestClose?: () => void;
 }
@@ -83,11 +84,13 @@ const SessionTree = memo(
       resolvedLabelsByTargetId = {},
       pluginViews = [],
       sessionPath = "",
+      hasMoreHistory = false,
       filter = "no-tools",
       onRequestClose,
     },
     ref,
   ) {
+    const { t } = useTranslation();
     const searchRef = useRef<SessionTreeSearchRef>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const [viewportHeight, setViewportHeight] = useState(320);
@@ -327,29 +330,6 @@ const SessionTree = memo(
       ],
     );
 
-    const revealActive = useCallback(() => {
-      if (!activeLeafUid) return;
-      setCollapsed(new Set());
-      setFocusedUid(activeLeafUid);
-      setSelectedUid(activeLeafUid);
-    }, [activeLeafUid]);
-
-    const collapseAlternateBranches = useCallback(() => {
-      if (!model) return;
-      const activeSegments = new Set(
-        buildPath(model, activeLeafUid)
-          .map((node) => node.segmentUid)
-          .filter(Boolean),
-      );
-      setCollapsed(
-        new Set(
-          model.segments
-            .filter((segment) => !activeSegments.has(segment.uid))
-            .map((segment) => segment.uid),
-        ),
-      );
-    }, [activeLeafUid, model]);
-
     const goToSearchMatch = useCallback(
       (direction: 1 | -1) => {
         if (searchMatches.length === 0) return;
@@ -400,33 +380,7 @@ const SessionTree = memo(
 
     return (
       <div className="flex h-full min-h-0 flex-col session-tree-shell branch-outline-shell">
-        <header className="branch-outline-heading">
-          <div>
-            <span>BRANCH OUTLINE</span>
-            <strong>Session branches</strong>
-            <small>Linear entries stay level; only real forks nest.</small>
-          </div>
-          <div className="branch-outline-actions">
-            <button
-              type="button"
-              onClick={revealActive}
-              aria-label="Locate active branch"
-              title="Locate active branch"
-            >
-              <LocateFixed size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={collapseAlternateBranches}
-              aria-label="Collapse inactive branches"
-              title="Collapse inactive branches"
-            >
-              <ChevronDown size={14} />
-            </button>
-          </div>
-        </header>
-
-        {model ? (
+        {model && !hasMoreHistory ? (
           <div
             className={`branch-map-view branch-map-overview ${mapCollapsed ? "is-collapsed" : ""}`}
           >
@@ -442,6 +396,13 @@ const SessionTree = memo(
               onActivateNode={activateNode}
               onOpenAtlas={() => setAtlasOpen(true)}
             />
+          </div>
+        ) : hasMoreHistory ? (
+          <div className="branch-map-loading" role="status">
+            {t(
+              "components.branchMap.loadingTopology",
+              "Loading complete branch topology...",
+            )}
           </div>
         ) : null}
 
@@ -599,7 +560,7 @@ const SessionTree = memo(
           ) : null}
         </footer>
 
-        {model ? (
+        {model && !hasMoreHistory ? (
           <AtlasDialog
             open={atlasOpen}
             model={model}
@@ -650,15 +611,24 @@ const SessionTree = memo(
                     >
                       <PluginContributionSlot
                         render={() =>
-                          activePluginView.render({
-                            session: { path: sessionPath },
-                            activeEntryId: activeLeafId ?? null,
-                            entries: entries as any,
-                            labelsByTargetId: resolvedLabelsByTargetId,
-                            filter: treeFilter,
-                            closeView: () => setActivePluginViewId(null),
-                            onNavigate: onNodeClick,
-                          })
+                          hasMoreHistory ? (
+                            <div className="branch-map-loading" role="status">
+                              {t(
+                                "components.branchMap.loadingTopology",
+                                "Loading complete branch topology...",
+                              )}
+                            </div>
+                          ) : (
+                            activePluginView.render({
+                              session: { path: sessionPath },
+                              activeEntryId: activeLeafId ?? null,
+                              entries: entries as any,
+                              labelsByTargetId: resolvedLabelsByTargetId,
+                              filter: treeFilter,
+                              closeView: () => setActivePluginViewId(null),
+                              onNavigate: onNodeClick,
+                            })
+                          )
                         }
                       />
                     </PluginContributionBoundary>

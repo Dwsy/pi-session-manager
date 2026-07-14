@@ -10,6 +10,12 @@ import {
   shouldListenRuntimeSessionEvents,
 } from "@/runtime-data/sessionSource";
 
+vi.mock("@/transport", () => ({
+  invoke: vi.fn(),
+  isTauri: () => false,
+  listen: vi.fn(),
+}));
+
 vi.mock("@/runtime-data/sessionSource", () => ({
   getPreviewEntriesFromDB: vi.fn(),
   readRuntimeSessionChunk: vi.fn(),
@@ -128,7 +134,9 @@ describe("useSessionViewerData", () => {
 
     releaseSecondChunk();
 
-    await waitFor(() => expect(readRuntimeSessionChunk).toHaveBeenCalledTimes(3));
+    await waitFor(() =>
+      expect(readRuntimeSessionChunk).toHaveBeenCalledTimes(3),
+    );
     expect(result.current.entries.map((entry) => entry.id)).toEqual(["msg-1"]);
     expect(result.current.hasMoreHistory).toBe(true);
 

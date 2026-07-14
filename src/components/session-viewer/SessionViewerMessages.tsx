@@ -24,16 +24,18 @@ import {
 } from "@/hooks/useSessionViewerVirtualScroll";
 import { useSessionViewerSearchHighlight } from "@/hooks/useSessionViewerSearchHighlight";
 import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
-import type { LegacySessionStats, SessionEntry } from "@/types";
+import type { LegacySessionStats, SessionEntry, SessionInfo } from "@/types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
 import ConversationPreviewMessages from "./ConversationPreviewMessages";
 import type { SessionPreviewVariant } from "./previewTypes";
 import NewMessagesButton from "./NewMessagesButton";
 import ScrollToBottomButton from "./ScrollToBottomButton";
 import ScrollToTopButton from "./ScrollToTopButton";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import {
   SessionMessagesEmptyState,
   SessionMessagesErrorState,
+  SessionMessagesLoadingState,
 } from "./SessionMessagesStates";
 
 
@@ -54,8 +56,8 @@ export interface SessionViewerMessagesProps {
   loading: boolean;
   error: string | null;
   hasNewMessages: boolean;
-  sessionId: string;
-  headerTimestamp?: string;
+  session: SessionInfo;
+  timestamp?: string;
   stats: LegacySessionStats;
   renderableEntries: SessionEntry[];
   searchQuery: string;
@@ -83,6 +85,7 @@ export interface SessionViewerMessagesProps {
   onPointerUp: (event: ReactPointerEvent) => void;
   onPointerLeave: (event: ReactPointerEvent) => void;
   isScrollMarkersFeatureEnabled: boolean;
+  isLive: boolean;
   previewMode?: boolean;
   previewVariant?: SessionPreviewVariant;
   scrollContainerRef?: RefObject<HTMLDivElement>;
@@ -96,8 +99,8 @@ const SessionViewerMessages = forwardRef<
   loading,
   error,
   hasNewMessages,
-  sessionId,
-  headerTimestamp,
+  session,
+  timestamp,
   stats,
   renderableEntries,
   searchQuery,
@@ -125,6 +128,7 @@ const SessionViewerMessages = forwardRef<
   onPointerUp,
   onPointerLeave,
   isScrollMarkersFeatureEnabled,
+  isLive,
   previewMode = false,
   previewVariant = "conversation",
   scrollContainerRef,
@@ -132,6 +136,7 @@ const SessionViewerMessages = forwardRef<
 }: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
   const { ensureToolExpandedForSearch } = useSessionView();
+  const showLoadingSpinner = useDelayedLoading(loading);
 
   const {
     messagesContainerRef,
@@ -331,15 +336,12 @@ const SessionViewerMessages = forwardRef<
     scrollToBottom,
   }));
 
-  // While loading, hold an empty flex-1 placeholder so:
-  //   - the spinner never appears (no animation when switching sessions)
-  //   - the "no messages" empty state cannot leak through before the new
-  //     entries arrive
-  //   - layout is preserved (the placeholder fills the same flex slot as
-  //     the messages container)
-  // On load completion, fall through to render the real messages list or
-  // the empty state (only when the session truly has no messages).
+  // While loading: keep layout with a flex-1 placeholder; only show the
+  // spinner after 500ms (useDelayedLoading) to avoid flash on fast switches.
   if (loading) {
+    if (showLoadingSpinner) {
+      return <SessionMessagesLoadingState />;
+    }
     return <div className="flex-1" aria-hidden="true" />;
   }
 
@@ -380,11 +382,11 @@ const SessionViewerMessages = forwardRef<
         onMouseLeave={handleContainerPointerLeave}
       >
         <SessionHeader
-          sessionId={sessionId}
-          timestamp={headerTimestamp}
+          session={session}
+          timestamp={timestamp}
           stats={stats}
           previewMode={previewMode}
-          sessionPath={sessionPath}
+          isLive={isLive}
         />
         <div className="messages" ref={setContentRef}>
           {renderableEntries.length > 0 ? (

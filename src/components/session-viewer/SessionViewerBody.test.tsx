@@ -20,11 +20,12 @@ vi.mock('@/components/session-viewer/SessionViewerSearchBar', () => ({
 }))
 
 vi.mock('@/components/session-viewer/SessionViewerSidebar', () => ({
-  default: ({ placement, isMobile }: any) => (
+  default: ({ placement, isMobile, open }: any) => (
     <aside
       data-testid="builtin-left-sidebar"
       data-placement={placement}
       data-mobile={String(isMobile)}
+      data-open={String(open)}
     />
   ),
 }))
@@ -150,16 +151,16 @@ describe('SessionViewerBody', () => {
     expect(builtinLeft.parentElement).toBe(externalLeft.parentElement)
   })
 
-  it('does not render the built-in session tree in plugin main view or preview modes', () => {
+  it('keeps the built-in session tree beside plugin main views but hides it in preview', () => {
     const { rerender } = renderBody({
       mainViewSlot: <div data-testid="plugin-main-view" />,
     })
 
-    expect(screen.queryByTestId('builtin-left-sidebar')).toBeNull()
+    expect(screen.getByTestId('builtin-left-sidebar')).not.toBeNull()
     expect(screen.getByTestId('plugin-main-view')).not.toBeNull()
 
     rerender(<SessionViewerBody {...createBodyProps({ previewMode: true })} />)
 
-    expect(screen.queryByTestId('builtin-left-sidebar')).toBeNull()
+    expect(screen.getByTestId('builtin-left-sidebar').getAttribute('data-open')).toBe('false')
   })
 })

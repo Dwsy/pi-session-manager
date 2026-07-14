@@ -29,7 +29,6 @@ interface RouteSyncOptions {
   setSelectedProject: (project: string | null) => void;
   setShowSettings: (show: boolean) => void;
   setShowTerminal: (show: boolean) => void;
-  setShowFavorites: (show: boolean) => void;
   setActiveAppViewId: (viewId: string | null) => void;
   appRoutes: Array<{ id: string; route?: string }>;
   appRoutesReady: boolean;
@@ -56,7 +55,6 @@ export function useRouteSync({
   setSelectedProject,
   setShowSettings,
   setShowTerminal,
-  setShowFavorites,
   setActiveAppViewId,
   appRoutes,
   appRoutesReady,
@@ -67,9 +65,11 @@ export function useRouteSync({
     () => parseRoute(location.pathname),
     [location.pathname],
   );
+  // Only block the main pane when the URL names a session we have not selected yet.
+  // If the user already picked a session in the sidebar (state ahead of URL), keep showing the viewer.
   const pendingSessionRoute =
     parsedRoute.route === 'session' &&
-    selectedSession?.id !== parsedRoute.sessionId;
+    selectedSession == null;
   const matchingAppRoute = useMemo(() => {
     if (parsedRoute.route !== 'app') return null;
     const routePath = normalizeRoutePath(parsedRoute.path);
@@ -151,7 +151,6 @@ export function useRouteSync({
         setActiveAppViewId(null);
         setSelectedProject(parsedRoute.projectPath);
         setViewMode('project');
-        setShowFavorites(false);
         if (routeChanged) {
           setShowSettings(false);
         }
@@ -167,7 +166,6 @@ export function useRouteSync({
           setShowSettings(false);
         }
         setShowTerminal(false);
-        setShowFavorites(false);
 
         switch (parsedRoute.feature) {
           case 'dashboard':
@@ -181,9 +179,6 @@ export function useRouteSync({
             break;
           case 'terminal':
             setShowTerminal(true);
-            break;
-          case 'favorites':
-            setShowFavorites(true);
             break;
         }
         break;
@@ -206,7 +201,6 @@ export function useRouteSync({
           setShowSettings(false);
         }
         setShowTerminal(false);
-        setShowFavorites(false);
         break;
       }
 

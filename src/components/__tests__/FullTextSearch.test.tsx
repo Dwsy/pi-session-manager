@@ -149,7 +149,8 @@ describe('FullTextSearch', () => {
     const input = screen.getByPlaceholderText(/search all sessions/i);
     fireEvent.change(input, { target: { value: 'test' } });
 
-    await vi.runAllTimersAsync();
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.advanceTimersByTimeAsync(500);
 
     const spinner = document.querySelector('svg.animate-spin');
     expect(spinner).not.toBeNull();

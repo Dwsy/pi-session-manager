@@ -12,6 +12,20 @@ export const components = {
     arguments: 'Arguments',
     output: 'Output',
   },
+  branchMap: {
+    copyOutput: 'Copy output',
+    copyJson: 'Copy JSON',
+    loadingTopology: 'Loading complete branch topology...',
+  },
+  traceInspector: {
+    title: 'Entry inspector',
+    locate: 'Locate in session',
+    segment: 'Segment',
+    sequence: 'Sequence',
+    relation: 'Relation',
+    time: 'Time',
+    copyId: 'Copy entry ID',
+  },
   toolCallReview: {
     title: 'Tool Call Review',
     filterLabel: 'Review filter',

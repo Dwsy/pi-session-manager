@@ -21,6 +21,7 @@ import { useDeepLink } from "./hooks/useDeepLink";
 import { useSessionBadges } from "./hooks/useSessionBadges";
 import { listSupportedSessionProviders } from "./utils/sessionProvidersApi";
 import { useSessions } from "./hooks/useSessions";
+import { useDelayedLoading } from "./hooks/useDelayedLoading";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useSessionActions } from "./hooks/useSessionActions";
 import { useAppearance } from "./hooks/useAppearance";
@@ -34,7 +35,6 @@ import { useAppBootstrap } from "./hooks/app/useAppBootstrap";
 import { useAppUiEffects } from "./hooks/app/useAppUiEffects";
 import { useUpdateChecker } from "./hooks/app/useUpdateChecker";
 import { useDesktopSidebarActions } from "./hooks/app/useDesktopSidebarActions";
-import { useFavorites } from "./hooks/app/useFavorites";
 import { useSidebarSessions } from "./hooks/app/useSidebarSessions";
 import { registerBuiltinToolPlugins } from "./plugins/tools-render";
 import ConnectionBanner from "./components/ConnectionBanner";
@@ -197,10 +197,7 @@ function App() {
   // Zoom control
   useZoomControl();
 
-  // Delayed scanning page: only show if loading takes >500ms (avoids flash on fast DB loads)
-  const [showScanningPage, setShowScanningPage] = useState(false);
   const [, setPluginRenderVersion] = useState(0);
-  const loadingRef = useRef(true);
   const frontendReadyEmittedRef = useRef(false);
   const [deepLinkListenerReady, setDeepLinkListenerReady] = useState(!isTauriRuntime);
 
@@ -239,18 +236,7 @@ function App() {
     cancelDeleteSession,
   } = useSessions();
 
-  // Delayed scanning page: only show if loading takes >500ms
-  useEffect(() => {
-    loadingRef.current = loading;
-    if (loading) {
-      const timer = setTimeout(() => {
-        if (loadingRef.current) setShowScanningPage(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      setShowScanningPage(false);
-    }
-  }, [loading]);
+  const showScanningPage = useDelayedLoading(loading);
 
   const { terminal, piPath, customCommand, resumeCommand, loadSettings } =
     useAppSettings();
@@ -330,7 +316,6 @@ function App() {
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showForkDialog, setShowForkDialog] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showFavorites, setShowFavorites] = useState(false);
   const standaloneDatasetId = standaloneDatasetRuntime
     ? getActiveDatasetId() || DEFAULT_STANDALONE_DATASET_ID
     : "";
@@ -373,7 +358,6 @@ function App() {
       setModelFilter("");
       setDateRange(null);
       setSidebarSearchQuery("");
-      setShowFavorites(false);
       setActiveAppViewId(null);
       setSidebarMode("list");
       if (isMobile) {
@@ -449,11 +433,13 @@ function App() {
     setSelectedProject,
     setShowSettings,
     setShowTerminal,
-    setShowFavorites,
     setActiveAppViewId,
     appRoutes,
     appRoutesReady: pluginUiReady,
   });
+
+  const routeMainPending = pendingSessionRoute || pendingAppRoute;
+  const showRouteMainPendingSpinner = useDelayedLoading(routeMainPending);
 
   const openPluginAppView = useCallback(
     (view: PsmAppViewRuntimeRegistration) => {
@@ -461,7 +447,6 @@ function App() {
       setActiveAppViewId(view.id);
       setSelectedSession(null);
       setSelectedProject(null);
-      setShowFavorites(false);
       navigateToPath(getAppViewRoute(view));
     },
     [navigateToPath, setSelectedSession],
@@ -479,10 +464,10 @@ function App() {
         label: view.title,
         icon: view.icon,
         shortcut: view.shortcut,
-        active: sidebarMode === "app" && activeAppViewId === view.id && !showFavorites,
+        active: sidebarMode === "app" && activeAppViewId === view.id,
         onSelect: () => openPluginAppView(view),
       })),
-    [activeAppViewId, appViews, openPluginAppView, showFavorites, sidebarMode],
+    [activeAppViewId, appViews, openPluginAppView, sidebarMode],
   );
   const mobileAppViewItems = useMemo(
     () => appViews.map((view) => ({
@@ -694,13 +679,6 @@ function App() {
       });
     }
   }, [deepLinkListenerReady, isInitialized, settingsLoading]);
-  const {
-    favorites,
-    loadingFavorites,
-    loadFavorites,
-    removeFavorite,
-    toggleFavorite,
-  } = useFavorites({ enabled: isInitialized });
   const { updateInfo, closeUpdateNotice, openUpdateSettings } =
     useUpdateChecker({ setShowSettings });
   useAppUiEffects({
@@ -734,7 +712,6 @@ function App() {
       setSelectedSession(null);
       setActiveAppViewId(null);
       setSidebarMode("project");
-      setShowFavorites(false);
       if (projectPath) {
         navigateToProject(projectPath);
       } else {
@@ -943,29 +920,25 @@ function App() {
         setSidebarMode("list");
         setActiveAppViewId(null);
         setSelectedProject(null);
-        setShowFavorites(false);
-        navigateToSessions();
+          navigateToSessions();
       },
       "cmd+shift+e": () => {
         setSidebarMode("list");
         setActiveAppViewId(null);
         setSelectedProject(null);
-        setShowFavorites(false);
-        navigateToSessions();
+          navigateToSessions();
       },
       "cmd+2": () => {
         setSidebarMode("project");
         setActiveAppViewId(null);
         setSelectedProject(null);
-        setShowFavorites(false);
-        navigateToProjects();
+          navigateToProjects();
       },
       "cmd+shift+g": () => {
         setSidebarMode("project");
         setActiveAppViewId(null);
         setSelectedProject(null);
-        setShowFavorites(false);
-        navigateToProjects();
+          navigateToProjects();
       },
       ...(primaryAppViewShortcutHandler
         ? { "cmd+3": primaryAppViewShortcutHandler }
@@ -1091,7 +1064,6 @@ function App() {
     isMobile,
     mobileTab,
     viewMode: sidebarMode,
-    showFavorites,
     sidebarSearchQuery,
     filterTagIds,
     sourceFilterSlugs,
@@ -1138,8 +1110,6 @@ function App() {
     resumeCommand,
     sortBy: sessionSortBy,
     sortOrder: sessionSortOrder,
-    favorites,
-    onToggleFavorite: toggleFavorite,
     tags,
     getTagsForSession,
     assignTag,
@@ -1356,8 +1326,7 @@ function App() {
       onResumeSession: standaloneDatasetRuntime ? undefined : requestResumeSession,
       onCopyResumeSession: standaloneDatasetRuntime ? undefined : requestCopyResumeCommand,
       onNewSession: standaloneDatasetRuntime ? undefined : handleNewSession,
-      favorites,
-      onToggleFavorite: toggleFavorite,
+      onSelectProject: handleSelectProject,
       terminal: standaloneDatasetRuntime ? undefined : terminal,
       piPath: standaloneDatasetRuntime ? undefined : piPath,
       customCommand: standaloneDatasetRuntime ? undefined : customCommand,
@@ -1386,8 +1355,6 @@ function App() {
       requestResumeSession,
       requestCopyResumeCommand,
       handleNewSession,
-      favorites,
-      toggleFavorite,
       terminal,
       piPath,
       customCommand,
@@ -1446,8 +1413,7 @@ function App() {
       onLoadMoreSidebarSessions={loadMoreSidebarSessions}
       onRefreshMobile={async () => {
         await loadSessions();
-        await loadFavorites();
-        await loadTags();
+          await loadTags();
       }}
     />
   );
@@ -1479,8 +1445,6 @@ function App() {
       filteredSessions={filteredSessions}
       onSelectProject={handleSelectProject}
       loading={loading}
-      favorites={favorites}
-      onToggleFavorite={toggleFavorite}
       liveSessionIds={liveSessionIds}
     />
   );
@@ -1627,16 +1591,13 @@ function App() {
   const {
     onSelectListView: handleSidebarSelectListView,
     onSelectProjectView: handleSidebarSelectProjectView,
-    onToggleFavorites: handleSidebarToggleFavorites,
     onOpenCommandPalette: handleSidebarOpenCommandPalette,
     onToggleTerminal: handleSidebarToggleTerminal,
     onOpenSettings: handleSidebarOpenSettings,
-    onSelectFavoriteProject: handleSelectFavoriteProject,
   } = useDesktopSidebarActions({
     setViewMode: setSidebarMode,
     setActiveAppViewId,
     setSelectedProject,
-    setShowFavorites,
     setShowTerminal,
     setShowSettings,
     navigateToSessions,
@@ -1685,8 +1646,14 @@ function App() {
               : renderDashboard
           }
           renderSettings={renderSettings}
-          routeSessionPending={pendingSessionRoute || pendingAppRoute}
-          renderRouteSessionPending={LoadingSpinner}
+          routeSessionPending={routeMainPending}
+          renderRouteSessionPending={() =>
+            showRouteMainPendingSpinner ? (
+              <LoadingSpinner />
+            ) : (
+              <div className="flex-1 min-h-0" aria-hidden="true" />
+            )
+          }
           showDashboardTab={!standaloneDatasetRuntime}
           renderOverlays={renderOverlays}
         />
@@ -1703,7 +1670,6 @@ function App() {
     setSidebarMode("list");
     setActiveAppViewId(null);
     setSelectedProject(null);
-    setShowFavorites(false);
     setShowSettings(false);
     setShowTerminal(false);
     setSelectedSession(null);
@@ -1745,12 +1711,12 @@ function App() {
 
   const desktopSidebarContent = (
       <AppDesktopSidebarContent
-        showFavorites={showFavorites}
         sidebarMode={sidebarMode}
+        selectedSession={selectedSession}
+        onSelectSession={handleSelectSession}
         activeAppViewId={activeAppViewId}
         sessions={sessions}
       selectedProject={selectedProject}
-      selectedSession={selectedSession}
       selectedProjectSummary={selectedProjectSummary}
       filteredSessions={filteredSessions}
       sidebarSessions={sidebarSessions}
@@ -1758,24 +1724,20 @@ function App() {
       sidebarHasMore={sidebarHasMore}
       sidebarLoadingMore={sidebarLoadingMore}
       loading={loading}
-      loadingFavorites={loadingFavorites}
-      favorites={favorites}
       getBadgeType={getBadgeType}
       listScrollRef={listScrollRef}
       sessionListCommonProps={runtimeSessionListCommonProps}
       onLoadMoreSidebarSessions={loadMoreSidebarSessions}
-      onSelectFavoriteProject={handleSelectFavoriteProject}
-      onSelectSession={handleSelectSession}
       onSelectProject={handleSelectProject}
-      onRemoveFavorite={removeFavorite}
-      onToggleFavorite={toggleFavorite}
       liveSessionIds={liveSessionIds}
     />
   );
 
-  const desktopMainContent = pendingSessionRoute || pendingAppRoute
+  const desktopMainContent = showRouteMainPendingSpinner
     ? <LoadingSpinner />
-    : resolveDesktopMainContent({
+    : routeMainPending
+      ? <div className="flex-1 min-h-0" aria-hidden="true" />
+      : resolveDesktopMainContent({
         selectedSession,
         sidebarMode,
         standaloneDatasetRuntime,
@@ -1883,8 +1845,7 @@ function App() {
               isTauriRuntime={isTauriRuntime}
               startDragging={startDragging}
               sidebarMode={sidebarMode}
-              showFavorites={showFavorites}
-              sidebarVisible={sidebarVisible}
+                    sidebarVisible={sidebarVisible}
               showDashboardButton={!standaloneDatasetRuntime}
               terminalEnabled={false}
               showTerminal={showTerminal}
@@ -1892,7 +1853,6 @@ function App() {
               onSelectListView={handleSidebarSelectListView}
               onSelectProjectView={handleSidebarSelectProjectView}
               appViewItems={appViewItems}
-              onToggleFavorites={handleSidebarToggleFavorites}
               onOpenCommandPalette={handleSidebarOpenCommandPalette}
               onToggleTerminal={handleSidebarToggleTerminal}
               onOpenSettings={handleSidebarOpenSettings}

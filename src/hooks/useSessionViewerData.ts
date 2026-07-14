@@ -11,7 +11,10 @@ import type {
 } from "@/types/pi-live";
 import { trimMarkdownCacheOnSessionSwitch } from "@/utils/markdown";
 import { getCachedSettings } from "@/utils/settingsApi";
-import { getSessionSourceSlug, parseSessionEntriesWithLineCount } from "@/utils/session";
+import {
+  getSessionSourceSlug,
+  parseSessionEntriesWithLineCount,
+} from "@/utils/session";
 import { getPathBasename, pathsEqual, stripJsonlExt } from "@/utils/path";
 import {
   BROWSER_DATASET_REFRESHED_EVENT,
@@ -361,7 +364,10 @@ export function useSessionViewerData({
             }
           } catch (dbError) {
             // Fallback to JSONL if DB read fails (e.g. message_entries not populated yet)
-            console.warn("[useSessionViewerData] DB preview read failed, falling back to JSONL:", dbError);
+            console.warn(
+              "[useSessionViewerData] DB preview read failed, falling back to JSONL:",
+              dbError,
+            );
           }
           if (dbEntries) {
             setLoading(false);
@@ -389,6 +395,7 @@ export function useSessionViewerData({
 
             pendingScrollToBottomRef.current =
               !initialEntryId && openPosition === "bottom";
+            setLoading(false);
             return;
           }
         }
@@ -400,7 +407,8 @@ export function useSessionViewerData({
         if (isLiveRef.current && isPiSession) {
           try {
             const liveEntries = await invoke<any[]>("get_pi_agent_entries", {
-              sessionId: stripJsonlExt(getPathBasename(sessionPath)) || sessionPath,
+              sessionId:
+                stripJsonlExt(getPathBasename(sessionPath)) || sessionPath,
             });
             if (liveEntries && liveEntries.length > 0) {
               setEntries(liveEntries);
@@ -411,7 +419,7 @@ export function useSessionViewerData({
           } catch (e) {
             // Silently ignore Pi Live fetch failures - fallback to disk is expected for non-Pi sessions
             console.debug(
-              "[useSessionViewerData] Pi Live fetch skipped or failed, using disk fallback"
+              "[useSessionViewerData] Pi Live fetch skipped or failed, using disk fallback",
             );
           }
         }
@@ -594,8 +602,8 @@ export function useSessionViewerData({
           const diff = event.payload;
           if (!diff?.updated?.length) return;
 
-          const hit = diff.updated.some(
-            (session) => pathsEqual(session.path, sessionPath),
+          const hit = diff.updated.some((session) =>
+            pathsEqual(session.path, sessionPath),
           );
           if (hit) {
             void loadMoreHistory({ asRealtime: true });
@@ -826,7 +834,8 @@ export function useSessionViewerData({
                   e.message?.role === "assistant" &&
                   e.message.content?.some(
                     (c: any) =>
-                      c.type === "toolCall" && (c.id === toolCallId || c.toolCallId === toolCallId),
+                      c.type === "toolCall" &&
+                      (c.id === toolCallId || c.toolCallId === toolCallId),
                   ),
               );
 
@@ -837,7 +846,8 @@ export function useSessionViewerData({
               const content = [...(msg.message?.content || [])];
               const toolIdx = content.findIndex(
                 (c: any) =>
-                  c.type === "toolCall" && (c.id === toolCallId || c.toolCallId === toolCallId),
+                  c.type === "toolCall" &&
+                  (c.id === toolCallId || c.toolCallId === toolCallId),
               );
 
               if (toolIdx !== -1) {
@@ -929,9 +939,12 @@ export function useSessionViewerData({
         "turn_end",
       ] as const;
       const liveEventUnsubs = liveEventNames.map((eventName) =>
-        psmRuntimeEventBus.subscribe<string, PiLiveChatEventPayload>(eventName, ({ payload }) => {
-          handleLiveEvent(eventName, payload);
-        }),
+        psmRuntimeEventBus.subscribe<string, PiLiveChatEventPayload>(
+          eventName,
+          ({ payload }) => {
+            handleLiveEvent(eventName, payload);
+          },
+        ),
       );
       const prevLiveEvents = unlistenLiveEvents;
       unlistenLiveEvents = () => {

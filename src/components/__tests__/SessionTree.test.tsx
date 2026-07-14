@@ -163,13 +163,20 @@ describe("SessionTree", () => {
 
     expect(screen.getByText("Plugin UI failed")).not.toBeNull();
     expect(screen.getAllByText("Assistant reply").length).toBeGreaterThan(0);
-    expect(screen.getByText("Session branches")).not.toBeNull();
   });
 
-  it("shows the branch outline and compact topology status", () => {
+  it("withholds the map until the session history is fully hydrated", () => {
+    renderSessionTree({ hasMoreHistory: true });
+
+    expect(
+      screen.getByText("Loading complete branch topology..."),
+    ).not.toBeNull();
+    expect(screen.queryByRole("region", { name: "Pi branch map" })).toBeNull();
+  });
+
+  it("shows the branch tree and compact topology status", () => {
     renderSessionTree({ activeLeafId: "assistant-1" });
 
-    expect(screen.getByText("Session branches")).not.toBeNull();
     expect(screen.getAllByText("Original user message").length).toBeGreaterThan(
       0,
     );

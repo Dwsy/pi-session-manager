@@ -1,122 +1,112 @@
-import { memo } from 'react'
-import type { LegacySessionStats } from '@/types'
-import { formatDate, formatTokens } from '@/utils/format'
-import { escapeHtml } from '@/utils/markdown'
+import { memo, useState } from 'react'
+import type { TFunction } from 'i18next'
+import type { SessionInfo, LegacySessionStats } from '@/types'
+import { formatDate, formatTokens, shortenPath } from '@/utils/format'
+import { formatShortTime } from '@/utils/sessionDisplay'
 import { useTranslation } from 'react-i18next'
-import { Copy } from 'lucide-react'
+import { Check, Copy, Radio } from 'lucide-react'
 import { useClipboard } from '@/hooks/useClipboard'
 
 interface SessionHeaderProps {
-  sessionId?: string
+  session: SessionInfo
   timestamp?: string
   stats: LegacySessionStats
   previewMode?: boolean
-  sessionPath?: string
+  isLive?: boolean
 }
 
-function SessionHeader({ sessionId, timestamp, stats, previewMode = false, sessionPath }: SessionHeaderProps) {
-  const { t } = useTranslation()
-  const { copyText } = useClipboard()
-  const totalCost = stats.cost.input + stats.cost.output + stats.cost.cacheRead + stats.cost.cacheWrite
+function formatHeaderTime(value: string, t: TFunction): string {
+  const timestamp = new Date(value).getTime()
+  const age = Date.now() - timestamp
 
-  const tokenParts = []
-  if (stats.tokens.input) tokenParts.push(`↑${formatTokens(stats.tokens.input)}`)
-  if (stats.tokens.output) tokenParts.push(`↓${formatTokens(stats.tokens.output)}`)
-  if (stats.tokens.cacheRead) tokenParts.push(`R${formatTokens(stats.tokens.cacheRead)}`)
-  if (stats.tokens.cacheWrite) tokenParts.push(`W${formatTokens(stats.tokens.cacheWrite)}`)
-
-  const msgParts = []
-  if (stats.userMessages) msgParts.push(`${stats.userMessages} ${t('session.header.user')}`)
-  if (stats.assistantMessages) msgParts.push(`${stats.assistantMessages} ${t('session.header.assistant')}`)
-  if (stats.toolResults) msgParts.push(`${stats.toolResults} ${t('session.header.toolResults')}`)
-  if (stats.customMessages) msgParts.push(`${stats.customMessages} ${t('session.header.custom')}`)
-  if (stats.compactions) msgParts.push(`${stats.compactions} ${t('session.header.compactions')}`)
-  if (stats.branchSummaries) msgParts.push(`${stats.branchSummaries} ${t('session.header.branchSummaries')}`)
-
-  const compactModelSummary = stats.models.length <= 1
-    ? (stats.models[0] || t('session.header.unknown'))
-    : `${stats.models[0]} +${stats.models.length - 1}`
-
-  const handleCopyPath = () => {
-    if (sessionPath) {
-      void copyText(sessionPath)
-    }
+  if (Number.isFinite(timestamp) && age >= 0 && age < 24 * 60 * 60 * 1000) {
+    return formatShortTime(value, t)
   }
 
-  if (previewMode) {
-    return (
-      <div className="session-header">
-        <h1>
-          {t('session.header.session')}: {escapeHtml(sessionId || t('session.header.unknown'))}
-          {sessionPath && (
-            <button
-              onClick={handleCopyPath}
-              className="ml-2 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground opacity-0 transition-opacity hover:bg-secondary hover:text-foreground group-hover:opacity-100"
-              title={t('session.copyPath', 'Copy JSONL path')}
-            >
-              <Copy className="h-3 w-3" />
-            </button>
-          )}
-        </h1>
-        <div className="session-meta">
-          <div className="info-item">
-            <span className="info-label">{t('session.header.date')}:</span>
-            <span className="info-value">{timestamp ? formatDate(timestamp) : t('session.header.unknown')}</span>
-          </div>
-          <div className="info-item">
-            <span className="info-label">{t('session.header.models')}:</span>
-            <span className="info-value">{compactModelSummary}</span>
-          </div>
-          <div className="info-item">
-            <span className="info-label">{t('session.header.messagesLabel')}:</span>
-            <span className="info-value">{msgParts.join(', ') || '0'}</span>
-          </div>
-        </div>
-      </div>
-    )
+  return formatDate(value)
+}
+
+function SessionHeader({ session, timestamp, stats, previewMode = false, isLive = false }: SessionHeaderProps) {
+  const { t } = useTranslation()
+  const { copyText } = useClipboard()
+  const [copiedTarget, setCopiedTarget] = useState<'path' | 'id' | null>(null)
+  const modelSummary = stats.models.join(', ') || session.models?.join(', ') || session.model || t('session.header.unknown')
+  const displayPath = shortenPath(session.cwd || session.path, previewMode ? 54 : 72)
+  const displayId = session.id || t('session.header.unknown')
+  const detailParts = [
+    stats.userMessages && `${stats.userMessages} ${t('session.header.user')}`,
+    stats.assistantMessages && `${stats.assistantMessages} ${t('session.header.assistant')}`,
+    stats.toolResults && `${stats.toolResults} ${t('session.header.toolResults')}`,
+    stats.compactions && `${stats.compactions} ${t('session.header.compactions')}`,
+  ].filter(Boolean)
+  const tokenParts = [
+    stats.tokens.input && `↑${formatTokens(stats.tokens.input)}`,
+    stats.tokens.output && `↓${formatTokens(stats.tokens.output)}`,
+    stats.tokens.cacheRead && `R${formatTokens(stats.tokens.cacheRead)}`,
+    stats.tokens.cacheWrite && `W${formatTokens(stats.tokens.cacheWrite)}`,
+  ].filter(Boolean)
+
+  const copyValue = async (target: 'path' | 'id', value: string) => {
+    await copyText(value)
+    setCopiedTarget(target)
+    window.setTimeout(() => setCopiedTarget(null), 1500)
   }
 
   return (
-    <div className="session-header">
-      <h1>
-        {t('session.header.session')}: {escapeHtml(sessionId || t('session.header.unknown'))}
-        {sessionPath && (
+    <section className={`session-header session-header--telemetry${previewMode ? ' session-header--preview' : ''}`} aria-label={t('session.header.context', 'Session context')}>
+      <div className="session-header__topline">
+        <div className="session-header__context">
+          <div className="session-header__path-row">
+            {session.name && !previewMode && (
+              <>
+                <span className="session-header__name" title={session.name}>{session.name}</span>
+                <span className="session-header__separator" aria-hidden="true">›</span>
+              </>
+            )}
+            <span className="session-header__path" title={session.cwd || session.path}>{displayPath}</span>
+            <button
+              type="button"
+              className="session-header__copy-button"
+              onClick={() => void copyValue('path', session.path)}
+              title={t('session.copyPath', 'Copy JSONL path')}
+              aria-label={t('session.copyPath', 'Copy JSONL path')}
+            >
+              {copiedTarget === 'path' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+            </button>
+          </div>
+          <div className="session-header__meta-row">
+            {isLive && (
+              <span className="session-header__live" title={t('session.streaming', 'Streaming')}>
+                <Radio className="session-header__live-icon" aria-hidden="true" />
+                {t('session.streaming', 'Streaming')}
+              </span>
+            )}
+            {timestamp && <><span>{t('common.created')} {formatHeaderTime(timestamp, t)}</span><span className="session-header__separator" aria-hidden="true">·</span></>}
+            {session.modified && <><span>{t('common.updated')} {formatHeaderTime(session.modified, t)}</span><span className="session-header__separator" aria-hidden="true">·</span></>}
+            <span className="session-header__model" title={modelSummary}>{modelSummary}</span>
+          </div>
+        </div>
+        <div className="session-header__id-wrap">
+          <span className="session-header__id" title={displayId}>{displayId}</span>
           <button
-            onClick={handleCopyPath}
-            className="ml-2 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground opacity-0 transition-opacity hover:bg-secondary hover:text-foreground group-hover:opacity-100"
-            title={t('session.copyPath', 'Copy JSONL path')}
+            type="button"
+            className="session-header__copy-button"
+            onClick={() => void copyValue('id', displayId)}
+            title={t('session.header.copyId', 'Copy session ID')}
+            aria-label={t('session.header.copyId', 'Copy session ID')}
           >
-            <Copy className="h-3 w-3" />
+            {copiedTarget === 'id' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
           </button>
-        )}
-      </h1>
-      <div className="session-meta">
-        <div className="info-item">
-          <span className="info-label">{t('session.header.date')}:</span>
-          <span className="info-value">{timestamp ? formatDate(timestamp) : t('session.header.unknown')}</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">{t('session.header.models')}:</span>
-          <span className="info-value">{stats.models.join(', ') || t('session.header.unknown')}</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">{t('session.header.messagesLabel')}:</span>
-          <span className="info-value">{msgParts.join(', ') || '0'}</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">{t('session.header.toolCalls')}:</span>
-          <span className="info-value">{stats.toolCalls}</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">{t('session.header.tokens')}:</span>
-          <span className="info-value">{tokenParts.join(' ') || '0'}</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">{t('session.header.cost')}:</span>
-          <span className="info-value">${totalCost.toFixed(3)}</span>
         </div>
       </div>
-    </div>
+
+      {!previewMode && (
+        <div className="session-header__detail-row">
+          <span>{detailParts.join(' · ') || `0 ${t('session.header.messagesLabel')}`}</span>
+          <span>{tokenParts.join(' ') || '0'}</span>
+        </div>
+      )}
+    </section>
   )
 }
 

@@ -2,12 +2,14 @@ import type { RefObject } from "react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { FolderOpen, Pin } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 
 export type ProjectListSortMode = "recent" | "sessions" | "messages" | "name";
 
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { ProjectListSkeleton } from "@/components/ui/Skeleton";
-import type { SessionInfo, FavoriteItem } from "@/types";
+import { usePsmPluginUi, PluginContributionBoundary, PluginContributionSlot } from "@/plugins/runtime-host";
+import type { SessionInfo } from "@/types";
 import {
   formatDirectory,
   formatShortTime,
@@ -19,8 +21,6 @@ interface ProjectListProps {
   onSelectProject?: (project: string | null) => void;
   loading: boolean;
   scrollParentRef?: RefObject<HTMLDivElement>;
-  favorites?: FavoriteItem[];
-  onToggleFavorite?: (item: Omit<FavoriteItem, "addedAt">) => void;
   liveSessionIds?: Set<string>;
   selectedProject?: string | null;
   searchQuery?: string;
@@ -41,14 +41,13 @@ export default function ProjectList({
   onSelectProject,
   loading,
   scrollParentRef,
-  favorites = [],
-  onToggleFavorite,
   liveSessionIds,
   selectedProject = null,
   searchQuery = "",
   sortMode = "recent",
 }: ProjectListProps) {
   const { t } = useTranslation();
+  const { projectListActions = [] } = usePsmPluginUi();
 
   const projects: Project[] = useMemo(() => {
     const projectMap = sessions.reduce(
@@ -102,8 +101,14 @@ export default function ProjectList({
     overscan: 8,
   });
 
-  if (loading) {
+  const showDelayedLoading = useDelayedLoading(loading);
+
+  if (showDelayedLoading) {
     return <ProjectListSkeleton />;
+  }
+
+  if (loading) {
+    return <div className="flex-1 min-h-[120px]" aria-hidden="true" />;
   }
 
   if (projects.length === 0) {
@@ -129,9 +134,21 @@ export default function ProjectList({
         {virtualItems.map((virtualRow) => {
           const project = projects[virtualRow.index];
           if (!project) return null;
-          const isFavorite = favorites.some(
-            (f) => f.type === "project" && f.id === project.dir,
-          );
+          const projectActions = projectListActions.map((action) => (
+            <PluginContributionBoundary key={action.id} pluginId={action.pluginId} contributionId={action.id} title={action.title}>
+              <PluginContributionSlot render={() => action.render({
+                project: {
+                  path: project.dir,
+                  name: project.dirName,
+                  sessionCount: project.sessionCount,
+                  messageCount: project.messageCount,
+                  lastModified: project.lastModified,
+                  liveCount: project.liveCount,
+                },
+                onActivate: () => {},
+              })} />
+            </PluginContributionBoundary>
+          ));
           const isSelected = selectedProject === project.dir;
           return (
             <div
@@ -155,11 +172,7 @@ export default function ProjectList({
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <div className="p-0.5 rounded flex-shrink-0">
-                        <FolderOpen
-                          className={`h-4 w-4 flex-shrink-0 ${
-                            isFavorite ? "text-yellow-500" : "text-blue-400"
-                          }`}
-                        />
+                        <FolderOpen className="h-4 w-4 flex-shrink-0 text-blue-400" />
                       </div>
                       <div className="text-[13px] sm:text-sm font-medium truncate leading-tight">
                         {project.dirName}
@@ -198,31 +211,7 @@ export default function ProjectList({
                     )}
                   </div>
                 </div>
-                {onToggleFavorite && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleFavorite({
-                        type: "project",
-                        id: project.dir,
-                        name: project.dirName,
-                        path: project.dir,
-                      });
-                    }}
-                    className={`p-1 rounded motion-color motion-press focus-ring flex-shrink-0 opacity-0 group-hover:opacity-100 ${
-                      isFavorite
-                        ? "text-yellow-400 opacity-100"
-                        : "text-muted-foreground hover:text-yellow-400"
-                    }`}
-                    title={
-                      isFavorite ? t("favorites.remove") : t("favorites.add")
-                    }
-                  >
-                    <Pin
-                      className={`h-3.5 w-3.5 ${isFavorite ? "fill-current" : ""}`}
-                    />
-                  </button>
-                )}
+                {projectActions}
               </div>
             </div>
           );

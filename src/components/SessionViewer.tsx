@@ -15,10 +15,10 @@ import { useSessionViewerDerivedData } from "@/hooks/useSessionViewerDerivedData
 import { useSessionViewerHotkeys } from "@/hooks/useSessionViewerHotkeys";
 import { useSessionViewerSearchController } from "@/hooks/useSessionViewerSearchController";
 import { useSessionViewerPanelController } from "@/hooks/useSessionViewerPanelController";
+import { useSessionViewerLiveState } from "@/hooks/useSessionViewerLiveState";
 import { useSessionViewerSettingsState } from "@/hooks/useSessionViewerSettingsState";
 import { useSessionViewerScrollActions } from "@/hooks/useSessionViewerScrollActions";
 import { useClipboard } from "@/hooks/useClipboard";
-import { useSessionViewerLiveState } from "@/hooks/useSessionViewerLiveState";
 import { useSessionViewerToolbarProps } from "@/hooks/useSessionViewerToolbarProps";
 import { useSessionViewerSidebarController } from "@/hooks/useSessionViewerSidebarController";
 
@@ -440,6 +440,7 @@ function SessionViewerContent({
         sidebarWidth,
         isResizing,
         activeEntryId,
+        hasMoreHistory,
         pluginViews: pluginTreeViews,
         onCloseSidebar: () => setShowSidebar(false),
         onNodeClick: handleTreeNodeClick,

@@ -1,22 +1,14 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
-import type { SessionInfo, FavoriteItem, Tag } from "@/types";
+import type { SessionInfo, Tag } from "@/types";
 import {
   ArrowRightLeft,
   CheckSquare2,
   Search,
   Square,
-  Star,
   Tags,
   Trash2,
   Zap,
@@ -39,7 +31,11 @@ import {
   getSessionSourceSlug,
   getSessionSourceTag,
 } from "@/utils/session";
-import { formatDirectory, formatShortTime } from "@/utils/sessionDisplay";
+import {
+  formatDirectory,
+  formatShortTime,
+  getSessionListDisplayName,
+} from "@/utils/sessionDisplay";
 import type { TerminalType } from "@/components/settings/types";
 import { getPlatformDefaults } from "@/components/settings/types";
 import { invoke, isTauri } from "@/transport";
@@ -51,6 +47,7 @@ import {
   buildCopyResumeCommand,
   openSessionInTerminalDirect,
 } from "@/utils/sessionResume";
+import { usePsmPluginSessionUi, PluginContributionBoundary, PluginContributionSlot } from '@/plugins/runtime-host';
 
 const ESTIMATED_ROW_HEIGHT = 122;
 const STICKY_SCROLL_TOP_THRESHOLD = 48;
@@ -92,8 +89,6 @@ interface SessionListProps {
   customCommand?: string;
   resumeCommand?: string;
   scrollParentRef?: RefObject<HTMLDivElement>;
-  favorites?: FavoriteItem[];
-  onToggleFavorite?: (item: Omit<FavoriteItem, "addedAt">) => void;
   showDirectory?: boolean;
   tags?: Tag[];
   getTagsForSession?: (sessionId: string) => Tag[];
@@ -133,8 +128,6 @@ export default function SessionList({
   customCommand,
   resumeCommand,
   scrollParentRef,
-  favorites = [],
-  onToggleFavorite,
   showDirectory = true,
   tags = [],
   getTagsForSession,
@@ -145,6 +138,7 @@ export default function SessionList({
   searchQuery,
   liveSessionIds,
 }: SessionListProps) {
+  const { sessionListActions = [], sessionContextMenuActions = [] } = usePsmPluginSessionUi();
   const { t } = useTranslation();
   const { getSessionSetting } = useSettings();
   const isMobile = useIsMobile();
@@ -183,15 +177,6 @@ export default function SessionList({
     sessionId: string;
     top: number;
   } | null>(null);
-  const favoriteSessionIds = useMemo(
-    () =>
-      new Set(
-        favorites
-          .filter((favorite) => favorite.type === "session")
-          .map((favorite) => favorite.id),
-      ),
-    [favorites],
-  );
   const sessionsById = useMemo(
     () => new Map(sessions.map((session) => [session.id, session] as const)),
     [sessions],
@@ -265,6 +250,29 @@ export default function SessionList({
       window.removeEventListener("resize", dismiss);
     };
   }, [hoveredCard]);
+
+  const renderSessionPluginActions = useCallback((session: SessionInfo) => (
+    sessionListActions.map((action) => (
+      <PluginContributionBoundary key={action.id} pluginId={action.pluginId} contributionId={action.id} title={action.title}>
+        <PluginContributionSlot render={() => action.render({
+          session: { path: session.path, id: session.id, name: session.name, cwd: session.cwd },
+          onActivate: () => {},
+        })} />
+      </PluginContributionBoundary>
+    ))
+  ), [sessionListActions]);
+
+  const renderSessionContextActions = useCallback((session: SessionInfo) => (
+    sessionContextMenuActions.map((action) => (
+      <PluginContributionBoundary key={action.id} pluginId={action.pluginId} contributionId={action.id} title={action.title}>
+        <PluginContributionSlot render={() => action.render({
+          session: { path: session.path, id: session.id, name: session.name, cwd: session.cwd },
+          close: () => setContextMenu(null),
+          onActivate: () => {},
+        })} />
+      </PluginContributionBoundary>
+    ))
+  ), [sessionContextMenuActions]);
 
   const allSessionsSelected =
     sessions.length > 0 && selectedSessionIds.size === sessions.length;
@@ -776,7 +784,7 @@ export default function SessionList({
                   }}
                 >
                   {rowSessions.map((session) => {
-                    const isFavorite = favoriteSessionIds.has(session.id);
+                    const pluginSessionActions = renderSessionPluginActions(session);
                     const updatedLabel = formatShortTime(session.modified, t);
                     const isSelectionMarked = selectedSessionIds.has(
                       session.id,
@@ -909,9 +917,10 @@ export default function SessionList({
                                       setHoveredCard(null);
                                     }}
                                   >
-                                    {session.name ||
-                                      session.first_message ||
-                                      t("session.list.untitled")}
+                                    {getSessionListDisplayName(
+                                      session,
+                                      t("session.list.untitled"),
+                                    )}
                                   </h3>
                                 </div>
                                 {isSelectionMode && isSelectionMarked && (
@@ -1015,36 +1024,7 @@ export default function SessionList({
                           <div
                             className={`flex items-center gap-1 transition-all duration-200 ease-out ${isMobile ? "flex-shrink-0" : "w-0 opacity-0 group-hover:w-auto group-hover:opacity-100"}`}
                           >
-                            {!isSelectionMode && onToggleFavorite && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onToggleFavorite({
-                                    type: "session",
-                                    id: session.id,
-                                    name:
-                                      session.name ||
-                                      session.first_message ||
-                                      t("session.list.untitled"),
-                                    path: session.path,
-                                  });
-                                }}
-                                className={`p-1 rounded motion-color motion-press focus-ring ${
-                                  isFavorite
-                                    ? "text-yellow-400"
-                                    : "text-muted-foreground/60 hover:text-yellow-400"
-                                }`}
-                                title={
-                                  isFavorite
-                                    ? t("favorites.remove")
-                                    : t("favorites.add")
-                                }
-                              >
-                                <Star
-                                  className={`h-3 w-3 ${isFavorite ? "fill-current" : ""}`}
-                                />
-                              </button>
-                            )}
+                            {pluginSessionActions}
                             {!isSelectionMode && onToggleTag && (
                               <button
                                 onClick={(e) => {
@@ -1190,21 +1170,7 @@ export default function SessionList({
                 }
               : undefined
           }
-          onToggleFavorite={
-            onToggleFavorite
-              ? () => {
-                  onToggleFavorite({
-                    type: "session",
-                    id: contextMenuSession.id,
-                    name:
-                      contextMenuSession.name ||
-                      contextMenuSession.first_message ||
-                      "Untitled",
-                    path: contextMenuSession.path,
-                  });
-                }
-              : undefined
-          }
+          pluginActions={renderSessionContextActions(contextMenuSession)}
           onCopyResume={
             onCopyResumeSession
               ? async () => {
@@ -1233,7 +1199,6 @@ export default function SessionList({
                 }
               : undefined
           }
-          isFavorite={favoriteSessionIds.has(contextMenuSession.id)}
           onDeleteDirect={
             onDeleteSession
               ? () => {
@@ -1315,9 +1280,10 @@ export default function SessionList({
           }}
         >
           <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-snug" style={{ whiteSpace: "normal", wordBreak: "break-word" }}>
-            {hoveredCard.session.name ||
-              hoveredCard.session.first_message ||
-              t("session.list.untitled")}
+            {getSessionListDisplayName(
+              hoveredCard.session,
+              t("session.list.untitled"),
+            )}
           </h3>
         </div>,
         document.body,

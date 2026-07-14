@@ -9,6 +9,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import type { SessionInfo } from "@/types";
 
 interface StandaloneDatasetOverviewProps {
@@ -80,8 +81,9 @@ export default function StandaloneDatasetOverview({
   const averageMessages =
     sessions.length > 0 ? (totalMessages / sessions.length).toFixed(1) : "0.0";
   const latestTimestamp = recentSessions[0]?.modified;
+  const showDelayedLoading = useDelayedLoading(Boolean(loading));
 
-  if (loading) {
+  if (showDelayedLoading) {
     return (
       <div className="h-full overflow-y-auto p-3 md:p-4">
         <div className="mx-auto max-w-7xl">
@@ -167,6 +169,10 @@ export default function StandaloneDatasetOverview({
         </div>
       </div>
     );
+  }
+
+  if (loading) {
+    return <div className="h-full min-h-0" aria-hidden="true" />;
   }
 
   return (

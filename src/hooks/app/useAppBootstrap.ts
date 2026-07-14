@@ -137,6 +137,23 @@ export function useAppBootstrap({
   }, [reloadTerminalConfig]);
 
   useEffect(() => {
+    const handleGlobalSelectAll = (event: KeyboardEvent) => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === "a"
+      ) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalSelectAll, { capture: true });
+    return () =>
+      window.removeEventListener("keydown", handleGlobalSelectAll, { capture: true });
+  }, []);
+
+  useEffect(() => {
     if (!isTauri()) {
       return;
     }

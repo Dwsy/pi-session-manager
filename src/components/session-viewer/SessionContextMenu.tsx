@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Terminal, Globe, Star, Trash2, Check, Copy, ArrowRightLeft, X, GitBranch, Pencil } from 'lucide-react'
+import type { ReactNode } from 'react'
 import type { Tag } from '@/types'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
 
@@ -24,6 +25,7 @@ interface SessionContextMenuProps {
   onRename?: () => void
   onDelete?: () => void
   onDeleteDirect?: () => void
+  pluginActions?: ReactNode
   isFavorite?: boolean
   onClose: () => void
 }
@@ -31,7 +33,7 @@ interface SessionContextMenuProps {
 export default function SessionContextMenu({
   x, y, tags, sessionTagIds,
   onToggleTag, onOpenTerminal, onOpenBrowser,
-  onConvert, onToggleFavorite, onCopyResume, onFork, onRename, onDelete, onDeleteDirect, isFavorite, onClose,
+  onConvert, onToggleFavorite, onCopyResume, onFork, onRename, onDelete, onDeleteDirect, pluginActions, isFavorite, onClose,
 }: SessionContextMenuProps) {
   const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
@@ -155,6 +157,7 @@ export default function SessionContextMenu({
           <span className="text-xs text-foreground">{t('tags.contextMenu.favorite')}</span>
         </button>
       )}
+      {pluginActions}
       {onCopyResume && (
         <button onClick={() => { onCopyResume(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
           <Copy className="h-3.5 w-3.5 text-muted-foreground" />

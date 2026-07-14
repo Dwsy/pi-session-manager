@@ -27,6 +27,7 @@ import DashboardInsightModal from "./DashboardInsightModal";
 import type { DashboardInsightMode } from "./DashboardInsightModal";
 import TokenTrendChart from "./TokenTrendChart";
 import SessionPreviewModal from "@/components/session-preview/SessionPreviewModal";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { DashboardSkeleton } from "@/components/ui/Skeleton";
 import {
   getRuntimeDayStats,
@@ -264,13 +265,18 @@ export default function Dashboard({
     setInsightModalMode("model_projects");
   };
 
-  // Show skeleton only on first load with no data
-  if (
+  const isInitialStatsLoading =
     !hasLoadedOnce.current &&
     stats === null &&
-    (parentLoading || sessions.length > 0)
-  ) {
+    (parentLoading || sessions.length > 0);
+  const showDelayedDashboardSkeleton = useDelayedLoading(isInitialStatsLoading);
+
+  if (showDelayedDashboardSkeleton) {
     return <DashboardSkeleton />;
+  }
+
+  if (isInitialStatsLoading) {
+    return <div className="flex-1 min-h-0" aria-hidden="true" />;
   }
 
   // Do not show loading state; display empty or actual data directly

@@ -16,6 +16,8 @@ import SessionLengthChart from './SessionLengthChart'
 import WeeklyComparison from './WeeklyComparison'
 import TokenStats from './TokenStats'
 import Achievements from './Achievements'
+import { DelayedLoadingOverlay } from '@/components/ui/DelayedLoading'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 interface StatsPanelProps {
   sessions: SessionInfo[]
@@ -28,6 +30,7 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
   const { t } = useTranslation()
   const [stats, setStats] = useState<SessionStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const showDelayedLoading = useDelayedLoading(loading)
   const [activeTab, setActiveTab] = useState<TabType>('overview')
   const isLoadingRef = useRef(false)
   const statsKey = useMemo(() => {
@@ -78,17 +81,12 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
     }
   }
 
+  if (showDelayedLoading) {
+    return <DelayedLoadingOverlay message={t('stats.panel.loading')} />
+  }
+
   if (loading) {
-    return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-background border border-border rounded-xl p-8">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 border-3 border-info border-t-transparent rounded-full animate-spin" />
-            <div className="text-muted-foreground">{t('stats.panel.loading')}</div>
-          </div>
-        </div>
-      </div>
-    )
+    return null
   }
 
   if (!stats || !stats.heatmap_data) {

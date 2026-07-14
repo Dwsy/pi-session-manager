@@ -34,6 +34,7 @@ export interface SessionViewerBodySidebarProps {
   sidebarWidth: number;
   isResizing: boolean;
   activeEntryId: string | null;
+  hasMoreHistory?: boolean;
   pluginViews?: PsmSessionTreeViewRuntimeRegistration[];
   onCloseSidebar: () => void;
   onNodeClick: (leafId: string, targetId: string) => void;
@@ -133,7 +134,7 @@ export default function SessionViewerBody({
     scrollContainerRef,
     scrollContentRef,
   } = scrollMarkers;
-  const shouldShowSidebar = !previewMode && !mainViewSlot && sidebar.showSidebar;
+  const shouldShowSidebar = !previewMode && sidebar.showSidebar;
   const shouldMountSidebar = useDeferredPresence(shouldShowSidebar);
   const sidebarNode = shouldMountSidebar ? (
     <SessionViewerSidebar
@@ -147,6 +148,7 @@ export default function SessionViewerBody({
       sessionPath={session.path}
       pluginViews={sidebar.pluginViews}
       activeEntryId={sidebar.activeEntryId}
+      hasMoreHistory={sidebar.hasMoreHistory ?? false}
       onCloseSidebar={sidebar.onCloseSidebar}
       onNodeClick={sidebar.onNodeClick}
       onResizeMouseDown={sidebar.onResizeMouseDown}
@@ -192,9 +194,10 @@ export default function SessionViewerBody({
                   loading={messages.loading}
                   error={messages.error}
                   hasNewMessages={messages.hasNewMessages}
-                  sessionId={messages.headerEntry?.id || session.id}
-                  headerTimestamp={messages.headerEntry?.timestamp || session.created}
+                  session={session}
+                  timestamp={messages.headerEntry?.timestamp || session.created}
                   stats={messages.stats}
+                  isLive={isLive}
                   renderableEntries={messages.renderableEntries}
                   searchQuery={messages.searchQuery}
                   currentSearchTarget={messages.currentSearchTarget}

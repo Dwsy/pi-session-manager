@@ -27,6 +27,7 @@ export interface SessionViewerSidebarProps {
   isResizing: boolean;
   entries: SessionEntry[];
   sessionPath: string;
+  hasMoreHistory?: boolean;
   pluginViews?: PsmSessionTreeViewRuntimeRegistration[];
   activeEntryId: string | null;
   onCloseSidebar: () => void;
@@ -48,6 +49,7 @@ export default function SessionViewerSidebar({
   isResizing,
   entries,
   sessionPath,
+  hasMoreHistory = false,
   pluginViews = [],
   activeEntryId,
   onCloseSidebar,
@@ -172,6 +174,7 @@ export default function SessionViewerSidebar({
             resolvedLabelsByTargetId={resolvedLabelsByTargetId}
             pluginViews={pluginViews}
             sessionPath={sessionPath}
+            hasMoreHistory={hasMoreHistory}
           />
         </div>
       </aside>

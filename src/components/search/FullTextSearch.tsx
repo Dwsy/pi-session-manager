@@ -37,6 +37,8 @@ import {
 } from "@/runtime-data/sessionSource";
 import { formatShortSessionId } from "@/utils/session";
 import { useCompositionInput } from "@/hooks/useCompositionInput";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
+import { DelayedLoadingCenter } from "@/components/ui/DelayedLoading";
 import CompositionInput from "@/components/ui/CompositionInput";
 
 const HIGHLIGHT_CACHE_MAX_ENTRIES = 500;
@@ -122,6 +124,11 @@ export default function FullTextSearch({
   const inputRef = useRef<HTMLInputElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const requestIdRef = useRef(0);
+
+  const showDelayedSearching = useDelayedLoading(isSearching);
+  const showDelayedEmptyResultsLoading = useDelayedLoading(
+    isSearching && allHits.length === 0,
+  );
 
   const pageSize = 20;
   const parsedToken = useMemo(
@@ -687,11 +694,13 @@ export default function FullTextSearch({
         </div>
         <div className="px-4 py-2 border-b border-[#2a2b36]/50 bg-[#1a1b26]/50 flex items-center justify-between text-xs">
           <div className="text-muted-foreground/90 font-medium">
-            {isSearching ? (
+            {showDelayedSearching ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400 mr-1.5 inline" />
                 {t("search.searching")}
               </>
+            ) : isSearching ? (
+              t("search.searching")
             ) : totalHitsCount > 0 ? (
               t("search.fullText.resultsFound", { count: totalHitsCount })
             ) : null}
@@ -713,15 +722,17 @@ export default function FullTextSearch({
                 <X className="w-12 h-12 mb-4 opacity-50" />
                 <p className="text-sm font-medium">{error}</p>
               </div>
-            ) : isSearching && allHits.length === 0 ? (
+            ) : showDelayedEmptyResultsLoading ? (
               <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground/50">
-                <Loader2 className="w-16 h-16 mb-4 animate-spin" />
+                <DelayedLoadingCenter className="flex items-center justify-center mb-4" />
                 <p className="text-lg font-medium">
                   {isLabelsBrowseMode
                     ? t("search.fullText.labelsPlaceholder")
                     : t("search.searching")}
                 </p>
               </div>
+            ) : isSearching && allHits.length === 0 ? (
+              <div className="min-h-[200px]" aria-hidden="true" />
             ) : paginatedHits.length === 0 ? (
               !isSearching && (normalizedQuery.trim() || isLabelsBrowseMode) ? (
                 <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground/50">

@@ -5,6 +5,12 @@ import { applySessionEntryTransformers } from '@/plugins/runtime-host/sessionEnt
 export const SHORT_SESSION_ID_LENGTH = 12
 export const MIN_SESSION_ID_PREFIX_LENGTH = 3
 
+// Parent links are structural facts in Pi JSONL. Keep source provenance outside
+// persisted entry data so provider-specific display grouping cannot collapse a Pi
+// branch anchor.
+const claudeConvertedEntries = new WeakSet<SessionEntry>()
+const codexConvertedEntries = new WeakSet<SessionEntry>()
+
 export function isTauriReady(): boolean {
   return typeof window !== 'undefined' && window.__TAURI__ !== undefined
 }
@@ -206,15 +212,21 @@ function normalizeSessionEntry(raw: any): SessionEntry | null {
   const type = typeof raw.type === 'string' ? raw.type : undefined
 
   if (type === 'user' || type === 'assistant' || type === 'tool_result') {
-    return convertClaudeLineToSessionEntry(raw)
+    const entry = convertClaudeLineToSessionEntry(raw)
+    if (entry) claudeConvertedEntries.add(entry)
+    return entry
   }
 
   if (type === 'response_item') {
-    return convertCodexResponseItem(raw)
+    const entry = convertCodexResponseItem(raw)
+    if (entry) codexConvertedEntries.add(entry)
+    return entry
   }
 
   if (type === 'event_msg') {
-    return convertCodexEventMsg(raw)
+    const entry = convertCodexEventMsg(raw)
+    if (entry) codexConvertedEntries.add(entry)
+    return entry
   }
 
   if (type === 'message') {
@@ -228,6 +240,7 @@ function normalizeSessionEntry(raw: any): SessionEntry | null {
     type === 'model_change' ||
     type === 'thinking_level_change' ||
     type === 'toolCall' ||
+    type === 'custom' ||
     type === 'custom_message' ||
     type === 'compaction' ||
     type === 'branch_summary' ||
@@ -319,7 +332,9 @@ function groupClaudeAssistantFragments(entries: SessionEntry[]): SessionEntry[] 
 
   for (const entry of entries) {
     const isAssistant = entry.type === 'message' && entry.message?.role === 'assistant'
-    const responseId = isAssistant ? entry.message?.responseId : undefined
+    const responseId = claudeConvertedEntries.has(entry)
+      ? entry.message?.responseId
+      : undefined
 
     if (isAssistant && responseId && responseId === currentResponseId && current) {
       current = mergeAssistantInto(current, entry)
@@ -437,6 +452,12 @@ function groupCodexAssistantFragments(entries: SessionEntry[]): SessionEntry[] {
   }
 
   for (const entry of entries) {
+    if (!codexConvertedEntries.has(entry)) {
+      flushGroup()
+      result.push(entry)
+      continue
+    }
+
     const role = entry.type === 'message' ? entry.message?.role : undefined
 
     if (role === 'user') {

@@ -4,6 +4,7 @@ import { BrainCircuit, ChevronDown, Loader2 } from "lucide-react";
 import { invoke } from "@/transport";
 import { useTranslation } from "react-i18next";
 import ModelSelector, { type RPCModel } from "@/components/ModelSelector";
+import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import type { LiveSessionInfo } from "@/hooks/usePiLiveSessions";
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
@@ -24,6 +25,7 @@ export default function SessionViewerModelControls({
   const popoverRef = useRef<HTMLDivElement>(null);
   const thinkingTriggerRef = useRef<HTMLButtonElement>(null);
   const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({});
+  const showModelsDelayedLoading = useDelayedLoading(modelsLoading);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -185,7 +187,7 @@ export default function SessionViewerModelControls({
         models={models}
         currentModel={currentModel}
         onSelect={handleModelSelect}
-        loading={modelsLoading || isChangingModel}
+        loading={showModelsDelayedLoading || isChangingModel}
         disabled={modelsLoading || isChangingModel}
       />
 

@@ -225,6 +225,8 @@ export const session = {
     custom: '自定义',
     compactions: '压缩',
     branchSummaries: '分支摘要',
+    context: '会话上下文',
+    copyId: '复制会话 ID',
     session: '会话',
     unknown: '未知',
   },

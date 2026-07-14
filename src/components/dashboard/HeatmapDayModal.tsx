@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import type { HeatmapPoint, DayStats } from '@/types'
 import { getPathBasename } from '@/utils/path'
+import { DelayedLoadingCenter } from '@/components/ui/DelayedLoading'
+import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 
 interface HeatmapDayModalProps {
   point: HeatmapPoint
@@ -94,6 +96,7 @@ export default function HeatmapDayModal({
   tokenTrend,
 }: HeatmapDayModalProps) {
   const { t, i18n } = useTranslation()
+  const showDelayedLoading = useDelayedLoading(loading)
 
   const [selectedHour, setSelectedHour] = useState<number | null>(null)
   const [focusPanel, setFocusPanel] = useState<FocusPanel>(null)
@@ -355,11 +358,13 @@ export default function HeatmapDayModal({
         </div>
 
         <div className="relative flex-1 min-h-0 p-2.5 sm:p-4 grid grid-rows-[auto_1fr] gap-3 bg-gradient-to-b from-muted/8 to-transparent">
-          {loading ? (
+          {showDelayedLoading ? (
             <div className="h-full rounded-xl border border-border/20 bg-muted/15 flex flex-col items-center justify-center gap-2">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <DelayedLoadingCenter className="flex items-center justify-center" />
               <div className="text-xs text-muted-foreground">{t('dashboard.loading', 'Loading dashboard...')}</div>
             </div>
+          ) : loading ? (
+            <div className="h-full min-h-[200px]" aria-hidden="true" />
           ) : (
             <>
               <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5">

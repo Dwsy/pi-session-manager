@@ -12,6 +12,7 @@ import { SessionBadge } from '@/components/session-viewer/SessionBadge'
 import type { TerminalType } from '@/components/settings/types'
 import { getPlatformDefaults } from '@/components/settings/types'
 import { getSessionSourceSlug, getSessionSourceTag } from '@/utils/session'
+import { getSessionListDisplayName } from '@/utils/sessionDisplay'
 import { useSettings } from '@/hooks/useSettings'
 
 interface SessionListByDirectoryProps {
@@ -88,6 +89,10 @@ export default function SessionListByDirectory({
 
   if (showDelayedLoading) {
     return <DirectoryListSkeleton />
+  }
+
+  if (loading) {
+    return <div className="flex-1 min-h-[120px]" aria-hidden="true" />
   }
 
   if (sessions.length === 0) {
@@ -187,8 +192,12 @@ export default function SessionListByDirectory({
           const sourceTag = getSessionSourceTag(session.path)
           const sourceSlug = getSessionSourceSlug(session.path)
           const isLive = session.isLive || (liveSessionIds?.has(session.id) ?? false)
+          const displayName = getSessionListDisplayName(
+            session,
+            t('session.list.untitled'),
+          )
           const hoverTitle = [
-            session.name || session.first_message || t('session.list.untitled'),
+            displayName,
             `${t('session.tooltip.path')}: ${session.path}`,
             `${t('session.tooltip.created')}: ${new Date(session.created).toLocaleString()}`,
             `${t('session.tooltip.updated')}: ${new Date(session.modified).toLocaleString()}`,
@@ -235,7 +244,7 @@ export default function SessionListByDirectory({
                         />
                       )}
                       <h3 className="font-medium text-xs truncate leading-tight flex-1">
-                        {session.name || session.first_message || t('session.list.untitled')}
+                        {displayName}
                       </h3>
                       {getBadgeType && getBadgeType(session.id) && (
                         <SessionBadge type={getBadgeType(session.id)!} />

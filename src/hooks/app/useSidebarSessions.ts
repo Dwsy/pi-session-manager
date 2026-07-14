@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { AppDesktopSidebarSessionListCommonProps } from "@/components/app/AppDesktopSidebarContent";
 import type { MobileTab } from "@/components/app/AppMobileLayout";
 import type { TerminalType } from "@/components/settings/types";
-import type { FavoriteItem, SessionInfo, SessionTag, Tag, DateRange } from "@/types";
+import type { SessionInfo, SessionTag, Tag, DateRange } from "@/types";
 import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
 import { filterSessions } from "@/utils/sessionFilters";
 import { getDirectoryName } from "@/utils/sessionDisplay";
@@ -25,7 +25,6 @@ export interface UseSidebarSessionsOptions {
   isMobile: boolean;
   mobileTab: MobileTab;
   viewMode: AppSidebarViewMode;
-  showFavorites: boolean;
   sidebarSearchQuery: string;
   filterTagIds: string[];
   sourceFilterSlugs?: string[];
@@ -55,8 +54,6 @@ export interface UseSidebarSessionsOptions {
   resumeCommand?: string;
   sortBy: SessionSortBy;
   sortOrder: SessionSortOrder;
-  favorites: FavoriteItem[];
-  onToggleFavorite: (item: Omit<FavoriteItem, "addedAt">) => Promise<void>;
   tags: Tag[];
   getTagsForSession: (sessionId: string) => Tag[];
   assignTag: (sessionId: string, tagId: string) => Promise<void>;
@@ -96,7 +93,6 @@ export function useSidebarSessions({
   isMobile,
   mobileTab,
   viewMode,
-  showFavorites,
   sidebarSearchQuery,
   filterTagIds,
   sourceFilterSlugs = [],
@@ -123,8 +119,6 @@ export function useSidebarSessions({
   resumeCommand,
   sortBy,
   sortOrder,
-  favorites,
-  onToggleFavorite,
   tags,
   getTagsForSession,
   assignTag,
@@ -186,7 +180,6 @@ export function useSidebarSessions({
     ? mobileTab === "projects" && !!selectedProject
     : viewMode === "project" && !!selectedProject;
   const shouldEnablePagedSidebar =
-    !showFavorites &&
     (isMobile
       ? mobileTab === "list" || showProjectSessionList
       : viewMode === "list" || showProjectSessionList);
@@ -322,8 +315,6 @@ export function useSidebarSessions({
       piPath,
       customCommand,
       resumeCommand,
-      favorites,
-      onToggleFavorite,
       tags,
       getTagsForSession,
       onToggleTag: handleToggleSessionTag,
@@ -353,8 +344,6 @@ export function useSidebarSessions({
       piPath,
       customCommand,
       resumeCommand,
-      favorites,
-      onToggleFavorite,
       tags,
       getTagsForSession,
       handleToggleSessionTag,

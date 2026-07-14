@@ -12,6 +12,20 @@ export const components = {
     arguments: '参数',
     output: '输出',
   },
+  branchMap: {
+    copyOutput: '复制输出',
+    copyJson: '复制 JSON',
+    loadingTopology: '正在加载完整分支拓扑…',
+  },
+  traceInspector: {
+    title: '条目检查器',
+    locate: '定位到会话',
+    segment: '分支段',
+    sequence: '序列',
+    relation: '关系',
+    time: '时间',
+    copyId: '复制条目 ID',
+  },
   toolCallReview: {
     title: '工具调用审查',
     filterLabel: '审查筛选',
