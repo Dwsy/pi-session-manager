@@ -1,0 +1,17 @@
+{
+  "ts": "2026-07-14T11:05:19.250Z",
+  "kind": "delta",
+  "delta": {
+    "updated_at": "2026-07-14T11:05:19.250Z",
+    "validation": {
+      "commands": [
+        "node scripts/release-version.mjs check",
+        "pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; pnpm exec vitest run src/utils/markdownLinks.test.ts src/components/ui/MarkdownContent.test.tsx; cargo test -p pi-session-manager --no-default-features auth::tests",
+        "cargo check -p pi-session-manager --features gui; cargo check -p pi-session-cli; pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; pnpm exec vitest run src/utils/markdownLinks.test.ts src/components/ui/MarkdownContent.test.tsx; cargo test -p pi-session-manager --no-default-features auth::tests"
+      ],
+      "notes": "目标编译、TypeScript、13 个 Markdown/链接测试、3 个认证策略测试均通过；全量 Vitest 仍为 BLOCK。"
+    },
+    "next_action": "修复全量 Vitest 的 4 个失败 suite 并完成剩余安全回归"
+  },
+  "event": "targeted-checks-passed"
+}

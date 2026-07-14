@@ -1,0 +1,82 @@
+{
+  "ts": "2026-07-14T11:03:18.405Z",
+  "kind": "delta",
+  "delta": {
+    "pdca": {
+      "stage": "check",
+      "stages": [
+        {
+          "id": "plan",
+          "label": "Plan",
+          "status": "completed"
+        },
+        {
+          "id": "do",
+          "label": "Do",
+          "status": "completed"
+        },
+        {
+          "id": "check",
+          "label": "Check",
+          "status": "in_progress"
+        },
+        {
+          "id": "act",
+          "label": "Act",
+          "status": "planned"
+        }
+      ]
+    },
+    "current_phase": "D1",
+    "updated_at": "2026-07-14T11:03:18.405Z",
+    "phases": [
+      {
+        "id": "P0",
+        "name": "frame objective and constraints",
+        "pdca_stage": "plan",
+        "status": "completed"
+      },
+      {
+        "id": "P1",
+        "name": "execute first tracer path",
+        "pdca_stage": "do",
+        "status": "completed"
+      },
+      {
+        "id": "D1",
+        "name": "choose implementation route",
+        "pdca_stage": "check",
+        "status": "in_progress",
+        "type": "decision"
+      },
+      {
+        "id": "P2",
+        "name": "validate evidence and regressions",
+        "pdca_stage": "check",
+        "status": "planned"
+      },
+      {
+        "id": "D2",
+        "name": "decide continue, pivot, or close",
+        "pdca_stage": "act",
+        "status": "planned",
+        "type": "decision"
+      },
+      {
+        "id": "P3",
+        "name": "act on learning and hand off",
+        "pdca_stage": "act",
+        "status": "planned"
+      }
+    ],
+    "validation": {
+      "commands": [
+        "node scripts/release-version.mjs check",
+        "pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; pnpm exec vitest run src/utils/markdownLinks.test.ts src/components/ui/MarkdownContent.test.tsx; cargo test -p pi-session-manager --no-default-features auth::tests"
+      ],
+      "notes": "目标 TypeScript、扩展 TypeScript、目标 Markdown 测试和认证策略测试已通过；全量 Vitest 仍有 4 个 suite evaluation failures，未宣称 GO。"
+    },
+    "next_action": "审查安全策略差异并修复全量 Vitest 失败套件"
+  },
+  "event": "p0-baseline-implemented"
+}

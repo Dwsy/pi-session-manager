@@ -1,0 +1,20 @@
+{
+  "ts": "2026-07-14T15:06:13.509Z",
+  "kind": "delta",
+  "delta": {
+    "updated_at": "2026-07-14T15:06:13.509Z",
+    "validation": {
+      "passed": true,
+      "commands": [
+        "node scripts/release-version.mjs check",
+        "pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; pnpm exec vitest run src/utils/markdownLinks.test.ts src/components/ui/MarkdownContent.test.tsx; cargo test -p pi-session-manager --no-default-features auth::tests",
+        "cargo check -p pi-session-manager --features gui; cargo check -p pi-session-cli; pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; pnpm exec vitest run src/utils/markdownLinks.test.ts src/components/ui/MarkdownContent.test.tsx; cargo test -p pi-session-manager --no-default-features auth::tests",
+        "pnpm run verify; cargo test -p pi-session-manager --no-default-features auth::tests -- --nocapture; cargo check -p pi-session-manager --features gui; cargo check -p pi-session-cli; pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; git diff --check; node scripts/release-version.mjs check",
+        "cargo test -p pi-session-manager --no-default-features auth::tests -- --nocapture; cargo check -p pi-session-manager --features gui; cargo check -p pi-session-cli; pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; git diff --check"
+      ],
+      "notes": "4 个 auth tests、GUI/CLI cargo check、两套 TypeScript 检查和 diff check 通过；pnpm run verify 仍因 4 个 fluent-emoji suite evaluation failures 返回非零，539 tests passed。"
+    },
+    "next_action": "按安全、CI、P1 分组提交；保留 verify blocker 与 smoke 缺口为交付前门禁"
+  },
+  "event": "final-targeted-validation"
+}

@@ -1,0 +1,60 @@
+{
+  "ts": "2026-07-14T15:02:55.718Z",
+  "kind": "delta",
+  "delta": {
+    "current_phase": "P2",
+    "updated_at": "2026-07-14T15:02:55.718Z",
+    "phases": [
+      {
+        "id": "P0",
+        "name": "frame objective and constraints",
+        "pdca_stage": "plan",
+        "status": "completed"
+      },
+      {
+        "id": "P1",
+        "name": "execute first tracer path",
+        "pdca_stage": "do",
+        "status": "completed"
+      },
+      {
+        "id": "D1",
+        "name": "choose implementation route",
+        "pdca_stage": "check",
+        "status": "completed",
+        "type": "decision"
+      },
+      {
+        "id": "P2",
+        "name": "validate evidence and regressions",
+        "pdca_stage": "check",
+        "status": "in_progress"
+      },
+      {
+        "id": "D2",
+        "name": "decide continue, pivot, or close",
+        "pdca_stage": "act",
+        "status": "planned",
+        "type": "decision"
+      },
+      {
+        "id": "P3",
+        "name": "act on learning and hand off",
+        "pdca_stage": "act",
+        "status": "planned"
+      }
+    ],
+    "validation": {
+      "passed": false,
+      "commands": [
+        "node scripts/release-version.mjs check",
+        "pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; pnpm exec vitest run src/utils/markdownLinks.test.ts src/components/ui/MarkdownContent.test.tsx; cargo test -p pi-session-manager --no-default-features auth::tests",
+        "cargo check -p pi-session-manager --features gui; cargo check -p pi-session-cli; pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; pnpm exec vitest run src/utils/markdownLinks.test.ts src/components/ui/MarkdownContent.test.tsx; cargo test -p pi-session-manager --no-default-features auth::tests",
+        "pnpm run verify; cargo test -p pi-session-manager --no-default-features auth::tests -- --nocapture; cargo check -p pi-session-manager --features gui; cargo check -p pi-session-cli; pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; git diff --check; node scripts/release-version.mjs check"
+      ],
+      "notes": "Rust auth 4/4、GUI/CLI cargo check、TS 两套检查、diff check、版本同步通过；pnpm run verify 的 typecheck/build 通过但全量 Vitest 失败 4 suites（539 tests passed），因此发布门禁仍为 BLOCK。"
+    },
+    "next_action": "保留 full verify blocker 证据，审查并分组提交安全/CI/P1 变更"
+  },
+  "event": "gui-raw-ws-gating-and-verify"
+}

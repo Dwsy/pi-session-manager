@@ -1,0 +1,6 @@
+{"ts":"2026-07-14T08:14:03.815Z","type":"created","status":"in_progress","phase":"P0","pdca_stage":"plan"}
+{"ts":"2026-07-14T08:15:03.053Z","type":"baseline-recorded","state_file":"state.json","status":"in_progress","phase":"P1","pdca_stage":"do","decision":null,"note":"","archive":"history/state/2026-07-14T08-15-03-053Z.delta.json"}
+{"ts":"2026-07-14T11:03:18.405Z","type":"p0-baseline-implemented","state_file":"state.json","status":"in_progress","phase":"D1","pdca_stage":"check","decision":null,"note":"","archive":"history/state/2026-07-14T11-03-18-405Z.delta.json"}
+{"ts":"2026-07-14T11:05:19.250Z","type":"targeted-checks-passed","state_file":"state.json","status":"in_progress","phase":"D1","pdca_stage":"check","decision":null,"note":"","archive":"history/state/2026-07-14T11-05-19-250Z.delta.json"}
+{"ts":"2026-07-14T15:02:55.718Z","type":"gui-raw-ws-gating-and-verify","state_file":"state.json","status":"in_progress","phase":"P2","pdca_stage":"check","decision":null,"note":"","archive":"history/state/2026-07-14T15-02-55-718Z.delta.json"}
+{"ts":"2026-07-14T15:06:13.509Z","type":"final-targeted-validation","state_file":"state.json","status":"in_progress","phase":"P2","pdca_stage":"check","decision":null,"note":"","archive":"history/state/2026-07-14T15-06-13-509Z.delta.json"}

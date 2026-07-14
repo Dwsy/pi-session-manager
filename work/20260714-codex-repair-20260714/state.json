@@ -1,0 +1,170 @@
+{
+  "schema_version": "work-pdca-loop.v1",
+  "project_root": "/Users/dengwenyu/worktrees/pi-session-manager/codex-repair-20260714",
+  "work_dir": "work/20260714-codex-repair-20260714",
+  "title": "PSM Codex Repair 2026-07-14",
+  "objective": "修复 PSM_CODEX_REPAIR_PACKET 中的 P0 安全/CI 阻断与 P1 稳定性、文档、动效和可访问性问题，并以可复现验证证据准备 PR。",
+  "status": "in_progress",
+  "mode": "pdca_goal_loop",
+  "pdca": {
+    "cycle": 1,
+    "stage": "check",
+    "stages": [
+      {
+        "id": "plan",
+        "label": "Plan",
+        "status": "completed"
+      },
+      {
+        "id": "do",
+        "label": "Do",
+        "status": "completed"
+      },
+      {
+        "id": "check",
+        "label": "Check",
+        "status": "in_progress"
+      },
+      {
+        "id": "act",
+        "label": "Act",
+        "status": "planned"
+      }
+    ]
+  },
+  "current_phase": "P2",
+  "created_at": "2026-07-14T08:14:03.815Z",
+  "updated_at": "2026-07-14T15:06:13.509Z",
+  "owner": "codex",
+  "scope": [],
+  "tags": [],
+  "ssot": [],
+  "inputs": [],
+  "outputs": [
+    "work/20260714-codex-repair-20260714/task.md",
+    "work/20260714-codex-repair-20260714/pdca.md",
+    "work/20260714-codex-repair-20260714/decisions.md",
+    "work/20260714-codex-repair-20260714/prompt.md",
+    "work/20260714-codex-repair-20260714/implementation-log.md",
+    "work/20260714-codex-repair-20260714/state.json",
+    "work/20260714-codex-repair-20260714/history/events.jsonl"
+  ],
+  "phases": [
+    {
+      "id": "P0",
+      "name": "frame objective and constraints",
+      "pdca_stage": "plan",
+      "status": "completed"
+    },
+    {
+      "id": "P1",
+      "name": "execute first tracer path",
+      "pdca_stage": "do",
+      "status": "completed"
+    },
+    {
+      "id": "D1",
+      "name": "choose implementation route",
+      "pdca_stage": "check",
+      "status": "completed",
+      "type": "decision"
+    },
+    {
+      "id": "P2",
+      "name": "validate evidence and regressions",
+      "pdca_stage": "check",
+      "status": "in_progress"
+    },
+    {
+      "id": "D2",
+      "name": "decide continue, pivot, or close",
+      "pdca_stage": "act",
+      "status": "planned",
+      "type": "decision"
+    },
+    {
+      "id": "P3",
+      "name": "act on learning and hand off",
+      "pdca_stage": "act",
+      "status": "planned"
+    }
+  ],
+  "decision_points": [
+    {
+      "id": "D1",
+      "phase": "D1",
+      "question": "Which route should the next implementation take?",
+      "status": "open",
+      "options": [
+        {
+          "id": "direct",
+          "label": "Direct implementation",
+          "next_phase": "P2",
+          "criteria": "Scope is clear, blast radius is small, and validation path is known."
+        },
+        {
+          "id": "research",
+          "label": "Research first",
+          "next_phase": "P0",
+          "criteria": "Domain facts, dependencies, or ownership are still unclear."
+        },
+        {
+          "id": "split",
+          "label": "Split into slices",
+          "next_phase": "P1",
+          "criteria": "The work is valid but too broad for one safe change."
+        }
+      ],
+      "selected_option_id": null,
+      "rationale": "",
+      "decided_at": null
+    },
+    {
+      "id": "D2",
+      "phase": "D2",
+      "question": "After Check, should this cycle close, pivot, or continue?",
+      "status": "open",
+      "options": [
+        {
+          "id": "close",
+          "label": "Close cycle",
+          "next_phase": "P3",
+          "criteria": "Acceptance evidence is complete and no important risk remains."
+        },
+        {
+          "id": "continue",
+          "label": "Continue same cycle",
+          "next_phase": "P1",
+          "criteria": "Core direction is right but more execution is required."
+        },
+        {
+          "id": "pivot",
+          "label": "Pivot plan",
+          "next_phase": "P0",
+          "criteria": "Validation changed the problem or invalidated current assumptions."
+        }
+      ],
+      "selected_option_id": null,
+      "rationale": "",
+      "decided_at": null
+    }
+  ],
+  "validation": {
+    "passed": true,
+    "commands": [
+      "node scripts/release-version.mjs check",
+      "pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; pnpm exec vitest run src/utils/markdownLinks.test.ts src/components/ui/MarkdownContent.test.tsx; cargo test -p pi-session-manager --no-default-features auth::tests",
+      "cargo check -p pi-session-manager --features gui; cargo check -p pi-session-cli; pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; pnpm exec vitest run src/utils/markdownLinks.test.ts src/components/ui/MarkdownContent.test.tsx; cargo test -p pi-session-manager --no-default-features auth::tests",
+      "pnpm run verify; cargo test -p pi-session-manager --no-default-features auth::tests -- --nocapture; cargo check -p pi-session-manager --features gui; cargo check -p pi-session-cli; pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; git diff --check; node scripts/release-version.mjs check",
+      "cargo test -p pi-session-manager --no-default-features auth::tests -- --nocapture; cargo check -p pi-session-manager --features gui; cargo check -p pi-session-cli; pnpm exec tsc --noEmit; pnpm exec tsc -p tsconfig.extensions.json --noEmit; git diff --check"
+    ],
+    "notes": "4 个 auth tests、GUI/CLI cargo check、两套 TypeScript 检查和 diff check 通过；pnpm run verify 仍因 4 个 fluent-emoji suite evaluation failures 返回非零，539 tests passed。"
+  },
+  "history": {
+    "state_snapshots": "work/20260714-codex-repair-20260714/history/state/",
+    "events": "work/20260714-codex-repair-20260714/history/events.jsonl"
+  },
+  "risks": [],
+  "next_action": "按安全、CI、P1 分组提交；保留 verify blocker 与 smoke 缺口为交付前门禁",
+  "notes": ""
+}

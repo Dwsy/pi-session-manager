@@ -1,0 +1,82 @@
+{
+  "ts": "2026-07-14T08:15:03.053Z",
+  "kind": "delta",
+  "delta": {
+    "pdca": {
+      "stage": "do",
+      "stages": [
+        {
+          "id": "plan",
+          "label": "Plan",
+          "status": "completed"
+        },
+        {
+          "id": "do",
+          "label": "Do",
+          "status": "in_progress"
+        },
+        {
+          "id": "check",
+          "label": "Check",
+          "status": "planned"
+        },
+        {
+          "id": "act",
+          "label": "Act",
+          "status": "planned"
+        }
+      ]
+    },
+    "current_phase": "P1",
+    "updated_at": "2026-07-14T08:15:03.053Z",
+    "phases": [
+      {
+        "id": "P0",
+        "name": "frame objective and constraints",
+        "pdca_stage": "plan",
+        "status": "completed"
+      },
+      {
+        "id": "P1",
+        "name": "execute first tracer path",
+        "pdca_stage": "do",
+        "status": "in_progress"
+      },
+      {
+        "id": "D1",
+        "name": "choose implementation route",
+        "pdca_stage": "check",
+        "status": "planned",
+        "type": "decision"
+      },
+      {
+        "id": "P2",
+        "name": "validate evidence and regressions",
+        "pdca_stage": "check",
+        "status": "planned"
+      },
+      {
+        "id": "D2",
+        "name": "decide continue, pivot, or close",
+        "pdca_stage": "act",
+        "status": "planned",
+        "type": "decision"
+      },
+      {
+        "id": "P3",
+        "name": "act on learning and hand off",
+        "pdca_stage": "act",
+        "status": "planned"
+      }
+    ],
+    "validation": {
+      "passed": true,
+      "commands": [
+        "node scripts/release-version.mjs check"
+      ],
+      "notes": "版本源 0.6.91 已同步；当前工作树从审计基线创建。"
+    },
+    "next_action": "实现共享认证、token、Origin 与 terminal capability 策略"
+  },
+  "event": "baseline-recorded"
+}
