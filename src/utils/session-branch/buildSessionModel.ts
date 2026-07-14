@@ -113,6 +113,10 @@ export function buildSessionBranchModel(
       : recordsMissingParent === rawEntryRecords.length
         ? "unknown"
         : "inferred");
+  // Pi's append-only JSONL omits parentId for normal continuation. An explicit
+  // parentId is therefore a branch jump, while an omitted one extends the
+  // immediately preceding entry. Legacy v1 records use the same sequence rule.
+  let previousId: string | null = null;
   for (let index = 0; index < entryRecords.length; index += 1) {
     const entry = entryRecords[index].value as SessionEntry;
     if (entry.id == null || entry.id === "") {
@@ -126,7 +130,12 @@ export function buildSessionBranchModel(
     } else {
       entry.id = String(entry.id);
     }
-    if (entry.parentId != null) {
+    if (
+      declaredVersion < 2 ||
+      !Object.prototype.hasOwnProperty.call(entry, "parentId")
+    ) {
+      entry.parentId = previousId;
+    } else if (entry.parentId != null) {
       entry.parentId = String(entry.parentId);
     }
     if (
@@ -136,6 +145,7 @@ export function buildSessionBranchModel(
     ) {
       entry.message.role = "custom";
     }
+    previousId = entry.id;
   }
 
   const nodes: SessionNode[] = [];

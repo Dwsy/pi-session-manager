@@ -268,7 +268,7 @@ export function computeTopologyPanBounds(
   };
 }
 
-export type MapNoteScope = "sidebar" | "atlas";
+export type MapNoteScope = "none" | "sidebar" | "atlas";
 
 export function buildTopologyProjection(
   layout: TopologyLayout,
@@ -301,9 +301,10 @@ export function buildTopologyProjection(
     eventByUid.set(point.node.uid, event);
   }
 
-  let enabled = layout.model.notes.filter(
-    (note) => settings.enabledNotes[note.type],
-  );
+  let enabled =
+    noteScope === "none"
+      ? []
+      : layout.model.notes.filter((note) => settings.enabledNotes[note.type]);
   if (noteScope === "atlas") {
     enabled = enabled.filter(
       (note) => note.type === "user" || note.type === "assistant_reply",

@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { SessionEntry } from "@/types";
+import { parseSessionEntriesWithLineCount } from "@/utils/session";
 
 import {
   buildEffectiveContext,
   buildPath,
   buildSessionBranchModel,
   buildTopologyLayout,
+  buildTopologyProjection,
   buildTreeItems,
 } from ".";
 
@@ -14,7 +16,7 @@ function message(
   id: string,
   role: "user" | "assistant",
   text: string,
-  parentId?: string,
+  parentId?: string | null,
 ): SessionEntry {
   return {
     type: "message",
@@ -61,6 +63,41 @@ describe("session branch model", () => {
     expect(
       layout.forkLinks.every((link) => link.fork.anchor.id === "root"),
     ).toBe(true);
+  });
+
+  it("hides annotations in the embedded map but retains them for Atlas", () => {
+    const model = buildSessionBranchModel([
+      message("root", "user", "Start"),
+      message("reply", "assistant", "Done", "root"),
+    ]);
+    const layout = buildTopologyLayout(model, "sequence");
+    const settings = {
+      scope: "all" as const,
+      axis: "sequence" as const,
+      smartMapLayout: false,
+      enabledNotes: {
+        user: true,
+        assistant_reply: true,
+        rename: true,
+        label: true,
+        model: true,
+        thinking: true,
+        compaction: true,
+        error: true,
+      },
+      selectedModels: [],
+      showBridgeCounts: true,
+      showSegmentLabels: true,
+      showForkLabels: true,
+    };
+
+    expect(
+      buildTopologyProjection(layout, settings, "reply", "reply", "none").notes,
+    ).toEqual([]);
+    expect(
+      buildTopologyProjection(layout, settings, "reply", "reply", "atlas").notes
+        .length,
+    ).toBeGreaterThan(0);
   });
 
   it("projects active lineage first without nesting linear entries", () => {
@@ -121,19 +158,44 @@ describe("session branch model", () => {
     expect(model.topologyQuality).toBe("inferred");
   });
 
-  it("does not invent storage edges when source records omit parentId", () => {
+  it("uses source order for Pi entries that omit parentId", () => {
     const entries = [
       message("one", "user", "One"),
       message("two", "assistant", "Two"),
+      message("three", "user", "Three"),
     ];
-    delete entries[0].parentId;
-    delete entries[1].parentId;
+    for (const entry of entries) delete entry.parentId;
 
     const model = buildSessionBranchModel(entries);
 
     expect(model.topologyQuality).toBe("unknown");
-    expect(model.firstById.get("one")?.parent).toBeNull();
-    expect(model.firstById.get("two")?.parent).toBeNull();
+    expect(model.roots.map((node) => node.id)).toEqual(["one"]);
+    expect(model.firstById.get("two")?.parent?.id).toBe("one");
+    expect(model.firstById.get("three")?.parent?.id).toBe("two");
+    expect(model.segments).toHaveLength(1);
+  });
+
+  it("keeps a custom parent anchor in the same topology path", () => {
+    const content = [
+      JSON.stringify(message("root", "user", "Start", null)),
+      JSON.stringify({
+        type: "custom",
+        id: "custom-anchor",
+        parentId: "root",
+        timestamp: "2026-07-14T00:00:01Z",
+        content: "branch anchor",
+      }),
+      JSON.stringify(
+        message("child", "assistant", "Continue", "custom-anchor"),
+      ),
+    ].join("\n");
+
+    const { entries } = parseSessionEntriesWithLineCount(content);
+    const model = buildSessionBranchModel(entries);
+
+    expect(model.roots.map((node) => node.id)).toEqual(["root"]);
+    expect(model.segments).toHaveLength(1);
+    expect(model.firstById.get("child")?.parent?.id).toBe("custom-anchor");
   });
 
   it("keeps ambiguous duplicate parent references as roots", () => {

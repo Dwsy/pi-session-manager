@@ -77,8 +77,9 @@ describe("psm-trace path timeline", () => {
     await waitFor(() => {
       expect(screen.getByText(/ACTIVE PATH/)).not.toBeNull();
     });
-    expect(screen.getByText("Branch A")).not.toBeNull();
+    expect(screen.getAllByText("Branch A").length).toBeGreaterThan(0);
     expect(screen.queryByText("Branch B")).toBeNull();
+    expect(screen.getByLabelText("Selected path entry")).not.toBeNull();
 
     const rootRowText = screen
       .getAllByText("Root prompt")
@@ -104,11 +105,11 @@ describe("psm-trace path timeline", () => {
       <TraceView {...props} activeEntryId="branch-a" />,
     );
 
-    await screen.findByText("Branch A");
+    await screen.findAllByText("Branch A");
     rerender(<TraceView {...props} activeEntryId="branch-b" />);
 
     await waitFor(() => {
-      expect(screen.getByText("Branch B")).not.toBeNull();
+      expect(screen.getAllByText("Branch B").length).toBeGreaterThan(0);
       expect(client.sessions.readFileChunk).toHaveBeenCalledTimes(2);
     });
   });

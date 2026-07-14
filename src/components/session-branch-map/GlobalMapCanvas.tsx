@@ -1,10 +1,13 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
   useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   BranchFork,
   BranchSegment,
@@ -36,7 +39,12 @@ import {
   formatTimestamp,
   truncate,
 } from "@/utils/session-branch";
+import { buildSegmentBranchColors } from "./branchColors";
 import { useElementSize } from "./useElementSize";
+
+const GenericToolCall = lazy(
+  () => import("@/components/tool-calls/GenericToolCall"),
+);
 
 export interface MapView {
   zoom: number;
@@ -137,6 +145,7 @@ interface ColorSet {
   error: string;
   purple: string;
   cyan: string;
+  branchPalette: readonly string[];
 }
 
 interface DrawState {
@@ -232,6 +241,7 @@ export function GlobalMapCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const size = useElementSize(stageRef);
   const renderCacheRef = useRef<RenderCache | null>(null);
+  const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -242,6 +252,20 @@ export function GlobalMapCanvas({
   const suppressClickRef = useRef(false);
   const [hover, setHover] = useState<HoverTarget | null>(null);
   const [themeVersion, setThemeVersion] = useState(0);
+
+  function cancelHoverClose(): void {
+    if (hoverCloseTimerRef.current === null) return;
+    clearTimeout(hoverCloseTimerRef.current);
+    hoverCloseTimerRef.current = null;
+  }
+
+  function scheduleHoverClose(): void {
+    cancelHoverClose();
+    hoverCloseTimerRef.current = setTimeout(() => {
+      hoverCloseTimerRef.current = null;
+      setHover(null);
+    }, 220);
+  }
 
   useEffect(() => {
     const root = document.documentElement;
@@ -270,7 +294,7 @@ export function GlobalMapCanvas({
         settings,
         activeLeafUid,
         selectedUid,
-        mode === "atlas" ? "atlas" : "sidebar",
+        mode === "atlas" ? "atlas" : "none",
       ),
     [layout, settings, activeLeafUid, selectedUid, mode],
   );
@@ -469,6 +493,7 @@ export function GlobalMapCanvas({
   function handlePointerMove(
     event: ReactPointerEvent<HTMLCanvasElement>,
   ): void {
+    cancelHoverClose();
     const drag = dragRef.current;
     const cache = renderCacheRef.current;
     if (drag && cache && mode === "atlas" && onViewChange) {
@@ -541,8 +566,9 @@ export function GlobalMapCanvas({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onPointerEnter={cancelHoverClose}
         onPointerLeave={() => {
-          if (!dragRef.current) setHover(null);
+          if (!dragRef.current) scheduleHoverClose();
         }}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
@@ -550,10 +576,13 @@ export function GlobalMapCanvas({
       />
       {hover ? (
         <MapTooltip
+          model={model}
           target={hover}
           width={size.width}
           height={size.height}
           mode={mode}
+          onTooltipEnter={cancelHoverClose}
+          onTooltipLeave={scheduleHoverClose}
         />
       ) : null}
     </div>
@@ -598,16 +627,27 @@ function resolveNearestRailEntry(
 }
 
 function MapTooltip({
+  model,
   target,
   width,
   height,
   mode,
+  onTooltipEnter,
+  onTooltipLeave,
 }: {
+  model: SessionModel;
   target: HoverTarget;
   width: number;
   height: number;
   mode: "overview" | "atlas";
+  onTooltipEnter: () => void;
+  onTooltipLeave: () => void;
 }): React.ReactElement {
+  const tooltipEvents = {
+    onPointerEnter: onTooltipEnter,
+    onPointerLeave: onTooltipLeave,
+    onPointerDown: (event: React.PointerEvent) => event.stopPropagation(),
+  };
   const rich = mode === "atlas" && target.kind === "event";
   const tooltipWidth = rich ? Math.min(420, Math.max(280, width * 0.38)) : 250;
   const left = clamp(
@@ -623,7 +663,11 @@ function MapTooltip({
   if (target.kind === "segment") {
     const segment = target.segment;
     return (
-      <div className="map-tooltip" style={{ left, top, width: tooltipWidth }}>
+      <div
+        {...tooltipEvents}
+        className="map-tooltip global-map-tooltip"
+        style={{ left, top, width: tooltipWidth }}
+      >
         <span>LINEAR SEGMENT · {segment.code}</span>
         <strong>{segment.level === 0 ? "主干序列" : "分支序列"}</strong>
         <p>
@@ -643,7 +687,11 @@ function MapTooltip({
   if (target.kind === "fork") {
     const fork = target.fork;
     return (
-      <div className="map-tooltip" style={{ left, top, width: tooltipWidth }}>
+      <div
+        {...tooltipEvents}
+        className="map-tooltip global-map-tooltip"
+        style={{ left, top, width: tooltipWidth }}
+      >
         <span>REAL FORK · {fork.code}</span>
         <strong>
           从序列 #{formatNumber(fork.anchor.sequence)} 分出{" "}
@@ -660,7 +708,8 @@ function MapTooltip({
   if (target.kind === "note") {
     return (
       <div
-        className={`map-tooltip note-${target.note.type}`}
+        {...tooltipEvents}
+        className={`map-tooltip global-map-tooltip note-${target.note.type}`}
         style={{ left, top, width: tooltipWidth }}
       >
         <span>{noteTypeLabel(target.note.type)}</span>
@@ -670,15 +719,48 @@ function MapTooltip({
           {target.node.segment?.code} · #{formatNumber(target.node.sequence)} ·
           line {formatNumber(target.note.lineNo)}
         </small>
+        <TooltipActions
+          output={target.note.detail}
+          source={JSON.stringify(target.note, null, 2)}
+        />
       </div>
     );
   }
 
   const node = target.node;
   const body = nodePrimaryText(node);
+  const toolPresentation = resolveToolPresentation(node, model, body);
+  if (rich && toolPresentation) {
+    return (
+      <div
+        {...tooltipEvents}
+        className="map-tooltip map-tooltip-rich global-map-tooltip map-tooltip-tool"
+        style={{ left, top, width: tooltipWidth }}
+      >
+        <span className="tooltip-kicker">
+          {nodeRoleLabel(node)} · {node.segment?.code} · #
+          {formatNumber(node.sequence)}
+        </span>
+        <Suspense fallback={<div className="map-tooltip-tool-loading" />}>
+          <GenericToolCall
+            name={toolPresentation.name}
+            arguments={toolPresentation.arguments}
+            output={toolPresentation.output}
+            isError={toolPresentation.isError}
+            entryId={node.uid}
+          />
+        </Suspense>
+        <TooltipActions
+          output={toolPresentation.output}
+          source={JSON.stringify(node.entry, null, 2)}
+        />
+      </div>
+    );
+  }
   if (rich) {
     return (
       <div
+        {...tooltipEvents}
         className="map-tooltip map-tooltip-rich global-map-tooltip"
         style={{ left, top, width: tooltipWidth }}
       >
@@ -692,14 +774,20 @@ function MapTooltip({
           {entryRelationLabel(node)} · level {formatNumber(node.branchLevel)} ·{" "}
           {node.id}
         </small>
+        <TooltipActions
+          output={body}
+          source={JSON.stringify(node.entry, null, 2)}
+        />
       </div>
     );
   }
   return (
     <div
+      {...tooltipEvents}
       className="map-tooltip global-map-tooltip"
       style={{ left, top, width: tooltipWidth }}
     >
+      {" "}
       <span>
         {nodeRoleLabel(node)} · {node.segment?.code}
       </span>
@@ -711,6 +799,89 @@ function MapTooltip({
       </small>
     </div>
   );
+}
+
+function TooltipActions({
+  output,
+  source,
+}: {
+  output: string;
+  source: string;
+}): React.ReactElement {
+  const { t } = useTranslation();
+
+  return (
+    <div className="map-tooltip-actions">
+      <button
+        type="button"
+        onClick={() => void copyTooltipText(output)}
+        disabled={!output}
+      >
+        {t("components.branchMap.copyOutput", "Copy output")}
+      </button>
+      <button type="button" onClick={() => void copyTooltipText(source)}>
+        {t("components.branchMap.copyJson", "Copy JSON")}
+      </button>
+    </div>
+  );
+}
+
+async function copyTooltipText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.style.cssText = "position:fixed;top:-9999px;opacity:0";
+  document.body.appendChild(area);
+  area.select();
+  document.execCommand("copy");
+  area.remove();
+}
+
+function resolveToolPresentation(
+  node: SessionNode,
+  model: SessionModel,
+  body: string,
+): {
+  name: string;
+  arguments: Record<string, unknown>;
+  output: string;
+  isError: boolean;
+} | null {
+  const message = node.entry.message;
+  if (!message) return null;
+
+  if (message.role === "toolResult") {
+    const call = message.toolCallId
+      ? model.toolCallMap.get(String(message.toolCallId))
+      : undefined;
+    return {
+      name: call?.name || message.toolName || "tool result",
+      arguments: call?.arguments || {},
+      output: body,
+      isError: Boolean(message.isError),
+    };
+  }
+
+  if (message.role !== "assistant" || !Array.isArray(message.content)) {
+    return null;
+  }
+  const toolCall = message.content.find(
+    (block) => block.type === "toolCall" && block.name,
+  );
+  if (!toolCall) return null;
+  const result = toolCall.id
+    ? model.toolResultByCallId.get(String(toolCall.id))?.[0]
+    : undefined;
+  return {
+    name: toolCall.name || "tool",
+    arguments: toolCall.arguments || {},
+    output: result ? nodePrimaryText(result) : "",
+    isError: Boolean(result?.entry.message?.isError),
+  };
 }
 
 function drawCanvas(
@@ -740,10 +911,46 @@ function drawCanvas(
 
   const circleHits: CircleHit[] = [];
   const rectHits: RectHit[] = [];
-  drawBackground(ctx, projection.layout, transform, colors, state.mode);
-  drawSegmentRails(ctx, projection.layout, transform, colors, state, rectHits);
-  drawForks(ctx, projection.layout, transform, colors, state, circleHits);
-  drawEvents(ctx, projection.events, transform, colors, state, circleHits);
+  const branchColors = buildSegmentBranchColors(
+    projection.layout.model.segments,
+    projection.layout.model.terminalSegments,
+    { accent: colors.accent, branches: colors.branchPalette },
+  );
+  drawBackground(
+    ctx,
+    projection.layout,
+    transform,
+    colors,
+    branchColors,
+    state.mode,
+  );
+  drawSegmentRails(
+    ctx,
+    projection.layout,
+    transform,
+    colors,
+    branchColors,
+    state,
+    rectHits,
+  );
+  drawForks(
+    ctx,
+    projection.layout,
+    transform,
+    colors,
+    branchColors,
+    state,
+    circleHits,
+  );
+  drawEvents(
+    ctx,
+    projection.events,
+    transform,
+    colors,
+    branchColors,
+    state,
+    circleHits,
+  );
   drawNotes(ctx, projection, transform, colors, state, rectHits);
   drawAxis(ctx, projection.layout, transform, colors, state.mode);
   drawSemanticBadge(
@@ -762,6 +969,7 @@ function drawBackground(
   layout: TopologyLayout,
   transform: CanvasTransform,
   colors: ColorSet,
+  branchColors: ReadonlyMap<string, string>,
   mode: "overview" | "atlas",
 ): void {
   ctx.fillStyle = colors.panel;
@@ -780,15 +988,15 @@ function drawBackground(
     ctx.stroke();
   }
 
-  const terminalXs = new Set(
-    layout.model.terminalSegments
-      .map((segment) => layout.segmentByUid.get(segment.uid)?.x)
-      .filter((x): x is number => x != null),
-  );
   ctx.setLineDash([2, 5]);
-  ctx.strokeStyle = alpha(colors.borderStrong, 0.25);
-  for (const xWorld of terminalXs) {
-    const x = transform.toScreen({ x: xWorld, y: transform.worldTop }).x;
+  for (const segment of layout.model.terminalSegments) {
+    const item = layout.segmentByUid.get(segment.uid);
+    if (!item) continue;
+    const x = transform.toScreen({ x: item.x, y: transform.worldTop }).x;
+    ctx.strokeStyle = alpha(
+      branchColors.get(segment.uid) ?? colors.borderStrong,
+      0.34,
+    );
     ctx.beginPath();
     ctx.moveTo(x + 0.5, transform.plotTop);
     ctx.lineTo(x + 0.5, transform.plotTop + transform.plotHeight);
@@ -802,6 +1010,7 @@ function drawSegmentRails(
   layout: TopologyLayout,
   transform: CanvasTransform,
   colors: ColorSet,
+  branchColors: ReadonlyMap<string, string>,
   state: DrawState,
   rectHits: RectHit[],
 ): void {
@@ -815,35 +1024,32 @@ function drawSegmentRails(
     if (!rangeVisible(item.minY, item.maxY, transform, 0.02)) continue;
     const active = state.activeSegmentPath.has(item.segment.uid);
     const selected = state.selectedSegmentUid === item.segment.uid;
+    const branchColor = branchColors.get(item.segment.uid) ?? colors.accent;
     const start = transform.toScreen({ x: item.x, y: item.startY });
     const end = transform.toScreen({ x: item.x, y: item.endY });
     const minHeight = state.mode === "overview" ? 3 : 5;
     const endY =
       Math.abs(end.y - start.y) < minHeight ? start.y + minHeight : end.y;
 
-    if (active) {
-      ctx.strokeStyle = alpha(colors.accent, 0.16);
-      ctx.lineWidth = state.mode === "atlas" ? 10 : 7;
+    if (active || selected) {
+      ctx.strokeStyle = alpha(active ? colors.accent : branchColor, 0.22);
+      ctx.lineWidth = state.mode === "atlas" ? 11 : 8;
       ctx.beginPath();
       ctx.moveTo(start.x, start.y);
       ctx.lineTo(end.x, endY);
       ctx.stroke();
     }
 
-    ctx.strokeStyle = active
-      ? colors.accent
-      : selected
-        ? colors.blue
-        : alpha(colors.base, 0.76);
+    ctx.strokeStyle = active ? colors.accent : branchColor;
     ctx.lineWidth = active
       ? state.mode === "atlas"
-        ? 3.2
-        : 2.7
+        ? 3.5
+        : 2.9
       : selected
-        ? 2.4
+        ? 2.8
         : state.mode === "atlas"
-          ? 1.45
-          : 1.2;
+          ? 2
+          : 1.65;
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
@@ -865,12 +1071,16 @@ function drawSegmentRails(
         transform.plotLeft + transform.plotWidth - width,
       );
       roundedRect(ctx, x, labelY, width, state.mode === "atlas" ? 15 : 12, 4);
-      ctx.fillStyle = active ? alpha(colors.accent, 0.15) : colors.panel2;
+      ctx.fillStyle = active
+        ? alpha(colors.accent, 0.17)
+        : alpha(branchColor, 0.12);
       ctx.fill();
-      ctx.strokeStyle = active ? alpha(colors.accent, 0.65) : colors.border;
+      ctx.strokeStyle = active
+        ? alpha(colors.accent, 0.78)
+        : alpha(branchColor, 0.7);
       ctx.lineWidth = 1;
       ctx.stroke();
-      ctx.fillStyle = active ? colors.accentStrong : colors.textSecondary;
+      ctx.fillStyle = active ? colors.accentStrong : branchColor;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(
@@ -897,6 +1107,7 @@ function drawForks(
   layout: TopologyLayout,
   transform: CanvasTransform,
   colors: ColorSet,
+  branchColors: ReadonlyMap<string, string>,
   state: DrawState,
   circleHits: CircleHit[],
 ): void {
@@ -909,8 +1120,9 @@ function drawForks(
     const from = transform.toScreen(link.from);
     const to = transform.toScreen(link.to);
     const active = state.activeSegmentPath.has(link.child.uid);
-    ctx.strokeStyle = active ? colors.accent : alpha(colors.base, 0.76);
-    ctx.lineWidth = active ? (state.mode === "atlas" ? 2.8 : 2.2) : 1.25;
+    const branchColor = branchColors.get(link.child.uid) ?? colors.accent;
+    ctx.strokeStyle = active ? colors.accent : branchColor;
+    ctx.lineWidth = active ? (state.mode === "atlas" ? 3 : 2.35) : 1.7;
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
@@ -974,18 +1186,13 @@ function drawForks(
     const p = transform.toScreen(point);
     const active = segment.leaf?.uid === state.activeLeafUid;
     const selected = segment.uid === state.selectedSegmentUid;
-    const radius = state.mode === "atlas" ? 5.2 : 4.2;
+    const branchColor = branchColors.get(segment.uid) ?? colors.accent;
+    const radius = state.mode === "atlas" ? 5.6 : 4.6;
     ctx.fillStyle = active
       ? colors.accent
-      : selected
-        ? colors.blue
-        : colors.panel;
-    ctx.strokeStyle = active
-      ? colors.accentStrong
-      : selected
-        ? colors.blue
-        : colors.textSecondary;
-    ctx.lineWidth = active ? 2.4 : 1.5;
+      : alpha(branchColor, selected ? 0.95 : 0.76);
+    ctx.strokeStyle = active ? colors.accentStrong : branchColor;
+    ctx.lineWidth = active ? 2.7 : selected ? 2.4 : 1.8;
     ctx.beginPath();
     ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
     ctx.fill();
@@ -1001,7 +1208,7 @@ function drawForks(
 
     ctx.font = `800 ${state.mode === "atlas" ? 9 : 7}px ${fontMono()}`;
     ctx.textAlign = "center";
-    ctx.fillStyle = active ? colors.accentStrong : colors.muted;
+    ctx.fillStyle = active ? colors.accentStrong : branchColor;
     ctx.fillText(
       `L${index + 1}`,
       p.x,
@@ -1019,6 +1226,7 @@ function drawEvents(
   events: ProjectedEvent[],
   transform: CanvasTransform,
   colors: ColorSet,
+  branchColors: ReadonlyMap<string, string>,
   state: DrawState,
   circleHits: CircleHit[],
 ): void {
@@ -1030,8 +1238,8 @@ function drawEvents(
     const selected = event.node.uid === state.selectedUid;
     const activeLeaf = event.node.uid === state.activeLeafUid;
     const activePath = state.activeNodePath.has(event.node.uid);
-    const radius = (state.mode === "atlas" ? 3.5 : 2.8) * densityScale;
-    const color = nodeColor(event.node, colors);
+    const radius = (state.mode === "atlas" ? 4.1 : 3.2) * densityScale;
+    const color = eventColor(event.node, colors, branchColors);
     const opacity =
       event.scopeMatch && event.modelMatch ? (activePath ? 1 : 0.82) : 0.35;
 
@@ -1069,7 +1277,7 @@ function drawEvents(
     }
 
     if (event.node.relation === "branch-start") {
-      ctx.strokeStyle = activePath ? colors.accentStrong : colors.warning;
+      ctx.strokeStyle = activePath ? colors.accentStrong : color;
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.arc(p.x, p.y, radius + 2.1, Math.PI * 1.05, Math.PI * 1.92);
@@ -1077,7 +1285,7 @@ function drawEvents(
     }
 
     if (selected || activeLeaf) {
-      ctx.strokeStyle = activeLeaf ? colors.accentStrong : colors.blue;
+      ctx.strokeStyle = activeLeaf ? colors.accentStrong : color;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(
@@ -1453,15 +1661,13 @@ function isPointVisible(
   );
 }
 
-function nodeColor(node: SessionNode, colors: ColorSet): string {
-  if (node.kind === "user") return colors.user;
-  if (node.kind === "assistant") return colors.assistant;
-  if (node.kind === "tool") return colors.tool;
+function eventColor(
+  node: SessionNode,
+  colors: ColorSet,
+  branchColors: ReadonlyMap<string, string>,
+): string {
   if (node.kind === "error") return colors.error;
-  if (node.kind === "compaction" || node.kind === "branch")
-    return colors.warning;
-  if (node.kind === "setting") return colors.blue;
-  return colors.cyan;
+  return branchColors.get(node.segmentUid) ?? colors.accent;
 }
 
 function drawNoteGlyph(
@@ -1625,6 +1831,14 @@ function readColors(): ColorSet {
     error: rgbToken("--color-destructive", accent),
     purple: rgbToken("--color-purple", accent),
     cyan: rgbToken("--color-info", accent),
+    branchPalette: [
+      accent,
+      rgbToken("--color-info", accent),
+      rgbToken("--color-success", accent),
+      rgbToken("--color-purple", accent),
+      rgbToken("--color-warning", accent),
+      rgbToken("--color-cyan", rgbToken("--color-info", accent)),
+    ],
   };
 }
 

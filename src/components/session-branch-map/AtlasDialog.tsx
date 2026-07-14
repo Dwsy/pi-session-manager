@@ -117,24 +117,37 @@ export function AtlasDialog({
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        onClose();
+        return;
+      }
       if (event.key.toLowerCase() === "f") focus(selectedUid);
       if (event.key === "0") setView(fitView);
       if (event.key === "1") setSidebarTab("branches");
       if (event.key === "2") setSidebarTab("forks");
       if (event.key === "3") setSidebarTab("notes");
     };
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown, true);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown, true);
       document.body.style.overflow = previousOverflow;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, onClose, selectedUid]);
 
   if (!open) return null;
+
+  const isMacTauri =
+    typeof document !== "undefined" &&
+    Boolean(
+      document.querySelector(
+        '.app-shell[data-runtime="tauri"][data-os="macos"]',
+      ),
+    );
 
   function focus(uid: string): void {
     setFocusUid(uid);
@@ -170,23 +183,19 @@ export function AtlasDialog({
         aria-modal="true"
         aria-label="Pi Branch Atlas"
       >
-        <header className="atlas-header branch-atlas-header">
+        <header
+          className={`atlas-header branch-atlas-header ${isMacTauri ? "is-macos-tauri" : ""}`}
+        >
           <div className="atlas-heading">
-            <span>PI BRANCH ATLAS</span>
-            <strong>分支地图</strong>
+            <strong>
+              PI BRANCH ATLAS <span>分支地图</span>
+            </strong>
             <small>
               {formatNumber(model.nodes.length)} entries 被折叠为{" "}
               {formatNumber(model.segments.length)} 条线性段 ·{" "}
               {formatNumber(model.forks.length)} 个真实分叉 ·{" "}
               {formatNumber(model.terminalSegments.length)} 个终点
             </small>
-          </div>
-          <div
-            className="atlas-semantic-contract"
-            title="这是本视图最重要的语义约束"
-          >
-            <b>LINEAR ≠ HIERARCHY</b>
-            <span>parentId 是路径前驱；只有 fork 才创建分支层级</span>
           </div>
           <div className="atlas-header-actions">
             <button

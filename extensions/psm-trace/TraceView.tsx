@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import GenericToolCall from "@/components/tool-calls/GenericToolCall";
+import { useClipboard } from "@/hooks/useClipboard";
 import type {
   PsmCapabilityClient,
   PsmSessionViewerController,
@@ -11,6 +14,7 @@ import {
   buildSessionBranchModel,
   entryRelationLabel,
   filterTimelineToSegmentScope,
+  nodePrimaryText,
   formatMoney,
   formatNumber,
   formatTimestamp,
@@ -275,6 +279,7 @@ function PathTimeline({
     [activeLeafUid, model],
   );
   const activeSegment = activeLeaf.segment;
+  const selectedNode = model.uidMap.get(selectedUid) ?? activeLeaf;
   const metrics = activeLeaf.cum;
   const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
   const endIndex = Math.min(
@@ -307,6 +312,7 @@ function PathTimeline({
   }, [nodes, scrollRef, selectedUid]);
 
   return (
+    <div className="path-timeline-workbench">
     <main className="path-timeline-view timeline-pane path-timeline-pane">
       <header className="path-timeline-header">
         <div className="path-timeline-heading">
@@ -463,7 +469,121 @@ function PathTimeline({
         </span>
       </footer>
     </main>
+    <TraceInspector
+      model={model}
+      node={selectedNode}
+      onActivate={() => onActivateNode(selectedNode.uid)}
+    />
+    </div>
   );
+}
+
+function TraceInspector({
+  model,
+  node,
+  onActivate,
+}: {
+  model: SessionModel;
+  node: SessionNode;
+  onActivate: () => void;
+}) {
+  const { copyText } = useClipboard();
+  const { t } = useTranslation();
+  const body = nodePrimaryText(node);
+  const tool = traceToolPresentation(model, node, body);
+
+  return (
+    <aside className="path-timeline-inspector" aria-label="Selected path entry">
+      <header>
+        <span>{t("components.traceInspector.title", "Entry inspector")}</span>
+        <strong>{roleLabel(node)}</strong>
+        <button type="button" onClick={onActivate}>
+          {t("components.traceInspector.locate", "Locate in session")}
+        </button>
+      </header>
+      <dl className="path-inspector-meta">
+        <div>
+          <dt>{t("components.traceInspector.segment", "Segment")}</dt>
+          <dd>{node.segment?.code || "B?"}</dd>
+        </div>
+        <div>
+          <dt>{t("components.traceInspector.sequence", "Sequence")}</dt>
+          <dd>#{formatNumber(node.sequence)}</dd>
+        </div>
+        <div>
+          <dt>{t("components.traceInspector.relation", "Relation")}</dt>
+          <dd>{entryRelationLabel(node)}</dd>
+        </div>
+        <div>
+          <dt>{t("components.traceInspector.time", "Time")}</dt>
+          <dd>{formatTimestamp(node.timestampMs)}</dd>
+        </div>
+      </dl>
+      <div className="path-inspector-id">
+        <code>{node.id}</code>
+        <button
+          type="button"
+          onClick={() => void copyText(node.id)}
+          aria-label={t("components.traceInspector.copyId", "Copy entry ID")}
+          title={t("components.traceInspector.copyId", "Copy entry ID")}
+        >
+          <Copy size={13} />
+        </button>
+      </div>
+      {tool ? (
+        <GenericToolCall
+          name={tool.name}
+          arguments={tool.arguments}
+          output={tool.output}
+          isError={tool.isError}
+          entryId={`trace:${node.uid}`}
+        />
+      ) : (
+        <pre className="path-inspector-content">{body || node.summary}</pre>
+      )}
+    </aside>
+  );
+}
+
+function traceToolPresentation(
+  model: SessionModel,
+  node: SessionNode,
+  body: string,
+): {
+  name: string;
+  arguments: Record<string, unknown>;
+  output: string;
+  isError: boolean;
+} | null {
+  const message = node.entry.message;
+  if (!message) return null;
+  if (message.role === "toolResult") {
+    const call = message.toolCallId
+      ? model.toolCallMap.get(String(message.toolCallId))
+      : undefined;
+    return {
+      name: call?.name || message.toolName || "tool result",
+      arguments: call?.arguments || {},
+      output: body,
+      isError: Boolean(message.isError),
+    };
+  }
+  if (message.role !== "assistant" || !Array.isArray(message.content)) {
+    return null;
+  }
+  const call = message.content.find(
+    (block) => block.type === "toolCall" && block.name,
+  );
+  if (!call) return null;
+  const result = call.id
+    ? model.toolResultByCallId.get(String(call.id))?.[0]
+    : undefined;
+  return {
+    name: call.name || "tool",
+    arguments: call.arguments || {},
+    output: result ? nodePrimaryText(result) : "",
+    isError: Boolean(result?.entry.message?.isError),
+  };
 }
 
 function TimelineRow({
