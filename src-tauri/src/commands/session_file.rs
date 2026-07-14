@@ -1,6 +1,5 @@
 use crate::types::SessionEntry;
 use serde_json::Value;
-use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
@@ -289,34 +288,35 @@ pub(super) async fn read_session_file_chunk_impl(path: String, offset: Option<u6
         return Ok(SessionChunk { content: String::new(), next_offset: start_offset, file_size, has_more: start_offset < file_size });
     }
 
-    let base_next_offset = start_offset + bytes_read as u64;
-
     let mut cut = utf8_safe_cut(&buffer, buffer.len());
-    let mut has_more = base_next_offset < file_size;
-
-    if has_more {
+    if start_offset + (bytes_read as u64) < file_size {
         if let Some(last_newline_idx) = buffer[..cut].iter().rposition(|b| *b == b'\n') {
             cut = last_newline_idx + 1;
-        }
+        } else {
+            // JSONL entries are atomic: a base64 image or large tool payload may
+            // exceed the nominal chunk size. Read through its terminating newline
+            // instead of returning invalid line fragments that the viewer drops.
+            loop {
+                let buffered_len = buffer.len();
+                let mut continuation = [0u8; 64 * 1024];
+                let continuation_read = file.read(&mut continuation).map_err(|e| format!("Failed to continue oversized JSONL entry: {e}"))?;
+                if continuation_read == 0 {
+                    cut = buffer.len();
+                    break;
+                }
 
-        if cut == 0 {
-            let fallback_len = cmp::min(buffer.len(), 8192);
-            cut = utf8_safe_cut(&buffer, fallback_len);
-        }
-
-        if cut == 0 {
-            let next_offset = (start_offset + 1).min(file_size);
-            return Ok(SessionChunk { content: String::new(), next_offset, file_size, has_more: next_offset < file_size });
+                buffer.extend_from_slice(&continuation[..continuation_read]);
+                if let Some(newline_idx) = buffer[buffered_len..].iter().position(|byte| *byte == b'\n') {
+                    cut = buffered_len + newline_idx + 1;
+                    break;
+                }
+            }
         }
     }
 
-    let content_bytes = &buffer[..cut];
-    let content = String::from_utf8(content_bytes.to_vec()).map_err(|e| format!("Failed to decode session chunk as UTF-8: {e}"))?;
-
+    let content = String::from_utf8(buffer[..cut].to_vec()).map_err(|e| format!("Failed to decode session chunk as UTF-8: {e}"))?;
     let next_offset = start_offset + cut as u64;
-    if next_offset >= file_size {
-        has_more = false;
-    }
+    let has_more = next_offset < file_size;
 
     Ok(SessionChunk { content, next_offset, file_size, has_more })
 }
@@ -769,6 +769,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn read_session_file_chunk_keeps_oversized_jsonl_entry_intact() {
+        let temp_dir = tempdir().expect("tempdir");
+        let path = temp_dir.path().join("session.jsonl");
+        let payload = "x".repeat(12_000);
+        let content = format!("{{\"id\":\"root\"}}\n{{\"id\":\"image-tool-result\",\"data\":\"{payload}\"}}\n{{\"id\":\"child\"}}\n");
+        fs::write(&path, &content).expect("write session content");
+
+        let first = read_session_file_chunk_impl(path.to_str().expect("path utf8").to_string(), Some(0), Some(64)).await.expect("read first chunk");
+        assert_eq!(first.content, "{\"id\":\"root\"}\n");
+
+        let oversized = read_session_file_chunk_impl(path.to_str().expect("path utf8").to_string(), Some(first.next_offset), Some(64)).await.expect("read oversized entry");
+        assert_eq!(oversized.content.lines().count(), 1);
+        assert!(oversized.content.contains("image-tool-result"));
+        assert_eq!(serde_json::from_str::<serde_json::Value>(oversized.content.trim()).expect("oversized entry remains valid JSON")["data"].as_str().expect("payload string").len(), payload.len());
+
+        let last = read_session_file_chunk_impl(path.to_str().expect("path utf8").to_string(), Some(oversized.next_offset), Some(64)).await.expect("read final chunk");
+        assert_eq!(last.content, "{\"id\":\"child\"}\n");
+        assert!(!last.has_more);
+    }
+
+    #[tokio::test]
     async fn read_session_file_chunk_handles_incomplete_utf8_at_chunk_end() {
         let unique = SystemTime::now().duration_since(UNIX_EPOCH).expect("system time after epoch").as_nanos();
         let base_dir = std::env::temp_dir().join(format!("psm-chunk-utf8-{unique}"));
@@ -782,8 +803,8 @@ mod tests {
 
         let chunk = read_session_file_chunk_impl(path.to_str().expect("path utf8").to_string(), Some(0), Some(5)).await.expect("chunk should decode");
 
-        assert_eq!(chunk.content, "abcd");
-        assert_eq!(chunk.next_offset, 4);
+        assert_eq!(chunk.content, "abcd你\n");
+        assert_eq!(chunk.next_offset, 8);
         assert!(chunk.has_more);
 
         let _ = fs::remove_file(&path);
