@@ -388,23 +388,7 @@ fn main() {
                     pi_session_manager::deep_link::mark_frontend_ready(&app_handle_ready, &deep_link_ready_state);
                 });
 
-                // ── Lightweight mode: intercept window close → destroy to free memory ──
-                let window_handle = window.clone();
-                window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                        // Check lightweight mode setting
-                        let lightweight = pi_session_manager::settings_store::get::<bool>("lightweight_mode").unwrap_or(None).unwrap_or(false);
-
-                        if lightweight {
-                            // Prevent default close (which would exit the app)
-                            api.prevent_close();
-                            // Destroy window to free memory; tray will recreate on next show
-                            let _ = window_handle.destroy();
-                            log::debug!("Lightweight mode: window destroyed, app stays in tray");
-                        }
-                        // If not lightweight, allow default close (app exits)
-                    }
-                });
+                pi_session_manager::tray::install_lightweight_close_handler(&window);
 
                 // Restore saved zoom level
                 tauri::async_runtime::spawn(async move {
@@ -603,6 +587,11 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { has_visible_windows: false, .. } = event {
+                pi_session_manager::tray::show_or_create_window(app_handle);
+            }
+
             // ── Prevent app exit when lightweight mode is active ──
             // When all windows are destroyed (lightweight mode), Tauri tries to exit.
             // We intercept ExitRequested and keep the app running in tray.

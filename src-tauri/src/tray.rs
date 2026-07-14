@@ -2,7 +2,7 @@ use tauri::{
     image::Image,
     menu::{MenuBuilder, MenuItemBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Listener, Manager, Runtime, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Emitter, Listener, Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 
 const TRAY_ID: &str = "main";
@@ -63,6 +63,25 @@ fn load_tray_icon() -> Result<Image<'static>, String> {
     Image::from_bytes(icon_bytes).map_err(|e| format!("Failed to load tray icon: {e}"))
 }
 
+/// Keep the app alive in the tray when lightweight mode closes a window.
+///
+/// This is shared by the initial main window and every recreated window so the
+/// close behavior remains consistent after reopening from the Dock or tray.
+pub fn install_lightweight_close_handler<R: Runtime>(window: &WebviewWindow<R>) {
+    let window_handle = window.clone();
+    window.on_window_event(move |event| {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            let lightweight = crate::settings_store::get::<bool>("lightweight_mode").unwrap_or(None).unwrap_or(false);
+
+            if lightweight {
+                api.prevent_close();
+                let _ = window_handle.destroy();
+                log::debug!("Lightweight mode: window destroyed, app stays in tray");
+            }
+        }
+    });
+}
+
 /// Show existing window or create a new one.
 ///
 /// When lightweight mode is enabled, closing the window destroys it (freeing memory).
@@ -98,6 +117,7 @@ fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     }
 
     let window = builder.visible(false).build().map_err(|e| format!("Build window: {e}"))?;
+    install_lightweight_close_handler(&window);
 
     let window_clone = window.clone();
     app.listen("frontend://ready", move |_event| {
