@@ -1,9 +1,20 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { FolderOpen, LayoutDashboard, List, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Search, Settings, Star, Terminal, Wifi } from "lucide-react";
+import { ArrowDown, ArrowUp, FolderOpen, LayoutDashboard, List, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pin, PinOff, Search, Settings, Star, Terminal, Wifi } from "lucide-react";
 
 import KbdTooltip from "@/components/ui/KbdTooltip";
+import {
+  ensureOrderContains,
+  loadAppViewOrderState,
+  moveId,
+  orderAppViewItems,
+  resolvePinnedAppViewIds,
+  saveAppViewOrderState,
+  sortAppViewsForMenu,
+  togglePinnedId,
+  type AppViewOrderState,
+} from "@/utils/appViewOrder";
 import { appendShortcutLabel, shouldUseTauriDragRegion, stripShortcutSuffix } from "@/utils/platformShortcuts";
 import { isRemoteMode } from "@/transport";
 import AppViewIcon from "./AppViewIcon";
@@ -71,17 +82,59 @@ function AppDesktopSidebar({
   const { t } = useTranslation();
   const [appMenuOpen, setAppMenuOpen] = useState(false);
   const appMenuRef = useRef<HTMLDivElement>(null);
-  const { visibleAppViewItems, overflowAppViewItems } = useMemo(() => {
-    const visible = new Set<string>();
-    const pinned = appViewItems.slice(0, 1);
-    for (const item of pinned) visible.add(item.id);
-    const activeItem = appViewItems.find((item) => item.active);
-    if (activeItem) visible.add(activeItem.id);
-    return {
-      visibleAppViewItems: appViewItems.filter((item) => visible.has(item.id)),
-      overflowAppViewItems: appViewItems.filter((item) => !visible.has(item.id)),
-    };
-  }, [appViewItems]);
+  const [appViewOrder, setAppViewOrder] = useState<AppViewOrderState>(() => loadAppViewOrderState());
+
+  const orderedAppViewItems = useMemo(
+    () => orderAppViewItems(appViewItems, appViewOrder),
+    [appViewItems, appViewOrder],
+  );
+
+  const pinnedAppViewIds = useMemo(
+    () => resolvePinnedAppViewIds(orderedAppViewItems, appViewOrder, { maxPinned: 1 }),
+    [appViewOrder, orderedAppViewItems],
+  );
+
+  // Only explicitly pinned plugin apps appear in the primary toolbar.
+  // Activating an unpinned app must not auto-promote it into the toolbar.
+  const visibleAppViewItems = useMemo(
+    () => orderedAppViewItems.filter((item) => pinnedAppViewIds.includes(item.id)),
+    [orderedAppViewItems, pinnedAppViewIds],
+  );
+
+  const menuAppViewItems = useMemo(
+    () => sortAppViewsForMenu(orderedAppViewItems, pinnedAppViewIds),
+    [orderedAppViewItems, pinnedAppViewIds],
+  );
+
+  const updateAppViewOrder = (updater: (current: AppViewOrderState) => AppViewOrderState) => {
+    setAppViewOrder((current) => {
+      const allIds = appViewItems.map((item) => item.id);
+      const next = updater({
+        pinnedIds: current.pinnedIds.filter((id) => allIds.includes(id)),
+        orderIds: ensureOrderContains(current.orderIds, allIds),
+      });
+      const normalized: AppViewOrderState = {
+        pinnedIds: next.pinnedIds.filter((id) => allIds.includes(id)).slice(0, 1),
+        orderIds: ensureOrderContains(next.orderIds, allIds),
+      };
+      saveAppViewOrderState(normalized);
+      return normalized;
+    });
+  };
+
+  const handleTogglePin = (id: string) => {
+    updateAppViewOrder((current) => ({
+      ...current,
+      pinnedIds: togglePinnedId(current.pinnedIds, id, { maxPinned: 1 }),
+    }));
+  };
+
+  const handleMove = (id: string, direction: -1 | 1) => {
+    updateAppViewOrder((current) => ({
+      ...current,
+      orderIds: moveId(ensureOrderContains(current.orderIds, appViewItems.map((item) => item.id)), id, direction),
+    }));
+  };
 
   useEffect(() => {
     if (!appMenuOpen) return;
@@ -211,7 +264,7 @@ function AppDesktopSidebar({
               );
             })}
           </div>
-          {overflowAppViewItems.length > 0 && (
+          {orderedAppViewItems.length > 0 && (
             <div className="relative" ref={appMenuRef}>
               <button
                 type="button"
@@ -230,37 +283,91 @@ function AppDesktopSidebar({
               </button>
               {appMenuOpen && (
                 <div
-                  className="absolute left-1/2 top-[calc(100%+0.25rem)] z-50 w-44 max-w-[calc(100vw-1rem)] -translate-x-[42%] rounded-md border border-border/70 bg-background py-1 shadow-[0_10px_28px_rgba(0,0,0,0.22)]"
+                  className="absolute left-1/2 top-[calc(100%+0.25rem)] z-50 w-56 max-w-[calc(100vw-1rem)] -translate-x-[42%] rounded-md border border-border/70 bg-background py-1 shadow-[0_10px_28px_rgba(0,0,0,0.22)]"
                   role="menu"
                   aria-label={t("app.sidebar.moreApps", "More apps")}
                 >
-                  {overflowAppViewItems.map((item) => {
-                    const menuItem = (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setAppMenuOpen(false);
-                          item.onSelect();
-                        }}
-                        className="grid h-8 w-full grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 px-2.5 text-left text-[13px] text-muted-foreground hover:bg-surface/80 hover:text-foreground motion-color motion-press focus-ring"
-                      >
-                        <AppViewIcon icon={item.icon} />
-                        <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                      </button>
-                    );
-
-                    return item.shortcut ? (
-                      <KbdTooltip
+                  <div className="px-2.5 pb-1 pt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">
+                    {t("app.sidebar.pluginApps", "Plugin apps")}
+                  </div>
+                  {menuAppViewItems.map((item) => {
+                    const isPinned = pinnedAppViewIds.includes(item.id);
+                    const orderIndex = orderedAppViewItems.findIndex((candidate) => candidate.id === item.id);
+                    const canMoveUp = orderIndex > 0;
+                    const canMoveDown = orderIndex >= 0 && orderIndex < orderedAppViewItems.length - 1;
+                    return (
+                      <div
                         key={item.id}
-                        shortcut={item.shortcut}
-                        position="right"
-                        className="relative flex w-full"
+                        className={`group grid h-8 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-1.5 ${
+                          item.active ? "bg-surface/70" : ""
+                        }`}
+                        role="menuitem"
                       >
-                        {menuItem}
-                      </KbdTooltip>
-                    ) : (
-                      <Fragment key={item.id}>{menuItem}</Fragment>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAppMenuOpen(false);
+                            item.onSelect();
+                          }}
+                          className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 rounded px-1 py-1 text-left text-[13px] text-muted-foreground hover:bg-surface/80 hover:text-foreground motion-color motion-press focus-ring"
+                          title={item.label}
+                        >
+                          <AppViewIcon icon={item.icon} />
+                          <span className="min-w-0 truncate">{item.label}</span>
+                        </button>
+                        <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleTogglePin(item.id);
+                            }}
+                            className={`inline-flex h-6 w-6 items-center justify-center rounded motion-color focus-ring ${
+                              isPinned
+                                ? "text-blue-400 hover:bg-secondary"
+                                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                            }`}
+                            aria-label={
+                              isPinned
+                                ? t("app.sidebar.unpinApp", "Unpin from toolbar")
+                                : t("app.sidebar.pinApp", "Pin to toolbar")
+                            }
+                            title={
+                              isPinned
+                                ? t("app.sidebar.unpinApp", "Unpin from toolbar")
+                                : t("app.sidebar.pinApp", "Pin to toolbar")
+                            }
+                          >
+                            {isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!canMoveUp}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleMove(item.id, -1);
+                            }}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground motion-color focus-ring disabled:cursor-not-allowed disabled:opacity-30"
+                            aria-label={t("app.sidebar.moveAppUp", "Move up")}
+                            title={t("app.sidebar.moveAppUp", "Move up")}
+                          >
+                            <ArrowUp className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!canMoveDown}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleMove(item.id, 1);
+                            }}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground motion-color focus-ring disabled:cursor-not-allowed disabled:opacity-30"
+                            aria-label={t("app.sidebar.moveAppDown", "Move down")}
+                            title={t("app.sidebar.moveAppDown", "Move down")}
+                          >
+                            <ArrowDown className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>

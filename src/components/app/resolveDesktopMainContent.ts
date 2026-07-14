@@ -7,6 +7,8 @@ export interface ResolveDesktopMainContentOptions {
   selectedSession: SessionInfo | null;
   sidebarMode: AppDesktopSidebarMode;
   standaloneDatasetRuntime: boolean;
+  /** When true, plugin app views should not replace the main pane. */
+  keepMainContent?: boolean;
   renderSessionViewer: () => ReactNode;
   renderAppView: () => ReactNode;
   renderStandaloneDatasetOverview: () => ReactNode;
@@ -17,13 +19,14 @@ export function resolveDesktopMainContent({
   selectedSession,
   sidebarMode,
   standaloneDatasetRuntime,
+  keepMainContent = false,
   renderSessionViewer,
   renderAppView,
   renderStandaloneDatasetOverview,
   renderDashboard,
 }: ResolveDesktopMainContentOptions): ReactNode {
   if (selectedSession) return renderSessionViewer();
-  if (sidebarMode === "app") return renderAppView();
+  if (sidebarMode === "app" && !keepMainContent) return renderAppView();
   if (standaloneDatasetRuntime) return renderStandaloneDatasetOverview();
   return renderDashboard();
 }

@@ -1779,6 +1779,10 @@ function App() {
         selectedSession,
         sidebarMode,
         standaloneDatasetRuntime,
+        keepMainContent: Boolean(
+          activeAppViewId
+          && appViews.find((view) => view.id === activeAppViewId)?.mainContent === 'keep',
+        ),
         renderSessionViewer,
         renderAppView,
         renderStandaloneDatasetOverview,
