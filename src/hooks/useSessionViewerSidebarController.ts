@@ -23,6 +23,7 @@ export function useSessionViewerSidebarController({
   previewMode,
   mainViewOpen,
   setShowMobileMenu,
+  setActiveEntryId,
   setScrollTargetId,
 }: UseSessionViewerSidebarControllerOptions) {
   const [showSidebar, setShowSidebar] = useState(false);
@@ -52,10 +53,11 @@ export function useSessionViewerSidebarController({
   }, [isMobile, previewMode, setShowMobileMenu]);
 
   const handleTreeNodeClick = useCallback(
-    (_leafId: string, targetId: string) => {
+    (leafId: string, targetId: string) => {
+      setActiveEntryId(leafId);
       setScrollTargetId(targetId);
     },
-    [setScrollTargetId],
+    [setActiveEntryId, setScrollTargetId],
   );
 
   const contentPaddingLeft =

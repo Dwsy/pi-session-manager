@@ -77,13 +77,14 @@ The new session viewer controller closes an important SDK gap for session panels
 | --- | --- | --- |
 | `viewer?.revealEntry(entryId, options)` | reveal a concrete session entry already known to the plugin | generic message-level navigation path |
 | `viewer?.revealToolCall(toolCallId, options)` | reveal a rendered tool/widget block by tool call id | preferred path for widget and review plugins |
+| `viewer?.navigateBranch(leafEntryId, targetEntryId, options)` | activate a terminal branch while revealing an entry on that branch | optional for host compatibility; used by branch-aware main views |
 | `PsmSessionTreeViewRenderProps.onNavigate(...)` | tree-specific navigation callback | unchanged; still the right surface for tree projections |
 
 Important limits:
 
 - `viewer` is available only on `PsmSessionUiRenderProps`, not on the capability client.
 - `viewer` remains optional for compatibility with older host/runtime combinations.
-- The host owns DOM lookup, scroll timing, conversation-turn expansion, and tool-card expansion.
+- The host owns active-branch state, DOM lookup, scroll timing, conversation-turn expansion, and tool-card expansion.
 - Plugins should pass stable ids from session content, not fabricate host-private render ids such as `tool-result-*`.
 
 ## Remaining Documentation Gaps

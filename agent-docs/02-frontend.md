@@ -368,7 +368,8 @@ Key local boundaries:
 | `_code-block.less` | Code block styles |
 | `_tool-execution.less` | Tool execution styles |
 | `_subagent.less` | Subagent styles |
-| `_flow.less` | Flow view styles |
+| `_branch-atlas.less` | Branch Outline 与 Branch Map 样式 |
+| `_branch-atlas-timeline.less` | Active Path Timeline 样式 |
 | `_scroll-markers.less` | Scroll marker styles |
 | `_cmdk.less` | Command palette styles |
 | `_search.less` | Search styles |

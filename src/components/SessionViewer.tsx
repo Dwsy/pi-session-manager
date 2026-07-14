@@ -28,7 +28,10 @@ import { getPlatformDefaults } from "./settings/types";
 import type { PsmSessionTreeViewRuntimeRegistration } from "@/plugins/runtime-host/types";
 import type { SessionEntry, SessionInfo } from "@/types";
 import type { TerminalType } from "./settings/types";
-import type { SessionViewerToolbarSlots, SessionViewerLayoutSlots } from "./session-viewer/SessionViewerToolbarTypes";
+import type {
+  SessionViewerToolbarSlots,
+  SessionViewerLayoutSlots,
+} from "./session-viewer/SessionViewerToolbarTypes";
 import type { SessionPreviewVariant } from "./session-viewer/previewTypes";
 import type {
   PsmSessionRevealOptions,
@@ -60,7 +63,9 @@ interface SessionViewerProps {
   mainViewSlot?: ReactNode;
   pluginTreeViews?: PsmSessionTreeViewRuntimeRegistration[];
   onActiveEntryIdChange?: (activeEntryId: string | null) => void;
-  onViewerControllerChange?: (controller: PsmSessionViewerController | null) => void;
+  onViewerControllerChange?: (
+    controller: PsmSessionViewerController | null,
+  ) => void;
 }
 
 interface SessionViewerRevealTarget {
@@ -71,14 +76,19 @@ interface SessionViewerRevealTarget {
   align: NonNullable<PsmSessionRevealOptions["align"]>;
 }
 
-function findToolCallRowEntryId(entries: SessionEntry[], toolCallId: string): string | null {
+function findToolCallRowEntryId(
+  entries: SessionEntry[],
+  toolCallId: string,
+): string | null {
   for (const entry of entries) {
     if (entry.type !== "message" || entry.message?.role !== "assistant") {
       continue;
     }
 
     const hasToolCall = entry.message.content?.some(
-      (item: any) => item.type === "toolCall" && (item.id === toolCallId || item.toolCallId === toolCallId),
+      (item: any) =>
+        item.type === "toolCall" &&
+        (item.id === toolCallId || item.toolCallId === toolCallId),
     );
     if (hasToolCall) {
       return entry.id;
@@ -125,10 +135,9 @@ function SessionViewerContent({
   } = useSessionView();
   const isMobile = useIsMobile();
   const { copyText } = useClipboard();
-  const {
-    cmdFBehavior,
-    scrollMarkersEnabled,
-  } = useSessionViewerSettingsState({ previewMode });
+  const { cmdFBehavior, scrollMarkersEnabled } = useSessionViewerSettingsState({
+    previewMode,
+  });
 
   const { liveSession, isLive } = useSessionViewerLiveState({
     sessionId: session.id,
@@ -137,7 +146,8 @@ function SessionViewerContent({
   });
 
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const [externalRevealTarget, setExternalRevealTarget] = useState<SessionViewerRevealTarget | null>(null);
+  const [externalRevealTarget, setExternalRevealTarget] =
+    useState<SessionViewerRevealTarget | null>(null);
   const {
     showSystemPromptDialog,
     openSystemPromptDialog,
@@ -190,7 +200,6 @@ function SessionViewerContent({
     previewMode,
   });
 
-
   const {
     showSidebar,
     setShowSidebar,
@@ -237,8 +246,31 @@ function SessionViewerContent({
           align,
         });
       },
-      revealToolCall: (toolCallId: string, options?: PsmSessionToolRevealOptions) => {
-        const rowEntryId = findToolCallRowEntryId(renderableEntriesRef.current, toolCallId);
+      navigateBranch: (
+        leafEntryId: string,
+        targetEntryId: string,
+        options?: PsmSessionRevealOptions,
+      ) => {
+        const align = options?.align ?? "center";
+        const highlight = options?.highlight !== false;
+        setActiveEntryId(leafEntryId);
+        setScrollTargetId(targetEntryId);
+        setExternalRevealTarget({
+          rowEntryId: targetEntryId,
+          targetEntryId,
+          expandTool: false,
+          highlight,
+          align,
+        });
+      },
+      revealToolCall: (
+        toolCallId: string,
+        options?: PsmSessionToolRevealOptions,
+      ) => {
+        const rowEntryId = findToolCallRowEntryId(
+          renderableEntriesRef.current,
+          toolCallId,
+        );
         if (!rowEntryId) {
           return;
         }
@@ -329,7 +361,6 @@ function SessionViewerContent({
     onResume: hasResumeAction ? handleResume : undefined,
   });
 
-
   const {
     markers: scrollMarkers,
     showMarkers: showScrollMarkers,
@@ -349,7 +380,6 @@ function SessionViewerContent({
     scrollContainerRef: scrollMarkersContainerRef,
     scrollContentRef: scrollMarkersContentRef,
   });
-
 
   const toolbarProps = useSessionViewerToolbarProps({
     isMobile,

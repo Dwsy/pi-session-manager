@@ -20,7 +20,7 @@
 
 ## Tech Stack
 
-**Frontend**: React 18, TypeScript 5, Vite 5, Tailwind CSS, i18next, cmdk, @dnd-kit, @xyflow/react, recharts, @xterm/xterm
+**Frontend**: React 18, TypeScript 5, Vite 5, Tailwind CSS, i18next, cmdk, @dnd-kit, recharts, @xterm/xterm
 
 **Backend**: Rust 2021, Tauri 2, Tokio, Axum, rusqlite, SQLite FTS5, notify, portable-pty
 

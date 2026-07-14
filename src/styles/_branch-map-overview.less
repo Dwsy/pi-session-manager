@@ -1,0 +1,33 @@
+.branch-map-overview {
+  height: 300px;
+  min-height: 280px;
+  flex: 0 0 300px;
+  transition:
+    height var(--motion-duration-data) var(--motion-ease-standard),
+    flex-basis var(--motion-duration-data) var(--motion-ease-standard),
+    min-height var(--motion-duration-data) var(--motion-ease-standard);
+}
+
+.branch-map-overview.is-collapsed {
+  height: 38px;
+  min-height: 38px;
+  flex-basis: 38px;
+}
+
+.branch-map-overview > .global-map-panel {
+  height: 100%;
+}
+
+@media (max-height: 760px) {
+  .branch-map-overview:not(.is-collapsed) {
+    height: 240px;
+    min-height: 220px;
+    flex-basis: 240px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .branch-map-overview {
+    transition-duration: 1ms;
+  }
+}

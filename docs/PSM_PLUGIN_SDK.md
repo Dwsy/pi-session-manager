@@ -330,6 +330,11 @@ export interface PsmSessionToolRevealOptions extends PsmSessionRevealOptions {
 export interface PsmSessionViewerController {
   revealEntry(entryId: string, options?: PsmSessionRevealOptions): void
   revealToolCall(toolCallId: string, options?: PsmSessionToolRevealOptions): void
+  navigateBranch?(
+    leafEntryId: string,
+    targetEntryId: string,
+    options?: PsmSessionRevealOptions,
+  ): void
 }
 
 export interface PsmSessionUiRenderProps {
@@ -354,8 +359,9 @@ Rules:
 - `viewer` is optional. Guard every call with `props.viewer?.…`.
 - `revealEntry(...)` is the generic path for message-level navigation.
 - `revealToolCall(...)` is the preferred path for tool/widget reveal flows; pass the original tool call id from session content.
-- The host owns scrolling, turn expansion, highlight timing, and tool-card expansion details.
-- Tree views keep using `onNavigate(leafId, targetId)`; do not reuse tree-only semantics in panels.
+- `navigateBranch?(leafEntryId, targetEntryId, ...)` activates one terminal branch while revealing a possibly earlier entry on that branch. Guard it because older hosts may not provide it.
+- The host owns active-branch state, scrolling, turn expansion, highlight timing, and tool-card expansion details.
+- Tree views keep using `onNavigate(leafId, targetId)`; branch-aware main views use `viewer.navigateBranch?` rather than private DOM or state access.
 
 Example:
 
