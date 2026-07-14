@@ -1,0 +1,169 @@
+{
+  "schema_version": "work-pdca-loop.v1",
+  "project_root": "/Users/dengwenyu/worktrees/pi-session-manager/codex-windows-linux-ux",
+  "work_dir": "work/20260714-windows-linux-ux",
+  "title": "Windows/Linux 原生体验修复",
+  "objective": "完成 ZIP 任务书中的 Windows/Linux 窗口、生命周期、快捷键、布局、终端、opener、CI 与发布门禁修复，并提交可审查 PR。",
+  "status": "in_progress",
+  "mode": "pdca_goal_loop",
+  "pdca": {
+    "cycle": 1,
+    "stage": "act",
+    "stages": [
+      {
+        "id": "plan",
+        "label": "Plan",
+        "status": "completed"
+      },
+      {
+        "id": "do",
+        "label": "Do",
+        "status": "completed"
+      },
+      {
+        "id": "check",
+        "label": "Check",
+        "status": "completed"
+      },
+      {
+        "id": "act",
+        "label": "Act",
+        "status": "in_progress"
+      }
+    ]
+  },
+  "current_phase": "D2",
+  "created_at": "2026-07-14T06:50:12.229Z",
+  "updated_at": "2026-07-14T08:42:59.216Z",
+  "owner": "codex",
+  "scope": [],
+  "tags": [],
+  "ssot": [],
+  "inputs": [],
+  "outputs": [
+    "work/20260714-windows-linux-ux/task.md",
+    "work/20260714-windows-linux-ux/pdca.md",
+    "work/20260714-windows-linux-ux/decisions.md",
+    "work/20260714-windows-linux-ux/prompt.md",
+    "work/20260714-windows-linux-ux/implementation-log.md",
+    "work/20260714-windows-linux-ux/state.json",
+    "work/20260714-windows-linux-ux/history/events.jsonl"
+  ],
+  "phases": [
+    {
+      "id": "P0",
+      "name": "frame objective and constraints",
+      "pdca_stage": "plan",
+      "status": "completed"
+    },
+    {
+      "id": "P1",
+      "name": "execute first tracer path",
+      "pdca_stage": "do",
+      "status": "completed"
+    },
+    {
+      "id": "D1",
+      "name": "choose implementation route",
+      "pdca_stage": "check",
+      "status": "completed",
+      "type": "decision"
+    },
+    {
+      "id": "P2",
+      "name": "validate evidence and regressions",
+      "pdca_stage": "check",
+      "status": "completed"
+    },
+    {
+      "id": "D2",
+      "name": "decide continue, pivot, or close",
+      "pdca_stage": "act",
+      "status": "in_progress",
+      "type": "decision"
+    },
+    {
+      "id": "P3",
+      "name": "act on learning and hand off",
+      "pdca_stage": "act",
+      "status": "planned"
+    }
+  ],
+  "decision_points": [
+    {
+      "id": "D1",
+      "phase": "D1",
+      "question": "Which route should the next implementation take?",
+      "status": "decided",
+      "options": [
+        {
+          "id": "direct",
+          "label": "Direct implementation",
+          "next_phase": "P2",
+          "criteria": "Scope is clear, blast radius is small, and validation path is known."
+        },
+        {
+          "id": "research",
+          "label": "Research first",
+          "next_phase": "P0",
+          "criteria": "Domain facts, dependencies, or ownership are still unclear."
+        },
+        {
+          "id": "split",
+          "label": "Split into slices",
+          "next_phase": "P1",
+          "criteria": "The work is valid but too broad for one safe change."
+        }
+      ],
+      "selected_option_id": "split",
+      "rationale": "任务横跨 Rust GUI 生命周期、前端快捷键/布局、终端跨平台参数与 CI 发布链；三路调用链已确认但需分阶段验证，拆分 vertical slices 可避免一次性大改。",
+      "decided_at": "2026-07-14T07:04:15.580Z"
+    },
+    {
+      "id": "D2",
+      "phase": "D2",
+      "question": "After Check, should this cycle close, pivot, or continue?",
+      "status": "open",
+      "options": [
+        {
+          "id": "close",
+          "label": "Close cycle",
+          "next_phase": "P3",
+          "criteria": "Acceptance evidence is complete and no important risk remains."
+        },
+        {
+          "id": "continue",
+          "label": "Continue same cycle",
+          "next_phase": "P1",
+          "criteria": "Core direction is right but more execution is required."
+        },
+        {
+          "id": "pivot",
+          "label": "Pivot plan",
+          "next_phase": "P0",
+          "criteria": "Validation changed the problem or invalidated current assumptions."
+        }
+      ],
+      "selected_option_id": null,
+      "rationale": "",
+      "decided_at": null
+    }
+  ],
+  "validation": {
+    "passed": false,
+    "commands": [
+      "git status --short && git diff --stat",
+      "cargo search tauri-plugin-single-instance --limit 3; cargo search tauri-plugin-opener --limit 3; cargo search tauri-plugin-window-state --limit 3",
+      "pnpm exec tsc --noEmit",
+      "gh pr view 42 --json statusCheckRollup"
+    ],
+    "notes": "PR #42 已创建并推送；当前 lint 仍 in_progress。局部验证通过，全量 Vitest/跨平台 GUI/真实 Authenticode 保留明确限制。"
+  },
+  "history": {
+    "state_snapshots": "work/20260714-windows-linux-ux/history/state/",
+    "events": "work/20260714-windows-linux-ux/history/events.jsonl"
+  },
+  "risks": [],
+  "next_action": "等待 PR #42 CI，若 CI 发现回归则按检查结果修复",
+  "notes": ""
+}

@@ -13,8 +13,8 @@ pub async fn open_path_with_default_app_impl(path: String) -> Result<(), String>
     terminal::open_path_with_default_app_impl(path).await
 }
 
-pub async fn open_session_in_terminal_impl(path: String, cwd: String, terminal: Option<String>, pi_path: Option<String>, resume_command: Option<String>) -> Result<(), String> {
-    terminal::open_session_in_terminal_impl(path, cwd, terminal, pi_path, resume_command).await
+pub async fn open_session_in_terminal_impl(path: String, cwd: String, terminal: Option<String>, pi_path: Option<String>, resume_command: Option<String>, shell: Option<String>) -> Result<(), String> {
+    terminal::open_session_in_terminal_impl(path, cwd, terminal, pi_path, resume_command, shell).await
 }
 
 pub async fn open_session_in_browser_impl(path: String) -> Result<(), String> {

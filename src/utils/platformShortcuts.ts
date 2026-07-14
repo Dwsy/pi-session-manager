@@ -1,18 +1,4 @@
-function resolveIsMac(explicitIsMac?: boolean): boolean {
-  if (typeof explicitIsMac === 'boolean') {
-    return explicitIsMac
-  }
-
-  if (typeof navigator === 'undefined') {
-    return false
-  }
-
-  const platform = navigator.platform || ''
-  const userAgent = navigator.userAgent || ''
-  const value = `${platform} ${userAgent}`.toUpperCase()
-
-  return value.includes('MAC') || value.includes('MACINTOSH')
-}
+import { detectPlatform, shouldUseTauriDragRegion as platformShouldUseTauriDragRegion } from "./platform";
 
 function tokenizeShortcut(shortcut: string): string[] {
   return shortcut
@@ -26,18 +12,18 @@ function tokenizeShortcut(shortcut: string): string[] {
 }
 
 export function isMacPlatform(explicitIsMac?: boolean): boolean {
-  return resolveIsMac(explicitIsMac)
+  return explicitIsMac ?? detectPlatform() === "macos";
 }
 
 export function shouldUseTauriDragRegion(explicitIsMac?: boolean): boolean {
-  return resolveIsMac(explicitIsMac)
+  return explicitIsMac ?? platformShouldUseTauriDragRegion();
 }
 
 export function formatShortcutDisplay(
   shortcut: string,
   options?: { isMac?: boolean; symbolic?: boolean },
 ): string {
-  const mac = resolveIsMac(options?.isMac)
+  const mac = options?.isMac ?? detectPlatform() === "macos"
   const symbolic = options?.symbolic ?? false
   const tokens = tokenizeShortcut(shortcut)
 
@@ -72,7 +58,7 @@ export function formatShortcutDisplay(
 }
 
 export function formatShortcutText(text: string, options?: { isMac?: boolean }): string {
-  if (resolveIsMac(options?.isMac)) {
+  if (isMacPlatform(options?.isMac)) {
     return text
   }
 

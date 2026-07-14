@@ -41,6 +41,34 @@ pub const DEFAULT_WINDOW_HEIGHT: f64 = 900.0;
 pub const DEFAULT_MIN_WINDOW_WIDTH: f64 = 1000.0;
 pub const DEFAULT_MIN_WINDOW_HEIGHT: f64 = 600.0;
 
+#[cfg(feature = "gui")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WindowChromePolicy {
+    MacOverlay,
+    Native,
+}
+
+#[cfg(feature = "gui")]
+pub fn window_chrome_policy() -> WindowChromePolicy {
+    #[cfg(target_os = "macos")]
+    {
+        WindowChromePolicy::MacOverlay
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        WindowChromePolicy::Native
+    }
+}
+
+#[cfg(feature = "gui")]
+pub fn configure_main_window_chrome<'a, R: tauri::Runtime, M: tauri::Manager<R>>(builder: tauri::WebviewWindowBuilder<'a, R, M>) -> tauri::WebviewWindowBuilder<'a, R, M> {
+    match window_chrome_policy() {
+        WindowChromePolicy::MacOverlay => builder.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true).traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 22.0))),
+        WindowChromePolicy::Native => builder.decorations(true),
+    }
+}
+
+#[cfg(feature = "gui")]
 pub fn clamp_window_dimensions(available_width: f64, available_height: f64) -> ((f64, f64), (f64, f64)) {
     let initial_width = DEFAULT_WINDOW_WIDTH.min(available_width).max(1.0);
     let initial_height = DEFAULT_WINDOW_HEIGHT.min(available_height).max(1.0);
@@ -56,6 +84,19 @@ pub fn resolve_window_dimensions(monitor: Option<&tauri::Monitor>) -> ((f64, f64
         let scale_factor = monitor.scale_factor();
         clamp_window_dimensions(f64::from(work_area.size.width) / scale_factor, f64::from(work_area.size.height) / scale_factor)
     })
+}
+#[cfg(test)]
+mod window_tests {
+    use super::{window_chrome_policy, WindowChromePolicy};
+
+    #[test]
+    fn window_chrome_matches_platform_policy() {
+        #[cfg(not(target_os = "macos"))]
+        assert_eq!(window_chrome_policy(), WindowChromePolicy::Native);
+
+        #[cfg(target_os = "macos")]
+        assert_eq!(window_chrome_policy(), WindowChromePolicy::MacOverlay);
+    }
 }
 
 // Backward-compat re-exports
@@ -93,6 +134,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
+        .plugin(tauri_plugin_window_state::Builder::new().with_state_flags(tauri_plugin_window_state::StateFlags::SIZE | tauri_plugin_window_state::StateFlags::POSITION | tauri_plugin_window_state::StateFlags::MAXIMIZED).build())
         .invoke_handler(tauri::generate_handler![
             plugin_dispatch_command,
             scan_sessions,

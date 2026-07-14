@@ -188,5 +188,6 @@ export async function openSessionInTerminalDirect(
     terminal: terminal === "custom" ? customCommand : terminal,
     piPath: piPath || null,
     resumeCommand: resumeCommand || null,
+    shell: settings.terminal?.defaultShell || getPlatformDefaults().defaultShell,
   });
 }

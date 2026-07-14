@@ -142,6 +142,9 @@ export function useAppBootstrap({
     }
 
     const handleKeyDown = async (event: KeyboardEvent) => {
+      if (event.isComposing || event.keyCode === 229 || event.getModifierState?.("AltGraph")) {
+        return;
+      }
       if (event.key !== "F12") {
         return;
       }
@@ -170,12 +173,11 @@ export function useAppBootstrap({
 
   useEffect(() => {
     const handleRefresh = (event: KeyboardEvent) => {
-      const isCmdShiftR =
-        (event.metaKey || event.ctrlKey) &&
-        event.shiftKey &&
-        event.key.toLowerCase() === "r";
+      if (event.isComposing || event.keyCode === 229 || event.getModifierState?.("AltGraph")) {
+        return;
+      }
       const isF5 = event.key === "F5";
-      if (!isCmdShiftR && !isF5) {
+      if (!isF5) {
         return;
       }
 

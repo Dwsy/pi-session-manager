@@ -14,6 +14,10 @@ impl DeepLinkState {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn mark_frontend_ready(&self) {
+        self.frontend_ready.store(true, Ordering::SeqCst);
+    }
 }
 
 pub fn handle_deep_link_payload<R: Runtime>(app: &AppHandle<R>, state: &DeepLinkState, payload: &str) {
@@ -23,6 +27,21 @@ pub fn handle_deep_link_payload<R: Runtime>(app: &AppHandle<R>, state: &DeepLink
     }
 }
 
+pub fn handle_frontend_ready<R: Runtime>(app: &AppHandle<R>, state: &DeepLinkState) {
+    queue_current_deep_links(app, state);
+    state.mark_frontend_ready();
+    let urls = match state.pending_urls.lock() {
+        Ok(mut pending) => pending.drain(..).collect::<Vec<_>>(),
+        Err(error) => {
+            log::warn!("Failed to drain pending deep links: {error}");
+            Vec::new()
+        }
+    };
+
+    for url in urls {
+        let _ = app.emit("deep-link://navigate", url);
+    }
+}
 pub fn queue_current_deep_links<R: Runtime>(app: &AppHandle<R>, state: &DeepLinkState) {
     let Some(deep_link) = app.try_state::<tauri_plugin_deep_link::DeepLink<R>>() else {
         return;
@@ -36,21 +55,6 @@ pub fn queue_current_deep_links<R: Runtime>(app: &AppHandle<R>, state: &DeepLink
         }
         Ok(None) => {}
         Err(error) => log::warn!("Failed to read current deep links: {error}"),
-    }
-}
-
-pub fn mark_frontend_ready<R: Runtime>(app: &AppHandle<R>, state: &DeepLinkState) {
-    state.frontend_ready.store(true, Ordering::SeqCst);
-    let urls = match state.pending_urls.lock() {
-        Ok(mut pending) => pending.drain(..).collect::<Vec<_>>(),
-        Err(error) => {
-            log::warn!("Failed to drain pending deep links: {error}");
-            Vec::new()
-        }
-    };
-
-    for url in urls {
-        let _ = app.emit("deep-link://navigate", url);
     }
 }
 

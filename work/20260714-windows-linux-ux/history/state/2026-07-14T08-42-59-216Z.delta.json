@@ -1,0 +1,84 @@
+{
+  "ts": "2026-07-14T08:42:59.216Z",
+  "kind": "delta",
+  "delta": {
+    "pdca": {
+      "stage": "act",
+      "stages": [
+        {
+          "id": "plan",
+          "label": "Plan",
+          "status": "completed"
+        },
+        {
+          "id": "do",
+          "label": "Do",
+          "status": "completed"
+        },
+        {
+          "id": "check",
+          "label": "Check",
+          "status": "completed"
+        },
+        {
+          "id": "act",
+          "label": "Act",
+          "status": "in_progress"
+        }
+      ]
+    },
+    "current_phase": "D2",
+    "updated_at": "2026-07-14T08:42:59.216Z",
+    "phases": [
+      {
+        "id": "P0",
+        "name": "frame objective and constraints",
+        "pdca_stage": "plan",
+        "status": "completed"
+      },
+      {
+        "id": "P1",
+        "name": "execute first tracer path",
+        "pdca_stage": "do",
+        "status": "completed"
+      },
+      {
+        "id": "D1",
+        "name": "choose implementation route",
+        "pdca_stage": "check",
+        "status": "completed",
+        "type": "decision"
+      },
+      {
+        "id": "P2",
+        "name": "validate evidence and regressions",
+        "pdca_stage": "check",
+        "status": "completed"
+      },
+      {
+        "id": "D2",
+        "name": "decide continue, pivot, or close",
+        "pdca_stage": "act",
+        "status": "in_progress",
+        "type": "decision"
+      },
+      {
+        "id": "P3",
+        "name": "act on learning and hand off",
+        "pdca_stage": "act",
+        "status": "planned"
+      }
+    ],
+    "validation": {
+      "commands": [
+        "git status --short && git diff --stat",
+        "cargo search tauri-plugin-single-instance --limit 3; cargo search tauri-plugin-opener --limit 3; cargo search tauri-plugin-window-state --limit 3",
+        "pnpm exec tsc --noEmit",
+        "gh pr view 42 --json statusCheckRollup"
+      ],
+      "notes": "PR #42 已创建并推送；当前 lint 仍 in_progress。局部验证通过，全量 Vitest/跨平台 GUI/真实 Authenticode 保留明确限制。"
+    },
+    "next_action": "等待 PR #42 CI，若 CI 发现回归则按检查结果修复"
+  },
+  "event": "pr-opened"
+}

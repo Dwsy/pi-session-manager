@@ -26,13 +26,14 @@ export type TerminalType =
   | "mate-terminal"
   | "lxterminal";
 
+import { detectPlatform as detectUnifiedPlatform } from "@/utils/platform";
+import { defaultPiLiveSettings, type PiLiveSettings } from "@/types/pi-live";
+import type { SessionConvertTarget } from "@/types";
+
 export type Platform = "macos" | "windows" | "linux";
 
 export function detectPlatform(): Platform {
-  const ua = navigator.userAgent || navigator.platform || "";
-  if (/Win/i.test(ua)) return "windows";
-  if (/Mac/i.test(ua)) return "macos";
-  return "linux";
+  return detectUnifiedPlatform();
 }
 
 export function getPlatformDefaults(): {
@@ -48,9 +49,6 @@ export function getPlatformDefaults(): {
       return { defaultTerminal: "auto", defaultShell: "/bin/zsh" };
   }
 }
-
-import { defaultPiLiveSettings, type PiLiveSettings } from "@/types/pi-live";
-import type { SessionConvertTarget } from "@/types";
 
 export type SubagentCompatibilityMode = "smart" | "forced";
 export type ForcedSubagentProvider =

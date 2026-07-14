@@ -1,0 +1,142 @@
+{
+  "ts": "2026-07-14T07:04:15.580Z",
+  "kind": "delta",
+  "delta": {
+    "pdca": {
+      "stage": "check",
+      "stages": [
+        {
+          "id": "plan",
+          "label": "Plan",
+          "status": "completed"
+        },
+        {
+          "id": "do",
+          "label": "Do",
+          "status": "completed"
+        },
+        {
+          "id": "check",
+          "label": "Check",
+          "status": "in_progress"
+        },
+        {
+          "id": "act",
+          "label": "Act",
+          "status": "planned"
+        }
+      ]
+    },
+    "current_phase": "D1",
+    "updated_at": "2026-07-14T07:04:15.580Z",
+    "phases": [
+      {
+        "id": "P0",
+        "name": "frame objective and constraints",
+        "pdca_stage": "plan",
+        "status": "completed"
+      },
+      {
+        "id": "P1",
+        "name": "execute first tracer path",
+        "pdca_stage": "do",
+        "status": "completed"
+      },
+      {
+        "id": "D1",
+        "name": "choose implementation route",
+        "pdca_stage": "check",
+        "status": "in_progress",
+        "type": "decision"
+      },
+      {
+        "id": "P2",
+        "name": "validate evidence and regressions",
+        "pdca_stage": "check",
+        "status": "planned"
+      },
+      {
+        "id": "D2",
+        "name": "decide continue, pivot, or close",
+        "pdca_stage": "act",
+        "status": "planned",
+        "type": "decision"
+      },
+      {
+        "id": "P3",
+        "name": "act on learning and hand off",
+        "pdca_stage": "act",
+        "status": "planned"
+      }
+    ],
+    "decision_points": [
+      {
+        "id": "D1",
+        "phase": "D1",
+        "question": "Which route should the next implementation take?",
+        "status": "decided",
+        "options": [
+          {
+            "id": "direct",
+            "label": "Direct implementation",
+            "next_phase": "P2",
+            "criteria": "Scope is clear, blast radius is small, and validation path is known."
+          },
+          {
+            "id": "research",
+            "label": "Research first",
+            "next_phase": "P0",
+            "criteria": "Domain facts, dependencies, or ownership are still unclear."
+          },
+          {
+            "id": "split",
+            "label": "Split into slices",
+            "next_phase": "P1",
+            "criteria": "The work is valid but too broad for one safe change."
+          }
+        ],
+        "selected_option_id": "split",
+        "rationale": "任务横跨 Rust GUI 生命周期、前端快捷键/布局、终端跨平台参数与 CI 发布链；三路调用链已确认但需分阶段验证，拆分 vertical slices 可避免一次性大改。",
+        "decided_at": "2026-07-14T07:04:15.580Z"
+      },
+      {
+        "id": "D2",
+        "phase": "D2",
+        "question": "After Check, should this cycle close, pivot, or continue?",
+        "status": "open",
+        "options": [
+          {
+            "id": "close",
+            "label": "Close cycle",
+            "next_phase": "P3",
+            "criteria": "Acceptance evidence is complete and no important risk remains."
+          },
+          {
+            "id": "continue",
+            "label": "Continue same cycle",
+            "next_phase": "P1",
+            "criteria": "Core direction is right but more execution is required."
+          },
+          {
+            "id": "pivot",
+            "label": "Pivot plan",
+            "next_phase": "P0",
+            "criteria": "Validation changed the problem or invalidated current assumptions."
+          }
+        ],
+        "selected_option_id": null,
+        "rationale": "",
+        "decided_at": null
+      }
+    ],
+    "validation": {
+      "commands": [
+        "git status --short && git diff --stat",
+        "cargo search tauri-plugin-single-instance --limit 3; cargo search tauri-plugin-opener --limit 3; cargo search tauri-plugin-window-state --limit 3"
+      ],
+      "notes": "已确认兼容插件版本：single-instance 2.4.3、opener 2.5.4、window-state 2.4.1；Context7 因配额耗尽未能使用，改用本地 Cargo registry 源码核对 API。"
+    },
+    "next_action": "先实现窗口策略、ready 生命周期和 GUI 单实例切片"
+  },
+  "event": "research-complete-split-slices"
+}

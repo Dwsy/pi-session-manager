@@ -2,6 +2,27 @@
 pub use crate::utils::string::{cmd_double_quote, command_exists, escape_double_quoted, powershell_single_quote, resolve_launch_cwd, shell_escape_single_quotes, shell_single_quote};
 use std::process::Command;
 
+pub fn shell_command_args(shell: &str, command: &str) -> (&'static str, Vec<String>) {
+    let normalized = shell.trim().to_ascii_lowercase();
+    if normalized.ends_with("/fish") || normalized == "fish" {
+        return ("-c", vec![command.to_string()]);
+    }
+    if normalized.ends_with("/nu") || normalized == "nu" {
+        return ("-c", vec![command.to_string()]);
+    }
+    ("-lc", vec![command.to_string()])
+}
+#[cfg(test)]
+mod tests {
+    use super::shell_command_args;
+
+    #[test]
+    fn shell_command_args_use_command_mode_for_non_posix_shells() {
+        assert_eq!(shell_command_args("/bin/fish", "echo hi"), ("-c", vec!["echo hi".to_string()]));
+        assert_eq!(shell_command_args("/bin/nu", "echo hi"), ("-c", vec!["echo hi".to_string()]));
+        assert_eq!(shell_command_args("/bin/zsh", "echo hi"), ("-lc", vec!["echo hi".to_string()]));
+    }
+}
 pub fn spawn_command(command: &mut Command, error_context: &str) -> Result<(), String> {
     command.spawn().map_err(|error| format!("Failed to launch {error_context}: {error}"))?;
     Ok(())

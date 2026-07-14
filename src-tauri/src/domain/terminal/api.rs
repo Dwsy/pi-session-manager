@@ -75,7 +75,7 @@ end tell"#,
 }
 
 /// Open session in external terminal
-pub async fn open_session_in_terminal_impl(path: String, cwd: String, terminal: Option<String>, pi_path: Option<String>, resume_command: Option<String>) -> Result<(), String> {
+pub async fn open_session_in_terminal_impl(path: String, cwd: String, terminal: Option<String>, pi_path: Option<String>, resume_command: Option<String>, shell: Option<String>) -> Result<(), String> {
     let has_explicit_resume_command = resume_command.as_deref().map(str::trim).filter(|value| !value.is_empty()).is_some();
 
     if !has_explicit_resume_command && !Path::new(&path).is_file() {
@@ -86,6 +86,7 @@ pub async fn open_session_in_terminal_impl(path: String, cwd: String, terminal: 
     let requested_terminal = terminal.as_deref().map(str::trim).filter(|value| !value.is_empty()).unwrap_or("auto");
     let pi_cmd = pi_path.as_deref().map(str::trim).filter(|value| !value.is_empty()).unwrap_or("pi").to_string();
     let resume_cmd = resume_command.as_deref().map(str::trim).filter(|value| !value.is_empty());
+    let default_shell = shell.as_deref().map(str::trim).filter(|value| !value.is_empty());
 
     log::info!("[Terminal] Terminal: {requested_terminal}");
     log::info!("[Terminal] CWD: {resolved_cwd}");
@@ -104,7 +105,7 @@ pub async fn open_session_in_terminal_impl(path: String, cwd: String, terminal: 
     }
 
     for terminal_id in build_terminal_attempt_order(requested_terminal) {
-        match try_launch_known_terminal(&terminal_id, &resolved_cwd, &path, &pi_cmd, resume_cmd) {
+        match try_launch_known_terminal(&terminal_id, &resolved_cwd, &path, &pi_cmd, resume_cmd, default_shell) {
             Ok(true) => return Ok(()),
             Ok(false) => attempts.push(format!("{terminal_id}: not installed")),
             Err(error) => attempts.push(format!("{terminal_id}: {error}")),
@@ -157,15 +158,11 @@ fn resolve_existing_open_target(path: &str) -> Result<PathBuf, String> {
     Err(format!("Path does not exist: {}", target.display()))
 }
 
-fn open_system_target(target: &str) -> std::io::Result<std::process::Child> {
-    if cfg!(target_os = "macos") {
-        Command::new("open").arg(target).spawn()
-    } else if cfg!(target_os = "linux") {
-        Command::new("xdg-open").arg(target).spawn()
-    } else if cfg!(target_os = "windows") {
-        Command::new("cmd").args(["/C", "start", "", target]).spawn()
+fn open_system_target(target: &str) -> Result<(), String> {
+    if target.starts_with("http://") || target.starts_with("https://") {
+        tauri_plugin_opener::open_url(target, None::<&str>).map_err(|error| error.to_string())
     } else {
-        Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "unsupported operating system"))
+        tauri_plugin_opener::open_path(target, None::<&str>).map_err(|error| error.to_string())
     }
 }
 

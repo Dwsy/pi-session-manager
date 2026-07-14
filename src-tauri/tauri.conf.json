@@ -13,7 +13,9 @@
     "windows": [],
     "security": {
       "csp": null,
-      "capabilities": ["default"]
+      "capabilities": [
+        "default"
+      ]
     },
     "withGlobalTauri": true
   },
@@ -27,12 +29,32 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "digestAlgorithm": "sha256",
+      "signCommand": {
+        "cmd": "powershell",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "scripts/sign-windows-artifact.ps1",
+          "%1"
+        ]
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      }
+    }
   },
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["pi-session"]
+        "schemes": [
+          "pi-session"
+        ]
       }
     },
     "updater": {

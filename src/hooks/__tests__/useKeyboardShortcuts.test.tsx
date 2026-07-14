@@ -131,4 +131,17 @@ describe('useKeyboardShortcuts', () => {
     expect(onProjectView).toHaveBeenCalledTimes(1)
     expect(onKanbanView).toHaveBeenCalledTimes(1)
   })
+
+  it('ignores IME composition, keyCode 229, and AltGraph input', () => {
+    const { outsideButton, onSettings } = renderHarness()
+    outsideButton.focus()
+
+    fireEvent.keyDown(outsideButton, { key: ',', metaKey: true, isComposing: true })
+    fireEvent.keyDown(outsideButton, { key: ',', metaKey: true, keyCode: 229 })
+    const altGraph = new KeyboardEvent('keydown', { key: ',', ctrlKey: true, altKey: true, bubbles: true })
+    Object.defineProperty(altGraph, 'getModifierState', { value: (name: string) => name === 'AltGraph' })
+    outsideButton.dispatchEvent(altGraph)
+
+    expect(onSettings).not.toHaveBeenCalled()
+  })
 })

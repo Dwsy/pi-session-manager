@@ -1,16 +1,25 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
-const MOBILE_BREAKPOINT = 768
+export type LayoutMode = "mobile" | "compact" | "desktop";
 
-export function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_BREAKPOINT)
+export function getLayoutMode(width: number): LayoutMode {
+  if (width < 768) return "mobile";
+  if (width < 1120) return "compact";
+  return "desktop";
+}
+
+export function useLayoutMode(): LayoutMode {
+  const [mode, setMode] = useState(() => getLayoutMode(typeof window === "undefined" ? 1120 : window.innerWidth));
 
   useEffect(() => {
-    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-    mql.addEventListener('change', handler)
-    return () => mql.removeEventListener('change', handler)
-  }, [])
+    const handleResize = () => setMode(getLayoutMode(window.innerWidth));
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
-  return isMobile
+  return mode;
+}
+
+export function useIsMobile(): boolean {
+  return useLayoutMode() === "mobile";
 }

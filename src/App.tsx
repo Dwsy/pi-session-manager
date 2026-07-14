@@ -15,7 +15,7 @@ import { useRouteSync } from "./hooks/useRouteSync";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSwipe } from "./hooks/useSwipe";
 import { triggerHaptic } from "./utils/haptics";
-import { isMacPlatform } from "./utils/platformShortcuts";
+import { detectPlatform } from "@/utils/platform";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useDeepLink } from "./hooks/useDeepLink";
 import { useSessionBadges } from "./hooks/useSessionBadges";
@@ -26,7 +26,7 @@ import { useSessionActions } from "./hooks/useSessionActions";
 import { useAppearance } from "./hooks/useAppearance";
 import { useSettings } from "./hooks/useSettings";
 import { useToolStyles } from "./hooks/useToolStyles";
-import { useIsMobile } from "./hooks/useIsMobile";
+import { useLayoutMode } from "./hooks/useIsMobile";
 import { useClipboard } from "./hooks/useClipboard";
 import { useContextMenuOverride } from "./hooks/useContextMenuOverride";
 import { useZoomControl } from "./hooks/useZoomControl";
@@ -215,7 +215,8 @@ function App() {
     });
     return unsubscribe;
   }, []);
-  const isMobile = useIsMobile();
+  const layoutMode = useLayoutMode();
+  const isMobile = layoutMode === "mobile";
 
   const [mobileTab, setMobileTab] = useState<MobileTab>("list");
   const listScrollRef = useRef<HTMLDivElement>(null);
@@ -753,6 +754,7 @@ function App() {
     [piPath, resumeCommand],
   );
 
+  const shell = terminalConfig.defaultShell;
   const openResumeCommandInTerminal = useCallback(
     async (
       path: string,
@@ -778,13 +780,14 @@ function App() {
           terminal: terminal === "custom" ? customCommand : terminal,
           piPath: piPath || null,
           resumeCommand: commandOverride || resumeCommand || null,
+          shell,
         });
       } catch (err) {
         console.error("Failed to resume session:", err);
         throw err;
       }
     },
-    [openTerminalScope, terminal, customCommand, piPath, resumeCommand],
+    [openTerminalScope, terminal, customCommand, piPath, resumeCommand, shell],
   );
 
   const handleResumeSessionWithTarget = useCallback(
@@ -883,13 +886,14 @@ function App() {
           terminal: terminal === "custom" ? customCommand : terminal,
           piPath: piPath || null,
           resumeCommand: command,
+          shell,
         });
       } catch (err) {
         console.error("Failed to open new session in terminal:", err);
         throw err;
       }
     },
-    [openTerminalScope, terminal, customCommand, piPath],
+    [openTerminalScope, terminal, customCommand, piPath, shell],
   );
 
   const handleResumeSession = useCallback(async () => {
@@ -1857,8 +1861,8 @@ function App() {
       <div
         className="app-shell flex flex-col h-screen-safe bg-background text-foreground"
         data-runtime={appRuntime}
-        data-sidebar-collapsed={!sidebarVisible}
-        data-os={isMacPlatform() ? "macos" : "other"}
+        data-layout-mode={layoutMode}
+        data-os={detectPlatform()}
       >
         <ConnectionBanner />
 

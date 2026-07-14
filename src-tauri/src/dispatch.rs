@@ -1268,7 +1268,8 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
                 let terminal = extract_optional_string(payload, "terminal");
                 let pi_path = extract_optional_string(payload, "piPath").or_else(|| extract_optional_string(payload, "pi_path"));
                 let resume_command = extract_optional_string(payload, "resumeCommand").or_else(|| extract_optional_string(payload, "resume_command"));
-                crate::open_session_in_terminal(path, cwd, terminal, pi_path, resume_command).await?;
+                let shell = extract_optional_string(payload, "shell");
+                crate::open_session_in_terminal(path, cwd, terminal, pi_path, resume_command, shell).await?;
                 Ok(Value::Null)
             }
             #[cfg(not(feature = "gui"))]

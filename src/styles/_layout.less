@@ -552,6 +552,22 @@
   width: 2px;
 }
 
+[data-layout-mode="compact"] {
+  .app-desktop-sidebar {
+    width: min(256px, 28vw);
+  }
+
+  [data-session-toolbar] {
+    gap: 4px;
+  }
+
+  .app-desktop-sidebar__chrome button,
+  [data-session-toolbar] button {
+    min-width: 28px;
+    min-height: 28px;
+  }
+}
+
 // Sidebar Controls
 .sidebar-controls {
   padding: 12px;

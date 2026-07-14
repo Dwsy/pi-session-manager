@@ -97,14 +97,13 @@ const MENU_CHECK_UPDATE: &str = "app_check_update";
 
 fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
     let handle = app.handle();
-    let reload_item = MenuItemBuilder::with_id(MENU_VIEW_RELOAD, "Reload").accelerator("CmdOrCtrl+R").build(handle)?;
-    let devtools_item = MenuItemBuilder::with_id(MENU_VIEW_TOGGLE_DEVTOOLS, "Developer Tools").accelerator("CmdOrCtrl+Shift+I").build(handle)?;
-    let view_menu = SubmenuBuilder::new(handle, "View").item(&reload_item).separator().item(&devtools_item).build()?;
-
     let menu = MenuBuilder::new(handle);
 
     #[cfg(target_os = "macos")]
     let menu = {
+        let reload_item = MenuItemBuilder::with_id(MENU_VIEW_RELOAD, "Reload").build(handle)?;
+        let devtools_item = MenuItemBuilder::with_id(MENU_VIEW_TOGGLE_DEVTOOLS, "Developer Tools").accelerator("CmdOrCtrl+Shift+I").build(handle)?;
+        let view_menu = SubmenuBuilder::new(handle, "View").item(&reload_item).separator().item(&devtools_item).build()?;
         let check_update_item = MenuItemBuilder::with_id(MENU_CHECK_UPDATE, "Check for Updates").build(handle)?;
         let app_menu = SubmenuBuilder::new(handle, "Pi Session Manager").about(None).item(&check_update_item).separator().services().separator().hide().hide_others().show_all().separator().quit().build()?;
         let edit_menu = SubmenuBuilder::new(handle, "Edit").undo().redo().separator().cut().copy().paste().select_all().build()?;
@@ -113,7 +112,14 @@ fn install_native_menu(app: &tauri::App) -> tauri::Result<()> {
     };
 
     #[cfg(not(target_os = "macos"))]
-    let menu = menu.item(&view_menu);
+    let menu = if cfg!(debug_assertions) {
+        let reload_item = MenuItemBuilder::with_id(MENU_VIEW_RELOAD, "Reload").build(handle)?;
+        let devtools_item = MenuItemBuilder::with_id(MENU_VIEW_TOGGLE_DEVTOOLS, "Developer Tools").accelerator("CmdOrCtrl+Shift+I").build(handle)?;
+        let view_menu = SubmenuBuilder::new(handle, "View").item(&reload_item).separator().item(&devtools_item).build()?;
+        menu.item(&view_menu)
+    } else {
+        menu
+    };
 
     app.set_menu(menu.build()?)?;
     Ok(())
@@ -165,12 +171,28 @@ fn main() {
     cli_common::apply_server_overrides(&mut server_cfg, &main_args.common);
     let runtime_token = main_args.common.runtime_token.clone();
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
+        .plugin(tauri_plugin_window_state::Builder::new().with_state_flags(tauri_plugin_window_state::StateFlags::SIZE | tauri_plugin_window_state::StateFlags::POSITION | tauri_plugin_window_state::StateFlags::MAXIMIZED).build());
+
+    if !cli_mode {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            } else {
+                pi_session_manager::tray::show_or_create_window(app);
+            }
+        }));
+    }
+
+    builder
         .on_menu_event(handle_native_menu_event)
         .setup(move |app| {
             let app_handle = app.handle().clone();
@@ -196,6 +218,7 @@ fn main() {
             let app_state = pi_session_manager::app_state::create_app_state(app_handle);
             app.manage(app_state.clone());
             let deep_link_state = pi_session_manager::deep_link::DeepLinkState::new();
+            app.manage(deep_link_state.clone());
 
             if !cli_mode {
                 if let Err(error) = install_native_menu(app) {
@@ -367,11 +390,7 @@ fn main() {
 
                 let builder = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("index.html".into())).title("Pi Session Manager").inner_size(initial_width, initial_height).min_inner_size(min_width, min_height).center().resizable(true).fullscreen(false).zoom_hotkeys_enabled(true);
 
-                #[cfg(target_os = "macos")]
-                let builder = builder.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true).traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 22.0)));
-
-                #[cfg(not(target_os = "macos"))]
-                let builder = builder.decorations(false);
+                let builder = pi_session_manager::configure_main_window_chrome(builder);
 
                 let window = builder.visible(false).build()?;
 
@@ -379,12 +398,13 @@ fn main() {
                 let window_clone = window.clone();
                 let app_handle_ready = app.handle().clone();
                 let deep_link_ready_state = deep_link_state.clone();
-                app.listen("frontend://ready", move |_event| {
+                // Use a one-shot listener so lightweight-mode recreation cannot
+                // accumulate global ready handlers.
+                app.once("frontend://ready", move |_event| {
                     let _ = window_clone.show();
                     #[cfg(not(target_os = "macos"))]
                     let _ = window_clone.set_focus();
-                    pi_session_manager::deep_link::queue_current_deep_links(&app_handle_ready, &deep_link_ready_state);
-                    pi_session_manager::deep_link::mark_frontend_ready(&app_handle_ready, &deep_link_ready_state);
+                    pi_session_manager::deep_link::handle_frontend_ready(&app_handle_ready, &deep_link_ready_state);
                 });
 
                 pi_session_manager::tray::install_lightweight_close_handler(&window);

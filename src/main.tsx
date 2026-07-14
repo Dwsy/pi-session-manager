@@ -14,7 +14,7 @@ import {
 import './i18n'
 import './styles/index.less'
 import { isTauri } from './transport'
-import { isMacPlatform } from './utils/platformShortcuts'
+import { detectPlatform, isMacPlatform } from './utils/platform'
 
 const SETTINGS_CACHE_KEY = 'pi-session-manager-settings'
 const LANGUAGE_KEY = 'app-language'
@@ -115,6 +115,7 @@ if (shouldBootstrapStandaloneDatasetSettings()) {
 // Set titlebar height for Tauri desktop (drag region) and clear macOS native title overlay
 if (isTauri()) {
   document.documentElement.style.setProperty('--titlebar-height', '32px')
+  document.documentElement.dataset.os = detectPlatform()
   if (isMacPlatform()) {
     document.title = ''
   }

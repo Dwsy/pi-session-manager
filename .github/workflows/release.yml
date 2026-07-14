@@ -95,13 +95,27 @@ jobs:
       - name: Build frontend
         run: pnpm run build
 
-      # ── Desktop (Tauri) ───────────────────────────────────
+      - name: Verify Windows Authenticode configuration
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_SIGNTOOL_PATH: ${{ secrets.WINDOWS_SIGNTOOL_PATH }}
+          WINDOWS_SIGN_CERT_SHA1: ${{ secrets.WINDOWS_SIGN_CERT_SHA1 }}
+          WINDOWS_SIGN_TIMESTAMP_URL: ${{ secrets.WINDOWS_SIGN_TIMESTAMP_URL }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNTOOL_PATH) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGN_CERT_SHA1) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGN_TIMESTAMP_URL)) {
+            Write-Error 'Windows Authenticode signing secrets are required for release builds'
+          }
+
       - name: Build Tauri desktop app
         uses: tauri-apps/tauri-action@v0.6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          WINDOWS_SIGNTOOL_PATH: ${{ secrets.WINDOWS_SIGNTOOL_PATH }}
+          WINDOWS_SIGN_CERT_SHA1: ${{ secrets.WINDOWS_SIGN_CERT_SHA1 }}
+          WINDOWS_SIGN_TIMESTAMP_URL: ${{ secrets.WINDOWS_SIGN_TIMESTAMP_URL }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Pi Session Manager ${{ github.ref_name }}"
@@ -109,6 +123,19 @@ jobs:
           releaseDraft: true
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           args: ${{ matrix.tauri_args }}
+
+      - name: Validate Windows Authenticode artifacts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $artifacts = Get-ChildItem -Path 'src-tauri/target/release/bundle' -Recurse -File | Where-Object { $_.Extension -in '.exe', '.msi' }
+          if ($artifacts.Count -eq 0) { throw 'No Windows executable or MSI artifacts found for Authenticode validation' }
+          foreach ($artifact in $artifacts) {
+            $signature = Get-AuthenticodeSignature -FilePath $artifact.FullName
+            Write-Host "$($artifact.FullName): $($signature.Status)"
+            if ($signature.Status -ne 'Valid') { throw "Invalid Authenticode signature: $($artifact.FullName)" }
+            if ($null -eq $signature.TimeStamperCertificate) { throw "Missing Authenticode timestamp: $($artifact.FullName)" }
+          }
 
       # ── CLI binary ────────────────────────────────────────
       - name: Build CLI binary

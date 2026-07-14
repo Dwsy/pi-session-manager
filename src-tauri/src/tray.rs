@@ -23,9 +23,13 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
 
     let icon = load_tray_icon()?;
 
-    let _tray = TrayIconBuilder::with_id(TRAY_ID)
-        .icon(icon)
-        .icon_as_template(true) // macOS: adapt to dark/light menu bar
+    let mut tray = TrayIconBuilder::with_id(TRAY_ID).icon(icon);
+    #[cfg(target_os = "macos")]
+    {
+        tray = tray.icon_as_template(true);
+    }
+
+    let _tray = tray
         .tooltip("Pi Session Manager")
         .menu(&menu)
         .show_menu_on_left_click(false) // left-click toggles window, not menu
@@ -75,8 +79,16 @@ pub fn install_lightweight_close_handler<R: Runtime>(window: &WebviewWindow<R>) 
 
             if lightweight {
                 api.prevent_close();
-                let _ = window_handle.destroy();
-                log::debug!("Lightweight mode: window destroyed, app stays in tray");
+                #[cfg(target_os = "linux")]
+                {
+                    let _ = window_handle.hide();
+                    log::debug!("Lightweight mode: Linux window hidden, app stays recoverable");
+                }
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let _ = window_handle.destroy();
+                    log::debug!("Lightweight mode: window destroyed, app stays in tray");
+                }
             }
         }
     });
@@ -89,6 +101,7 @@ pub fn install_lightweight_close_handler<R: Runtime>(window: &WebviewWindow<R>) 
 pub fn show_or_create_window<R: Runtime>(app: &AppHandle<R>) {
     // If window already exists, just show and focus it
     if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
         return;
@@ -107,23 +120,20 @@ fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
 
     let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into())).title("Pi Session Manager").inner_size(w, h).min_inner_size(min_w, min_h).center().resizable(true).fullscreen(false).zoom_hotkeys_enabled(true);
 
-    #[cfg(target_os = "macos")]
-    {
-        builder = builder.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true).traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 22.0)));
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        builder = builder.decorations(false);
-    }
+    let builder = crate::configure_main_window_chrome(builder);
 
     let window = builder.visible(false).build().map_err(|e| format!("Build window: {e}"))?;
     install_lightweight_close_handler(&window);
 
     let window_clone = window.clone();
-    app.listen("frontend://ready", move |_event| {
+    let deep_link_state = app.state::<crate::deep_link::DeepLinkState>().inner().clone();
+    let listener_handle: AppHandle<R> = app.clone();
+    let callback_handle: AppHandle<R> = app.clone();
+    listener_handle.once("frontend://ready", move |_event| {
         let _ = window_clone.show();
         #[cfg(not(target_os = "macos"))]
         let _ = window_clone.set_focus();
+        crate::deep_link::handle_frontend_ready(&callback_handle, &deep_link_state);
     });
 
     // Restore saved zoom level
@@ -146,20 +156,8 @@ fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
 fn open_web<R: Runtime>(_app: &AppHandle<R>) {
     let port = crate::load_server_settings_sync().http_port;
     let url = format!("http://127.0.0.1:{port}");
-    #[cfg(target_os = "macos")]
-    {
-        let _ = std::process::Command::new("open").arg(&url).spawn();
-    }
-    #[cfg(target_os = "linux")]
-    {
-        let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
-    }
-    #[cfg(target_os = "windows")]
-    {
-        // Pass an empty title as the first arg: `cmd /C start "" <url>`. Without
-        // it, `start` treats the first quoted token of the URL as the window
-        // title and any `&` in the URL is parsed as a command separator.
-        let _ = std::process::Command::new("cmd").args(["/C", "start", "", &url]).spawn();
+    if let Err(error) = tauri_plugin_opener::open_url(&url, None::<&str>) {
+        log::error!("Failed to open web UI in system browser: {error}");
     }
 }
 

@@ -45,8 +45,14 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Frontend tests (lint gate)
+        run: pnpm exec vitest run
+
       - name: Frontend build
         run: npx vite build
+
+      - name: Window chrome regression gate
+        run: node -e "const fs=require('fs'); for (const file of ['src-tauri/src/main.rs','src-tauri/src/tray.rs']) { if (fs.readFileSync(file,'utf8').includes('decorations(false)')) process.exit(1); }"
 
       - name: Rust fmt (desktop)
         working-directory: src-tauri
@@ -117,6 +123,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Frontend tests (matrix)
+        run: pnpm exec vitest run
 
       - name: Frontend build
         run: npx vite build

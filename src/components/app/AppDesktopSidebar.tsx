@@ -160,7 +160,7 @@ function AppDesktopSidebar({
 
   return (
     <div
-      className="app-desktop-sidebar relative w-80 border-r border-border flex flex-col"
+      className="app-desktop-sidebar relative w-80 compact:w-64 border-r border-border flex flex-col"
       role="navigation"
       aria-label={t("app.sidebar.label", "Primary navigation")}
     >

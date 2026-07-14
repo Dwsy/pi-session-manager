@@ -405,7 +405,11 @@ fn resolve_package_install_path(source: &str, agent_dir: &Path, project_base: Op
     }
 
     // local path relative to agent/project root, or absolute
-    let local = if source.starts_with('/') || (source.len() > 2 && source.as_bytes()[1] == b':') { PathBuf::from(&source) } else { install_root.join(&source) };
+    let local = if Path::new(&source).is_absolute() {
+        PathBuf::from(&source)
+    } else {
+        install_root.join(&source)
+    };
     local.exists().then_some(local)
 }
 

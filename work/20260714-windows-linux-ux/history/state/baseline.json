@@ -1,0 +1,164 @@
+{
+  "schema_version": "work-pdca-loop.v1",
+  "project_root": "/Users/dengwenyu/worktrees/pi-session-manager/codex-windows-linux-ux",
+  "work_dir": "work/20260714-windows-linux-ux",
+  "title": "Windows/Linux 原生体验修复",
+  "objective": "完成 ZIP 任务书中的 Windows/Linux 窗口、生命周期、快捷键、布局、终端、opener、CI 与发布门禁修复，并提交可审查 PR。",
+  "status": "in_progress",
+  "mode": "pdca_goal_loop",
+  "pdca": {
+    "cycle": 1,
+    "stage": "plan",
+    "stages": [
+      {
+        "id": "plan",
+        "label": "Plan",
+        "status": "in_progress"
+      },
+      {
+        "id": "do",
+        "label": "Do",
+        "status": "planned"
+      },
+      {
+        "id": "check",
+        "label": "Check",
+        "status": "planned"
+      },
+      {
+        "id": "act",
+        "label": "Act",
+        "status": "planned"
+      }
+    ]
+  },
+  "current_phase": "P0",
+  "created_at": "2026-07-14T06:50:12.229Z",
+  "updated_at": "2026-07-14T06:50:12.229Z",
+  "owner": "codex",
+  "scope": [],
+  "tags": [],
+  "ssot": [],
+  "inputs": [],
+  "outputs": [
+    "work/20260714-windows-linux-ux/task.md",
+    "work/20260714-windows-linux-ux/pdca.md",
+    "work/20260714-windows-linux-ux/decisions.md",
+    "work/20260714-windows-linux-ux/prompt.md",
+    "work/20260714-windows-linux-ux/implementation-log.md",
+    "work/20260714-windows-linux-ux/state.json",
+    "work/20260714-windows-linux-ux/history/events.jsonl"
+  ],
+  "phases": [
+    {
+      "id": "P0",
+      "name": "frame objective and constraints",
+      "pdca_stage": "plan",
+      "status": "in_progress"
+    },
+    {
+      "id": "P1",
+      "name": "execute first tracer path",
+      "pdca_stage": "do",
+      "status": "planned"
+    },
+    {
+      "id": "D1",
+      "name": "choose implementation route",
+      "pdca_stage": "check",
+      "status": "planned",
+      "type": "decision"
+    },
+    {
+      "id": "P2",
+      "name": "validate evidence and regressions",
+      "pdca_stage": "check",
+      "status": "planned"
+    },
+    {
+      "id": "D2",
+      "name": "decide continue, pivot, or close",
+      "pdca_stage": "act",
+      "status": "planned",
+      "type": "decision"
+    },
+    {
+      "id": "P3",
+      "name": "act on learning and hand off",
+      "pdca_stage": "act",
+      "status": "planned"
+    }
+  ],
+  "decision_points": [
+    {
+      "id": "D1",
+      "phase": "D1",
+      "question": "Which route should the next implementation take?",
+      "status": "open",
+      "options": [
+        {
+          "id": "direct",
+          "label": "Direct implementation",
+          "next_phase": "P2",
+          "criteria": "Scope is clear, blast radius is small, and validation path is known."
+        },
+        {
+          "id": "research",
+          "label": "Research first",
+          "next_phase": "P0",
+          "criteria": "Domain facts, dependencies, or ownership are still unclear."
+        },
+        {
+          "id": "split",
+          "label": "Split into slices",
+          "next_phase": "P1",
+          "criteria": "The work is valid but too broad for one safe change."
+        }
+      ],
+      "selected_option_id": null,
+      "rationale": "",
+      "decided_at": null
+    },
+    {
+      "id": "D2",
+      "phase": "D2",
+      "question": "After Check, should this cycle close, pivot, or continue?",
+      "status": "open",
+      "options": [
+        {
+          "id": "close",
+          "label": "Close cycle",
+          "next_phase": "P3",
+          "criteria": "Acceptance evidence is complete and no important risk remains."
+        },
+        {
+          "id": "continue",
+          "label": "Continue same cycle",
+          "next_phase": "P1",
+          "criteria": "Core direction is right but more execution is required."
+        },
+        {
+          "id": "pivot",
+          "label": "Pivot plan",
+          "next_phase": "P0",
+          "criteria": "Validation changed the problem or invalidated current assumptions."
+        }
+      ],
+      "selected_option_id": null,
+      "rationale": "",
+      "decided_at": null
+    }
+  ],
+  "validation": {
+    "passed": false,
+    "commands": [],
+    "notes": ""
+  },
+  "history": {
+    "state_snapshots": "work/20260714-windows-linux-ux/history/state/",
+    "events": "work/20260714-windows-linux-ux/history/events.jsonl"
+  },
+  "risks": [],
+  "next_action": "Complete P0: frame objective, constraints, acceptance, and first decision criteria.",
+  "notes": ""
+}

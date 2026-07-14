@@ -49,6 +49,10 @@ export function useKeyboardShortcuts(shortcuts: Shortcuts, options?: UseKeyboard
         return
       }
 
+      if (e.isComposing || e.keyCode === 229 || e.getModifierState?.("AltGraph")) {
+        return
+      }
+
       const key = `${e.metaKey || e.ctrlKey ? 'cmd+' : ''}${e.altKey ? 'alt+' : ''}${e.shiftKey ? 'shift+' : ''}${e.key.toLowerCase()}`
 
       if (isTextEntryTarget(e.target) && !allowInTextEntryRef.current.has(key)) {
