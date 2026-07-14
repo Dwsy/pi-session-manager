@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn calculate_stats_from_inputs_populates_daily_token_and_cost_totals() {
-        let _env_lock = crate::paths::test_env_lock().lock().expect("test env lock");
+        let _env_lock = crate::paths::acquire_test_env_lock();
         let temp = tempfile::tempdir().expect("tempdir");
         let _test_db = EnvVarGuard::set("PPM_TEST_DB", temp.path().join("stats.db"));
         let session_path = temp.path().join("stats-session.jsonl");

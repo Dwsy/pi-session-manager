@@ -462,7 +462,7 @@ mod tests {
 
     #[test]
     fn uses_primary_db_for_local_mode() {
-        let _env_lock = crate::paths::test_env_lock().lock().expect("test env lock");
+        let _env_lock = crate::paths::acquire_test_env_lock();
         // Ensure clean state - remove any leftover PPM_TEST_DB
         std::env::remove_var("PPM_TEST_DB");
 
@@ -473,7 +473,7 @@ mod tests {
 
     #[test]
     fn uses_dataset_db_for_dataset_mode() {
-        let _env_lock = crate::paths::test_env_lock().lock().expect("test env lock");
+        let _env_lock = crate::paths::acquire_test_env_lock();
         // Ensure clean state - remove any leftover PPM_TEST_DB
         std::env::remove_var("PPM_TEST_DB");
 
@@ -530,7 +530,7 @@ mod tests {
 
     #[test]
     fn version_downgrade_override_allows_opening_newer_schema_for_current_run() {
-        let _env_lock = crate::paths::test_env_lock().lock().expect("test env lock");
+        let _env_lock = crate::paths::acquire_test_env_lock();
         set_version_downgrade_override(false);
 
         let temp_dir = tempdir().expect("tempdir");

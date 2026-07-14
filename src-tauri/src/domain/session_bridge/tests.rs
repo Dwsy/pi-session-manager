@@ -502,10 +502,9 @@ CREATE TABLE part (
 
 #[test]
 fn convert_codex_to_pi_writes_existing_pi_style_bridge_file() {
-    let _guard = crate::paths::test_env_lock().lock().expect("test env lock");
-    let previous_home = std::env::var("HOME").ok();
+    let _env_lock = crate::paths::acquire_test_env_lock();
     let temp = tempfile::tempdir().expect("tempdir");
-    std::env::set_var("HOME", temp.path());
+    let _home = crate::paths::TestHomeGuard::set(temp.path());
 
     let codex_dir = temp.path().join(".codex/sessions/2026/07/06");
     std::fs::create_dir_all(&codex_dir).expect("create codex sessions dir");
@@ -547,7 +546,8 @@ fn convert_codex_to_pi_writes_existing_pi_style_bridge_file() {
 
     let written_path = PathBuf::from(&result.written_paths[0]);
     assert!(written_path.exists(), "converted Pi bridge file should exist");
-    assert!(written_path.to_string_lossy().contains("/.pi/agent/sessions/bridge/"));
+    let written = written_path.to_string_lossy().replace('\\', "/");
+    assert!(written.contains("/.pi/agent/sessions/bridge/") || written.contains(".pi/agent/sessions/bridge"), "unexpected bridge path: {written}");
     assert!(result.resume_command.contains(written_path.to_string_lossy().as_ref()));
 
     let content = std::fs::read_to_string(&written_path).expect("read written");
@@ -562,20 +562,13 @@ fn convert_codex_to_pi_writes_existing_pi_style_bridge_file() {
     assert_eq!(tool_result["message"]["content"][0]["text"], Value::String("file contents".to_string()));
     let assistant_plain_tool_output = entries.iter().any(|entry| entry["message"]["role"] == "assistant" && entry["message"]["content"][0]["text"] == "file contents");
     assert!(!assistant_plain_tool_output, "tool output must not be rendered as assistant text");
-
-    if let Some(home) = previous_home {
-        std::env::set_var("HOME", home);
-    } else {
-        std::env::remove_var("HOME");
-    }
 }
 
 #[test]
 fn convert_claude_code_to_pi_writes_existing_pi_style_bridge_file() {
-    let _guard = crate::paths::test_env_lock().lock().expect("test env lock");
-    let previous_home = std::env::var("HOME").ok();
+    let _env_lock = crate::paths::acquire_test_env_lock();
     let temp = tempfile::tempdir().expect("tempdir");
-    std::env::set_var("HOME", temp.path());
+    let _home = crate::paths::TestHomeGuard::set(temp.path());
 
     let claude_dir = temp.path().join(".claude/projects/-repo-demo");
     std::fs::create_dir_all(&claude_dir).expect("create claude projects dir");
@@ -627,7 +620,8 @@ fn convert_claude_code_to_pi_writes_existing_pi_style_bridge_file() {
 
     let written_path = PathBuf::from(&result.written_paths[0]);
     assert!(written_path.exists(), "converted Pi bridge file should exist");
-    assert!(written_path.to_string_lossy().contains("/.pi/agent/sessions/bridge/"));
+    let written = written_path.to_string_lossy().replace('\\', "/");
+    assert!(written.contains("/.pi/agent/sessions/bridge/") || written.contains(".pi/agent/sessions/bridge"), "unexpected bridge path: {written}");
     assert!(result.resume_command.contains(written_path.to_string_lossy().as_ref()));
 
     let content = std::fs::read_to_string(&written_path).expect("read written");
@@ -642,12 +636,6 @@ fn convert_claude_code_to_pi_writes_existing_pi_style_bridge_file() {
     assert_eq!(tool_result["message"]["content"][0]["text"], Value::String("file contents".to_string()));
     let user_plain_tool_output = entries.iter().any(|entry| entry["message"]["role"] == "user" && entry["message"]["content"][0]["text"] == "file contents");
     assert!(!user_plain_tool_output, "tool output must not be rendered as user text");
-
-    if let Some(home) = previous_home {
-        std::env::set_var("HOME", home);
-    } else {
-        std::env::remove_var("HOME");
-    }
 }
 
 #[test]

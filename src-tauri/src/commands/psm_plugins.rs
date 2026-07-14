@@ -982,10 +982,9 @@ mod tests {
 
     #[test]
     fn discovers_psm_npm_extension_entries() {
-        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let _env_lock = crate::paths::acquire_test_env_lock();
         let home = tempfile::tempdir().unwrap();
-        let old_home = env::var("HOME").ok();
-        env::set_var("HOME", home.path());
+        let _home = crate::paths::TestHomeGuard::set(home.path());
 
         let package_dir = home.path().join(".pi/pi-session-manager/extensions/npm/node_modules/@acme/psm-sidechat");
         fs::create_dir_all(package_dir.join("dist")).unwrap();
@@ -1007,20 +1006,13 @@ mod tests {
         assert!(Path::new(&entries[0].entry_path).ends_with(Path::new("dist").join("index.js")));
         assert!(entries[0].module_modified_ms.is_some());
         assert!(entries[0].source_hash.as_deref().is_some_and(|hash| hash.len() == 64));
-
-        if let Some(old_home) = old_home {
-            env::set_var("HOME", old_home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 
     #[test]
     fn reads_and_updates_plugin_config() {
-        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let _env_lock = crate::paths::acquire_test_env_lock();
         let home = tempfile::tempdir().unwrap();
-        let old_home = env::var("HOME").ok();
-        env::set_var("HOME", home.path());
+        let _home = crate::paths::TestHomeGuard::set(home.path());
 
         let mut config = read_plugins_config().unwrap();
         assert_eq!(config, PsmPluginsConfig::default());
@@ -1030,20 +1022,13 @@ mod tests {
         let loaded = read_plugins_config().unwrap();
         assert_eq!(loaded.plugins["builtin.sidechat"].enabled, false);
         assert!(plugins_config_path().unwrap().ends_with("plugins.json"));
-
-        if let Some(old_home) = old_home {
-            env::set_var("HOME", old_home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 
     #[test]
     fn writes_plugin_permission_overrides_without_disabling_plugin() {
-        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let _env_lock = crate::paths::acquire_test_env_lock();
         let home = tempfile::tempdir().unwrap();
-        let old_home = env::var("HOME").ok();
-        env::set_var("HOME", home.path());
+        let _home = crate::paths::TestHomeGuard::set(home.path());
 
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let mut permission_overrides = BTreeMap::new();
@@ -1055,20 +1040,13 @@ mod tests {
         assert!(entry.enabled);
         assert_eq!(entry.source, "builtin");
         assert_eq!(entry.permission_overrides.get("agent:invoke"), Some(&false));
-
-        if let Some(old_home) = old_home {
-            env::set_var("HOME", old_home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 
     #[test]
     fn writes_plugin_settings_without_disabling_plugin() {
-        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let _env_lock = crate::paths::acquire_test_env_lock();
         let home = tempfile::tempdir().unwrap();
-        let old_home = env::var("HOME").ok();
-        env::set_var("HOME", home.path());
+        let _home = crate::paths::TestHomeGuard::set(home.path());
 
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let mut settings = BTreeMap::new();
@@ -1081,20 +1059,13 @@ mod tests {
         assert_eq!(entry.source, "builtin");
         assert_eq!(entry.settings["limit"], Value::from(12));
         assert_eq!(entry.settings["thinkingLevel"], Value::from("high"));
-
-        if let Some(old_home) = old_home {
-            env::set_var("HOME", old_home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 
     #[test]
     fn reads_and_writes_scoped_plugin_json_config() {
-        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let _env_lock = crate::paths::acquire_test_env_lock();
         let home = tempfile::tempdir().unwrap();
-        let old_home = env::var("HOME").ok();
-        env::set_var("HOME", home.path());
+        let _home = crate::paths::TestHomeGuard::set(home.path());
 
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let missing = runtime.block_on(read_psm_plugin_json_config("builtin.config-test".to_string(), "workspace".to_string(), Some(serde_json::json!({ "items": [] })))).unwrap();
@@ -1106,12 +1077,6 @@ mod tests {
 
         let unsafe_key = runtime.block_on(write_psm_plugin_json_config("builtin.config-test".to_string(), "folder/workspace".to_string(), serde_json::json!({}))).unwrap_err();
         assert!(unsafe_key.contains("single safe path segment"));
-
-        if let Some(old_home) = old_home {
-            env::set_var("HOME", old_home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 
     #[test]
@@ -1177,10 +1142,9 @@ mod tests {
 
     #[test]
     fn read_npm_module_source_rejects_unsafe_files() {
-        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let _env_lock = crate::paths::acquire_test_env_lock();
         let home = tempfile::tempdir().unwrap();
-        let old_home = env::var("HOME").ok();
-        env::set_var("HOME", home.path());
+        let _home = crate::paths::TestHomeGuard::set(home.path());
 
         let package_dir = home.path().join(".pi/pi-session-manager/extensions/npm/node_modules/@acme/psm-safe/dist");
         fs::create_dir_all(&package_dir).unwrap();
@@ -1202,20 +1166,13 @@ mod tests {
         let decoded = crate::compression::gzip_decompress_from_base64(big_result.trim_start_matches(PLUGIN_MODULE_GZIP_PREFIX)).unwrap();
         assert_eq!(String::from_utf8(decoded).unwrap(), big_source);
         assert!(outside_err.contains("outside the managed npm extensions directory"));
-
-        if let Some(old_home) = old_home {
-            env::set_var("HOME", old_home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 
     #[test]
     fn reload_psm_plugins_returns_current_npm_entries() {
-        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let _env_lock = crate::paths::acquire_test_env_lock();
         let home = tempfile::tempdir().unwrap();
-        let old_home = env::var("HOME").ok();
-        env::set_var("HOME", home.path());
+        let _home = crate::paths::TestHomeGuard::set(home.path());
 
         let package_dir = home.path().join(".pi/pi-session-manager/extensions/npm/node_modules/@acme/psm-reload");
         fs::create_dir_all(package_dir.join("dist")).unwrap();
@@ -1236,20 +1193,13 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].package_name, "@acme/psm-reload");
         assert_eq!(entries[0].export_path, "./dist/index.mjs");
-
-        if let Some(old_home) = old_home {
-            env::set_var("HOME", old_home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 
     #[test]
     fn adds_lists_and_removes_custom_path_plugin_entries() {
-        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let _env_lock = crate::paths::acquire_test_env_lock();
         let home = tempfile::tempdir().unwrap();
-        let old_home = env::var("HOME").ok();
-        env::set_var("HOME", home.path());
+        let _home = crate::paths::TestHomeGuard::set(home.path());
 
         let plugin_dir = home.path().join("plugins");
         fs::create_dir_all(&plugin_dir).unwrap();
@@ -1272,20 +1222,13 @@ mod tests {
         let removed = runtime.block_on(remove_path_psm_plugin(plugin_path.to_string_lossy().to_string())).unwrap();
         assert!(removed.custom_paths.is_empty());
         assert!(runtime.block_on(list_path_psm_plugin_entries()).unwrap().is_empty());
-
-        if let Some(old_home) = old_home {
-            env::set_var("HOME", old_home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 
     #[test]
     fn adds_lists_builds_and_removes_dev_plugin_projects() {
-        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let _env_lock = crate::paths::acquire_test_env_lock();
         let home = tempfile::tempdir().unwrap();
-        let old_home = env::var("HOME").ok();
-        env::set_var("HOME", home.path());
+        let _home = crate::paths::TestHomeGuard::set(home.path());
 
         let project_dir = home.path().join("dev-plugin");
         fs::create_dir_all(project_dir.join("dist")).unwrap();
@@ -1342,20 +1285,13 @@ mod tests {
         assert!(removed.dev_projects.is_empty());
         assert!(!removed.plugins.contains_key("dev.plugin"));
         assert!(runtime.block_on(list_dev_psm_plugin_entries()).unwrap().is_empty());
-
-        if let Some(old_home) = old_home {
-            env::set_var("HOME", old_home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 
     #[test]
     fn dev_plugin_project_validation_rejects_missing_exports_and_unsafe_modules() {
-        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let _env_lock = crate::paths::acquire_test_env_lock();
         let home = tempfile::tempdir().unwrap();
-        let old_home = env::var("HOME").ok();
-        env::set_var("HOME", home.path());
+        let _home = crate::paths::TestHomeGuard::set(home.path());
 
         let project_dir = home.path().join("bad-dev-plugin");
         fs::create_dir_all(project_dir.join("dist")).unwrap();
@@ -1373,20 +1309,13 @@ mod tests {
         assert_eq!(add_config.dev_projects.len(), 1);
         let list_err = runtime.block_on(list_dev_psm_plugin_entries()).unwrap_err();
         assert!(list_err.contains(".js or .mjs"));
-
-        if let Some(old_home) = old_home {
-            env::set_var("HOME", old_home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 
     #[test]
     fn read_path_module_source_rejects_unsafe_files() {
-        let _guard = crate::paths::test_env_lock().lock().unwrap();
+        let _env_lock = crate::paths::acquire_test_env_lock();
         let home = tempfile::tempdir().unwrap();
-        let old_home = env::var("HOME").ok();
-        env::set_var("HOME", home.path());
+        let _home = crate::paths::TestHomeGuard::set(home.path());
 
         let plugin_dir = home.path().join("plugins");
         fs::create_dir_all(&plugin_dir).unwrap();
@@ -1407,11 +1336,5 @@ mod tests {
         assert!(big_result.starts_with(PLUGIN_MODULE_GZIP_PREFIX));
         let decoded = crate::compression::gzip_decompress_from_base64(big_result.trim_start_matches(PLUGIN_MODULE_GZIP_PREFIX)).unwrap();
         assert_eq!(String::from_utf8(decoded).unwrap(), big_source);
-
-        if let Some(old_home) = old_home {
-            env::set_var("HOME", old_home);
-        } else {
-            env::remove_var("HOME");
-        }
     }
 }
