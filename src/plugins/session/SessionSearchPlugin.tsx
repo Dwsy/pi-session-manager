@@ -4,6 +4,7 @@ import type { SearchContext, SearchPluginResult } from '@/plugins/types'
 import { getPathBasename, pathsEqual } from '@/utils/path'
 import { parseQuotedQuery } from '@/utils/search'
 import { formatShortSessionId, getSessionIdMatchKind } from '@/utils/session'
+import { getSessionListDisplayName } from '@/utils/sessionDisplay'
 
 /**
  * Session search plugin
@@ -112,7 +113,13 @@ export class SessionSearchPlugin extends BaseSearchPlugin {
           results.push({
             id: `session-${session.id}`,
             pluginId: this.id,
-            title: session.name || this.truncateText(session.first_message, 60),
+            title: getSessionListDisplayName(
+              {
+                name: session.name,
+                first_message: this.truncateText(session.first_message, 60),
+              },
+              '',
+            ),
             subtitle: `${this.getProjectName(session.cwd)} · ${formatShortSessionId(session.id)}`,
             description: this.getSessionDescription(session, context),
             icon: <FileText className="w-4 h-4 text-green-400" />,

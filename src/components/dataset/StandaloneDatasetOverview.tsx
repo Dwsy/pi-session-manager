@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import type { SessionInfo } from "@/types";
+import { getSessionListDisplayName } from "@/utils/sessionDisplay";
 
 interface StandaloneDatasetOverviewProps {
   currentDatasetId: string;
@@ -291,7 +292,7 @@ export default function StandaloneDatasetOverview({
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium text-foreground">
-                        {session.name || session.first_message || session.id}
+                        {getSessionListDisplayName(session, session.id)}
                       </div>
                       <div className="mt-1 truncate text-xs text-muted-foreground">
                         {session.cwd ||
