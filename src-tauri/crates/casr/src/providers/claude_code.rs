@@ -235,8 +235,7 @@ impl Provider for ClaudeCode {
             // Also accept wrapped `{type:"message", role:"user"|"assistant"}` envelopes.
             let entry_type = entry.get("type").and_then(|v| v.as_str());
             let role_hint = entry.pointer("/message/role").and_then(|v| v.as_str()).or_else(|| entry.get("role").and_then(|v| v.as_str()));
-            let is_conversational = matches!(entry_type, Some("user") | Some("assistant"))
-                || (entry_type == Some("message") && matches!(role_hint, Some("user") | Some("assistant")));
+            let is_conversational = matches!(entry_type, Some("user") | Some("assistant")) || (entry_type == Some("message") && matches!(role_hint, Some("user") | Some("assistant")));
             if !is_conversational {
                 trace!(line = line_num, ?entry_type, "skipping non-conversational entry");
                 continue;
