@@ -14,7 +14,7 @@ env:
   CARGO_NET_RETRY: 10
 
 jobs:
-  build:
+  build-desktop:
     strategy:
       fail-fast: false
       matrix:
@@ -23,26 +23,18 @@ jobs:
           - platform: macos-latest
             target: aarch64-apple-darwin
             tauri_args: "--target aarch64-apple-darwin --bundles app,dmg"
-            cli_artifact: pi-session-cli-macos-arm64
-            cli_binary: pi-session-cli
           # macOS x64
           - platform: macos-latest
             target: x86_64-apple-darwin
             tauri_args: "--target x86_64-apple-darwin --bundles app,dmg"
-            cli_artifact: pi-session-cli-macos-x64
-            cli_binary: pi-session-cli
           # Linux x64
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             tauri_args: "--bundles appimage,deb,rpm"
-            cli_artifact: pi-session-cli-linux-x64
-            cli_binary: pi-session-cli
           # Windows x64
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
             tauri_args: "--bundles msi,nsis"
-            cli_artifact: pi-session-cli-windows-x64.exe
-            cli_binary: pi-session-cli.exe
 
     runs-on: ${{ matrix.platform }}
 
@@ -68,7 +60,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: ". -> target"
-          key: ${{ matrix.target }}
+          shared-key: release-desktop-${{ matrix.target }}
+          cache-on-failure: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -91,11 +84,9 @@ jobs:
             node scripts/release-version.mjs check
           fi
 
-      # ── Frontend (shared by both Desktop and CLI) ──────────
       - name: Build frontend
         run: pnpm run build
 
-      # ── Desktop (Tauri) ───────────────────────────────────
       - name: Build Tauri desktop app
         uses: tauri-apps/tauri-action@v0.6
         env:
@@ -110,7 +101,81 @@ jobs:
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           args: ${{ matrix.tauri_args }}
 
-      # ── CLI binary ────────────────────────────────────────
+  build-cli:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            cli_artifact: pi-session-cli-macos-arm64
+            cli_binary: pi-session-cli
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            cli_artifact: pi-session-cli-macos-x64
+            cli_binary: pi-session-cli
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            cli_artifact: pi-session-cli-linux-x64
+            cli_binary: pi-session-cli
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            cli_artifact: pi-session-cli-windows-x64.exe
+            cli_binary: pi-session-cli.exe
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add ${{ matrix.target }}
+          rustup show
+          echo "$(rustc --print sysroot)/bin" >> $GITHUB_PATH
+
+      # CLI is headless (no Tauri/WebKit). Only need basic build tools.
+      - name: Install Linux CLI dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+          shared-key: release-cli-${{ matrix.target }}
+          cache-on-failure: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release version sync
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            node scripts/release-version.mjs check "${GITHUB_REF_NAME#v}"
+          else
+            node scripts/release-version.mjs check
+          fi
+
+      # CLI embeds ../dist via rust-embed; must exist before cargo build.
+      - name: Build frontend
+        run: pnpm run build
+
       - name: Build CLI binary
         run: cargo build --release --target ${{ matrix.target }} -p pi-session-cli
 
@@ -140,7 +205,7 @@ jobs:
 
   # ── Finalize Release ─────────────────────────────────────
   finalize-release:
-    needs: build
+    needs: [build-desktop, build-cli]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
 
