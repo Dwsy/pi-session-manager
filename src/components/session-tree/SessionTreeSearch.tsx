@@ -13,6 +13,7 @@ interface SessionTreeSearchProps {
   onClear: () => void
   onNext: () => void
   onPrevious: () => void
+  onSubmit?: () => void
   currentIndex: number
   totalResults: number
 }
@@ -24,6 +25,7 @@ const SessionTreeSearch = forwardRef<SessionTreeSearchRef, SessionTreeSearchProp
     onClear,
     onNext,
     onPrevious,
+    onSubmit,
     currentIndex,
     totalResults
   }: SessionTreeSearchProps,
@@ -47,15 +49,23 @@ const SessionTreeSearch = forwardRef<SessionTreeSearchRef, SessionTreeSearchProp
     if (e.key === 'Escape') {
       e.preventDefault()
       onClear()
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      onNext()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      onPrevious()
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (e.shiftKey) {
         onPrevious()
+      } else if (onSubmit) {
+        onSubmit()
       } else {
         onNext()
       }
     }
-  }, [onClear, onNext, onPrevious])
+  }, [onClear, onNext, onPrevious, onSubmit])
 
   return (
     <div className="session-tree-search">

@@ -149,18 +149,16 @@ describe('SessionTree', () => {
 
     expect(screen.getByText('Plugin UI failed')).not.toBeNull();
     expect(screen.getAllByText('Assistant reply').length).toBeGreaterThan(0);
-    expect(screen.getByText('Thread context')).not.toBeNull();
+    expect(screen.getByText('Thread')).not.toBeNull();
   });
 
-  it('shows sticky user context and rich selected-node preview', () => {
+  it('shows compact thread context and status without a detail pane', () => {
     renderSessionTree({ activeLeafId: 'assistant-1' });
 
-    expect(screen.getByText('Thread context')).not.toBeNull();
+    expect(screen.getByText('Thread')).not.toBeNull();
     expect(screen.getAllByText('Original user message').length).toBeGreaterThan(0);
-    expect(screen.getByText('JSONL')).not.toBeNull();
-    expect(screen.getByText('row 2 of 2')).not.toBeNull();
-    expect(screen.getByText('source 3 of 3')).not.toBeNull();
-    expect(screen.getByText('current')).not.toBeNull();
+    expect(screen.queryByText('JSONL')).toBeNull();
+    expect(screen.getByRole('status').textContent).toMatch(/No tools/);
     expect(screen.getAllByText('Assistant reply').length).toBeGreaterThan(0);
   });
 
@@ -191,7 +189,7 @@ describe('SessionTree', () => {
 
     renderSessionTree({ entries: multiTurnEntries, activeLeafId: 'assistant-2' });
 
-    expect(screen.getAllByText('Thread context')).toHaveLength(1);
+    expect(screen.getAllByText('Thread')).toHaveLength(1);
     expect(screen.getAllByText('Second user message').length).toBeGreaterThan(0);
   });
 
@@ -207,11 +205,10 @@ describe('SessionTree', () => {
     expect(screen.getByText('1 / 1')).not.toBeNull();
   });
 
-  it('does not show branch disclosure controls for a linear chain', () => {
+  it('allows folding the root of a linear chain when it has visible children', () => {
     renderSessionTree();
 
-    expect(screen.queryByRole('button', { name: /Collapse branch/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Expand branch/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Collapse branch/ })).not.toBeNull();
   });
 
   it('recomputes the tree when resolved labels change after render', () => {
@@ -238,21 +235,25 @@ describe('SessionTree', () => {
   it('shows only labeled target nodes when the labeled-only filter is active', () => {
     renderSessionTree();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Labeled' })[0]);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Tree filter' }), {
+      target: { value: 'labeled-only' },
+    });
 
     expect(screen.getAllByText('Pinned node').length).toBeGreaterThan(0);
     expect(screen.queryByText('Label: Raw label')).toBeNull();
   });
 
-  it('navigates raw label entries through the target node', () => {
+  it('selects on click and navigates raw label entries on double click through the target node', () => {
     const { onNodeClick } = renderSessionTree({ filter: 'all' });
 
     fireEvent.click(screen.getByText('Label: Raw label'));
+    expect(onNodeClick).not.toHaveBeenCalled();
 
+    fireEvent.doubleClick(screen.getByText('Label: Raw label'));
     expect(onNodeClick).toHaveBeenCalledWith('assistant-1', 'user-1');
   });
 
-  it('does not jump to the newest descendant when clicking an earlier branch node', () => {
+  it('does not jump to the newest descendant when opening an earlier branch node', () => {
     const branchedEntries: SessionEntry[] = [
       {
         type: 'message',
@@ -296,7 +297,9 @@ describe('SessionTree', () => {
 
     expect(rootTreeText).toBeTruthy();
     fireEvent.click(rootTreeText!.closest('.tree-node')!);
+    expect(onNodeClick).not.toHaveBeenCalled();
 
+    fireEvent.doubleClick(rootTreeText!.closest('.tree-node')!);
     expect(onNodeClick).toHaveBeenCalledWith('root-user', 'root-user');
   });
 
@@ -354,6 +357,17 @@ describe('SessionTree', () => {
     renderSessionTree({ filter: 'all' });
 
     expect(screen.getAllByText('Label: Raw label').length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText('Assistant').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Assistant reply').length).toBeGreaterThan(0);
+  });
+
+  it('moves tree focus with arrow keys without opening a node', () => {
+    const { onNodeClick } = renderSessionTree({ activeLeafId: 'assistant-1' });
+    const tree = screen.getByRole('tree');
+
+    tree.focus();
+    fireEvent.keyDown(tree, { key: 'ArrowUp' });
+    fireEvent.keyDown(tree, { key: 'Enter' });
+
+    expect(onNodeClick).toHaveBeenCalledTimes(1);
   });
 });

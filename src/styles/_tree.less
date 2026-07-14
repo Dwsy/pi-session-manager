@@ -30,23 +30,140 @@
   background-clip: content-box;
 }
 
-// Tree Node
-.tree-node {
-  padding: 0 8px 0 6px;
-  margin: 0;
-  display: grid;
-  grid-template-columns: auto 18px 14px minmax(0, 1fr) auto;
+// Tree toolbar
+.tree-toolbar {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 23px;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgb(var(--color-border) / 0.45);
+  background: rgb(var(--color-card) / 0.55);
+}
+
+.tree-toolbar-views {
+  flex-wrap: wrap;
+}
+
+.tree-filter-select {
+  min-width: 108px;
+  height: 24px;
+  border: 1px solid rgb(var(--color-border) / 0.7);
+  border-radius: 4px;
+  background: rgb(var(--color-background));
+  color: rgb(var(--color-foreground));
   font-size: 11px;
-  line-height: 15px;
+  padding: 0 6px;
+}
+
+.tree-toolbar-meta {
+  color: rgb(var(--color-muted-foreground));
+  font: 10px var(--font-family-mono, ui-monospace, monospace);
+}
+
+.tree-container:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgb(var(--color-ring) / 0.55);
+}
+
+// Tree Node — Pi export layout: [prefix][marker][content]
+.tree-node {
+  padding: 1px 8px 1px 8px;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  min-height: 22px;
+  font-size: 12px;
+  line-height: 18px;
   white-space: nowrap;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   border-left: 2px solid transparent;
+  cursor: default;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+.tree-prefix,
+.tree-prefix-button {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: 0;
+  white-space: pre;
+  tab-size: 2;
+  user-select: none;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+.tree-prefix-button {
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.tree-prefix-button:hover {
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
+.tree-prefix-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.45);
+}
+
+.tree-node.in-path .tree-prefix,
+.tree-node.in-path .tree-prefix-button,
+.tree-node.active .tree-prefix,
+.tree-node.active .tree-prefix-button {
+  color: rgba(var(--accent-rgb), 0.9);
+}
+
+.tree-marker {
+  flex: 0 0 1.25ch;
+  width: 1.25ch;
+  color: rgb(var(--color-muted-foreground));
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 18px;
+  letter-spacing: 0;
+  white-space: pre;
+  text-align: center;
+  user-select: none;
+}
+
+.tree-marker.path,
+.tree-marker.selected {
+  color: rgba(var(--accent-rgb), 0.75);
+}
+
+.tree-marker.current {
+  color: var(--accent);
+}
+
+.tree-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 2px;
+}
+
+.tree-hidden-count {
+  color: rgb(var(--color-muted-foreground));
+  font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.tree-node.focused {
+  box-shadow: inset 0 0 0 1px rgb(var(--color-ring) / 0.45);
 }
 
 .tree-node:has(.tree-content-user) {
@@ -71,61 +188,13 @@
 }
 
 .tree-node.active .tree-content {
-  font-weight: 600;
   color: var(--accent);
 }
 
-// Tree Gutter
-.tree-gutter {
-  position: relative;
-  display: block;
-  align-self: stretch;
-  flex-shrink: 0;
-  min-width: 10px;
+.tree-node.selected:not(.active) .tree-content {
+  color: rgb(var(--color-foreground));
 }
 
-.tree-gutter-rail {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(var(--color-muted-foreground), 0.18);
-}
-
-.tree-gutter-rail.visible {
-  background: rgba(var(--accent-rgb), 0.28);
-}
-
-.tree-gutter-rail.faded {
-  opacity: 0.35;
-}
-
-.tree-gutter-elbow {
-  position: absolute;
-  top: 50%;
-  height: 1px;
-  background: rgba(var(--color-muted-foreground), 0.22);
-}
-
-.tree-node.in-path .tree-gutter-elbow,
-.tree-node.active .tree-gutter-elbow {
-  background: rgba(var(--accent-rgb), 0.5);
-}
-
-// Depth clipping bar
-.tree-sticky-depth {
-  flex-shrink: 0;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  border-top: 1px solid rgba(var(--accent-rgb), 0.08);
-  border-bottom: 1px solid rgba(var(--accent-rgb), 0.12);
-  background: var(--bg-subtle);
-  color: var(--accent);
-  font-size: 10px;
-  font-family: var(--font-family-mono, ui-monospace, Menlo, monospace);
-}
 
 // Thread context bar
 .tree-user-sticky {
@@ -160,72 +229,6 @@
   font-weight: 600;
 }
 
-// Tree Marker (node dot)
-.tree-disclosure,
-.tree-disclosure-spacer {
-  width: 18px;
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.tree-disclosure {
-  border: 0;
-  padding: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: rgb(var(--color-muted-foreground));
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.tree-disclosure:hover {
-  background: rgba(var(--accent-rgb), 0.08);
-  color: var(--accent);
-}
-
-.tree-disclosure:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.3) inset;
-}
-
-.tree-marker {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(var(--color-muted-foreground), 0.35);
-  background: transparent;
-  flex-shrink: 0;
-}
-
-.tree-marker.path {
-  border-color: rgba(var(--accent-rgb), 0.75);
-  background: rgba(var(--accent-rgb), 0.16);
-}
-
-.tree-marker.selected {
-  border-color: rgba(var(--accent-rgb), 0.55);
-  background: rgba(var(--accent-rgb), 0.08);
-}
-
-.tree-marker.current {
-  width: 10px;
-  height: 10px;
-  border-color: var(--accent);
-  background: var(--accent);
-}
-
-// Tree Toggle
-.tree-toggle {
-  color: rgb(var(--color-muted-foreground));
-  flex-shrink: 0;
-  font-size: 10px;
-  line-height: 16px;
-  transition: color 0.15s ease;
-  user-select: none;
-}
 
 .tree-toggle:hover {
   color: var(--accent);

@@ -367,11 +367,7 @@ export function filterFlatNodes(
     }
   });
 
-  if (searchTerms.length > 0 || currentFilter !== "no-tools") {
-    return recalculateVisualStructure(baseFiltered, flatNodes);
-  }
-
-  return baseFiltered;
+  return recalculateVisualStructure(baseFiltered, flatNodes);
 }
 
 export function filterCollapsedFlatNodes(
@@ -402,7 +398,7 @@ export function recalculateVisualStructure(
   allFlatNodes: FlatNode[],
 ): FlatNode[] {
   if (filteredNodes.length === 0) {
-    return filteredNodes;
+    return [];
   }
 
   const visibleIds = new Set(filteredNodes.map((node) => node.node.entry.id));
@@ -464,6 +460,8 @@ export function recalculateVisualStructure(
     ]);
   }
 
+  const result: FlatNode[] = [];
+
   while (stack.length > 0) {
     const [
       nodeId,
@@ -480,12 +478,15 @@ export function recalculateVisualStructure(
       continue;
     }
 
-    flatNode.indent = indent;
-    flatNode.showConnector = showConnector;
-    flatNode.isLast = isLast;
-    flatNode.gutters = gutters;
-    flatNode.isVirtualRootChild = isVirtualRootChild;
-    flatNode.multipleRoots = multipleRoots;
+    result.push({
+      node: flatNode.node,
+      indent,
+      showConnector,
+      isLast,
+      gutters,
+      isVirtualRootChild,
+      multipleRoots,
+    });
 
     const children = visibleChildren.get(nodeId) ?? [];
     const multipleChildren = children.length > 1;
@@ -514,10 +515,87 @@ export function recalculateVisualStructure(
     }
   }
 
-  return filteredNodes;
+  return result;
 }
 
-export function buildTreePrefix(flatNode: FlatNode): string {
+/**
+ * Build visible parent/children maps for a projected flat list.
+ * Climbs each entry's real parentId chain until a still-visible ancestor is found.
+ */
+export function buildVisibleTreeMaps(
+  projectedNodes: FlatNode[],
+  allFlatNodes: FlatNode[] = projectedNodes,
+): {
+  visibleParentById: Map<string, string | null>;
+  visibleChildrenById: Map<string, string[]>;
+} {
+  const visibleParentById = new Map<string, string | null>();
+  const visibleChildrenById = new Map<string, string[]>();
+  const visibleIds = new Set(projectedNodes.map((node) => node.node.entry.id));
+  const parentById = new Map<string, string | null>();
+
+  for (const flatNode of allFlatNodes) {
+    const entry = flatNode.node.entry;
+    const parentId = isNoneParent(entry.parentId) || entry.parentId === entry.id
+      ? null
+      : (entry.parentId as string);
+    parentById.set(entry.id, parentId);
+  }
+
+  for (const flatNode of projectedNodes) {
+    visibleChildrenById.set(flatNode.node.entry.id, []);
+  }
+
+  const findVisibleAncestor = (nodeId: string): string | null => {
+    let currentId = parentById.get(nodeId) ?? null;
+    while (currentId != null) {
+      if (visibleIds.has(currentId)) {
+        return currentId;
+      }
+      currentId = parentById.get(currentId) ?? null;
+    }
+    return null;
+  };
+
+  for (const flatNode of projectedNodes) {
+    const id = flatNode.node.entry.id;
+    const parentId = findVisibleAncestor(id);
+    visibleParentById.set(id, parentId);
+    if (parentId != null) {
+      visibleChildrenById.get(parentId)?.push(id);
+    }
+  }
+
+  return { visibleParentById, visibleChildrenById };
+}
+
+/**
+ * Pi fold rule: a node is foldable when it has visible children and is either a
+ * visible root or a segment start (its visible parent has multiple children).
+ */
+export function isFoldableNode(
+  entryId: string,
+  visibleParentById: ReadonlyMap<string, string | null>,
+  visibleChildrenById: ReadonlyMap<string, string[]>,
+): boolean {
+  const children = visibleChildrenById.get(entryId);
+  if (!children || children.length === 0) {
+    return false;
+  }
+
+  const parentId = visibleParentById.get(entryId);
+  if (parentId == null) {
+    return true;
+  }
+
+  const siblings = visibleChildrenById.get(parentId);
+  return siblings !== undefined && siblings.length > 1;
+}
+
+export function buildTreePrefix(
+  flatNode: FlatNode,
+  options: { folded?: boolean; foldable?: boolean } = {},
+): string {
   const {
     indent,
     showConnector,
@@ -528,9 +606,8 @@ export function buildTreePrefix(flatNode: FlatNode): string {
   } = flatNode;
 
   const displayIndent = multipleRoots ? Math.max(0, indent - 1) : indent;
-  const connector =
-    showConnector && !isVirtualRootChild ? (isLast ? "└─ " : "├─ ") : "";
-  const connectorPosition = connector ? displayIndent - 1 : -1;
+  const showsConnector = Boolean(showConnector && !isVirtualRootChild);
+  const connectorPosition = showsConnector ? displayIndent - 1 : -1;
   const prefixChars: string[] = [];
 
   for (let index = 0; index < displayIndent * 3; index += 1) {
@@ -545,20 +622,29 @@ export function buildTreePrefix(flatNode: FlatNode): string {
       continue;
     }
 
-    if (connector && level === connectorPosition) {
-      prefixChars.push(
-        positionInLevel === 0
-          ? isLast
-            ? "└"
-            : "├"
-          : positionInLevel === 1
-            ? "─"
-            : " ",
-      );
+    if (showsConnector && level === connectorPosition) {
+      if (positionInLevel === 0) {
+        prefixChars.push(isLast ? "└" : "├");
+      } else if (positionInLevel === 1) {
+        // Pi TUI embeds fold state inside the connector's second cell.
+        prefixChars.push(
+          options.folded ? "⊞" : options.foldable ? "⊟" : "─",
+        );
+      } else {
+        prefixChars.push(" ");
+      }
       continue;
     }
 
     prefixChars.push(" ");
+  }
+
+  // Roots have no connector cells; Pi still shows a fold marker before the body.
+  if (options.folded && !showsConnector) {
+    return `${prefixChars.join("")}⊞ `;
+  }
+  if (options.foldable && !showsConnector) {
+    return `${prefixChars.join("")}⊟ `;
   }
 
   return prefixChars.join("");
