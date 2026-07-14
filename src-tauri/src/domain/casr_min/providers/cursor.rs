@@ -108,7 +108,7 @@ fn config_dir() -> Option<PathBuf> {
     }
     #[cfg(target_os = "macos")]
     {
-        return dirs::data_dir().map(|d| d.join("Cursor"));
+        dirs::data_dir().map(|d| d.join("Cursor"))
     }
     #[cfg(not(target_os = "macos"))]
     {
