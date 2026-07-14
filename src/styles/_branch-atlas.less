@@ -5,81 +5,6 @@
   min-width: 0;
 }
 
-.branch-outline-heading {
-  display: flex;
-  min-height: 62px;
-  flex: 0 0 62px;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 10px 8px;
-  border-bottom: 1px solid rgb(var(--color-border) / 0.5);
-  background:
-    radial-gradient(
-      circle at 90% 0%,
-      rgb(var(--color-info) / 0.08),
-      transparent 52%
-    ),
-    rgb(var(--color-card) / 0.82);
-}
-
-.branch-outline-heading > div:first-child {
-  min-width: 0;
-}
-
-.branch-outline-heading span,
-.branch-outline-heading strong,
-.branch-outline-heading small {
-  display: block;
-}
-
-.branch-outline-heading span {
-  color: var(--accent);
-  font: 700 9px var(--font-family-mono, ui-monospace, monospace);
-  letter-spacing: 0.14em;
-}
-
-.branch-outline-heading strong {
-  margin-top: 3px;
-  color: rgb(var(--color-foreground));
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.branch-outline-heading small {
-  margin-top: 3px;
-  overflow: hidden;
-  color: rgb(var(--color-muted-foreground));
-  font: 9px var(--font-family-mono, ui-monospace, monospace);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.branch-outline-actions {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 4px;
-}
-
-.branch-outline-actions button {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border: 1px solid rgb(var(--color-border) / 0.62);
-  border-radius: 6px;
-  background: rgb(var(--color-background) / 0.32);
-  color: rgb(var(--color-muted-foreground));
-  transition:
-    background var(--motion-duration-fast) var(--motion-ease-standard),
-    color var(--motion-duration-fast) var(--motion-ease-standard);
-}
-
-.branch-outline-actions button:hover {
-  background: rgb(var(--color-secondary) / 0.78);
-  color: var(--accent);
-}
-
 .branch-outline-controls {
   display: flex;
   min-height: 34px;
@@ -457,12 +382,6 @@
 .branch-topology-quality {
   width: 100%;
   color: rgb(var(--color-warning));
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .branch-outline-actions button {
-    transition-duration: 1ms;
-  }
 }
 
 .branch-map-view,
@@ -869,7 +788,7 @@
     border-radius: 9px;
     background: color-mix(in srgb, var(--bg-elevated) 97%, transparent);
     box-shadow: 0 12px 35px rgba(0, 0, 0, 0.28);
-    pointer-events: none;
+    pointer-events: auto;
   }
   .tooltip-kicker {
     color: var(--accent);
@@ -968,8 +887,8 @@
     letter-spacing: 0.1em;
   }
   .atlas-dialog {
-    width: min(1680px, calc(100vw - 32px));
-    height: min(1020px, calc(100vh - 32px));
+    width: calc(100vw - 56px);
+    height: calc(100dvh - 56px);
     min-height: 560px;
     display: grid;
     grid-template-rows: 58px auto minmax(0, 1fr);
@@ -978,6 +897,12 @@
     border-radius: 15px;
     background: var(--bg-panel);
     box-shadow: 0 30px 100px rgba(0, 0, 0, 0.55);
+  }
+  @media (min-width: 640px) {
+    .atlas-dialog {
+      width: min(1960px, calc(100vw - 64px));
+      height: min(1120px, calc(100dvh - 64px));
+    }
   }
   .atlas-header {
     display: flex;
@@ -1001,9 +926,30 @@
     color: var(--text-muted);
     font: 8px var(--font-mono);
   }
+  .atlas-header-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+  }
   .atlas-header-actions .toolbar-button {
     height: 30px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-panel-2);
+    color: var(--text-secondary);
     font-size: 9px;
+    cursor: pointer;
+  }
+  .atlas-header-actions .toolbar-button:hover,
+  .atlas-header-actions .icon-button:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-hover);
+    color: var(--accent);
   }
   .atlas-filterbar {
     min-height: 42px;
@@ -1365,8 +1311,50 @@
   .map-tooltip.map-tooltip-rich {
     max-width: min(420px, calc(100vw - 32px));
     padding: 11px 12px;
-    pointer-events: none;
+    pointer-events: auto;
     z-index: 40;
+  }
+  .map-tooltip.global-map-tooltip::before {
+    content: "";
+    position: absolute;
+    left: -18px;
+    top: 50%;
+    width: 22px;
+    height: 52px;
+    transform: translateY(-50%);
+    clip-path: polygon(100% 0, 100% 100%, 0 50%);
+    pointer-events: auto;
+  }
+  .map-tooltip-actions {
+    display: flex;
+    gap: 5px;
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px solid var(--border);
+  }
+  .map-tooltip-actions button {
+    min-height: 22px;
+    padding: 0 7px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg-panel-2);
+    color: var(--text-secondary);
+    font-size: 8px;
+    cursor: pointer;
+  }
+  .map-tooltip-actions button:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .map-tooltip-actions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  .map-tooltip-tool {
+    pointer-events: auto;
+  }
+  .map-tooltip-tool .tool-execution {
+    margin: 8px 0 0;
   }
   .map-tooltip-rich .map-tooltip-body {
     margin: 8px 0 6px;
@@ -1387,33 +1375,31 @@
   .branch-atlas-dialog {
     width: min(1760px, calc(100vw - 28px));
     height: min(1040px, calc(100vh - 28px));
-    grid-template-rows: 68px auto minmax(0, 1fr);
+    grid-template-rows: 56px auto minmax(0, 1fr);
     border-radius: 18px;
   }
   .branch-atlas-header {
     position: relative;
-    padding-left: 17px;
+    padding: 0 12px 0 17px;
+  }
+  .branch-atlas-header.is-macos-tauri {
+    padding-left: calc(var(--macos-traffic-clearance, 72px) + 14px);
   }
   .branch-atlas-header .atlas-heading strong {
-    font-size: 15px;
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    margin-top: 0;
+    font-size: 14px;
+    letter-spacing: 0.03em;
   }
-  .atlas-semantic-contract {
-    min-width: 285px;
-    display: grid;
-    gap: 3px;
-    padding: 7px 10px;
-    border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
-    border-radius: 9px;
-    background: var(--accent-dim);
-  }
-  .atlas-semantic-contract b {
+  .branch-atlas-header .atlas-heading strong span {
     color: var(--accent);
-    font: 800 8px var(--font-mono);
-    letter-spacing: 0.1em;
+    font: 700 9px var(--font-mono);
+    letter-spacing: 0.08em;
   }
-  .atlas-semantic-contract span {
-    color: var(--text-secondary);
-    font-size: 8px;
+  .branch-atlas-header .atlas-heading small {
+    margin-top: 2px;
   }
   .branch-atlas-body {
     grid-template-columns: minmax(0, 1fr) 410px;
