@@ -2,72 +2,29 @@
 
 All notable changes to Pi Session Manager will be documented in this file.
 
-## [0.6.3] - 2026-05-21
-
-### Fixed
-
-- **WebView CPU usage** — fixed a SettingsPanel render loop that caused maximum update depth warnings and sustained WebContent CPU usage.
-- **Pi Live event pressure** — stopped high-frequency live update events from flooding the Tauri WebView bridge while preserving external WebSocket delivery.
-- **Pi Live sidebar state** — reused unchanged live session state references to avoid unnecessary React re-renders.
-
-## [0.6.2] - 2026-05-21
-
-### Added
-
-- **Settings sections** — split settings into focused app behavior, data sources, diagnostics, Pi agent, and search/export sections.
-- **Dashboard day drilldown** — expanded heatmap day modal with richer daily stats and preview flow.
-- **Review modal tests** — added coverage for tool-call review and session viewer derived data behavior.
-
-### Changed
-
-- **Tool call review UI** — refined ToolCallReviewModal into a flatter IDE-style review surface with clearer diff and operation filtering.
-- **Conversation process rendering** — removed legacy tool-call folding paths in favor of inline expanded process entries.
-- **Kanban interactions** — tightened drag state, delete confirmation, and menu behavior.
-- **Session loading** — improved session refresh, pagination, and notification lifecycle handling.
-
-### Fixed
-
-- **Native feel cleanup** — removed ineffective sidebar vibrancy/accent hooks and updated related audit docs.
-- **Stats cache** — added cache token fields to day statistics and demo/runtime stats data.
-- **Release metadata** — synchronized package, Cargo, and Tauri versions for v0.6.2.
-
-## [0.6.1] - 2026-05-15
-
-### Added
-
-- **System tray & lightweight mode** — minimize-to-tray on close, lightweight mode toggle in Advanced Settings
-- **Session tree gutter layout** — enhanced SessionTree with gutter layout and detail pane
-- **Date range, model, and source filters** — LabelFilter now supports date range, model, and source type filtering
-- **Terminal launcher expansion** — added warp, zed, hyper, tabby, ghostty launch support
-- **Bulk insert/upsert** — SQLite bulk operations and FTS trigger management API
-- **IO tracing diagnostics** — scanner startup classify-reason diagnostics for IO analysis
-- **Conversation preview folding** — collapsible conversation preview in session viewer
-- **ThinkingBlock improvements** — collapsed state with brain icon for thinking content
-- **Conversation mode primary** — conversation mode is now the default view
-- **Tag filter submenu & dashboard i18n** — added tag filter submenu and dashboard translations (en/zh)
-- **Model field propagation** — session model field now flows through the full scan pipeline
-
-### Fixed
-
-- **Dashboard insight modal** — pass sessions prop to DashboardInsightModal
-- **Settings locale sync** — sync settings locale keys and minor frontend fixes
-- **Thinking toggle collapse** — make thinking toggle collapse blocks properly
-- **Terminal session open** — open session via local web route
-- **Stats cache tokens** — include cache tokens in totals
-- **resume-x SQLite error** — expose SQLite init error instead of misleading 'no session' message
-- **resume-x session switch** — prevent stale context access, use withSession callback
-- **CI pipeline** — fixed macOS rustup compatibility, release CLI permissions, lint gate ordering
-
-### Changed
-
-- **Code block styling** — frosted glass header overlay, refined tool path display
-- **Message layout** — split viewer controllers and message layout for cleaner architecture
-- **Sidebar responsibilities** — clarified project sidebar component boundaries
-- **pi-session-bridge** — restructured extension with src/ directory, reads port from config, supports 8-char session IDs
-- **Performance** — truncate message previews in list query to 200 chars for faster rendering
-- **Tech debt cleanup** — code quality improvements, cargo config for faster dev builds
-
 ## [Unreleased]
+
+### Added
+
+- **Branch Atlas views** — integrated branch-aware session visualization with global maps, timeline views, navigation, and session-branch modeling
+- **Agent usage analytics** — added backend usage collection, provider parsers, runtime SDK support, and the built-in Agent Usage plugin
+- **Cursor and Antigravity session sources** — added scanning, parsing, provider metadata, and session viewer support for both sources
+
+### Changed
+
+- **Plugin app view ordering** — plugin views can now be pinned and ordered while preserving the main content view
+- **Embedded session tree density** — streamlined the tree controller and tightened the embedded session-tree layout
+
+### Refactor
+
+- **Branch visualization architecture** — replaced the previous flow-oriented implementation with the Branch Atlas model and dedicated map/timeline components
+
+### Fixed
+
+- **macOS lightweight close handling** — shared the lightweight close handler across recreated windows
+- **Session bridge compatibility** — fixed parsing for Claude message envelopes and legacy Codex tool calls
+- **Code review stability** — stabilized tool selection and static asset serving for the code-review plugin
+- **Session viewer process folding** — kept `model_change` entries visible outside the process fold
 
 ### Added
 
@@ -375,6 +332,308 @@ All notable changes to Pi Session Manager will be documented in this file.
 - **Hierarchical labels** — parent-child tag relationships
 - **Kanban UX improvements** — project filtering, context menu, untagged first
 - **Tree view improvements** — `findNewestLeaf` navigation, Write filter
+
+## [0.6.91] - 2026-07-10
+
+### Added
+
+- **Pi configuration management** — expanded resource and settings management across the Pi configuration panel
+- **Session entry transformer extension** — added an extension point for transforming session entries
+- **Pi Live and external session UX** — added session actions, paginated sidebar support, scroll markers, and context-delete workflows
+- **Plugin onboarding and localization** — added plugin setup to onboarding and expanded settings/model/plugin translations
+
+### Changed
+
+- **Session viewer and code review** — refined viewer controls, toolbar/title actions, preview actions, and split shell/file review surfaces
+- **Settings and app shell** — simplified appearance settings and refreshed dashboard, sidebar session, and session-list surfaces
+- **Release update checks** — prefer update manifests before falling back to GitHub Releases
+
+### Fixed
+
+- **Session preview** — guard the code-review host when no session is selected
+- **Session bridge** — fixed command/cache usage paths and preserved external tool-result roles
+- **Deep links and installer** — fixed cold-start deep links and polished CLI installer output
+
+## [0.6.9] - 2026-07-03
+
+### Fixed
+
+- **Windows CI tests** — run Rust tests without default GUI features to prevent Windows GUI DLL crashes
+
+## [0.6.8] - 2026-07-03
+
+### Fixed
+
+- **Pi Live test build** — added the required feature gate and corrected the dispatch unit-test assertion
+
+## [0.6.7] - 2026-07-03
+
+### Fixed
+
+- **CI dependency resolution** — aliased `@google/genai` to an empty mock in Vite to resolve CI build failures
+
+## [0.6.6] - 2026-07-03
+
+### Added
+
+- **Codex themes** — added built-in Codex themes to Appearance settings
+- **Pi Notes extension** — introduced the notes extension
+- **Session viewer controls** — added pinned panels and expanded session-viewer interactions
+- **Update checker and session actions** — added update utilities and related session actions
+- **Remote connections** — expanded settings, tree, and session-bridge support for remote connections
+
+### Changed
+
+- **Session viewer and backend** — refreshed viewer layout, scroll behavior, session commands, scanner, SQLite storage, authentication, and tray integration
+- **Code review and Pi bridge** — updated review components and bridge client tools/tests
+- **Shortcuts and localization** — aligned navigation shortcuts, command-palette triggers, settings controls, and multiple locale translations
+
+### Fixed
+
+- **Code review read operations** — render read operations as content blocks instead of raw arguments
+
+## [0.6.5] - 2026-06-10
+
+### Added
+
+- **Subagent compatibility** — refactored the compatibility layer for external subagent sessions
+- **Terminal and remote modes** — added Ghostty support, Tauri remote-mode switching, and CLI port/runtime improvements
+- **Dataset mode** — added standalone browser-dataset mode and deployment support
+- **Cross-platform CLI installation** — added install scripts and improved CLI build tooling
+- **Keyboard and command workflows** — expanded settings, Command Palette, and shortcut interactions
+
+### Changed
+
+- **Session loading** — replaced the loading animation with a short grace period to avoid distracting flashes
+- **Code review** — compacted the status strip and hid secondary detail content by default
+
+### Fixed
+
+- **Windows title-bar behavior** — disabled unsupported drag regions and localized shortcut labels
+- **Pi Live source detection** — enabled real-time features only for Pi sessions
+- **User-message modal** — rendered the expand modal through a portal
+
+## [0.6.4] - 2026-06-04
+
+### Added
+
+- **PSM plugin platform** — added the runtime host, SDK client/types, generic plugin records, permissions, app views, path plugins, and npm-installable plugin boundaries
+- **Builtin plugin migration** — moved trace, tool rendering, code review, and session graph functionality into plugins
+- **Generative UI and agent bridge** — added a generative UI renderer and host-managed agent bridge capabilities
+- **Session Sidechat** — added threaded sidechat backend/frontend, configurable options, and persisted conversations
+- **Session intelligence** — added the intelligence panel, summary/analytics surfaces, and initial AI summary/session-intelligence plugins
+- **Search and session sources** — added paginated source-filtered search, WSL CLI session sources, external resume bridge files, and conversion compatibility improvements
+- **Plugin and dashboard capabilities** — added day insights, theme catalogs, cache-usage/word-cloud views, bulk selection and density controls, scoped terminals, and docked panels
+
+### Changed
+
+- **Plugin architecture** — reorganized settings, runtime host, session viewer, app shell, and SDK documentation around the plugin platform
+- **Navigation and review UX** — refined command surfaces, Kanban interactions, tool inspection, session preview flows, and unified side panels
+- **Backend boundaries** — added font/plugin-window commands and updated dispatch, session opening, and domain modules
+
+### Fixed
+
+- **Session and routing compatibility** — fixed conversion IPC parameters, external resume bridge writes, deep-link/tag handling, clicked branch context, sidechat fallback context, and hard-to-reproduce preview routes
+- **Data and platform edge cases** — handled incomplete dataset loads, acknowledged database downgrades, and improved external conversion compatibility
+- **Rust and build checks** — resolved clippy issues and font sorting behavior
+
+## [0.6.3] - 2026-05-21
+
+### Fixed
+
+- **WebView CPU usage** — fixed a SettingsPanel render loop that caused maximum update depth warnings and sustained WebContent CPU usage.
+- **Pi Live event pressure** — stopped high-frequency live update events from flooding the Tauri WebView bridge while preserving external WebSocket delivery.
+- **Pi Live sidebar state** — reused unchanged live session state references to avoid unnecessary React re-renders.
+
+## [0.6.2] - 2026-05-21
+
+### Added
+
+- **Settings sections** — split settings into focused app behavior, data sources, diagnostics, Pi agent, and search/export sections.
+- **Dashboard day drilldown** — expanded heatmap day modal with richer daily stats and preview flow.
+- **Review modal tests** — added coverage for tool-call review and session viewer derived data behavior.
+
+### Changed
+
+- **Tool call review UI** — refined ToolCallReviewModal into a flatter IDE-style review surface with clearer diff and operation filtering.
+- **Conversation process rendering** — removed legacy tool-call folding paths in favor of inline expanded process entries.
+- **Kanban interactions** — tightened drag state, delete confirmation, and menu behavior.
+- **Session loading** — improved session refresh, pagination, and notification lifecycle handling.
+
+### Fixed
+
+- **Native feel cleanup** — removed ineffective sidebar vibrancy/accent hooks and updated related audit docs.
+- **Stats cache** — added cache token fields to day statistics and demo/runtime stats data.
+- **Release metadata** — synchronized package, Cargo, and Tauri versions for v0.6.2.
+
+## [0.6.1] - 2026-05-15
+
+### Added
+
+- **System tray & lightweight mode** — minimize-to-tray on close, lightweight mode toggle in Advanced Settings
+- **Session tree gutter layout** — enhanced SessionTree with gutter layout and detail pane
+- **Date range, model, and source filters** — LabelFilter now supports date range, model, and source type filtering
+- **Terminal launcher expansion** — added warp, zed, hyper, tabby, ghostty launch support
+- **Bulk insert/upsert** — SQLite bulk operations and FTS trigger management API
+- **IO tracing diagnostics** — scanner startup classify-reason diagnostics for IO analysis
+- **Conversation preview folding** — collapsible conversation preview in session viewer
+- **ThinkingBlock improvements** — collapsed state with brain icon for thinking content
+- **Conversation mode primary** — conversation mode is now the default view
+- **Tag filter submenu & dashboard i18n** — added tag filter submenu and dashboard translations (en/zh)
+- **Model field propagation** — session model field now flows through the full scan pipeline
+
+### Fixed
+
+- **Dashboard insight modal** — pass sessions prop to DashboardInsightModal
+- **Settings locale sync** — sync settings locale keys and minor frontend fixes
+- **Thinking toggle collapse** — make thinking toggle collapse blocks properly
+- **Terminal session open** — open session via local web route
+- **Stats cache tokens** — include cache tokens in totals
+- **resume-x SQLite error** — expose SQLite init error instead of misleading 'no session' message
+- **resume-x session switch** — prevent stale context access, use withSession callback
+- **CI pipeline** — fixed macOS rustup compatibility, release CLI permissions, lint gate ordering
+
+### Changed
+
+- **Code block styling** — frosted glass header overlay, refined tool path display
+- **Message layout** — split viewer controllers and message layout for cleaner architecture
+- **Sidebar responsibilities** — clarified project sidebar component boundaries
+- **pi-session-bridge** — restructured extension with src/ directory, reads port from config, supports 8-char session IDs
+- **Performance** — truncate message previews in list query to 200 chars for faster rendering
+- **Tech debt cleanup** — code quality improvements, cargo config for faster dev builds
+
+## [0.6.0] - 2026-05-09
+
+### Added
+
+- **Kanban workspaces** — added workspace management, project search, time-range filtering, and improved workspace filtering/sorting
+- **Session labels and search** — indexed labels in full-text search, added label badges, and updated labels during full-parse fallback
+- **Resume-X extension** — added a SQLite-backed fast session-resume extension with search, detail panes, preview mode, tool folding, and keyboard navigation
+- **Routing and deep links** — added URL-driven project/feature routes, session URL synchronization, and the `pi-session://` deep-link scheme
+- **Incremental scanning diagnostics** — added IO tracing, scan diagnostics, byte-offset reads, incremental database updates, and append-only file handling
+- **CLI and transport APIs** — added IPv6 dual-stack support, terminal commands in WS dispatch, and the HTTP session-entries API
+
+### Changed
+
+- **Scanner and SQLite performance** — reduced redundant file reads and database work, batched incremental updates, raised WAL checkpoint thresholds, and removed redundant indexes
+- **Session navigation** — improved sidebar refresh behavior, session-list search, Kanban virtualization, loading splash timing, and truncated-name marquee display
+- **Input and theming** — added CJK/IME-safe inputs, light-mode color adaptation, and viewport-relative settings sizing
+
+### Fixed
+
+- **Resume-X preview** — fixed preview entry, rendering, tool detection, search navigation, session switching, and stale context handling
+- **Session and routing state** — fixed route synchronization clearing selection, deep-link listener churn, and duplicate desktop main content
+- **Search and labels** — fixed label indexing, session rename persistence, and fast-search skeleton flashes
+- **Database and CLI** — fixed cold-start stats retries, workspace command registration, and terminal/server edge cases
+
+## [0.5.7] - 2026-04-30
+
+### Added
+
+- **IO diagnostics** — added instrumentation across file reads, session parsing, database writes, and scanner paths
+- **Trace and preview UX** — added LoopStrip-based trace navigation, collapsible tool rendering, and a persistent command-palette preview panel
+- **Dashboard and settings search** — added insight-modal search/filter/sort and fuzzy search across settings
+- **Session preview shortcuts** — added Option/Alt-click preview opening from session lists
+
+### Changed
+
+- **Scanner and SQLite performance** — introduced incremental sync, header-only parsing, cache warm-up, larger page cache, reduced duplicate scans, and lower checkpoint/write IO
+- **Session viewer** — improved flow/tree building, tool expansion scroll stability, and preview interactions
+
+### Fixed
+
+- **Updater and configuration** — corrected updater protocol/endpoint handling and fallback behavior
+- **Session actions** — restored preview imports, improved copy feedback, and registered stats/fork commands
+- **Search and platform behavior** — fixed IME-triggered searches, large-dataset timeout handling, and Windows path assertions
+
+## [0.5.6] - 2026-04-22
+
+### Added
+
+- **IME input handling** — added the shared `useCompositionInput` hook for safe CJK input
+- **Dashboard insights** — grouped insight statistics by provider
+- **Terminal workflows** — added Ghostty, resume-command copy, improved terminal tabs, and related shortcut handling
+- **Dataset and CLI distribution** — added standalone dataset mode, pages deployment, cross-platform install scripts, and improved CLI builds
+
+### Changed
+
+- **Session and terminal UX** — improved scroll reset behavior and copy-to-toast feedback
+- **Translations and documentation** — refreshed Chinese translations and architecture documentation
+
+### Fixed
+
+- **Updater reliability** — disabled the rate-limit-prone automatic path and added safer fallback handling
+- **Session viewer scrolling** — prevented jumps and preserved position when expanding tool calls
+- **Search input** — handled IME composition so pinyin input does not trigger premature searches
+
+## [0.5.5] - 2026-04-18
+
+### Added
+
+- **Pi Live** — added real-time agent monitoring, chat, available-model selection, slash commands, request/response bridging, and live session indicators
+- **External session providers** — added cross-agent session scanning, filtering, resume controls, and CASR-based provider bridges
+- **Dataset browser** — added browser dataset management and API integration
+- **Trace analytics** — added trace extraction, details/analytics charts, timeline/Gantt views, and inspector tooling
+- **Search and tool rendering** — added node-label/source-filter search, message-search plugins, and the registry-based tool-render system
+- **Model and settings management** — expanded model configuration, settings registries/tabs, Command Palette, and session preview workflows
+
+### Changed
+
+- **Architecture** — introduced runtime-data providers, session-bridge/domain modules, plugin-aware backend adapters, and modular settings/session-viewer components
+- **Frontend UX** — refreshed session lists, Kanban, onboarding, translations, tool execution, and dashboard surfaces
+
+### Fixed
+
+- **Pi Live stability** — fixed streaming state, queue preservation, stale session switching, slash-command loading, and available-model propagation
+- **External session conversion** — preserved tool payloads and hardened resume/copy flows
+- **Search and data migrations** — fixed quoted session-ID handling, FTS sorting/filtering, and compatibility with SQLite schema changes
+
+## [0.5.4] - 2026-04-11
+
+### Added
+
+- **External session controls** — added provider filtering, unified resume flows, configurable resume targets, and available-model support
+- **Pi Live controls** — added model selector, thinking-level controls, slash-command completion/history, and live input
+- **Session tree and dashboard polish** — improved tree simplification, virtualization, tooltips, toolbar borders, and dashboard card hover effects
+
+### Changed
+
+- **Session bridge architecture** — reorganized CASR bridge operations and unified external-provider resume commands
+- **SQLite writes** — added retry handling and busy timeouts for concurrent writes
+
+### Fixed
+
+- **Tool payload preservation** — preserved tool payloads during conversion verification
+- **CI and build configuration** — synchronized lockfiles, dispatch signatures, updater capabilities, and release validation
+- **Session viewer behavior** — reset scroll after chat send, stabilized model-selector rendering, and corrected project live-count calculations
+
+## [0.5.3] - 2026-04-07
+
+### Added
+
+- **tmux resume command** — added unique tmux session names and copy-to-clipboard toast feedback
+
+## [0.5.2] - 2026-04-07
+
+### Added
+
+- **Tauri updater** — added signed auto-updates, progress UI, updater artifacts, and release signing support
+- **Pi Live integration** — added live-session indicators, online status, model controls, agent steering RPCs, and bridge state synchronization
+- **Pluggable tool rendering** — added extensible tool-card rendering and success-style configuration
+- **ANSI thinking rendering** — converted ANSI escape sequences to Markdown with configurable color stripping
+- **Search and command palette** — added session-ID lookup, integrated full-text search filters, sort order controls, and session preview flows
+
+### Changed
+
+- **Component architecture** — reorganized frontend components into logical directories and replaced relative imports with TypeScript path aliases
+- **Rust backend** — split dispatch, commands, domain, and utility modules for clearer boundaries
+- **Session and settings UX** — refreshed Command Palette, settings, session list/Kanban, onboarding, and localization surfaces
+
+### Fixed
+
+- **Live session synchronization** — corrected payload extraction, streaming updates, RPC correlation, disconnect cleanup, and session matching
+- **Cross-platform builds** — guarded platform-specific imports/exports and fixed Windows/macOS release build issues
+- **Search and UI behavior** — fixed quoted session-ID handling, search sorting, initial empty-state flashes, and related command-menu behavior
 
 ## [0.5.1] - 2026-03-31
 
