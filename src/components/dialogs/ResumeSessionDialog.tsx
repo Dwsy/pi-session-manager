@@ -10,6 +10,7 @@ import type {
   SessionProviderInfo,
 } from "@/types";
 import { getSessionSourceTag } from "@/utils/session";
+import { getSessionListDisplayName } from "@/utils/sessionDisplay";
 import { listSupportedSessionProviders } from "@/utils/sessionProvidersApi";
 
 interface ResumeSessionDialogProps {
@@ -102,7 +103,7 @@ export default function ResumeSessionDialog({
 
         <div className="mb-4 rounded-lg border border-border/60 bg-secondary/30 px-3 py-2 text-sm">
           <div className="font-medium truncate">
-            {session.name || session.first_message || t("session.list.untitled")}
+            {getSessionListDisplayName(session, t("session.list.untitled"))}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             {t("session.convert.source")}: {sourceLabel}

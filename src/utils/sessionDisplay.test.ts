@@ -1,5 +1,59 @@
 import { describe, expect, it } from "vitest";
-import { formatDirectory } from "./sessionDisplay";
+import {
+  formatDirectory,
+  formatSkillInvocationTitle,
+  getSessionListDisplayName,
+} from "./sessionDisplay";
+
+describe("formatSkillInvocationTitle", () => {
+  it("formats skill invocation tags as SKILL:name", () => {
+    expect(
+      formatSkillInvocationTitle(
+        '<skill name="work-pdca-loop" location="/Users/dengwenyu/.agents/skills/work-pdca-loop/SKILL.md">',
+      ),
+    ).toBe("SKILL:work-pdca-loop");
+  });
+
+  it("accepts single-quoted name attributes", () => {
+    expect(
+      formatSkillInvocationTitle(
+        "<skill name='grill-me' location='/tmp/SKILL.md'>",
+      ),
+    ).toBe("SKILL:grill-me");
+  });
+
+  it("returns null for ordinary titles", () => {
+    expect(formatSkillInvocationTitle("fix the login bug")).toBeNull();
+    expect(formatSkillInvocationTitle("")).toBeNull();
+  });
+});
+
+describe("getSessionListDisplayName", () => {
+  it("prefers explicit name over first_message", () => {
+    expect(
+      getSessionListDisplayName(
+        { name: "My session", first_message: "hello" },
+        "Untitled",
+      ),
+    ).toBe("My session");
+  });
+
+  it("pretty-prints skill first messages", () => {
+    expect(
+      getSessionListDisplayName(
+        {
+          first_message:
+            '<skill name="work-pdca-loop" location="/Users/dengwenyu/.agents/skills/work-pdca-loop/SKILL.md">',
+        },
+        "Untitled",
+      ),
+    ).toBe("SKILL:work-pdca-loop");
+  });
+
+  it("falls back to untitled", () => {
+    expect(getSessionListDisplayName({}, "Untitled")).toBe("Untitled");
+  });
+});
 
 describe("formatDirectory", () => {
   it("shows only the current cwd name for deep paths", () => {
