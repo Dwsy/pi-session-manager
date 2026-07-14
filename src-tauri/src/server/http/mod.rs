@@ -1,5 +1,6 @@
 #[cfg(feature = "gui")]
 use crate::app_state::SharedAppState;
+use crate::auth;
 use crate::dispatch::dispatch_with_state;
 #[cfg(feature = "gui")]
 use crate::server::ws::ws_dispatch;
@@ -21,10 +22,16 @@ mod sessions;
 mod static_assets;
 
 async fn handle_command(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri, Json(req): Json<common::HttpRequest>) -> impl IntoResponse {
+    if !auth::origin_allowed(headers.get("origin").and_then(|value| value.to_str().ok()), headers.get("host").and_then(|value| value.to_str().ok())) {
+        return (StatusCode::FORBIDDEN, common::cors_headers(), Json(common::HttpResponse { success: false, data: None, error: Some("Forbidden origin".to_string()) })).into_response();
+    }
     if !common::is_authorized(&addr.ip(), &headers, &uri) {
         return (StatusCode::UNAUTHORIZED, common::cors_headers(), Json(common::HttpResponse { success: false, data: None, error: Some("Unauthorized".to_string()) })).into_response();
     }
 
+    if auth::is_terminal_command(&req.command) && !auth::terminal_capability_allowed(addr.ip(), headers.get("origin").is_some(), auth::origin_allowed(headers.get("origin").and_then(|value| value.to_str().ok()), headers.get("host").and_then(|value| value.to_str().ok())), auth::auth_required(), true, true) {
+        return common::json_error_response(StatusCode::FORBIDDEN, "Terminal capability denied");
+    }
     let gzip_requested = common::accepts_gzip(&headers);
     let force_gzip = std::env::var("PSM_FORCE_GZIP").unwrap_or_default() == "1";
     let gzip_enabled = gzip_requested || force_gzip;
@@ -37,7 +44,7 @@ async fn handle_command(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_st
         Err(error) => common::HttpResponse { success: false, data: None, error: Some(error) },
     };
 
-    let compression_disabled = common::query_param(&uri, "no_gzip").is_some() || common::query_param(&uri, "disable_compression").is_some();
+    let compression_disabled = uri.query().is_some_and(|query| query.split('&').any(|pair| pair.split('=').next().is_some_and(|key| matches!(key, "no_gzip" | "disable_compression"))));
 
     if gzip_enabled && !compression_disabled {
         if let Ok(json_bytes) = serde_json::to_vec(&resp) {
@@ -46,9 +53,10 @@ async fn handle_command(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_st
                     log::debug!("Gzip compressed: {} bytes -> {} bytes", json_bytes.len(), compressed.len());
                     return Response::builder()
                         .status(StatusCode::OK)
-                        .header("access-control-allow-origin", "*")
+                        .header("access-control-allow-origin", "http://localhost:1420")
                         .header("access-control-allow-methods", "GET, POST, OPTIONS")
                         .header("access-control-allow-headers", "content-type, authorization")
+                        .header("vary", "Origin")
                         .header("content-type", "application/json")
                         .header("content-encoding", "gzip")
                         .body(Body::from(compressed))

@@ -113,6 +113,7 @@ async fn main() {
     // Load configuration and apply CLI overrides
     let mut server_cfg = cli_common::load_server_config();
     cli_common::apply_server_overrides(&mut server_cfg, &cli_args);
+    cli_common::configure_security_policy(&server_cfg).unwrap_or_else(|error| { eprintln!("Invalid server security configuration: {error}"); std::process::exit(2); });
     let runtime_token = cli_args.runtime_token.clone();
 
     // Initialize auth

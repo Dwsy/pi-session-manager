@@ -33,6 +33,9 @@ pub(crate) async fn handle_preflight() -> impl IntoResponse {
 }
 
 pub(crate) async fn handle_sse(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri) -> impl IntoResponse {
+    if !auth::origin_allowed(headers.get("origin").and_then(|value| value.to_str().ok()), headers.get("host").and_then(|value| value.to_str().ok())) {
+        return (StatusCode::FORBIDDEN, "Forbidden origin").into_response();
+    }
     if !is_authorized(&addr.ip(), &headers, &uri) {
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
@@ -57,16 +60,20 @@ pub(crate) async fn handle_sse(ConnectInfo(addr): ConnectInfo<SocketAddr>, State
         }
     };
 
-    ([("access-control-allow-origin", "*"), ("cache-control", "no-cache")], Sse::new(stream).keep_alive(KeepAlive::default())).into_response()
+    ([("access-control-allow-origin", "http://localhost:1420"), ("cache-control", "no-cache"), ("vary", "Origin")], Sse::new(stream).keep_alive(KeepAlive::default())).into_response()
 }
 
 pub(crate) async fn handle_ws_upgrade(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(app_state): State<SharedAppState>, headers: HeaderMap, uri: Uri, ws: WebSocketUpgrade) -> Response {
+    let origin_is_allowed = auth::origin_allowed(headers.get("origin").and_then(|value| value.to_str().ok()), headers.get("host").and_then(|value| value.to_str().ok()));
+    if !origin_is_allowed {
+        return StatusCode::FORBIDDEN.into_response();
+    }
     let pre_authed = is_authorized(&addr.ip(), &headers, &uri);
-    let needs_auth = auth::is_auth_required(&addr.ip());
-    ws.on_upgrade(move |socket| handle_ws_connection(socket, app_state, pre_authed, needs_auth))
+    let terminal_allowed = auth::terminal_allowed(addr.ip(), headers.get("origin").is_some(), origin_is_allowed);
+    ws.on_upgrade(move |socket| handle_ws_connection(socket, app_state, pre_authed, auth::auth_required(), terminal_allowed))
 }
 
-async fn handle_ws_connection(socket: WebSocket, app_state: SharedAppState, pre_authed: bool, needs_auth: bool) {
+async fn handle_ws_connection(socket: WebSocket, app_state: SharedAppState, pre_authed: bool, needs_auth: bool, terminal_allowed: bool) {
     let (mut tx, mut rx) = socket.split();
 
     if needs_auth && !pre_authed {
@@ -98,11 +105,11 @@ async fn handle_ws_connection(socket: WebSocket, app_state: SharedAppState, pre_
             msg = rx.next() => {
                 match msg {
                     Some(Ok(AxumWsMsg::Text(text))) => {
-                        if text.contains("\"ping\"") {
-                            if tx.send(AxumWsMsg::Text(r#"{"pong":true}"#.into())).await.is_err() {
-                                break;
+                        if let Ok(value) = serde_json::from_str::<Value>(&text) {
+                            if value.get("ping").and_then(Value::as_bool) == Some(true) {
+                                if tx.send(AxumWsMsg::Text(r#"{"pong":true}"#.into())).await.is_err() { break; }
+                                continue;
                             }
-                            continue;
                         }
 
                         // ── Pi agent protocol: register ─────────────────────
@@ -212,6 +219,11 @@ async fn handle_ws_connection(socket: WebSocket, app_state: SharedAppState, pre_
 
                         match serde_json::from_str::<WsReq>(&text) {
                             Ok(req) => {
+                                if auth::is_terminal_command(&req.command) && !terminal_allowed {
+                                    let response = json!({ "id": req.id, "command": req.command, "success": false, "error": "Terminal capability denied" });
+                                    if tx.send(AxumWsMsg::Text(response.to_string())).await.is_err() { break; }
+                                    continue;
+                                }
                                 let result = dispatch_with_state(&Some(app_state.clone()), &req.command, &req.payload).await;
                                 let response = match result {
                                     Ok(data) => json!({

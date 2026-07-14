@@ -204,8 +204,8 @@ pub struct EmbeddingStatusResponse {
     pub memory_mb: Option<u64>,
 }
 
-fn cors_headers() -> [(&'static str, &'static str); 3] {
-    [("access-control-allow-origin", "*"), ("access-control-allow-methods", "GET, POST, OPTIONS"), ("access-control-allow-headers", "content-type, authorization")]
+fn cors_headers() -> [(&'static str, &'static str); 4] {
+    [("access-control-allow-origin", "http://localhost:1420"), ("access-control-allow-methods", "GET, POST, OPTIONS"), ("access-control-allow-headers", "content-type, authorization"), ("vary", "Origin")]
 }
 
 /// POST /v1/embedding - Generate embedding for single text

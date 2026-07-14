@@ -81,7 +81,6 @@ function readRemoteConfig(): RemoteConfig {
   const qServer = params.get('server')
   const qWs = params.get('ws')
   const qHttp = params.get('http')
-  const qToken = params.get('token')
   const qTransport = params.get('transport') as TransportPreference | null
 
   if (qServer) {
@@ -95,7 +94,6 @@ function readRemoteConfig(): RemoteConfig {
     localStorage.setItem('psm.wsUrl', toWsUrl(httpBase))
   }
   if (qWs) localStorage.setItem('psm.wsUrl', toWsUrl(qWs))
-  if (qToken) localStorage.setItem('psm.apiToken', qToken)
   if (qTransport && ['auto', 'ws', 'http'].includes(qTransport)) {
     localStorage.setItem('psm.transport', qTransport)
   }
@@ -103,7 +101,7 @@ function readRemoteConfig(): RemoteConfig {
   return {
     wsUrl: toWsUrl(localStorage.getItem('psm.wsUrl') || localStorage.getItem('psm.remoteServerUrl') || import.meta.env.VITE_WS_URL || defaultWs),
     httpBaseUrl: normalizeHttpBase(localStorage.getItem('psm.httpBaseUrl') || localStorage.getItem('psm.remoteServerUrl') || import.meta.env.VITE_HTTP_BASE_URL || defaultHttp),
-    token: localStorage.getItem('psm.apiToken') || localStorage.getItem('psm.remoteApiToken') || import.meta.env.VITE_API_TOKEN || undefined,
+    token: localStorage.getItem('psm.apiToken') || import.meta.env.VITE_API_TOKEN || undefined,
     transport: ((localStorage.getItem('psm.transport') || localStorage.getItem('psm.remoteTransport')) as TransportPreference | null)
       || (import.meta.env.VITE_TRANSPORT as TransportPreference | undefined)
       || 'auto',
@@ -409,25 +407,21 @@ export class WebSocketTransport implements Transport {
 
       const sendRequest = async () => {
         const acceptGzip = this.enableCompression
+        const isTerminalCommand = command.startsWith('terminal_') || command === 'get_default_shell' || command === 'get_available_shells'
+        const request = { id, command, payload: payload ?? {}, accept_gzip: acceptGzip, ...(isTerminalCommand ? { terminal_capability: true } : {}) }
 
         if (useCompression && payload) {
           try {
             const payloadStr = JSON.stringify(payload)
             const compressed = await gzipCompress(new TextEncoder().encode(payloadStr))
             const compressedB64 = base64Encode(compressed)
-            this.ws!.send(
-              JSON.stringify({ id, command, payload: compressedB64, compressed: true, accept_gzip: acceptGzip })
-            )
+            this.ws!.send(JSON.stringify({ ...request, payload: compressedB64, compressed: true }))
           } catch (e) {
             console.warn('[WS] Compression failed, sending uncompressed:', e)
-            this.ws!.send(
-              JSON.stringify({ id, command, payload: payload ?? {}, accept_gzip: acceptGzip })
-            )
+            this.ws!.send(JSON.stringify(request))
           }
         } else {
-          this.ws!.send(
-            JSON.stringify({ id, command, payload: payload ?? {}, accept_gzip: acceptGzip })
-          )
+          this.ws!.send(JSON.stringify(request))
         }
       }
 

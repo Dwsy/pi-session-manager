@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify'
 import { marked, type Tokens } from 'marked'
 import { createHighlighterCoreSync } from '@shikijs/core'
 import { createJavaScriptRegexEngine } from '@shikijs/engine-javascript'
@@ -445,10 +446,27 @@ export function parseMarkdown(text: string): string {
 
   const processedText = preprocessXmlBlocks(text)
   const parsed = marked.parse(processedText) as string
-  if (!canCacheMarkdown(text, parsed)) {
-    return parsed
+  const sanitized = sanitizeMarkdownHtml(parsed)
+  if (!canCacheMarkdown(text, sanitized)) {
+    return sanitized
   }
-  return upsertMarkdownCache(cacheKey, parsed, now)
+  return upsertMarkdownCache(cacheKey, sanitized, now)
+}
+
+export function sanitizeMarkdownHtml(parsed: string): string {
+  return DOMPurify.sanitize(parsed, {
+    ALLOWED_TAGS: [
+      'a', 'blockquote', 'br', 'button', 'code', 'dd', 'details', 'div', 'dl', 'dt',
+      'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'li', 'mark', 'ol', 'p', 'pre',
+      'span', 'strong', 'summary', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'ul',
+    ],
+    ALLOWED_ATTR: ['aria-label', 'class', 'data-code-copy', 'data-markdown-href', 'href', 'open', 'title'],
+    ALLOW_DATA_ATTR: true,
+    ADD_ATTR: ['data-code-copy', 'data-markdown-href'],
+    FORBID_TAGS: ['embed', 'form', 'iframe', 'img', 'math', 'object', 'script', 'style', 'svg', 'template'],
+    FORBID_ATTR: ['contenteditable', 'formaction', 'srcdoc'],
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|#)/i,
+  })
 }
 
 export function escapeHtml(text: string): string {

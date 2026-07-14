@@ -14,7 +14,6 @@
     "core:window:allow-set-focus",
     "core:window:allow-is-visible",
     "core:tray:default",
-    "shell:default",
     "dialog:default",
     "core:webview:allow-set-webview-zoom",
     "updater:default",

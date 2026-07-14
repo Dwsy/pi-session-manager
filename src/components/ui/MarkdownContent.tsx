@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo } from 'react'
-import { parseMarkdown } from '@/utils/markdown'
+import { parseMarkdown, sanitizeMarkdownHtml } from '@/utils/markdown'
 import {
   classifyMarkdownLink,
   getMarkdownLinkConfirmationMessage,
@@ -25,7 +25,7 @@ function MarkdownContent({ content, className = '', searchQuery = '' }: Markdown
     if (searchQuery) {
       parsed = highlightSearchInHTML(parsed, searchQuery)
     }
-    return parsed
+    return sanitizeMarkdownHtml(parsed)
   }, [content, searchQuery])
 
   const handleClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -35,6 +35,9 @@ function MarkdownContent({ content, className = '', searchQuery = '' }: Markdown
     }
 
     const rawHref = link.getAttribute('data-markdown-href') || link.getAttribute('href')
+    if (!rawHref || rawHref === '#') {
+      return
+    }
     const target = classifyMarkdownLink(rawHref)
     if (target.kind === 'anchor') {
       return
@@ -62,7 +65,7 @@ function MarkdownContent({ content, className = '', searchQuery = '' }: Markdown
     <div
       className={`markdown-content ${className}`}
       onClickCapture={handleClick}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: sanitizeMarkdownHtml(html) }}
     />
   )
 }

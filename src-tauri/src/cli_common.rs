@@ -89,6 +89,11 @@ pub struct ServerConfig {
     pub auth_enabled: bool,
     #[serde(default)]
     pub embedding_enabled: bool,
+    pub remote_terminal_enabled: bool,
+    #[serde(default)]
+    pub trusted_proxies: Vec<String>,
+    #[serde(default)]
+    pub allowed_origins: Vec<String>,
     /// Whether to serve frontend assets via HTTP. None defaults to enabled.
     #[serde(default)]
     pub serve_frontend: Option<bool>,
@@ -96,7 +101,7 @@ pub struct ServerConfig {
 
 impl Default for ServerConfig {
     fn default() -> Self {
-        Self { ws_enabled: true, http_enabled: true, ws_port: 52131, http_port: 52131, bind_addr: "127.0.0.1".to_string(), auth_enabled: true, embedding_enabled: false, serve_frontend: None }
+        Self { ws_enabled: true, http_enabled: true, ws_port: 52131, http_port: 52131, bind_addr: "127.0.0.1".to_string(), auth_enabled: true, embedding_enabled: false, remote_terminal_enabled: false, trusted_proxies: Vec::new(), allowed_origins: Vec::new(), serve_frontend: None }
     }
 }
 
@@ -121,7 +126,10 @@ pub fn load_server_config() -> ServerConfig {
             "http_port": 52131,
             "bind_addr": "127.0.0.1",
             "auth_enabled": true,
-            "embedding_enabled": false
+            "embedding_enabled": false,
+            "remote_terminal_enabled": false,
+            "trusted_proxies": [],
+            "allowed_origins": []
         })
     });
 
@@ -133,6 +141,9 @@ pub fn load_server_config() -> ServerConfig {
         bind_addr: value["bind_addr"].as_str().unwrap_or("127.0.0.1").to_string(),
         auth_enabled: value["auth_enabled"].as_bool().unwrap_or(true),
         embedding_enabled: value["embedding_enabled"].as_bool().unwrap_or(false),
+        remote_terminal_enabled: value["remote_terminal_enabled"].as_bool().unwrap_or(false),
+        trusted_proxies: value["trusted_proxies"].as_array().map(|items| items.iter().filter_map(|item| item.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+        allowed_origins: value["allowed_origins"].as_array().map(|items| items.iter().filter_map(|item| item.as_str().map(str::to_string)).collect()).unwrap_or_default(),
         serve_frontend: value["serve_frontend"].as_bool(),
     }
 }
@@ -150,25 +161,44 @@ pub fn apply_server_overrides(server_cfg: &mut ServerConfig, cli_args: &CommonCl
     }
 }
 
+pub fn validate_server_security(server_cfg: &ServerConfig) -> Result<(), String> {
+    let bind_addr = server_cfg.bind_addr.parse::<std::net::IpAddr>().map_err(|e| format!("Invalid bind address '{}': {e}", server_cfg.bind_addr))?;
+    if !server_cfg.auth_enabled && !bind_addr.is_loopback() {
+        return Err("Disabling auth on a non-loopback bind requires an explicit insecure opt-in".to_string());
+    }
+    Ok(())
+}
+
+pub fn configure_security_policy(server_cfg: &ServerConfig) -> Result<(), String> {
+    validate_server_security(server_cfg)?;
+    crate::auth::configure_network_policy(server_cfg.trusted_proxies.clone(), server_cfg.allowed_origins.clone(), server_cfg.remote_terminal_enabled);
+    Ok(())
+}
+
 /// Initialize auth and apply runtime token if provided.
 ///
 /// Returns `true` if auth was successfully initialized.
 pub fn init_auth(runtime_token: &Option<String>, cli_mode: bool) -> bool {
     match crate::auth::init() {
-        Ok(token) => {
+        Ok(result) => {
+            if let Some(token) = result.created_or_rotated_token {
+                if cli_mode {
+                    log::info!("Auth token created or rotated; use the one-time pairing output to configure clients");
+                    println!("Auth token (one-time): {token}");
+                }
+            } else if cli_mode {
+                log::info!("Auth enabled (active token: {})", result.active_token_preview);
+            }
             if let Some(cli_token) = runtime_token.as_ref() {
                 if let Err(e) = crate::auth::set_runtime_tokens(vec![cli_token.clone()]) {
                     eprintln!("Failed to set runtime token: {e}");
                     std::process::exit(2);
                 }
                 if cli_mode {
-                    log::info!("Auth enabled (runtime token loaded from CLI)");
+                    log::info!("Runtime auth token loaded from CLI");
                 }
             } else {
                 let _ = crate::auth::set_runtime_tokens(Vec::new());
-                if cli_mode {
-                    log::info!("Auth token: {token}");
-                }
             }
             true
         }

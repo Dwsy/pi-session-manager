@@ -53,30 +53,19 @@ pub(crate) struct CheckoutRequest {
     pub(crate) carryover_message: Option<String>,
 }
 
-pub(crate) fn cors_headers() -> [(&'static str, &'static str); 3] {
-    [("access-control-allow-origin", "*"), ("access-control-allow-methods", "GET, POST, OPTIONS"), ("access-control-allow-headers", "content-type, authorization")]
+pub(crate) fn cors_headers() -> [(&'static str, &'static str); 4] {
+    [("access-control-allow-origin", "http://localhost:1420"), ("access-control-allow-methods", "GET, POST, OPTIONS"), ("access-control-allow-headers", "content-type, authorization"), ("vary", "Origin")]
 }
 
-pub(crate) fn query_param(uri: &Uri, key: &str) -> Option<String> {
-    uri.query().and_then(|query| {
-        query.split('&').find_map(|pair| {
-            let mut parts = pair.splitn(2, '=');
-            let current_key = parts.next()?;
-            let value = parts.next().unwrap_or("");
-            (current_key == key).then(|| value.to_string())
-        })
-    })
-}
-
-pub(crate) fn is_authorized(ip: &std::net::IpAddr, headers: &HeaderMap, uri: &Uri) -> bool {
-    if !auth::is_auth_required(ip) {
-        return true;
+pub(crate) fn is_authorized(ip: &std::net::IpAddr, headers: &HeaderMap, _uri: &axum::http::Uri) -> bool {
+    let origin_allowed = auth::origin_allowed(headers.get("origin").and_then(|value| value.to_str().ok()), headers.get("host").and_then(|value| value.to_str().ok()));
+    if !origin_allowed {
+        return false;
     }
-    let header_ok = headers.get("authorization").and_then(|value| value.to_str().ok()).and_then(|value| value.strip_prefix("Bearer ")).map(auth::validate).unwrap_or(false);
-    if header_ok {
-        return true;
+    if !auth::auth_required() {
+        return ip.is_loopback();
     }
-    query_param(uri, "token").as_deref().map(auth::validate).unwrap_or(false)
+    headers.get("authorization").and_then(|value| value.to_str().ok()).and_then(|value| value.strip_prefix("Bearer ")).map(auth::validate).unwrap_or(false)
 }
 
 pub(crate) fn accepts_gzip(headers: &HeaderMap) -> bool {

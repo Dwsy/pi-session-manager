@@ -44,7 +44,10 @@ fn default_server_section() -> Value {
         "http_port": 52131,
         "auth_enabled": true,
         "bind_addr": "127.0.0.1",
-        "embedding_enabled": false
+        "embedding_enabled": false,
+        "remote_terminal_enabled": false,
+        "trusted_proxies": [],
+        "allowed_origins": []
     })
 }
 
@@ -184,7 +187,7 @@ fn migrate_server_section() -> Value {
             continue;
         };
         if let (Some(target), Some(source)) = (server.as_object_mut(), value.as_object()) {
-            for key in ["ws_enabled", "ws_port", "http_enabled", "http_port", "auth_enabled", "bind_addr", "embedding_enabled"] {
+            for key in ["ws_enabled", "ws_port", "http_enabled", "http_port", "auth_enabled", "bind_addr", "embedding_enabled", "remote_terminal_enabled", "trusted_proxies", "allowed_origins"] {
                 if let Some(value) = source.get(key) {
                     target.insert(key.to_string(), value.clone());
                 }

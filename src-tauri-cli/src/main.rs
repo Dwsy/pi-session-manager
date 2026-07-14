@@ -59,7 +59,7 @@ fn default_http_port() -> u16 {
     52131
 }
 fn default_bind() -> String {
-    "0.0.0.0".to_string()
+    "127.0.0.1".to_string()
 }
 fn default_auth_enabled() -> bool {
     true
@@ -67,7 +67,7 @@ fn default_auth_enabled() -> bool {
 
 impl Default for ServerConfig {
     fn default() -> Self {
-        Self { http_enabled: true, http_port: 52131, bind_addr: "0.0.0.0".to_string(), auth_enabled: true }
+        Self { http_enabled: true, http_port: 52131, bind_addr: "127.0.0.1".to_string(), auth_enabled: true }
     }
 }
 
@@ -76,49 +76,20 @@ fn load_config() -> ServerConfig {
         serde_json::json!({
             "http_enabled": true,
             "http_port": 52131,
-            "bind_addr": "0.0.0.0",
+            "bind_addr": "127.0.0.1",
             "auth_enabled": true
         })
     });
 
-    ServerConfig { http_enabled: value["http_enabled"].as_bool().unwrap_or(true), http_port: value["http_port"].as_u64().unwrap_or(52131) as u16, bind_addr: value["bind_addr"].as_str().unwrap_or("0.0.0.0").to_string(), auth_enabled: value["auth_enabled"].as_bool().unwrap_or(true) }
+    ServerConfig { http_enabled: value["http_enabled"].as_bool().unwrap_or(true), http_port: value["http_port"].as_u64().unwrap_or(52131) as u16, bind_addr: value["bind_addr"].as_str().unwrap_or("127.0.0.1").to_string(), auth_enabled: value["auth_enabled"].as_bool().unwrap_or(true) }
 }
 
-fn query_param(uri: &Uri, key: &str) -> Option<String> {
-    uri.query().and_then(|q| {
-        q.split('&').find_map(|pair| {
-            let mut it = pair.splitn(2, '=');
-            let k = it.next()?;
-            let v = it.next().unwrap_or("");
-            (k == key).then(|| v.to_string())
-        })
-    })
-}
-
-fn is_authorized(ip: &std::net::IpAddr, headers: &HeaderMap, uri: &Uri) -> bool {
-    let real_ip = get_real_ip(ip, headers);
-    if !pi_session_manager::auth::is_auth_required(&real_ip) {
-        return true;
+fn is_authorized(_ip: &std::net::IpAddr, headers: &HeaderMap, _uri: &Uri) -> bool {
+    if !pi_session_manager::auth::auth_required() {
+        return false;
     }
-    let header_ok = headers.get("authorization").and_then(|v| v.to_str().ok()).and_then(|v| v.strip_prefix("Bearer ")).map(pi_session_manager::auth::validate).unwrap_or(false);
-    if header_ok {
-        return true;
-    }
-    query_param(uri, "token").as_deref().map(pi_session_manager::auth::validate).unwrap_or(false)
+    headers.get("authorization").and_then(|v| v.to_str().ok()).and_then(|v| v.strip_prefix("Bearer ")).map(pi_session_manager::auth::validate).unwrap_or(false)
 }
-
-/// Extract real client IP from X-Forwarded-For (ngrok/reverse proxy) or use socket IP
-fn get_real_ip(socket_ip: &std::net::IpAddr, headers: &HeaderMap) -> std::net::IpAddr {
-    if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
-        if let Some(first) = xff.split(',').next() {
-            if let Ok(ip) = first.trim().parse::<std::net::IpAddr>() {
-                return ip;
-            }
-        }
-    }
-    *socket_ip
-}
-
 #[tokio::main]
 async fn main() {
     if std::env::var("RUST_LOG").is_err() {
@@ -147,11 +118,15 @@ async fn main() {
     // Init auth
     if config.auth_enabled {
         match pi_session_manager::auth::init() {
-            Ok(token) => {
+            Ok(result) => {
                 let _ = pi_session_manager::auth::set_runtime_tokens(Vec::new());
-                println!("{} Token: {}", "🔑 Auth enabled,".green(), token.yellow());
+                if let Some(token) = result.created_or_rotated_token {
+                    println!("{} Auth token (one-time): {}", "🔑 Auth enabled,".green(), token.yellow());
+                } else {
+                    println!("{} Auth enabled (token: {})", "🔑".green(), result.active_token_preview.yellow());
+                }
             }
-            Err(e) => error!("Failed to init auth: {e}"),
+            Err(e) => { error!("Failed to init auth: {e}"); std::process::exit(1); }
         }
     } else {
         println!("{}", "🔓 Auth disabled".yellow());
@@ -209,15 +184,21 @@ struct ApiReq {
 }
 
 async fn api_handler(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(state): State<SharedState>, headers: HeaderMap, uri: Uri, Json(body): Json<ApiReq>) -> impl IntoResponse {
+    if !pi_session_manager::auth::origin_allowed(headers.get("origin").and_then(|value| value.to_str().ok()), headers.get("host").and_then(|value| value.to_str().ok())) {
+        return (StatusCode::FORBIDDEN, cors_headers(), Json(serde_json::json!({ "success": false, "error": "Forbidden origin" }))).into_response();
+    }
     if !is_authorized(&addr.ip(), &headers, &uri) {
-        return (StatusCode::UNAUTHORIZED, cors_headers(), Json(serde_json::json!({ "success": false, "error": "Unauthorized" })));
+        return (StatusCode::UNAUTHORIZED, cors_headers(), Json(serde_json::json!({ "success": false, "error": "Unauthorized" }))).into_response();
+    }
+    if pi_session_manager::auth::is_terminal_command(&body.command) && !pi_session_manager::auth::terminal_allowed(addr.ip(), headers.get("origin").is_some(), true) {
+        return (StatusCode::FORBIDDEN, cors_headers(), Json(serde_json::json!({ "success": false, "error": "Terminal capability denied" }))).into_response();
     }
     let result = dispatch_command(&state, &body.command, &body.payload).await;
     let resp = match result {
         Ok(data) => serde_json::json!({ "success": true, "data": data }),
         Err(e) => serde_json::json!({ "success": false, "error": e }),
     };
-    (StatusCode::OK, cors_headers(), Json(resp))
+    (StatusCode::OK, cors_headers(), Json(resp)).into_response()
 }
 
 async fn preflight_handler() -> impl IntoResponse {
@@ -225,8 +206,7 @@ async fn preflight_handler() -> impl IntoResponse {
 }
 
 async fn auth_check(ConnectInfo(addr): ConnectInfo<SocketAddr>, headers: HeaderMap, uri: Uri) -> impl IntoResponse {
-    let real_ip = get_real_ip(&addr.ip(), &headers);
-    let needs_auth = pi_session_manager::auth::is_auth_required(&real_ip);
+    let needs_auth = pi_session_manager::auth::auth_required();
     let is_valid = is_authorized(&addr.ip(), &headers, &uri);
     (
         StatusCode::OK,
@@ -291,8 +271,7 @@ async fn dispatch_command(state: &SharedState, command: &str, payload: &Value) -
 
 async fn ws_upgrade(ConnectInfo(addr): ConnectInfo<SocketAddr>, State(state): State<SharedState>, headers: HeaderMap, uri: Uri, ws: WebSocketUpgrade) -> Response {
     let pre_authed = is_authorized(&addr.ip(), &headers, &uri);
-    let real_ip = get_real_ip(&addr.ip(), &headers);
-    let needs_auth = pi_session_manager::auth::is_auth_required(&real_ip);
+    let needs_auth = pi_session_manager::auth::auth_required();
     ws.on_upgrade(move |socket| handle_ws(socket, state, pre_authed, needs_auth))
 }
 
@@ -351,8 +330,8 @@ async fn run_server_dual(state: SharedState, port: u16) -> Result<(), Box<dyn st
     Ok(())
 }
 
-fn cors_headers() -> [(&'static str, &'static str); 3] {
-    [("access-control-allow-origin", "*"), ("access-control-allow-methods", "GET, POST, OPTIONS"), ("access-control-allow-headers", "content-type, authorization")]
+fn cors_headers() -> [(&'static str, &'static str); 4] {
+    [("access-control-allow-origin", "http://localhost:1420"), ("access-control-allow-methods", "GET, POST, OPTIONS"), ("access-control-allow-headers", "content-type, authorization"), ("vary", "Origin")]
 }
 
 // ─── WebSocket handler ──────────────────────────────────────
@@ -381,13 +360,15 @@ async fn handle_ws(socket: WebSocket, state: SharedState, pre_authed: bool, need
             msg = rx.next() => {
                 match msg {
                     Some(Ok(AxumWsMsg::Text(text))) => {
-                        if text.contains("\"ping\"") {
-                            if tx.send(AxumWsMsg::Text(r#"{"pong":true}"#.into())).await.is_err() { break; }
-                            continue;
-                        }
-                        if text.contains("\"auth\"") {
-                            let _ = tx.send(AxumWsMsg::Text(r#"{"auth":"ok"}"#.into())).await;
-                            continue;
+                        if let Ok(value) = serde_json::from_str::<Value>(&text) {
+                            if value.get("ping").and_then(Value::as_bool) == Some(true) {
+                                if tx.send(AxumWsMsg::Text(r#"{"pong":true}"#.into())).await.is_err() { break; }
+                                continue;
+                            }
+                            if value.get("auth").and_then(Value::as_str).is_some() {
+                                let _ = tx.send(AxumWsMsg::Text(r#"{"auth":"ok"}"#.into())).await;
+                                continue;
+                            }
                         }
 
                         #[derive(serde::Deserialize)]
@@ -395,6 +376,11 @@ async fn handle_ws(socket: WebSocket, state: SharedState, pre_authed: bool, need
 
                         match serde_json::from_str::<WsReq>(&text) {
                             Ok(req) => {
+                                if pi_session_manager::auth::is_terminal_command(&req.command) {
+                                    let response = serde_json::json!({ "id": req.id, "command": req.command, "success": false, "error": "Terminal capability denied" });
+                                    if tx.send(AxumWsMsg::Text(response.to_string())).await.is_err() { break; }
+                                    continue;
+                                }
                                 let result = dispatch_command(&state, &req.command, &req.payload).await;
                                 let resp = match result {
                                     Ok(data) => serde_json::json!({ "id": req.id, "command": req.command, "success": true, "data": data }),

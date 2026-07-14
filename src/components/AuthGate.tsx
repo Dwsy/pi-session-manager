@@ -7,14 +7,6 @@ interface AuthGateProps {
   children: React.ReactNode;
 }
 
-function isLocalHost(): boolean {
-  if (typeof window === "undefined") return true;
-  const h = window.location.hostname;
-  return (
-    h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0" || h === "::1"
-  );
-}
-
 function getStoredToken(): string | null {
   return localStorage.getItem("psm.apiToken");
 }
@@ -23,18 +15,15 @@ function storeToken(token: string): void {
   localStorage.setItem("psm.apiToken", token);
 }
 
-async function checkAuth(
-  token?: string,
-): Promise<{ needsAuth: boolean; authenticated: boolean }> {
-  try {
-    const headers: Record<string, string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    const resp = await fetch("/api/auth-check", { headers });
-    if (!resp.ok) return { needsAuth: true, authenticated: false };
-    return await resp.json();
-  } catch {
-    return { needsAuth: false, authenticated: true };
-  }
+function checkAuth(token?: string): Promise<{ needsAuth: boolean; authenticated: boolean }> {
+  const headers: Record<string, string> = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+  return fetch('/api/auth-check', { headers })
+    .then(async (resp) => {
+      if (!resp.ok) return { needsAuth: true, authenticated: false }
+      return await resp.json() as { needsAuth: boolean; authenticated: boolean }
+    })
+    .catch(() => ({ needsAuth: true, authenticated: false }))
 }
 
 function AuthGate({ children }: AuthGateProps) {
@@ -58,16 +47,12 @@ function AuthGate({ children }: AuthGateProps) {
 
   useEffect(() => {
     if (shouldBypassAuthGate()) {
-      setState("authenticated");
-      return;
+      setState('authenticated')
+      return
     }
 
-    if (isLocalHost()) {
-      setState("authenticated");
-      return;
-    }
-    const stored = getStoredToken();
-    verify(stored || undefined);
+    const stored = getStoredToken()
+    verify(stored || undefined)
   }, [verify]);
 
   const handleSubmit = async (e: React.FormEvent) => {

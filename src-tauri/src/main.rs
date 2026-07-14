@@ -163,6 +163,10 @@ fn main() {
     // Load server settings and apply CLI overrides
     let mut server_cfg = cli_common::load_server_config();
     cli_common::apply_server_overrides(&mut server_cfg, &main_args.common);
+    cli_common::configure_security_policy(&server_cfg).unwrap_or_else(|error| {
+        eprintln!("Invalid server security configuration: {error}");
+        std::process::exit(2);
+    });
     let runtime_token = main_args.common.runtime_token.clone();
 
     tauri::Builder::default()

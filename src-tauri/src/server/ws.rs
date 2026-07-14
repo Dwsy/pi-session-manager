@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tauri::{Emitter, Listener};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::broadcast;
-use tokio_tungstenite::{accept_async, tungstenite::Message};
+use tokio_tungstenite::{accept_hdr_async, tungstenite::Message};
 
 #[derive(Debug, Deserialize)]
 struct WsRequest {
@@ -23,6 +23,9 @@ struct WsRequest {
     /// Whether response should use Gzip compression
     #[serde(default)]
     accept_gzip: bool,
+    /// Whether this connection explicitly requests terminal capability
+    #[serde(default)]
+    terminal_capability: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -88,11 +91,25 @@ impl WsAdapter {
     }
 
     async fn handle_connection(&self, stream: TcpStream, peer_addr: SocketAddr) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let ws_stream = accept_async(stream).await?;
+        let mut origin: Option<String> = None;
+        let mut host: Option<String> = None;
+        let ws_stream = accept_hdr_async(stream, |request: &tokio_tungstenite::tungstenite::handshake::server::Request, _response: tokio_tungstenite::tungstenite::handshake::server::Response| {
+            origin = request.headers().get("origin").and_then(|value| value.to_str().ok()).map(str::to_string);
+            host = request.headers().get("host").and_then(|value| value.to_str().ok()).map(str::to_string);
+            Ok(_response)
+        })
+        .await?;
+        let auth_required = crate::auth::auth_required();
+        let origin_is_allowed = crate::auth::origin_allowed(origin.as_deref(), host.as_deref());
+        if !origin_is_allowed {
+            return Ok(());
+        }
+        let has_origin = origin.is_some();
         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
         // Non-local connections must authenticate (if auth enabled)
-        if crate::auth::is_auth_required(&peer_addr.ip()) {
+        let mut authenticated = !auth_required;
+        if auth_required {
             let authed = match tokio::time::timeout(std::time::Duration::from_secs(10), ws_receiver.next()).await {
                 Ok(Some(Ok(Message::Text(text)))) => serde_json::from_str::<serde_json::Value>(&text).ok().and_then(|v| v.get("auth")?.as_str().map(String::from)).map(|t| crate::auth::validate(&t)).unwrap_or(false),
                 _ => false,
@@ -103,6 +120,7 @@ impl WsAdapter {
                 let _ = ws_sender.send(Message::Close(None)).await;
                 return Ok(());
             }
+            authenticated = true;
             let _ = ws_sender.send(Message::Text(r#"{"auth":"ok"}"#.to_string())).await;
         }
 
@@ -118,11 +136,12 @@ impl WsAdapter {
                 msg = ws_receiver.next() => {
                     match msg {
                         Some(Ok(Message::Text(text))) => {
-                            if text.contains("\"ping\"") {
-                                let _ = ws_sender.send(Message::Text(r#"{"pong":true}"#.to_string())).await;
-                                continue;
+                            if let Ok(value) = serde_json::from_str::<Value>(&text) {
+                                if value.get("ping").and_then(Value::as_bool) == Some(true) {
+                                    let _ = ws_sender.send(Message::Text(r#"{"pong":true}"#.to_string())).await;
+                                    continue;
+                                }
                             }
-
                             // Debug: log raw message start for pi-agent detection
                             let has_type = text.contains("\"type\"");
                             let has_register = text.contains("\"register\"");
@@ -242,6 +261,16 @@ impl WsAdapter {
 
                             match serde_json::from_str::<WsRequest>(&text) {
                                 Ok(mut request) => {
+                                    if crate::auth::is_terminal_command(&request.command) {
+                                        let requested = request.terminal_capability;
+                                        if !crate::auth::terminal_capability_allowed(peer_addr.ip(), has_origin, origin_is_allowed, auth_required, authenticated, requested) {
+                                            let response = WsResponse { id: request.id, command: request.command, success: false, data: None, error: Some("Terminal capability denied".to_string()), compressed: None };
+                                            let msg = self.compress_response_if_needed(response, request.accept_gzip)?;
+                                            if ws_sender.send(msg).await.is_err() { break; }
+                                            continue;
+                                        }
+                                    }
+
                                     // Handle compressed request payload
                                     if request.compressed {
                                         if let Some(payload_str) = request.payload.as_str() {
