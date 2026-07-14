@@ -28,6 +28,21 @@ export default defineConfig({
     // each polyfill with a typeof check) so node-environment tests are unaffected.
     setupFiles: ['./vitest.setup.ts'],
     globals: false,
+    server: {
+      deps: {
+        // These packages publish extensionless ESM submodule imports. Keep them
+        // in Vite's transform pipeline so Vitest resolves them consistently
+        // on Node versions used locally and in CI.
+        inline: [
+          '@emoji-mart/data',
+          '@emoji-mart/react',
+          '@lobehub/fluent-emoji',
+          '@lobehub/icons',
+          '@lobehub/ui',
+          'emoji-mart',
+        ],
+      },
+    },
     include: [
       'src/**/*.test.{ts,tsx}',
       'extensions/**/*.test.{ts,tsx}',

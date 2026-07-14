@@ -1,0 +1,61 @@
+{
+  "ts": "2026-07-14T09:14:53.792Z",
+  "kind": "delta",
+  "delta": {
+    "current_phase": "P3",
+    "updated_at": "2026-07-14T09:14:53.792Z",
+    "phases": [
+      {
+        "id": "P0",
+        "name": "frame objective and constraints",
+        "pdca_stage": "plan",
+        "status": "completed"
+      },
+      {
+        "id": "P1",
+        "name": "execute first tracer path",
+        "pdca_stage": "do",
+        "status": "completed"
+      },
+      {
+        "id": "D1",
+        "name": "choose implementation route",
+        "pdca_stage": "check",
+        "status": "completed",
+        "type": "decision"
+      },
+      {
+        "id": "P2",
+        "name": "validate evidence and regressions",
+        "pdca_stage": "check",
+        "status": "completed"
+      },
+      {
+        "id": "D2",
+        "name": "decide continue, pivot, or close",
+        "pdca_stage": "act",
+        "status": "completed",
+        "type": "decision"
+      },
+      {
+        "id": "P3",
+        "name": "act on learning and hand off",
+        "pdca_stage": "act",
+        "status": "in_progress"
+      }
+    ],
+    "validation": {
+      "passed": true,
+      "commands": [
+        "git status --short && git diff --stat",
+        "cargo search tauri-plugin-single-instance --limit 3; cargo search tauri-plugin-opener --limit 3; cargo search tauri-plugin-window-state --limit 3",
+        "pnpm exec tsc --noEmit",
+        "gh pr view 42 --json statusCheckRollup",
+        "pnpm exec vitest run && pnpm exec tsc --noEmit && cargo fmt --all --check"
+      ],
+      "notes": "本地全量 Vitest 258 suites/551 tests pass；tsc pass；cargo fmt --all --check 仍被 origin/main 未修改文件格式差异阻塞，已确认非本 PR 变更。新增 Vitest server.deps.inline 修复 CI Node ESM 收集失败。"
+    },
+    "next_action": "等待 PR #42 新一轮 CI；lint/check 均通过后再向用户报告可合并状态"
+  },
+  "event": "ci-vitest-collection-fixed"
+}

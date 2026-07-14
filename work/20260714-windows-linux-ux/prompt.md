@@ -22,7 +22,7 @@ Rules:
 ## Current Progress
 
 <!-- pdca:gen -->
-**Phase:** D2 (act)
+**Phase:** P3 (act)
 **Status:** in_progress
-**Next:** 等待 PR #42 CI，若 CI 发现回归则按检查结果修复
+**Next:** 等待 PR #42 新一轮 CI；lint/check 均通过后再向用户报告可合并状态
 <!-- /pdca:gen -->

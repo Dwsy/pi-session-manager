@@ -1,9 +1,9 @@
 # Windows/Linux 原生体验修复
 
 <!-- pdca:gen -->
-> **status:** in_progress  ·  **phase:** D2  ·  **pdca:** act
-> **validation:** pending  ·  **open decisions:** D2
-> **next:** 等待 PR #42 CI，若 CI 发现回归则按检查结果修复
+> **status:** in_progress  ·  **phase:** P3  ·  **pdca:** act
+> **validation:** passed  ·  **open decisions:** D2
+> **next:** 等待 PR #42 新一轮 CI；lint/check 均通过后再向用户报告可合并状态
 <!-- /pdca:gen -->
 
 ## Objective
