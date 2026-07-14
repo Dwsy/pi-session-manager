@@ -223,6 +223,47 @@ export function fitMapViewToLayout(
   };
 }
 
+export function zoomAtlasViewAtPointer(
+  view: MapView,
+  layout: TopologyLayout,
+  width: number,
+  height: number,
+  localX: number,
+  localY: number,
+  deltaY: number,
+): MapView {
+  const transform = createTransform(width, height, "atlas", view);
+  const worldPoint = transform.fromScreen(localX, localY);
+  const nextZoom = clamp(
+    view.zoom * Math.exp(-deltaY * 0.0016),
+    MIN_MAP_ZOOM,
+    MAX_MAP_ZOOM,
+  );
+  const nextWorldWidth = 1 / nextZoom;
+  const nextWorldHeight = 1 / nextZoom;
+  const ratioX = clamp(
+    (localX - transform.plotLeft) / Math.max(1, transform.plotWidth),
+    0,
+    1,
+  );
+  const ratioY = clamp(
+    (localY - transform.plotTop) / Math.max(1, transform.plotHeight),
+    0,
+    1,
+  );
+  const worldLeft = worldPoint.x - ratioX * nextWorldWidth;
+  const worldTop = worldPoint.y - ratioY * nextWorldHeight;
+
+  return clampView(
+    {
+      zoom: nextZoom,
+      centerX: worldLeft + nextWorldWidth / 2,
+      centerY: worldTop + nextWorldHeight / 2,
+    },
+    layout,
+  );
+}
+
 export function GlobalMapCanvas({
   model,
   activeLeafUid,
@@ -241,6 +282,13 @@ export function GlobalMapCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const size = useElementSize(stageRef);
   const renderCacheRef = useRef<RenderCache | null>(null);
+  const viewRef = useRef(view);
+  const wheelFrameRef = useRef<number | null>(null);
+  const pendingWheelRef = useRef<{
+    deltaY: number;
+    localX: number;
+    localY: number;
+  } | null>(null);
   const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -318,6 +366,10 @@ export function GlobalMapCanvas({
   const effectiveView = mode === "overview" ? overviewFitView : view;
 
   useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+
+  useEffect(() => {
     if (mode !== "atlas" || !focusUid || !onViewChange) return;
     const point = layout.pointByUid.get(focusUid);
     if (!point) return;
@@ -376,45 +428,50 @@ export function GlobalMapCanvas({
     if (!canvas || mode !== "atlas" || !onViewChange) return;
     const handleNativeWheel = (event: WheelEvent): void => {
       event.preventDefault();
-      const cache = renderCacheRef.current;
       const stage = stageRef.current;
-      if (!cache || !stage) return;
+      if (!stage) return;
+
       const rect = stage.getBoundingClientRect();
       const localX = event.clientX - rect.left;
       const localY = event.clientY - rect.top;
-      const worldPoint = cache.transform.fromScreen(localX, localY);
-      const factor = Math.exp(-event.deltaY * 0.0016);
-      const nextZoom = clamp(view.zoom * factor, MIN_MAP_ZOOM, MAX_MAP_ZOOM);
-      const nextWorldWidth = 1 / nextZoom;
-      const nextWorldHeight = 1 / nextZoom;
-      const ratioX = clamp(
-        (localX - cache.transform.plotLeft) /
-          Math.max(1, cache.transform.plotWidth),
-        0,
-        1,
-      );
-      const ratioY = clamp(
-        (localY - cache.transform.plotTop) /
-          Math.max(1, cache.transform.plotHeight),
-        0,
-        1,
-      );
-      const worldLeft = worldPoint.x - ratioX * nextWorldWidth;
-      const worldTop = worldPoint.y - ratioY * nextWorldHeight;
-      onViewChange(
-        clampView(
-          {
-            zoom: nextZoom,
-            centerX: worldLeft + nextWorldWidth / 2,
-            centerY: worldTop + nextWorldHeight / 2,
-          },
+      const pending = pendingWheelRef.current;
+      pendingWheelRef.current = {
+        deltaY: (pending?.deltaY ?? 0) + event.deltaY,
+        localX,
+        localY,
+      };
+      if (wheelFrameRef.current !== null) return;
+
+      wheelFrameRef.current = requestAnimationFrame(() => {
+        wheelFrameRef.current = null;
+        const wheel = pendingWheelRef.current;
+        pendingWheelRef.current = null;
+        if (!wheel) return;
+
+        const nextView = zoomAtlasViewAtPointer(
+          viewRef.current,
           layout,
-        ),
-      );
+          size.width,
+          size.height,
+          wheel.localX,
+          wheel.localY,
+          wheel.deltaY,
+        );
+        // Keep high-frequency trackpad events cumulative until React commits.
+        viewRef.current = nextView;
+        onViewChange(nextView);
+      });
     };
     canvas.addEventListener("wheel", handleNativeWheel, { passive: false });
-    return () => canvas.removeEventListener("wheel", handleNativeWheel);
-  }, [mode, onViewChange, layout, view.zoom, view.centerX, view.centerY]);
+    return () => {
+      canvas.removeEventListener("wheel", handleNativeWheel);
+      if (wheelFrameRef.current !== null) {
+        cancelAnimationFrame(wheelFrameRef.current);
+        wheelFrameRef.current = null;
+      }
+      pendingWheelRef.current = null;
+    };
+  }, [mode, onViewChange, layout, size.width, size.height]);
 
   function resolveTarget(event: {
     clientX: number;
@@ -1126,15 +1183,15 @@ function drawForks(
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
-    const spread = mapLayoutSpread(
-      transform,
-      state.mode,
-      state.settings.smartMapLayout,
+    const deltaY = to.y - from.y;
+    ctx.bezierCurveTo(
+      from.x,
+      from.y + deltaY * 0.56,
+      to.x,
+      to.y - deltaY * 0.56,
+      to.x,
+      to.y,
     );
-    const minBend = (state.mode === "atlas" ? 30 : 20) * spread;
-    const dy = Math.max(minBend, Math.abs(to.y - from.y));
-    const midY = from.y + dy * 0.58;
-    ctx.bezierCurveTo(from.x, midY, to.x, midY, to.x, to.y);
     ctx.stroke();
   }
 

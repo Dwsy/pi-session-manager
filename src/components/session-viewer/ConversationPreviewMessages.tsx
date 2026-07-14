@@ -360,7 +360,7 @@ function ConversationPreviewTurnView({
   );
 
   return (
-    <div className="space-y-2" data-entry-id={turn.id}>
+    <div className="conversation-preview-turn space-y-1.5" data-entry-id={turn.id}>
       {turn.userEntry && (
         <SessionEntryRenderer
           entry={turn.userEntry}
@@ -392,8 +392,8 @@ function ConversationPreviewTurnView({
       )}
 
       {expanded && foldableEntries.length > 0 && (
-        <div className="space-y-2">
-          <div className="sticky top-2 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-2">
+        <div className="conversation-preview-process space-y-1">
+          <div className="sticky top-2 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-1">
             <CollapsedProcessSummary
               entries={foldableEntries}
               expanded={expanded}
@@ -505,7 +505,7 @@ export default function ConversationPreviewMessages({
   };
 
   return (
-    <div className="space-y-4 px-1 py-2">
+    <div className="conversation-preview-messages space-y-3 px-1 py-1">
       {turns.map((turn) => (
         <ConversationPreviewTurnView
           key={turn.id}

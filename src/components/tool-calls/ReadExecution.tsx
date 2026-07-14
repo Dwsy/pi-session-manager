@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { escapeHtml, getLanguageFromPath } from '@/utils/markdown'
 import { shortenPath } from '@/utils/format'
@@ -33,16 +32,7 @@ export default function ReadExecution({
   const expanded = isToolExpanded(entryId)
 
   const lang = getLanguageFromPath(filePath)
-  const displayPath = isMobile ? shortenPath(filePath) : filePath
-  const desktopPathStyle: CSSProperties | undefined = isMobile
-    ? undefined
-    : {
-        overflow: 'visible',
-        textOverflow: 'clip',
-        whiteSpace: 'normal',
-        overflowWrap: 'anywhere',
-        wordBreak: 'break-word',
-      }
+  const displayPath = shortenPath(filePath, isMobile ? 42 : 56)
 
   let pathWithLines = displayPath
   if (offset !== undefined || limit !== undefined) {
@@ -72,7 +62,7 @@ export default function ReadExecution({
             Read
           </span>
         </div>
-        <span className="tool-path" style={desktopPathStyle}>{escapeHtml(pathWithLines)}</span>
+        <span className="tool-path" title={pathWithLines}>{escapeHtml(pathWithLines)}</span>
       </div>
 
       {images.length > 0 && (

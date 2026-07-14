@@ -150,3 +150,18 @@ export const ZoomOutIcon = (props: IconProps) => (
     <path d="m15.5 15.5 5 5M7 10.5h7" />
   </IconBase>
 );
+export const PlayIcon = (props: IconProps) => (
+  <IconBase {...props}>
+    <path d="m8 5 11 7-11 7z" />
+  </IconBase>
+);
+export const PauseIcon = (props: IconProps) => (
+  <IconBase {...props}>
+    <path d="M8 5v14M16 5v14" />
+  </IconBase>
+);
+export const StepIcon = (props: IconProps) => (
+  <IconBase {...props}>
+    <path d="m6 5 9 7-9 7zM18 5v14" />
+  </IconBase>
+);

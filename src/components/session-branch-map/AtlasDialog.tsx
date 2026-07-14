@@ -8,6 +8,7 @@ import type {
   SessionModel,
 } from "@/utils/session-branch";
 import {
+  buildBranchReplayCheckpoints,
   buildPath,
   buildSegmentPath,
   entryRelationLabel,
@@ -23,6 +24,9 @@ import {
   CloseIcon,
   ResetIcon,
   TargetIcon,
+  PlayIcon,
+  PauseIcon,
+  StepIcon,
   ZoomInIcon,
   ZoomOutIcon,
 } from "./Icons";
@@ -35,6 +39,7 @@ import {
   type MapView,
 } from "./GlobalMapCanvas";
 import { GlobalMapToolbar } from "./GlobalMapToolbar";
+import { useAtlasReplay } from "./useAtlasReplay";
 
 interface AtlasDialogProps {
   open: boolean;
@@ -86,6 +91,11 @@ export function AtlasDialog({
   const [focusUid, setFocusUid] = useState<string | null>(null);
   const [focusNonce, setFocusNonce] = useState(0);
   const [sidebarTab, setSidebarTab] = useState<AtlasTab>("branches");
+  const replayCheckpoints = useMemo(
+    () => buildBranchReplayCheckpoints(model, activeLeafUid),
+    [model, activeLeafUid],
+  );
+  const replay = useAtlasReplay(replayCheckpoints);
 
   const selectedNode = model.uidMap.get(selectedUid) ?? model.defaultLeaf;
   const selectedSegment = selectedNode.segment;
@@ -115,12 +125,23 @@ export function AtlasDialog({
   }, [open, model, fitView]);
 
   useEffect(() => {
+    if (!replay.started || !replay.current) return;
+    onSelectNode(replay.current.node.uid);
+    focus(replay.current.node.uid);
+  }, [onSelectNode, replay.current, replay.started]);
+
+  useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopImmediatePropagation();
         onClose();
+        return;
+      }
+      if (event.key === " ") {
+        event.preventDefault();
+        replay.playPause();
         return;
       }
       if (event.key.toLowerCase() === "f") focus(selectedUid);
@@ -137,7 +158,7 @@ export function AtlasDialog({
       document.body.style.overflow = previousOverflow;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, onClose, selectedUid]);
+  }, [open, onClose, selectedUid, replay]);
 
   if (!open) return null;
 
@@ -161,6 +182,7 @@ export function AtlasDialog({
   }
 
   function selectAndFocus(uid: string): void {
+    replay.stop();
     onSelectNode(uid);
     focus(uid);
   }
@@ -249,6 +271,68 @@ export function AtlasDialog({
             settings={settings}
             onSettingsChange={onSettingsChange}
           />
+          <div className="atlas-replay-controls" aria-label="分支回放">
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => replay.step(-1)}
+              disabled={!replay.index}
+              title="上一个回放节点"
+            >
+              <StepIcon style={{ transform: "scaleX(-1)" }} />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={replay.playPause}
+              disabled={!replayCheckpoints.length}
+              title={replay.playing ? "暂停回放 (Space)" : "播放回放 (Space)"}
+            >
+              {replay.playing ? <PauseIcon /> : <PlayIcon />}
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => replay.step(1)}
+              disabled={replay.index >= replay.lastIndex}
+              title="下一个回放节点"
+            >
+              <StepIcon />
+            </button>
+            <input
+              type="range"
+              min="0"
+              max={replay.lastIndex}
+              value={replay.index}
+              onChange={(event) => replay.seek(Number(event.target.value))}
+              aria-label="回放进度"
+            />
+            <select
+              className="replay-speed"
+              value={replay.speed}
+              onChange={(event) =>
+                replay.setSpeed(
+                  Number(event.target.value) as typeof replay.speed,
+                )
+              }
+              aria-label="回放速度"
+            >
+              {[1, 2, 4, 8, 16, 32, 64, 128].map((speed) => (
+                <option key={speed} value={speed}>
+                  {speed}×
+                </option>
+              ))}
+            </select>
+            <span className="replay-progress">
+              {replay.index + 1}/{Math.max(1, replayCheckpoints.length)}
+            </span>
+            {replay.current?.fork && (
+              <span className="replay-fork">
+                {replay.current.fork.code} ·{" "}
+                {replay.current.fork.children.length} routes
+              </span>
+            )}
+          </div>
           <div className="atlas-view-readout">
             <span>{Math.round(view.zoom * 100)}%</span>
             <span>{scopeLabel(settings.scope)}</span>

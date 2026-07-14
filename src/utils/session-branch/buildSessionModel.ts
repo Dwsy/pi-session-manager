@@ -705,13 +705,15 @@ function buildBranchStructure(
     }),
   );
   const forkByAnchorUid = new Map(forks.map((fork) => [fork.anchor.uid, fork]));
-  const terminalSegments = segments
-    .filter((segment) => segment.terminal)
-    .sort(
-      (a, b) =>
-        (a.leaf?.fileIndex ?? a.end.fileIndex) -
-        (b.leaf?.fileIndex ?? b.end.fileIndex),
-    );
+  const terminalSegments: BranchSegment[] = [];
+  const collectTerminalSegments = (segment: BranchSegment): void => {
+    if (segment.terminal) {
+      terminalSegments.push(segment);
+      return;
+    }
+    segment.children.forEach(collectTerminalSegments);
+  };
+  rootSegments.forEach(collectTerminalSegments);
 
   return {
     segments,

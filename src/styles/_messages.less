@@ -263,7 +263,7 @@
   align-items: center;
   gap: 0.4em;
   padding: var(--line-height);
-  color: var(--thinkingText);
+  color: var(--text);
   font-style: italic;
   font-size: 0.85em;
 }
@@ -284,6 +284,46 @@
 
 .thinking-block:not(.expanded) .thinking-collapsed {
   display: flex;
+}
+
+.assistant-direct-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-viewer .assistant-direct-tools .tool-execution {
+  margin: 0;
+}
+
+.session-viewer .thinking-collapsed {
+  padding: 8px 18px;
+  gap: 0.35em;
+  font-size: 0.8em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-viewer .thinking-block + .thinking-block {
+  margin-top: -4px;
+}
+
+.session-viewer .assistant-direct-tools + .thinking-block .thinking-collapsed,
+.session-viewer .assistant-direct-tools + .thinking-block .thinking-text {
+  padding-top: 4px;
+}
+
+.session-viewer .thinking-block + .assistant-text {
+  padding-top: 4px;
+}
+
+.session-viewer .conversation-preview-process .tool-execution {
+  margin: 0;
+}
+
+.session-viewer .conversation-preview-process .thinking-block:not(.expanded) .thinking-collapsed {
+  padding: 8px 12px;
 }
 
 // Ultra-compact markdown styles for thinking blocks

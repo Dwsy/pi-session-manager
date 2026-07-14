@@ -11,6 +11,11 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
+.session-viewer .tool-execution {
+  margin: 0;
+  border-radius: 6px;
+}
+
 .tool-execution > .message-timestamp {
   padding-left: 12px;
   padding-top: 8px;
@@ -133,7 +138,7 @@ html.tool-call-style-disabled {
     monospace
   );
   font-size: calc(var(--font-size-base, 16px) * 0.625);
-  color: rgb(var(--color-muted-foreground));
+  color: var(--text);
   // background: rgba(var(--accent-rgb), 0.06);
   // border: 1px solid rgba(var(--accent-rgb), 0.1);
   border-radius: 4px;
@@ -144,11 +149,9 @@ html.tool-call-style-disabled {
   white-space: nowrap;
   flex: 1;
   cursor: inherit;
-  opacity: 0.85;
 }
 
 .tool-header:hover .tool-generic-args-preview {
-  opacity: 1;
   border-color: rgba(var(--accent-rgb), 0.2);
 }
 

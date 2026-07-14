@@ -4,6 +4,7 @@ import type { SessionEntry } from "@/types";
 import { parseSessionEntriesWithLineCount } from "@/utils/session";
 
 import {
+  buildBranchReplayCheckpoints,
   buildEffectiveContext,
   buildPath,
   buildSessionBranchModel,
@@ -52,6 +53,40 @@ describe("session branch model", () => {
       "left-b",
       "right-b",
     ]);
+  });
+
+  it("builds replay beats for the active branch without traversing alternates", () => {
+    const model = buildSessionBranchModel(branchedEntries());
+    const leaf = model.firstById.get("left-b")!;
+    const checkpoints = buildBranchReplayCheckpoints(model, leaf.uid);
+
+    expect(checkpoints.map((checkpoint) => checkpoint.node.id)).toEqual([
+      "root",
+      "left-a",
+      "left-b",
+    ]);
+    expect(checkpoints[0]?.fork?.anchor.id).toBe("root");
+    expect(checkpoints.at(-1)?.kind).toBe("end");
+  });
+
+  it("orders child branch lanes by branch creation instead of terminal completion", () => {
+    const model = buildSessionBranchModel([
+      message("root", "user", "Start"),
+      message("a", "assistant", "Early branch", "root"),
+      message("b", "assistant", "Later branch", "root"),
+      message("c", "user", "Early branch completes later", "a"),
+    ]);
+    const layout = buildTopologyLayout(model, "sequence");
+    const earlyTail = model.firstById.get("c")!;
+    const late = model.firstById.get("b")!;
+
+    expect(model.terminalSegments.map((segment) => segment.end.id)).toEqual([
+      "c",
+      "b",
+    ]);
+    expect(layout.pointByUid.get(earlyTail.uid)!.x).toBeLessThan(
+      layout.pointByUid.get(late.uid)!.x,
+    );
   });
 
   it("draws connectors only for real forks", () => {

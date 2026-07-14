@@ -138,14 +138,23 @@ export function useAppBootstrap({
 
   useEffect(() => {
     const handleGlobalSelectAll = (event: KeyboardEvent) => {
+      const target = event.target;
+      const isTextEntry =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+
       if (
-        (event.metaKey || event.ctrlKey) &&
-        !event.altKey &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === "a"
+        isTextEntry ||
+        !(event.metaKey || event.ctrlKey) ||
+        event.altKey ||
+        event.shiftKey ||
+        event.key.toLowerCase() !== "a"
       ) {
-        event.preventDefault();
+        return;
       }
+
+      event.preventDefault();
     };
 
     window.addEventListener("keydown", handleGlobalSelectAll, { capture: true });

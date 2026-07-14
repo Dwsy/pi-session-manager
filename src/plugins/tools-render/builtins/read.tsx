@@ -5,7 +5,6 @@ import { escapeHtml, getLanguageFromPath, renderCodeHtml } from '@/utils/markdow
 import { shortenPath } from '@/utils/format'
 import CodeBlock from '@/components/ui/CodeBlock'
 import { useTranslation } from 'react-i18next'
-import type { CSSProperties } from 'react'
 
 /** Maximum height for tool output in pixels */
 const OUTPUT_MAX_HEIGHT = 450
@@ -28,17 +27,7 @@ function ReadExecution({
   const limit = args.limit
 
   const lang = getLanguageFromPath(filePath)
-  const displayPath = isMobile ? shortenPath(filePath) : filePath
-
-  const desktopPathStyle: CSSProperties | undefined = isMobile
-    ? undefined
-    : {
-        overflow: 'visible',
-        textOverflow: 'clip',
-        whiteSpace: 'normal',
-        overflowWrap: 'anywhere',
-        wordBreak: 'break-word',
-      }
+  const displayPath = shortenPath(filePath, isMobile ? 42 : 56)
 
   let pathWithLines = displayPath
   if (offset !== undefined || limit !== undefined) {
@@ -68,7 +57,7 @@ function ReadExecution({
             Read
           </span>
         </div>
-        <span className="tool-path" style={desktopPathStyle}>{escapeHtml(pathWithLines)}</span>
+        <span className="tool-path" title={pathWithLines}>{escapeHtml(pathWithLines)}</span>
       </div>
 
       {images && images.length > 0 && (
