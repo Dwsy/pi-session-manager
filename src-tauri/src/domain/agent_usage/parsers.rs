@@ -8,22 +8,8 @@ pub struct ParsedUsage {
 }
 
 pub fn parse_claude_rows(payload: &Value) -> ParsedUsage {
-    let plan_name = first_string(
-        payload,
-        &[
-            &["plan", "display_name"],
-            &["plan", "name"],
-            &["plan_name"],
-            &["planName"],
-            &["subscription", "plan"],
-        ],
-    );
-    let specs = [
-        ("five_hour", "5h"),
-        ("seven_day", "7d"),
-        ("seven_day_sonnet", "7d Sonnet"),
-        ("seven_day_omelette", "7d Omelette"),
-    ];
+    let plan_name = first_string(payload, &[&["plan", "display_name"], &["plan", "name"], &["plan_name"], &["planName"], &["subscription", "plan"]]);
+    let specs = [("five_hour", "5h"), ("seven_day", "7d"), ("seven_day_sonnet", "7d Sonnet"), ("seven_day_omelette", "7d Omelette")];
     let mut rows = Vec::new();
     for (key, label) in specs {
         let Some(window) = payload.get(key) else { continue };
@@ -32,29 +18,13 @@ pub fn parse_claude_rows(payload: &Value) -> ParsedUsage {
         if value.is_none() && reset_at.is_none() {
             continue;
         }
-        rows.push(metric(
-            label,
-            value,
-            reset_at,
-            value.map(|v| format!("{v:.1}% used")),
-        ));
+        rows.push(metric(label, value, reset_at, value.map(|v| format!("{v:.1}% used"))));
     }
     ParsedUsage { plan_name, rows }
 }
 
 pub fn parse_codex_rows(payload: &Value) -> ParsedUsage {
-    let raw_plan = first_string(
-        payload,
-        &[
-            &["plan_type"],
-            &["planType"],
-            &["account", "plan"],
-            &["plan"],
-            &["plan_name"],
-            &["planName"],
-        ],
-    )
-    .unwrap_or_default();
+    let raw_plan = first_string(payload, &[&["plan_type"], &["planType"], &["account", "plan"], &["plan"], &["plan_name"], &["planName"]]).unwrap_or_default();
     let plan_name = match raw_plan.to_ascii_lowercase().as_str() {
         "prolite" => Some("Pro 5x".to_string()),
         "pro" => Some("Pro 20x".to_string()),
@@ -70,59 +40,26 @@ pub fn parse_codex_rows(payload: &Value) -> ParsedUsage {
         if let Some(row) = row_for_window(rate_limit.get("secondary_window"), "7d") {
             rows.push(row);
         }
-        if let Some(row) = row_for_window(
-            payload
-                .pointer("/code_review_rate_limit/primary_window"),
-            "Reviews",
-        ) {
+        if let Some(row) = row_for_window(payload.pointer("/code_review_rate_limit/primary_window"), "Reviews") {
             rows.push(row);
         }
         return ParsedUsage { plan_name, rows };
     }
 
-    ParsedUsage {
-        plan_name,
-        rows: parse_generic_windows(
-            payload,
-            &[
-                ("monthly", "Monthly"),
-                ("daily", "Daily"),
-                ("hourly", "Hourly"),
-                ("current_billing_period", "Billing"),
-            ],
-        ),
-    }
+    ParsedUsage { plan_name, rows: parse_generic_windows(payload, &[("monthly", "Monthly"), ("daily", "Daily"), ("hourly", "Hourly"), ("current_billing_period", "Billing")]) }
 }
 
 pub fn parse_amp_rows(payload: &Value) -> ParsedUsage {
-    let plan_name = first_string(
-        payload,
-        &[
-            &["plan"],
-            &["plan_name"],
-            &["planName"],
-            &["subscription", "plan"],
-            &["product", "name"],
-        ],
-    );
-    let text = first_string(payload, &[&["result", "displayText"], &["result", "display_text"]])
-        .unwrap_or_default();
+    let plan_name = first_string(payload, &[&["plan"], &["plan_name"], &["planName"], &["subscription", "plan"], &["product", "name"]]);
+    let text = first_string(payload, &[&["result", "displayText"], &["result", "display_text"]]).unwrap_or_default();
     if text.is_empty() {
         return ParsedUsage { plan_name, rows: Vec::new() };
     }
 
     let mut rows = Vec::new();
-    if let Some((remaining, total)) = capture_two_numbers(
-        &text,
-        r"\$([0-9]+(?:\.[0-9]+)?)\s*/\s*\$([0-9]+(?:\.[0-9]+)?)\s*remaining",
-    ) {
+    if let Some((remaining, total)) = capture_two_numbers(&text, r"\$([0-9]+(?:\.[0-9]+)?)\s*/\s*\$([0-9]+(?:\.[0-9]+)?)\s*remaining") {
         let used = (total - remaining).max(0.0);
-        rows.push(metric(
-            "Free balance",
-            percent(used, total),
-            None,
-            Some(format!("{used:.2}/{total:.2}")),
-        ));
+        rows.push(metric("Free balance", percent(used, total), None, Some(format!("{used:.2}/{total:.2}"))));
     }
     if let Some(credits) = capture_one_number(&text, r"Individual credits:\s*\$([0-9]+(?:\.[0-9]+)?)\s*remaining") {
         rows.push(metric("Credits", None, None, Some(format!("${credits:.2}"))));
@@ -131,23 +68,10 @@ pub fn parse_amp_rows(payload: &Value) -> ParsedUsage {
 }
 
 pub fn parse_antigravity_rows(payload: &Value) -> ParsedUsage {
-    let groups = payload
-        .pointer("/response/groups")
-        .or_else(|| payload.get("groups"))
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    let buckets: Vec<Value> = groups
-        .into_iter()
-        .flat_map(|group| group.get("buckets").and_then(Value::as_array).cloned().unwrap_or_default())
-        .collect();
+    let groups = payload.pointer("/response/groups").or_else(|| payload.get("groups")).and_then(Value::as_array).cloned().unwrap_or_default();
+    let buckets: Vec<Value> = groups.into_iter().flat_map(|group| group.get("buckets").and_then(Value::as_array).cloned().unwrap_or_default()).collect();
 
-    let specs = [
-        ("gemini-5h", "Session"),
-        ("gemini-weekly", "Weekly"),
-        ("3p-5h", "Claude"),
-        ("3p-weekly", "Claude Weekly"),
-    ];
+    let specs = [("gemini-5h", "Session"), ("gemini-weekly", "Weekly"), ("3p-5h", "Claude"), ("3p-weekly", "Claude Weekly")];
     let mut rows = Vec::new();
     for (bucket_id, label) in specs {
         let Some(bucket) = buckets.iter().find(|item| item.get("bucketId").and_then(Value::as_str) == Some(bucket_id)) else {
@@ -155,28 +79,13 @@ pub fn parse_antigravity_rows(payload: &Value) -> ParsedUsage {
         };
         let Some(remaining) = number_or_null(bucket.get("remainingFraction")) else { continue };
         let used = ((1.0 - remaining) * 100.0).clamp(0.0, 100.0);
-        rows.push(metric(
-            label,
-            Some(used.round()),
-            first_date(bucket, &["resetTime", "resetAt", "reset_at"]),
-            Some(format!("{used:.0}/100")),
-        ));
+        rows.push(metric(label, Some(used.round()), first_date(bucket, &["resetTime", "resetAt", "reset_at"]), Some(format!("{used:.0}/100"))));
     }
     ParsedUsage { plan_name: None, rows }
 }
 
 pub fn parse_copilot_rows(payload: &Value) -> ParsedUsage {
-    let plan_name = first_string(
-        payload,
-        &[
-            &["copilot_plan"],
-            &["plan"],
-            &["plan_name"],
-            &["planName"],
-            &["product", "name"],
-            &["subscription", "plan"],
-        ],
-    );
+    let plan_name = first_string(payload, &[&["copilot_plan"], &["plan"], &["plan_name"], &["planName"], &["product", "name"], &["subscription", "plan"]]);
     let quota_reset_at = first_date(payload, &["quota_reset_date"]);
     let limited_reset_at = first_date(payload, &["limited_user_reset_date"]);
     let reset_at = quota_reset_at.clone().or(limited_reset_at.clone());
@@ -202,21 +111,14 @@ pub fn parse_copilot_rows(payload: &Value) -> ParsedUsage {
         }
     }
 
-    if let (Some(lq), Some(mq), Some(reset)) = (
-        payload.get("limited_user_quotas"),
-        payload.get("monthly_quotas"),
-        limited_reset_at,
-    ) {
+    if let (Some(lq), Some(mq), Some(reset)) = (payload.get("limited_user_quotas"), payload.get("monthly_quotas"), limited_reset_at) {
         if let (Some(chat_remaining), Some(chat_total)) = (first_number(lq, &["chat"]), first_number(mq, &["chat"])) {
             if chat_total > 0.0 {
                 let used = (chat_total - chat_remaining).max(0.0);
                 rows.push(metric("Chat", percent(used, chat_total), Some(reset.clone()), Some(format!("{used:.0}/{chat_total:.0}"))));
             }
         }
-        if let (Some(comp_remaining), Some(comp_total)) = (
-            first_number(lq, &["completions"]),
-            first_number(mq, &["completions"]),
-        ) {
+        if let (Some(comp_remaining), Some(comp_total)) = (first_number(lq, &["completions"]), first_number(mq, &["completions"])) {
             if comp_total > 0.0 {
                 let used = (comp_total - comp_remaining).max(0.0);
                 rows.push(metric("Completions", percent(used, comp_total), Some(reset), Some(format!("{used:.0}/{comp_total:.0}"))));
@@ -239,42 +141,22 @@ pub fn parse_devin_rows(payload: &Value) -> ParsedUsage {
     if let Some(daily_remaining) = number_or_null(plan_status.get("dailyQuotaRemainingPercent")) {
         if !hide_daily {
             let used = (100.0 - daily_remaining).clamp(0.0, 100.0);
-            rows.push(metric(
-                "Daily quota",
-                Some(used),
-                unix_seconds_date(plan_status.get("dailyQuotaResetAtUnix")),
-                Some(format!("{used:.0}/100")),
-            ));
+            rows.push(metric("Daily quota", Some(used), unix_seconds_date(plan_status.get("dailyQuotaResetAtUnix")), Some(format!("{used:.0}/100"))));
         }
     }
 
     if let Some(weekly_remaining) = number_or_null(plan_status.get("weeklyQuotaRemainingPercent")) {
         let used = (100.0 - weekly_remaining).clamp(0.0, 100.0);
-        rows.push(metric(
-            "Weekly quota",
-            Some(used),
-            unix_seconds_date(plan_status.get("weeklyQuotaResetAtUnix")),
-            Some(format!("{used:.0}/100")),
-        ));
+        rows.push(metric("Weekly quota", Some(used), unix_seconds_date(plan_status.get("weeklyQuotaResetAtUnix")), Some(format!("{used:.0}/100"))));
     } else if hide_daily {
         if let Some(daily_remaining) = number_or_null(plan_status.get("dailyQuotaRemainingPercent")) {
             let used = (100.0 - daily_remaining).clamp(0.0, 100.0);
-            rows.push(metric(
-                "Weekly quota",
-                Some(used),
-                unix_seconds_date(plan_status.get("weeklyQuotaResetAtUnix")),
-                Some(format!("{used:.0}/100")),
-            ));
+            rows.push(metric("Weekly quota", Some(used), unix_seconds_date(plan_status.get("weeklyQuotaResetAtUnix")), Some(format!("{used:.0}/100"))));
         }
     }
 
     if let Some(overage) = number_or_null(plan_status.get("overageBalanceMicros")) {
-        rows.push(metric(
-            "Extra usage balance",
-            None,
-            None,
-            Some(format!("${:.2}", overage.max(0.0) / 1_000_000.0)),
-        ));
+        rows.push(metric("Extra usage balance", None, None, Some(format!("${:.2}", overage.max(0.0) / 1_000_000.0))));
     }
 
     ParsedUsage { plan_name, rows }
@@ -313,8 +195,7 @@ pub fn parse_kimi_rows(payload: &Value) -> ParsedUsage {
 
     candidates.sort_by(|a, b| a.1.unwrap_or(f64::INFINITY).partial_cmp(&b.1.unwrap_or(f64::INFINITY)).unwrap_or(std::cmp::Ordering::Equal));
     let session = candidates.first().cloned();
-    let weekly = parse_quota(data.get("usage").unwrap_or(&Value::Null))
-        .or_else(|| candidates.get(1).map(|(quota, _)| quota.clone()));
+    let weekly = parse_quota(data.get("usage").unwrap_or(&Value::Null)).or_else(|| candidates.get(1).map(|(quota, _)| quota.clone()));
 
     let mut rows = Vec::new();
     if let Some((ref quota, period)) = session {
@@ -329,10 +210,7 @@ pub fn parse_kimi_rows(payload: &Value) -> ParsedUsage {
 }
 
 pub fn parse_factory_rows(payload: &Value) -> ParsedUsage {
-    let plan_name = first_string(
-        payload,
-        &[&["plan_name"], &["planName"], &["usage", "plan_name"], &["usage", "planName"]],
-    );
+    let plan_name = first_string(payload, &[&["plan_name"], &["planName"], &["usage", "plan_name"], &["usage", "planName"]]);
     let Some(usage) = payload.get("usage") else {
         return ParsedUsage { plan_name, rows: Vec::new() };
     };
@@ -356,19 +234,9 @@ pub fn parse_openrouter_credits_rows(payload: &Value) -> Vec<AgentUsageMetric> {
     let total_credits = number_or_null(data.get("total_credits")).unwrap_or(0.0).max(0.0);
     let mut rows = Vec::new();
     if total_credits > 0.0 {
-        rows.push(metric(
-            "Credits",
-            percent(used, total_credits),
-            None,
-            Some(format!("{used:.2}/{total_credits:.2}")),
-        ));
+        rows.push(metric("Credits", percent(used, total_credits), None, Some(format!("{used:.2}/{total_credits:.2}"))));
     }
-    rows.push(metric(
-        "Balance",
-        None,
-        None,
-        Some(format!("${:.2}", (total_credits - used).max(0.0))),
-    ));
+    rows.push(metric("Balance", None, None, Some(format!("${:.2}", (total_credits - used).max(0.0)))));
     rows
 }
 
@@ -381,129 +249,37 @@ pub fn parse_openrouter_key_rows(payload: &Value) -> ParsedUsage {
     if let Some(limit) = number_or_null(data.get("limit")) {
         if limit > 0.0 {
             let used = number_or_null(data.get("usage")).unwrap_or(0.0).max(0.0);
-            rows.push(metric(
-                "Key Limit",
-                percent(used, limit),
-                None,
-                Some(format!("{used:.2}/{limit:.2}")),
-            ));
+            rows.push(metric("Key Limit", percent(used, limit), None, Some(format!("{used:.2}/{limit:.2}"))));
         }
     }
-    let plan_name = data.get("is_free_tier").and_then(Value::as_bool).map(|free| {
-        if free {
-            "Free tier".to_string()
-        } else {
-            "Pay as you go".to_string()
-        }
-    });
+    let plan_name = data.get("is_free_tier").and_then(Value::as_bool).map(|free| if free { "Free tier".to_string() } else { "Pay as you go".to_string() });
     ParsedUsage { plan_name, rows }
 }
 
 pub fn parse_minimax_rows(payload: &Value) -> ParsedUsage {
-    let plan_name = first_string(
-        payload,
-        &[
-            &["data", "plan_name"],
-            &["data", "planName"],
-            &["data", "result", "plan_name"],
-            &["data", "result", "planName"],
-        ],
-    );
-    let candidates = [
-        payload,
-        payload.get("data").unwrap_or(&Value::Null),
-        payload.pointer("/data/result").unwrap_or(&Value::Null),
-        payload.get("result").unwrap_or(&Value::Null),
-    ];
+    let plan_name = first_string(payload, &[&["data", "plan_name"], &["data", "planName"], &["data", "result", "plan_name"], &["data", "result", "planName"]]);
+    let candidates = [payload, payload.get("data").unwrap_or(&Value::Null), payload.pointer("/data/result").unwrap_or(&Value::Null), payload.get("result").unwrap_or(&Value::Null)];
     for candidate in candidates {
-        let remains = candidate
-            .get("model_remains")
-            .or_else(|| candidate.get("modelRemains"))
-            .and_then(Value::as_array);
+        let remains = candidate.get("model_remains").or_else(|| candidate.get("modelRemains")).and_then(Value::as_array);
         let Some(remains) = remains else { continue };
         if remains.is_empty() {
             continue;
         }
-        let selected = remains
-            .iter()
-            .find(|item| {
-                first_number(
-                    item,
-                    &[
-                        "current_interval_total_count",
-                        "currentIntervalTotalCount",
-                        "total",
-                        "limit",
-                    ],
-                )
-                .unwrap_or(0.0)
-                    > 0.0
-            })
-            .unwrap_or(&remains[0]);
-        if let Some((used, total)) = parse_limit(
-            selected,
-            &[
-                "current_interval_total_count",
-                "currentIntervalTotalCount",
-                "total",
-                "limit",
-            ],
-            &[
-                "current_interval_remaining_count",
-                "currentIntervalRemainingCount",
-                "remaining",
-                "remains",
-            ],
-        ) {
+        let selected = remains.iter().find(|item| first_number(item, &["current_interval_total_count", "currentIntervalTotalCount", "total", "limit"]).unwrap_or(0.0) > 0.0).unwrap_or(&remains[0]);
+        if let Some((used, total)) = parse_limit(selected, &["current_interval_total_count", "currentIntervalTotalCount", "total", "limit"], &["current_interval_remaining_count", "currentIntervalRemainingCount", "remaining", "remains"]) {
             let reset_at = first_date(selected, &["end_time", "endTime", "reset_at", "resetAt"]);
-            return ParsedUsage {
-                plan_name,
-                rows: vec![metric(
-                    "Session",
-                    percent(used, total),
-                    reset_at,
-                    Some(format!("{used:.0}/{total:.0}")),
-                )],
-            };
+            return ParsedUsage { plan_name, rows: vec![metric("Session", percent(used, total), reset_at, Some(format!("{used:.0}/{total:.0}")))] };
         }
     }
-    ParsedUsage {
-        plan_name,
-        rows: parse_generic_windows(
-            payload,
-            &[("monthly", "Monthly"), ("daily", "Daily"), ("requests", "Requests")],
-        ),
-    }
+    ParsedUsage { plan_name, rows: parse_generic_windows(payload, &[("monthly", "Monthly"), ("daily", "Daily"), ("requests", "Requests")]) }
 }
 
 pub fn parse_zai_rows(payload: &Value, plan_name: Option<String>) -> ParsedUsage {
-    let limits = payload
-        .pointer("/data/limits")
-        .or_else(|| payload.get("limits"))
-        .or_else(|| payload.get("data"))
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    let token_limits: Vec<&Value> = limits
-        .iter()
-        .filter(|item| upper_string(item, &["limitType", "type", "name"]) == "TOKENS_LIMIT")
-        .collect();
-    let session = token_limits
-        .iter()
-        .find(|item| item.get("unit").and_then(Value::as_i64) == Some(3) || window_text(item).contains('5'))
-        .or_else(|| token_limits.first())
-        .copied();
-    let weekly = token_limits
-        .iter()
-        .find(|item| {
-            item.get("unit").and_then(Value::as_i64) == Some(6)
-                || window_text(item).contains('7')
-                || window_text(item).contains("WEEK")
-        })
-        .copied();
-    let mcp = limits
-        .iter()
-        .find(|item| upper_string(item, &["limitType", "type", "name"]) == "TIME_LIMIT");
+    let limits = payload.pointer("/data/limits").or_else(|| payload.get("limits")).or_else(|| payload.get("data")).and_then(Value::as_array).cloned().unwrap_or_default();
+    let token_limits: Vec<&Value> = limits.iter().filter(|item| upper_string(item, &["limitType", "type", "name"]) == "TOKENS_LIMIT").collect();
+    let session = token_limits.iter().find(|item| item.get("unit").and_then(Value::as_i64) == Some(3) || window_text(item).contains('5')).or_else(|| token_limits.first()).copied();
+    let weekly = token_limits.iter().find(|item| item.get("unit").and_then(Value::as_i64) == Some(6) || window_text(item).contains('7') || window_text(item).contains("WEEK")).copied();
+    let mcp = limits.iter().find(|item| upper_string(item, &["limitType", "type", "name"]) == "TIME_LIMIT");
 
     let mut rows = Vec::new();
     if let Some(session) = session {
@@ -527,12 +303,7 @@ pub fn parse_zai_rows(payload: &Value, plan_name: Option<String>) -> ParsedUsage
 }
 
 pub fn parse_zai_plan_name(payload: &Value) -> Option<String> {
-    payload
-        .get("data")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .find_map(|item| first_string(item, &[&["productName"], &["product_name"], &["name"]]))
+    payload.get("data").and_then(Value::as_array).into_iter().flatten().find_map(|item| first_string(item, &[&["productName"], &["product_name"], &["name"]]))
 }
 
 pub fn parse_grok_rows(payload: &Value) -> ParsedUsage {
@@ -550,39 +321,17 @@ pub fn parse_grok_rows(payload: &Value) -> ParsedUsage {
         if period_type == "USAGE_PERIOD_TYPE_WEEKLY" {
             let remaining_percent = number_or_null(config.get("creditUsagePercent")).unwrap_or(100.0).clamp(0.0, 100.0);
             let used_percent = 100.0 - remaining_percent;
-            rows.push(metric(
-                "Weekly limit",
-                Some(used_percent.clamp(0.0, 100.0)),
-                period_end,
-                Some(format!("{used_percent:.1}% used")),
-            ));
+            rows.push(metric("Weekly limit", Some(used_percent.clamp(0.0, 100.0)), period_end, Some(format!("{used_percent:.1}% used"))));
         }
         let on_demand_cap = number_or_null(config.pointer("/onDemandCap/val")).unwrap_or(0.0);
-        rows.push(metric(
-            "Pay as you go",
-            None,
-            None,
-            Some(if on_demand_cap > 0.0 {
-                format!("{on_demand_cap:.0} cap")
-            } else {
-                "Disabled".to_string()
-            }),
-        ));
+        rows.push(metric("Pay as you go", None, None, Some(if on_demand_cap > 0.0 { format!("{on_demand_cap:.0} cap") } else { "Disabled".to_string() })));
         return ParsedUsage { plan_name: None, rows };
     }
 
     let used = number_or_null(config.pointer("/used/val"));
     let limit = number_or_null(config.pointer("/monthlyLimit/val"));
     match (used, limit) {
-        (Some(used), Some(limit)) if limit > 0.0 => ParsedUsage {
-            plan_name: None,
-            rows: vec![metric(
-                "Credits",
-                percent(used, limit),
-                first_date(config, &["billingPeriodEnd"]),
-                Some(format!("{used:.0} / {limit:.0} units")),
-            )],
-        },
+        (Some(used), Some(limit)) if limit > 0.0 => ParsedUsage { plan_name: None, rows: vec![metric("Credits", percent(used, limit), first_date(config, &["billingPeriodEnd"]), Some(format!("{used:.0} / {limit:.0} units")))] },
         _ => ParsedUsage::default(),
     }
 }
@@ -600,15 +349,7 @@ pub fn parse_cursor_rows(payload: &Value) -> ParsedUsage {
     }
     let total_spend = number_or_null(plan_usage.get("totalSpend")).unwrap_or(0.0);
     let pct = first_number(plan_usage, &["totalPercentUsed"]).unwrap_or_else(|| ((total_spend / limit) * 100.0).clamp(0.0, 100.0));
-    ParsedUsage {
-        plan_name,
-        rows: vec![metric(
-            "Monthly",
-            Some(pct),
-            first_date(payload, &["billingCycleEnd"]),
-            Some(format!("${:.2} / ${:.2}", total_spend / 100.0, limit / 100.0)),
-        )],
-    }
+    ParsedUsage { plan_name, rows: vec![metric("Monthly", Some(pct), first_date(payload, &["billingCycleEnd"]), Some(format!("${:.2} / ${:.2}", total_spend / 100.0, limit / 100.0)))] }
 }
 
 pub fn parse_opencode_go_rows(rows: &[(i64, f64)], now_ms: i64) -> Vec<AgentUsageMetric> {
@@ -627,37 +368,14 @@ pub fn parse_opencode_go_rows(rows: &[(i64, f64)], now_ms: i64) -> Vec<AgentUsag
     let session_reset = next_rolling_reset(rows, now_ms, FIVE_HOURS_MS);
 
     vec![
-        metric(
-            "Session",
-            percent(session_cost, SESSION_LIMIT),
-            Some(chrono::DateTime::from_timestamp_millis(session_reset).map(|dt| dt.to_rfc3339()).unwrap_or_default()),
-            Some(format!("{session_cost:.2} / {SESSION_LIMIT} credits")),
-        ),
-        metric(
-            "Weekly",
-            percent(weekly_cost, WEEKLY_LIMIT),
-            Some(chrono::DateTime::from_timestamp_millis(weekly_start + WEEK_MS).map(|dt| dt.to_rfc3339()).unwrap_or_default()),
-            Some(format!("{weekly_cost:.2} / {WEEKLY_LIMIT} credits")),
-        ),
-        metric(
-            "Monthly",
-            percent(monthly_cost, MONTHLY_LIMIT),
-            Some(chrono::DateTime::from_timestamp_millis(monthly_end).map(|dt| dt.to_rfc3339()).unwrap_or_default()),
-            Some(format!("{monthly_cost:.2} / {MONTHLY_LIMIT} credits")),
-        ),
+        metric("Session", percent(session_cost, SESSION_LIMIT), Some(chrono::DateTime::from_timestamp_millis(session_reset).map(|dt| dt.to_rfc3339()).unwrap_or_default()), Some(format!("{session_cost:.2} / {SESSION_LIMIT} credits"))),
+        metric("Weekly", percent(weekly_cost, WEEKLY_LIMIT), Some(chrono::DateTime::from_timestamp_millis(weekly_start + WEEK_MS).map(|dt| dt.to_rfc3339()).unwrap_or_default()), Some(format!("{weekly_cost:.2} / {WEEKLY_LIMIT} credits"))),
+        metric("Monthly", percent(monthly_cost, MONTHLY_LIMIT), Some(chrono::DateTime::from_timestamp_millis(monthly_end).map(|dt| dt.to_rfc3339()).unwrap_or_default()), Some(format!("{monthly_cost:.2} / {MONTHLY_LIMIT} credits"))),
     ]
 }
 
 fn metric(label: &str, used_percent: Option<f64>, reset_at: Option<String>, detail: Option<String>) -> AgentUsageMetric {
-    AgentUsageMetric {
-        label: label.to_string(),
-        used_percent,
-        reset_at: reset_at.filter(|value| !value.is_empty()),
-        detail,
-        remaining: None,
-        limit: None,
-        unit: None,
-    }
+    AgentUsageMetric { label: label.to_string(), used_percent, reset_at: reset_at.filter(|value| !value.is_empty()), detail, remaining: None, limit: None, unit: None }
 }
 
 fn row_for_window(window: Option<&Value>, fallback_label: &str) -> Option<AgentUsageMetric> {
@@ -693,24 +411,14 @@ fn factory_bucket_row(label: &str, bucket: Option<&Value>, reset_at: Option<Stri
     if limit <= 0.0 {
         return None;
     }
-    let used = first_number(
-        bucket,
-        &["orgTotalTokensUsed", "org_total_tokens_used", "tokensUsed", "tokens_used", "used"],
-    )
-    .unwrap_or(0.0);
-    Some(metric(
-        label,
-        percent(used, limit),
-        reset_at,
-        Some(format!("{used:.0} / {limit:.0} tokens")),
-    ))
+    let used = first_number(bucket, &["orgTotalTokensUsed", "org_total_tokens_used", "tokensUsed", "tokens_used", "used"]).unwrap_or(0.0);
+    Some(metric(label, percent(used, limit), reset_at, Some(format!("{used:.0} / {limit:.0} tokens"))))
 }
 
 fn parse_limit(item: &Value, total_keys: &[&str], remaining_keys: &[&str]) -> Option<(f64, f64)> {
     let total = first_number(item, total_keys)?;
     let remaining = first_number(item, remaining_keys);
-    let used = first_number(item, &["used_count", "current_interval_used_count", "currentIntervalUsedCount", "used"])
-        .or_else(|| remaining.map(|value| total - value));
+    let used = first_number(item, &["used_count", "current_interval_used_count", "currentIntervalUsedCount", "used"]).or_else(|| remaining.map(|value| total - value));
     let used = used?;
     if total <= 0.0 {
         return None;
@@ -733,11 +441,7 @@ fn parse_quota(item: &Value) -> Option<Quota> {
     let direct_used = first_number(item, &["used", "current"]);
     let remaining = first_number(item, &["remaining", "remains", "left"]);
     let used = direct_used.or_else(|| remaining.map(|value| (limit - value).max(0.0)))?;
-    Some(Quota {
-        used: used.min(limit),
-        limit,
-        reset_at: first_date(item, &["resetTime", "reset_at", "resetAt", "reset_time"]),
-    })
+    Some(Quota { used: used.min(limit), limit, reset_at: first_date(item, &["resetTime", "reset_at", "resetAt", "reset_time"]) })
 }
 
 fn quota_row(label: &str, quota: &Quota, _period_secs: Option<f64>) -> AgentUsageMetric {
@@ -764,12 +468,7 @@ fn parse_window_secs(window: Option<&Value>) -> Option<f64> {
 
 fn zai_quota_row(label: &str, item: &Value) -> Option<AgentUsageMetric> {
     let (used, total) = parse_limit(item, &["limit", "total", "max"], &["remaining", "remains", "left"])?;
-    Some(metric(
-        label,
-        percent(used, total),
-        first_date(item, &["resetTime", "reset_at", "resetAt", "endTime", "end_time"]),
-        Some(format!("{used:.0}/{total:.0}")),
-    ))
+    Some(metric(label, percent(used, total), first_date(item, &["resetTime", "reset_at", "resetAt", "endTime", "end_time"]), Some(format!("{used:.0}/{total:.0}"))))
 }
 
 fn append_currency_value(rows: &mut Vec<AgentUsageMetric>, label: &str, value: Option<&Value>) {
@@ -849,10 +548,7 @@ fn first_date(value: &Value, keys: &[&str]) -> Option<String> {
                     return Some(chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc).to_rfc3339());
                 }
                 if let Ok(dt) = chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d") {
-                    return Some(
-                        chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt.and_hms_opt(0, 0, 0)?, chrono::Utc)
-                            .to_rfc3339(),
-                    );
+                    return Some(chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt.and_hms_opt(0, 0, 0)?, chrono::Utc).to_rfc3339());
                 }
             }
             if let Some(secs) = raw.as_i64() {
@@ -952,30 +648,15 @@ fn days_in_utc_month(year: i32, month: u32) -> u32 {
 fn start_of_anchor_month(now_ms: i64, anchor_ms: Option<i64>) -> (i64, i64) {
     let now = chrono::DateTime::from_timestamp_millis(now_ms).unwrap_or_else(chrono::Utc::now);
     let Some(anchor_ms) = anchor_ms else {
-        let start = chrono::NaiveDate::from_ymd_opt(now.year(), now.month(), 1)
-            .and_then(|d| d.and_hms_opt(0, 0, 0))
-            .map(|dt| dt.and_utc().timestamp_millis())
-            .unwrap_or(now_ms);
-        let end = if now.month() == 12 {
-            chrono::NaiveDate::from_ymd_opt(now.year() + 1, 1, 1)
-        } else {
-            chrono::NaiveDate::from_ymd_opt(now.year(), now.month() + 1, 1)
-        }
-        .and_then(|d| d.and_hms_opt(0, 0, 0))
-        .map(|dt| dt.and_utc().timestamp_millis())
-        .unwrap_or(now_ms);
+        let start = chrono::NaiveDate::from_ymd_opt(now.year(), now.month(), 1).and_then(|d| d.and_hms_opt(0, 0, 0)).map(|dt| dt.and_utc().timestamp_millis()).unwrap_or(now_ms);
+        let end = if now.month() == 12 { chrono::NaiveDate::from_ymd_opt(now.year() + 1, 1, 1) } else { chrono::NaiveDate::from_ymd_opt(now.year(), now.month() + 1, 1) }.and_then(|d| d.and_hms_opt(0, 0, 0)).map(|dt| dt.and_utc().timestamp_millis()).unwrap_or(now_ms);
         return (start, end);
     };
-    let anchor_day = chrono::DateTime::from_timestamp_millis(anchor_ms)
-        .map(|dt| dt.day())
-        .unwrap_or(1);
+    let anchor_day = chrono::DateTime::from_timestamp_millis(anchor_ms).map(|dt| dt.day()).unwrap_or(1);
     let mut year = now.year();
     let mut month = now.month();
     let mut day = anchor_day.min(days_in_utc_month(year, month));
-    let mut start = chrono::NaiveDate::from_ymd_opt(year, month, day)
-        .and_then(|d| d.and_hms_opt(0, 0, 0))
-        .map(|dt| dt.and_utc().timestamp_millis())
-        .unwrap_or(now_ms);
+    let mut start = chrono::NaiveDate::from_ymd_opt(year, month, day).and_then(|d| d.and_hms_opt(0, 0, 0)).map(|dt| dt.and_utc().timestamp_millis()).unwrap_or(now_ms);
     if start > now_ms {
         if month == 1 {
             month = 12;
@@ -984,16 +665,10 @@ fn start_of_anchor_month(now_ms: i64, anchor_ms: Option<i64>) -> (i64, i64) {
             month -= 1;
         }
         day = anchor_day.min(days_in_utc_month(year, month));
-        start = chrono::NaiveDate::from_ymd_opt(year, month, day)
-            .and_then(|d| d.and_hms_opt(0, 0, 0))
-            .map(|dt| dt.and_utc().timestamp_millis())
-            .unwrap_or(now_ms);
+        start = chrono::NaiveDate::from_ymd_opt(year, month, day).and_then(|d| d.and_hms_opt(0, 0, 0)).map(|dt| dt.and_utc().timestamp_millis()).unwrap_or(now_ms);
     }
     let (end_year, end_month) = if month == 12 { (year + 1, 1) } else { (year, month + 1) };
-    let end = chrono::NaiveDate::from_ymd_opt(end_year, end_month, anchor_day.min(days_in_utc_month(end_year, end_month)))
-        .and_then(|d| d.and_hms_opt(0, 0, 0))
-        .map(|dt| dt.and_utc().timestamp_millis())
-        .unwrap_or(now_ms);
+    let end = chrono::NaiveDate::from_ymd_opt(end_year, end_month, anchor_day.min(days_in_utc_month(end_year, end_month))).and_then(|d| d.and_hms_opt(0, 0, 0)).map(|dt| dt.and_utc().timestamp_millis()).unwrap_or(now_ms);
     (start, end)
 }
 
@@ -1016,9 +691,7 @@ mod regex_lite {
 
     impl Regex {
         pub fn new(pattern: &str) -> Result<Self, ()> {
-            Ok(Self {
-                pattern: pattern.to_string(),
-            })
+            Ok(Self { pattern: pattern.to_string() })
         }
 
         pub fn captures<'a>(&self, text: &'a str) -> Option<Captures<'a>> {
@@ -1030,10 +703,7 @@ mod regex_lite {
                 let dollar = rest.find('$')?;
                 let after = &rest[dollar + 1..];
                 let number = take_number(after)?;
-                return Some(Captures {
-                    groups: vec![number],
-                    _marker: std::marker::PhantomData,
-                });
+                return Some(Captures { groups: vec![number], _marker: std::marker::PhantomData });
             }
 
             // $a / $b remaining
@@ -1053,10 +723,7 @@ mod regex_lite {
                 let second = take_number(second_src)?;
                 let after_second = &second_src[second.len()..];
                 if after_second.to_ascii_lowercase().contains("remaining") {
-                    return Some(Captures {
-                        groups: vec![first, second],
-                        _marker: std::marker::PhantomData,
-                    });
+                    return Some(Captures { groups: vec![first, second], _marker: std::marker::PhantomData });
                 }
             }
             None

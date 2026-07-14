@@ -363,13 +363,7 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             Ok(Value::Null)
         }
         "get_agent_usage_status" => {
-            let provider_ids = payload
-                .get("providerIds")
-                .or_else(|| payload.get("provider_ids"))
-                .cloned()
-                .map(serde_json::from_value)
-                .transpose()
-                .map_err(|e| format!("Invalid providerIds: {e}"))?;
+            let provider_ids = payload.get("providerIds").or_else(|| payload.get("provider_ids")).cloned().map(serde_json::from_value).transpose().map_err(|e| format!("Invalid providerIds: {e}"))?;
             let result = crate::get_agent_usage_status_command(provider_ids).await?;
             Ok(to_val(result, "serialize agent usage status")?)
         }

@@ -6,9 +6,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{json, Map, Value};
 
-use crate::domain::casr_min::model::{
-    parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall,
-};
+use crate::domain::casr_min::model::{parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall};
 
 pub fn session_roots() -> Vec<PathBuf> {
     let base = base_root();
@@ -29,9 +27,7 @@ pub fn matches_path(path: &Path) -> bool {
 
 pub fn is_transcript_path(path: &Path) -> bool {
     let normalized = path.to_string_lossy().replace('\\', "/");
-    path.file_name().and_then(|value| value.to_str()) == Some("transcript.jsonl")
-        && normalized.contains("/.system_generated/logs/")
-        && (normalized.contains("/.gemini/antigravity-cli/") || normalized.contains("/antigravity-cli/"))
+    path.file_name().and_then(|value| value.to_str()) == Some("transcript.jsonl") && normalized.contains("/.system_generated/logs/") && (normalized.contains("/.gemini/antigravity-cli/") || normalized.contains("/antigravity-cli/"))
 }
 
 pub fn resume_command(session_id: &str) -> String {
@@ -86,30 +82,11 @@ pub fn read_session_from_str(path: &Path, content: &str) -> Result<CanonicalSess
     }
     reindex_messages(&mut messages);
 
-    let session_id = conversation_uuid_from_path(path).unwrap_or_else(|| {
-        path.file_stem()
-            .and_then(|stem| stem.to_str())
-            .unwrap_or("unknown")
-            .to_string()
-    });
+    let session_id = conversation_uuid_from_path(path).unwrap_or_else(|| path.file_stem().and_then(|stem| stem.to_str()).unwrap_or("unknown").to_string());
     let model_name = detect_model(&records);
-    let title = messages
-        .iter()
-        .find(|message| message.role == MessageRole::User)
-        .map(|message| truncate_title(&message.content, 100));
+    let title = messages.iter().find(|message| message.role == MessageRole::User).map(|message| truncate_title(&message.content, 100));
 
-    Ok(CanonicalSession {
-        session_id,
-        provider_slug: "antigravity".to_string(),
-        workspace: None,
-        title,
-        started_at,
-        ended_at,
-        messages,
-        metadata: json!({ "source": "antigravity", "model": model_name }),
-        source_path: path.to_path_buf(),
-        model_name,
-    })
+    Ok(CanonicalSession { session_id, provider_slug: "antigravity".to_string(), workspace: None, title, started_at, ended_at, messages, metadata: json!({ "source": "antigravity", "model": model_name }), source_path: path.to_path_buf(), model_name })
 }
 
 pub fn render_session(session: &CanonicalSession, _target_session_id: &str) -> Result<String, String> {
@@ -179,11 +156,7 @@ fn extract_user_request(content: &str) -> (String, Option<String>, Option<String
     let requests = extract_tagged_blocks(content, "USER_REQUEST");
     let settings = extract_tagged_blocks(content, "USER_SETTINGS_CHANGE").into_iter().next();
     let metadata = extract_tagged_blocks(content, "ADDITIONAL_METADATA").into_iter().next();
-    let body = if requests.is_empty() {
-        content.trim().to_string()
-    } else {
-        requests.join("\n\n")
-    };
+    let body = if requests.is_empty() { content.trim().to_string() } else { requests.join("\n\n") };
     (body, settings, metadata)
 }
 
@@ -220,27 +193,12 @@ fn detect_model(records: &[Value]) -> Option<String> {
 fn parse_tool_calls(tool_calls: Option<&Value>, step_type: &str) -> Vec<ToolCall> {
     let synthesized_name = step_type.to_ascii_lowercase();
     let Some(arr) = tool_calls.and_then(Value::as_array).filter(|a| !a.is_empty()) else {
-        return vec![ToolCall {
-            id: None,
-            name: synthesized_name,
-            arguments: Value::Null,
-        }];
+        return vec![ToolCall { id: None, name: synthesized_name, arguments: Value::Null }];
     };
     arr.iter()
         .map(|tc| {
-            let name = tc
-                .get("name")
-                .or_else(|| tc.get("tool_name"))
-                .or_else(|| tc.pointer("/function/name"))
-                .and_then(Value::as_str)
-                .filter(|s| !s.trim().is_empty())
-                .map_or_else(|| synthesized_name.clone(), String::from);
-            let call_id = tc
-                .get("id")
-                .or_else(|| tc.get("call_id"))
-                .or_else(|| tc.get("tool_call_id"))
-                .and_then(Value::as_str)
-                .map(String::from);
+            let name = tc.get("name").or_else(|| tc.get("tool_name")).or_else(|| tc.pointer("/function/name")).and_then(Value::as_str).filter(|s| !s.trim().is_empty()).map_or_else(|| synthesized_name.clone(), String::from);
+            let call_id = tc.get("id").or_else(|| tc.get("call_id")).or_else(|| tc.get("tool_call_id")).and_then(Value::as_str).map(String::from);
             let arguments = tc
                 .get("arguments")
                 .or_else(|| tc.get("args"))
@@ -252,11 +210,7 @@ fn parse_tool_calls(tool_calls: Option<&Value>, step_type: &str) -> Vec<ToolCall
                     other => other,
                 })
                 .unwrap_or(Value::Null);
-            ToolCall {
-                id: call_id,
-                name,
-                arguments,
-            }
+            ToolCall { id: call_id, name, arguments }
         })
         .collect()
 }
@@ -266,12 +220,7 @@ fn record_to_message(rec: &Value) -> Option<CanonicalMessage> {
     let step_type = rec.get("type").and_then(Value::as_str).unwrap_or("");
     let created = rec.get("created_at").and_then(parse_timestamp);
     let content = rec.get("content").and_then(Value::as_str).unwrap_or("").to_string();
-    let thinking = rec
-        .get("thinking")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(String::from);
+    let thinking = rec.get("thinking").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()).map(String::from);
     let tool_calls = rec.get("tool_calls").filter(|v| v.is_array());
 
     match step_type {
@@ -287,16 +236,7 @@ fn record_to_message(rec: &Value) -> Option<CanonicalMessage> {
             if let Some(m) = metadata {
                 extra.insert("additional_metadata".to_string(), Value::String(m));
             }
-            Some(CanonicalMessage {
-                idx: 0,
-                role: MessageRole::User,
-                content: body,
-                timestamp: created,
-                author: None,
-                tool_calls: Vec::new(),
-                tool_results: Vec::new(),
-                extra: Value::Object(extra),
-            })
+            Some(CanonicalMessage { idx: 0, role: MessageRole::User, content: body, timestamp: created, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) })
         }
         "PLANNER_RESPONSE" => {
             if content.trim().is_empty() && thinking.is_none() {
@@ -306,16 +246,7 @@ fn record_to_message(rec: &Value) -> Option<CanonicalMessage> {
             if let Some(t) = thinking {
                 extra.insert("thinking".to_string(), Value::String(t));
             }
-            Some(CanonicalMessage {
-                idx: 0,
-                role: MessageRole::Assistant,
-                content,
-                timestamp: created,
-                author: None,
-                tool_calls: Vec::new(),
-                tool_results: Vec::new(),
-                extra: Value::Object(extra),
-            })
+            Some(CanonicalMessage { idx: 0, role: MessageRole::Assistant, content, timestamp: created, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) })
         }
         "CONVERSATION_HISTORY" => None,
         "EPHEMERAL_MESSAGE" | "SYSTEM_MESSAGE" => {
@@ -325,16 +256,7 @@ fn record_to_message(rec: &Value) -> Option<CanonicalMessage> {
             let mut extra = Map::new();
             extra.insert("agy_type".to_string(), Value::String(step_type.to_string()));
             let author = if step_type == "EPHEMERAL_MESSAGE" { "ephemeral" } else { "system" };
-            Some(CanonicalMessage {
-                idx: 0,
-                role: MessageRole::System,
-                content,
-                timestamp: created,
-                author: Some(author.to_string()),
-                tool_calls: Vec::new(),
-                tool_results: Vec::new(),
-                extra: Value::Object(extra),
-            })
+            Some(CanonicalMessage { idx: 0, role: MessageRole::System, content, timestamp: created, author: Some(author.to_string()), tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) })
         }
         _ => {
             if source == "MODEL" {
@@ -347,16 +269,7 @@ fn record_to_message(rec: &Value) -> Option<CanonicalMessage> {
                 if let Some(t) = thinking {
                     extra.insert("thinking".to_string(), Value::String(t));
                 }
-                Some(CanonicalMessage {
-                    idx: 0,
-                    role: MessageRole::Tool,
-                    content,
-                    timestamp: created,
-                    author: Some(step_type.to_ascii_lowercase()),
-                    tool_calls,
-                    tool_results: Vec::new(),
-                    extra: Value::Object(extra),
-                })
+                Some(CanonicalMessage { idx: 0, role: MessageRole::Tool, content, timestamp: created, author: Some(step_type.to_ascii_lowercase()), tool_calls, tool_results: Vec::new(), extra: Value::Object(extra) })
             } else {
                 if content.trim().is_empty() {
                     return None;
@@ -366,16 +279,7 @@ fn record_to_message(rec: &Value) -> Option<CanonicalMessage> {
                 if !source.is_empty() {
                     extra.insert("agy_source".to_string(), Value::String(source.to_string()));
                 }
-                Some(CanonicalMessage {
-                    idx: 0,
-                    role: MessageRole::System,
-                    content,
-                    timestamp: created,
-                    author: None,
-                    tool_calls: Vec::new(),
-                    tool_results: Vec::new(),
-                    extra: Value::Object(extra),
-                })
+                Some(CanonicalMessage { idx: 0, role: MessageRole::System, content, timestamp: created, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) })
             }
         }
     }

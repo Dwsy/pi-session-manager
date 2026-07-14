@@ -1,16 +1,10 @@
-use super::credentials::{
-    env_var, first_string, home_dir, json_string, parse_toml_string, read_json, read_keychain, read_sqlite_map,
-    read_sqlite_query, read_text, unwrap_go_keyring,
-};
+use super::credentials::{env_var, first_string, home_dir, json_string, parse_toml_string, read_json, read_keychain, read_sqlite_map, read_sqlite_query, read_text, unwrap_go_keyring};
 use super::http::{http_json, HttpError, HttpRequest};
 use super::parsers::{
-    parse_amp_rows, parse_antigravity_rows, parse_claude_rows, parse_codex_rows, parse_copilot_rows, parse_cursor_rows,
-    parse_devin_rows, parse_factory_rows, parse_grok_rows, parse_kimi_rows, parse_minimax_rows, parse_opencode_go_rows,
-    parse_openrouter_credits_rows, parse_openrouter_key_rows, parse_zai_plan_name, parse_zai_rows, ParsedUsage,
+    parse_amp_rows, parse_antigravity_rows, parse_claude_rows, parse_codex_rows, parse_copilot_rows, parse_cursor_rows, parse_devin_rows, parse_factory_rows, parse_grok_rows, parse_kimi_rows, parse_minimax_rows, parse_opencode_go_rows, parse_openrouter_credits_rows, parse_openrouter_key_rows,
+    parse_zai_plan_name, parse_zai_rows, ParsedUsage,
 };
-use super::types::{
-    available_snapshot, error_snapshot, provider_meta, unavailable, AgentUsageMetric, AgentUsageProvider, PROVIDER_CATALOG,
-};
+use super::types::{available_snapshot, error_snapshot, provider_meta, unavailable, AgentUsageMetric, AgentUsageProvider, PROVIDER_CATALOG};
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -31,10 +25,7 @@ pub async fn fetch_all_providers(allowed: Option<&HashSet<String>>) -> Vec<Agent
     for handle in handles {
         match handle.await {
             Ok(provider) => providers.push(provider),
-            Err(error) => providers.push(error_snapshot(
-                provider_meta("claude").unwrap_or(&PROVIDER_CATALOG[0]),
-                format!("Provider task failed: {error}"),
-            )),
+            Err(error) => providers.push(error_snapshot(provider_meta("claude").unwrap_or(&PROVIDER_CATALOG[0]), format!("Provider task failed: {error}"))),
         }
     }
     providers.sort_by(|a, b| a.id.cmp(&b.id));
@@ -44,17 +35,7 @@ pub async fn fetch_all_providers(allowed: Option<&HashSet<String>>) -> Vec<Agent
 async fn fetch_provider(id: &str) -> AgentUsageProvider {
     let meta = match provider_meta(id) {
         Some(meta) => meta,
-        None => {
-            return AgentUsageProvider {
-                id: id.to_string(),
-                name: id.to_string(),
-                plan_name: None,
-                fetched_at: chrono::Utc::now().to_rfc3339(),
-                state: super::types::AgentUsageState::Error,
-                message: Some("Unknown provider".to_string()),
-                metrics: Vec::new(),
-            }
-        }
+        None => return AgentUsageProvider { id: id.to_string(), name: id.to_string(), plan_name: None, fetched_at: chrono::Utc::now().to_rfc3339(), state: super::types::AgentUsageState::Error, message: Some("Unknown provider".to_string()), metrics: Vec::new() },
     };
 
     match id {
@@ -76,13 +57,7 @@ async fn fetch_provider(id: &str) -> AgentUsageProvider {
     }
 }
 
-async fn fetch_with_token(
-    meta: &super::types::ProviderMeta,
-    token: Option<String>,
-    unauthenticated: &str,
-    request: impl FnOnce(&str) -> HttpRequest,
-    parse: impl FnOnce(&Value) -> ParsedUsage,
-) -> AgentUsageProvider {
+async fn fetch_with_token(meta: &super::types::ProviderMeta, token: Option<String>, unauthenticated: &str, request: impl FnOnce(&str) -> HttpRequest, parse: impl FnOnce(&Value) -> ParsedUsage) -> AgentUsageProvider {
     let Some(token) = token.filter(|value| !value.is_empty()) else {
         return unavailable(meta, unauthenticated);
     };
@@ -140,9 +115,7 @@ async fn fetch_claude(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
 
 fn read_claude_tokens() -> Vec<String> {
     let mut tokens = Vec::new();
-    if let Some(raw) = read_keychain("Claude Code-credentials", env_var("USER").as_deref())
-        .or_else(|| read_keychain("Claude Code-credentials", None))
-    {
+    if let Some(raw) = read_keychain("Claude Code-credentials", env_var("USER").as_deref()).or_else(|| read_keychain("Claude Code-credentials", None)) {
         if let Ok(payload) = serde_json::from_str::<Value>(&raw) {
             if let Some(token) = json_string(&payload, &["claudeAiOauth", "accessToken"]) {
                 tokens.push(token);
@@ -178,19 +151,11 @@ async fn fetch_codex(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
         token,
         "Sign in to Codex",
         |token| {
-            let mut headers = vec![
-                ("Authorization".to_string(), format!("Bearer {token}")),
-                ("Accept".to_string(), "application/json".to_string()),
-            ];
+            let mut headers = vec![("Authorization".to_string(), format!("Bearer {token}")), ("Accept".to_string(), "application/json".to_string())];
             if let Some(account_id) = &account_id {
                 headers.push(("ChatGPT-Account-Id".to_string(), account_id.clone()));
             }
-            HttpRequest {
-                url: "https://chatgpt.com/backend-api/wham/usage".to_string(),
-                method: "GET".to_string(),
-                headers,
-                body: None,
-            }
+            HttpRequest { url: "https://chatgpt.com/backend-api/wham/usage".to_string(), method: "GET".to_string(), headers, body: None }
         },
         parse_codex_rows,
     )
@@ -202,11 +167,7 @@ fn read_codex_auth() -> Option<(String, Option<String>)> {
         return Some((token, env_var("CODEX_ACCOUNT_ID")));
     }
     let home = home_dir()?;
-    let candidates = [
-        env_var("CODEX_HOME").map(|dir| PathBuf::from(dir).join("auth.json")),
-        Some(home.join(".config/codex/auth.json")),
-        Some(home.join(".codex/auth.json")),
-    ];
+    let candidates = [env_var("CODEX_HOME").map(|dir| PathBuf::from(dir).join("auth.json")), Some(home.join(".config/codex/auth.json")), Some(home.join(".codex/auth.json"))];
     for path in candidates.into_iter().flatten() {
         if let Some(payload) = read_json(path) {
             if let Some(token) = json_string(&payload, &["tokens", "access_token"]) {
@@ -220,12 +181,7 @@ fn read_codex_auth() -> Option<(String, Option<String>)> {
 async fn fetch_amp(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
     let home = home_dir();
     let secrets = home.as_ref().and_then(|home| read_json(home.join(".local/share/amp/secrets.json")));
-    let token = first_string([
-        env_var("AMP_API_KEY"),
-        secrets.as_ref().and_then(|payload| json_string(payload, &["apiKey@https://ampcode.com/"])),
-        secrets.as_ref().and_then(|payload| json_string(payload, &["apiKey"])),
-        secrets.as_ref().and_then(|payload| json_string(payload, &["token"])),
-    ]);
+    let token = first_string([env_var("AMP_API_KEY"), secrets.as_ref().and_then(|payload| json_string(payload, &["apiKey@https://ampcode.com/"])), secrets.as_ref().and_then(|payload| json_string(payload, &["apiKey"])), secrets.as_ref().and_then(|payload| json_string(payload, &["token"]))]);
     fetch_with_token(
         meta,
         token,
@@ -233,11 +189,7 @@ async fn fetch_amp(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
         |token| HttpRequest {
             url: "https://ampcode.com/api/internal".to_string(),
             method: "POST".to_string(),
-            headers: vec![
-                ("Authorization".to_string(), format!("Bearer {token}")),
-                ("Content-Type".to_string(), "application/json".to_string()),
-                ("Accept".to_string(), "application/json".to_string()),
-            ],
+            headers: vec![("Authorization".to_string(), format!("Bearer {token}")), ("Content-Type".to_string(), "application/json".to_string()), ("Accept".to_string(), "application/json".to_string())],
             body: Some(json!({ "method": "userDisplayBalanceInfo", "params": {} })),
         },
         parse_amp_rows,
@@ -248,45 +200,19 @@ async fn fetch_amp(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
 async fn fetch_copilot(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
     let home = home_dir();
     let hosts = home.as_ref().and_then(|home| read_json(home.join(".config/github-copilot/hosts.json")));
-    let hosts_token = hosts.as_ref().and_then(|payload| {
-        payload.as_object().and_then(|map| {
-            map.values().find_map(|host| {
-                json_string(host, &["oauth_token"])
-                    .or_else(|| json_string(host, &["token"]))
-                    .or_else(|| json_string(host, &["github_token"]))
-            })
-        })
-    });
+    let hosts_token = hosts.as_ref().and_then(|payload| payload.as_object().and_then(|map| map.values().find_map(|host| json_string(host, &["oauth_token"]).or_else(|| json_string(host, &["token"])).or_else(|| json_string(host, &["github_token"])))));
     let gh_token = home.as_ref().and_then(|home| read_text(home.join(".config/gh/hosts.yml"))).and_then(|text| {
         text.lines().find_map(|line| {
             let trimmed = line.trim();
-            trimmed
-                .strip_prefix("oauth_token:")
-                .map(|value| value.trim().trim_matches(['\'', '"']).to_string())
-                .filter(|value| !value.is_empty())
+            trimmed.strip_prefix("oauth_token:").map(|value| value.trim().trim_matches(['\'', '"']).to_string()).filter(|value| !value.is_empty())
         })
     });
-    let token = first_string([
-        env_var("COPILOT_GITHUB_TOKEN"),
-        env_var("GH_TOKEN"),
-        env_var("GITHUB_TOKEN"),
-        hosts_token,
-        gh_token,
-        read_keychain("github.com", None),
-    ]);
+    let token = first_string([env_var("COPILOT_GITHUB_TOKEN"), env_var("GH_TOKEN"), env_var("GITHUB_TOKEN"), hosts_token, gh_token, read_keychain("github.com", None)]);
     fetch_with_token(
         meta,
         token,
         "Sign in to Copilot",
-        |token| HttpRequest {
-            url: "https://api.github.com/copilot_internal/user".to_string(),
-            method: "GET".to_string(),
-            headers: vec![
-                ("Authorization".to_string(), format!("token {token}")),
-                ("Accept".to_string(), "application/json".to_string()),
-            ],
-            body: None,
-        },
+        |token| HttpRequest { url: "https://api.github.com/copilot_internal/user".to_string(), method: "GET".to_string(), headers: vec![("Authorization".to_string(), format!("token {token}")), ("Accept".to_string(), "application/json".to_string())], body: None },
         parse_copilot_rows,
     )
     .await
@@ -303,11 +229,7 @@ async fn fetch_cursor(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
         |token| HttpRequest {
             url: "https://api2.cursor.sh/aiserver.v1.DashboardService/GetCurrentPeriodUsage".to_string(),
             method: "POST".to_string(),
-            headers: vec![
-                ("Authorization".to_string(), format!("Bearer {token}")),
-                ("Content-Type".to_string(), "application/json".to_string()),
-                ("Connect-Protocol-Version".to_string(), "1".to_string()),
-            ],
+            headers: vec![("Authorization".to_string(), format!("Bearer {token}")), ("Content-Type".to_string(), "application/json".to_string()), ("Connect-Protocol-Version".to_string(), "1".to_string())],
             body: Some(json!({})),
         },
         parse_cursor_rows,
@@ -324,19 +246,9 @@ fn read_cursor_credentials() -> Option<(String, Option<String>)> {
         return Some((token, None));
     }
     let home = home_dir()?;
-    let db_paths = [
-        home.join("Library/Application Support/Cursor/User/globalStorage/state.vscdb"),
-        home.join(".config/Cursor/User/globalStorage/state.vscdb"),
-    ];
+    let db_paths = [home.join("Library/Application Support/Cursor/User/globalStorage/state.vscdb"), home.join(".config/Cursor/User/globalStorage/state.vscdb")];
     for db_path in db_paths {
-        if let Some(map) = read_sqlite_map(
-            &db_path,
-            &[
-                "cursorAuth/accessToken",
-                "cursorAuth/refreshToken",
-                "cursorAuth/stripeMembershipType",
-            ],
-        ) {
+        if let Some(map) = read_sqlite_map(&db_path, &["cursorAuth/accessToken", "cursorAuth/refreshToken", "cursorAuth/stripeMembershipType"]) {
             if let Some(token) = map.get("cursorAuth/accessToken").cloned() {
                 return Some((token, map.get("cursorAuth/stripeMembershipType").cloned()));
             }
@@ -352,10 +264,7 @@ async fn fetch_devin(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
     match http_json(HttpRequest {
         url: format!("{api_server}/exa.seat_management_pb.SeatManagementService/GetUserStatus"),
         method: "POST".to_string(),
-        headers: vec![
-            ("Content-Type".to_string(), "application/json".to_string()),
-            ("Connect-Protocol-Version".to_string(), "1".to_string()),
-        ],
+        headers: vec![("Content-Type".to_string(), "application/json".to_string()), ("Connect-Protocol-Version".to_string(), "1".to_string())],
         body: Some(json!({
             "metadata": {
                 "apiKey": api_key,
@@ -388,9 +297,7 @@ fn read_devin_credentials() -> Option<(String, String)> {
     let home = home_dir()?;
     if let Some(text) = read_text(home.join(".local/share/devin/credentials.toml")) {
         if let Some(key) = parse_toml_string(&text, "windsurf_api_key") {
-            let server = parse_toml_string(&text, "api_server_url")
-                .filter(|value| value.starts_with("https://"))
-                .unwrap_or_else(|| "https://server.codeium.com".to_string());
+            let server = parse_toml_string(&text, "api_server_url").filter(|value| value.starts_with("https://")).unwrap_or_else(|| "https://server.codeium.com".to_string());
             return Some((key, server.trim_end_matches('/').to_string()));
         }
     }
@@ -423,11 +330,7 @@ async fn fetch_factory(meta: &super::types::ProviderMeta) -> AgentUsageProvider 
         |token| HttpRequest {
             url: "https://api.factory.ai/api/organization/subscription/usage".to_string(),
             method: "POST".to_string(),
-            headers: vec![
-                ("Authorization".to_string(), format!("Bearer {token}")),
-                ("Accept".to_string(), "application/json".to_string()),
-                ("Content-Type".to_string(), "application/json".to_string()),
-            ],
+            headers: vec![("Authorization".to_string(), format!("Bearer {token}")), ("Accept".to_string(), "application/json".to_string()), ("Content-Type".to_string(), "application/json".to_string())],
             body: Some(json!({})),
         },
         parse_factory_rows,
@@ -452,12 +355,7 @@ fn token_from_credential_raw(raw: &str) -> Option<String> {
         return None;
     }
     if let Ok(payload) = serde_json::from_str::<Value>(trimmed) {
-        return first_string([
-            json_string(&payload, &["tokens", "access_token"]),
-            json_string(&payload, &["tokens", "accessToken"]),
-            json_string(&payload, &["access_token"]),
-            json_string(&payload, &["accessToken"]),
-        ]);
+        return first_string([json_string(&payload, &["tokens", "access_token"]), json_string(&payload, &["tokens", "accessToken"]), json_string(&payload, &["access_token"]), json_string(&payload, &["accessToken"])]);
     }
     if trimmed.split('.').count() >= 3 {
         Some(trimmed.to_string())
@@ -473,11 +371,7 @@ async fn fetch_grok(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
     match http_json(HttpRequest {
         url: "https://cli-chat-proxy.grok.com/v1/billing?format=credits".to_string(),
         method: "GET".to_string(),
-        headers: vec![
-            ("Authorization".to_string(), format!("Bearer {token}")),
-            ("X-XAI-Token-Auth".to_string(), "xai-grok-cli".to_string()),
-            ("Accept".to_string(), "application/json".to_string()),
-        ],
+        headers: vec![("Authorization".to_string(), format!("Bearer {token}")), ("X-XAI-Token-Auth".to_string(), "xai-grok-cli".to_string()), ("Accept".to_string(), "application/json".to_string())],
         body: None,
     })
     .await
@@ -490,11 +384,7 @@ async fn fetch_grok(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
                 let plan_name = http_json(HttpRequest {
                     url: "https://cli-chat-proxy.grok.com/v1/settings".to_string(),
                     method: "GET".to_string(),
-                    headers: vec![
-                        ("Authorization".to_string(), format!("Bearer {token}")),
-                        ("X-XAI-Token-Auth".to_string(), "xai-grok-cli".to_string()),
-                        ("Accept".to_string(), "application/json".to_string()),
-                    ],
+                    headers: vec![("Authorization".to_string(), format!("Bearer {token}")), ("X-XAI-Token-Auth".to_string(), "xai-grok-cli".to_string()), ("Accept".to_string(), "application/json".to_string())],
                     body: None,
                 })
                 .await
@@ -527,27 +417,8 @@ async fn fetch_openrouter(meta: &super::types::ProviderMeta) -> AgentUsageProvid
     let Some(api_key) = read_openrouter_key() else {
         return unavailable(meta, "Set OPENROUTER_API_KEY");
     };
-    let credits = http_json(HttpRequest {
-        url: "https://openrouter.ai/api/v1/credits".to_string(),
-        method: "GET".to_string(),
-        headers: vec![
-            ("Authorization".to_string(), format!("Bearer {api_key}")),
-            ("Accept".to_string(), "application/json".to_string()),
-        ],
-        body: None,
-    })
-    .await;
-    let key = http_json(HttpRequest {
-        url: "https://openrouter.ai/api/v1/key".to_string(),
-        method: "GET".to_string(),
-        headers: vec![
-            ("Authorization".to_string(), format!("Bearer {api_key}")),
-            ("Accept".to_string(), "application/json".to_string()),
-        ],
-        body: None,
-    })
-    .await
-    .ok();
+    let credits = http_json(HttpRequest { url: "https://openrouter.ai/api/v1/credits".to_string(), method: "GET".to_string(), headers: vec![("Authorization".to_string(), format!("Bearer {api_key}")), ("Accept".to_string(), "application/json".to_string())], body: None }).await;
+    let key = http_json(HttpRequest { url: "https://openrouter.ai/api/v1/key".to_string(), method: "GET".to_string(), headers: vec![("Authorization".to_string(), format!("Bearer {api_key}")), ("Accept".to_string(), "application/json".to_string())], body: None }).await.ok();
 
     match credits {
         Ok(credits_payload) => {
@@ -573,16 +444,9 @@ fn read_openrouter_key() -> Option<String> {
         return Some(key);
     }
     let home = home_dir()?;
-    for path in [
-        home.join(".config/openusage/openrouter.json"),
-        home.join(".config/openrouter/key.json"),
-    ] {
+    for path in [home.join(".config/openusage/openrouter.json"), home.join(".config/openrouter/key.json")] {
         if let Some(payload) = read_json(&path) {
-            if let Some(key) = first_string([
-                json_string(&payload, &["apiKey"]),
-                json_string(&payload, &["api_key"]),
-                json_string(&payload, &["key"]),
-            ]) {
+            if let Some(key) = first_string([json_string(&payload, &["apiKey"]), json_string(&payload, &["api_key"]), json_string(&payload, &["key"])]) {
                 return Some(key);
             }
         } else if let Some(raw) = read_text(&path) {
@@ -641,15 +505,7 @@ async fn fetch_kimi(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
         meta,
         token,
         "Sign in to Kimi",
-        |token| HttpRequest {
-            url: "https://api.kimi.com/coding/v1/usages".to_string(),
-            method: "GET".to_string(),
-            headers: vec![
-                ("Authorization".to_string(), format!("Bearer {token}")),
-                ("Accept".to_string(), "application/json".to_string()),
-            ],
-            body: None,
-        },
+        |token| HttpRequest { url: "https://api.kimi.com/coding/v1/usages".to_string(), method: "GET".to_string(), headers: vec![("Authorization".to_string(), format!("Bearer {token}")), ("Accept".to_string(), "application/json".to_string())], body: None },
         parse_kimi_rows,
     )
     .await
@@ -657,10 +513,7 @@ async fn fetch_kimi(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
 
 fn read_kimi_token() -> Option<String> {
     let home = home_dir()?;
-    for path in [
-        home.join(".kimi-code/credentials/kimi-code.json"),
-        home.join(".kimi/credentials/kimi-code.json"),
-    ] {
+    for path in [home.join(".kimi-code/credentials/kimi-code.json"), home.join(".kimi/credentials/kimi-code.json")] {
         if let Some(payload) = read_json(path) {
             if let Some(token) = json_string(&payload, &["access_token"]) {
                 return Some(token);
@@ -676,24 +529,12 @@ async fn fetch_minimax(meta: &super::types::ProviderMeta) -> AgentUsageProvider 
         env_var("MINIMAX_CN_API_KEY"),
         env_var("MINIMAX_API_KEY"),
         env_var("MINIMAX_API_TOKEN"),
-        home.as_ref().and_then(|home| read_json(home.join(".mmx/config.json")).and_then(|payload| first_string([
-            json_string(&payload, &["api_key"]),
-            json_string(&payload, &["apiKey"]),
-            json_string(&payload, &["token"]),
-        ]))),
+        home.as_ref().and_then(|home| read_json(home.join(".mmx/config.json")).and_then(|payload| first_string([json_string(&payload, &["api_key"]), json_string(&payload, &["apiKey"]), json_string(&payload, &["token"])]))),
         home.as_ref().and_then(|home| read_json(home.join(".mmx/credentials.json")).and_then(|payload| json_string(&payload, &["auth", "access_token"]))),
     ]);
     let cn = env_var("MINIMAX_CN_API_KEY").is_some();
-    let hosts = if cn {
-        vec!["api.minimaxi.com"]
-    } else {
-        vec!["api.minimax.io", "www.minimax.io"]
-    };
-    let endpoint = if cn {
-        "/v1/token_plan/remains"
-    } else {
-        "/v1/api/openplatform/coding_plan/remains"
-    };
+    let hosts = if cn { vec!["api.minimaxi.com"] } else { vec!["api.minimax.io", "www.minimax.io"] };
+    let endpoint = if cn { "/v1/token_plan/remains" } else { "/v1/api/openplatform/coding_plan/remains" };
 
     let Some(token) = token else {
         return unavailable(meta, "Sign in to MiniMax");
@@ -704,15 +545,7 @@ async fn fetch_minimax(meta: &super::types::ProviderMeta) -> AgentUsageProvider 
             meta,
             Some(token.clone()),
             "Sign in to MiniMax",
-            |token| HttpRequest {
-                url: format!("https://{host}{endpoint}"),
-                method: "GET".to_string(),
-                headers: vec![
-                    ("Authorization".to_string(), format!("Bearer {token}")),
-                    ("Accept".to_string(), "application/json".to_string()),
-                ],
-                body: None,
-            },
+            |token| HttpRequest { url: format!("https://{host}{endpoint}"), method: "GET".to_string(), headers: vec![("Authorization".to_string(), format!("Bearer {token}")), ("Accept".to_string(), "application/json".to_string())], body: None },
             parse_minimax_rows,
         )
         .await;
@@ -727,29 +560,10 @@ async fn fetch_zai(meta: &super::types::ProviderMeta) -> AgentUsageProvider {
     let Some(token) = first_string([env_var("ZAI_API_KEY")]) else {
         return unavailable(meta, "SET ZAI_API_KEY");
     };
-    let authorization = if token.to_ascii_lowercase().starts_with("bearer ") {
-        token
-    } else {
-        format!("Bearer {token}")
-    };
-    let headers = vec![
-        ("Authorization".to_string(), authorization),
-        ("Accept".to_string(), "application/json".to_string()),
-    ];
-    let subscription = http_json(HttpRequest {
-        url: "https://api.z.ai/api/biz/subscription/list".to_string(),
-        method: "GET".to_string(),
-        headers: headers.clone(),
-        body: None,
-    })
-    .await;
-    let quota = http_json(HttpRequest {
-        url: "https://api.z.ai/api/monitor/usage/quota/limit".to_string(),
-        method: "GET".to_string(),
-        headers,
-        body: None,
-    })
-    .await;
+    let authorization = if token.to_ascii_lowercase().starts_with("bearer ") { token } else { format!("Bearer {token}") };
+    let headers = vec![("Authorization".to_string(), authorization), ("Accept".to_string(), "application/json".to_string())];
+    let subscription = http_json(HttpRequest { url: "https://api.z.ai/api/biz/subscription/list".to_string(), method: "GET".to_string(), headers: headers.clone(), body: None }).await;
+    let quota = http_json(HttpRequest { url: "https://api.z.ai/api/monitor/usage/quota/limit".to_string(), method: "GET".to_string(), headers, body: None }).await;
 
     match (subscription, quota) {
         (Ok(subscription), Ok(quota)) => {
@@ -769,19 +583,11 @@ async fn fetch_antigravity(meta: &super::types::ProviderMeta) -> AgentUsageProvi
     let Some(token) = read_antigravity_token() else {
         return unavailable(meta, "Start Antigravity or run agy");
     };
-    for base_url in [
-        "https://daily-cloudcode-pa.googleapis.com",
-        "https://cloudcode-pa.googleapis.com",
-    ] {
+    for base_url in ["https://daily-cloudcode-pa.googleapis.com", "https://cloudcode-pa.googleapis.com"] {
         match http_json(HttpRequest {
             url: format!("{base_url}/v1internal:retrieveUserQuotaSummary"),
             method: "POST".to_string(),
-            headers: vec![
-                ("Authorization".to_string(), format!("Bearer {token}")),
-                ("Accept".to_string(), "application/json".to_string()),
-                ("Content-Type".to_string(), "application/json".to_string()),
-                ("User-Agent".to_string(), "antigravity".to_string()),
-            ],
+            headers: vec![("Authorization".to_string(), format!("Bearer {token}")), ("Accept".to_string(), "application/json".to_string()), ("Content-Type".to_string(), "application/json".to_string()), ("User-Agent".to_string(), "antigravity".to_string())],
             body: Some(json!({})),
         })
         .await
@@ -805,10 +611,7 @@ fn read_antigravity_token() -> Option<String> {
     let home = home_dir()?;
     if let Some(payload) = read_json(home.join("Library/Application Support/OpenUsage/antigravity/auth.json")) {
         if let Some(token) = json_string(&payload, &["accessToken"]) {
-            let expires = payload
-                .get("expiresAtMs")
-                .and_then(Value::as_i64)
-                .unwrap_or(0);
+            let expires = payload.get("expiresAtMs").and_then(Value::as_i64).unwrap_or(0);
             if expires > chrono::Utc::now().timestamp_millis() + 60_000 {
                 return Some(token);
             }

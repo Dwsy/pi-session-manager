@@ -15,6 +15,7 @@ import type {
   PsmAgentUsageStatus,
   PsmCapabilityClient,
   PsmCreateTagParams,
+  PsmFavoriteItem,
   PsmFullTextSearchParams,
   PsmFsClient,
   PsmFsReadOptions,
@@ -153,6 +154,18 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
     },
   }
 
+  const favorites = {
+    list() {
+      return invoke<PsmFavoriteItem[]>('get_all_favorites')
+    },
+    async toggle(item: Omit<PsmFavoriteItem, 'addedAt'>) {
+      await invoke<void>('toggle_favorite', { id: item.id, favoriteType: item.type, name: item.name, path: item.path })
+    },
+    async remove(id: string) {
+      await invoke<void>('remove_favorite', { id })
+    },
+  }
+
   const transportAgent = {
     createSession(params: PsmAgentCreateSessionParams) {
       return invoke<PsmAgentSessionHandle>('plugin_agent_create_session', params as unknown as Record<string, unknown>)
@@ -216,6 +229,7 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
   }
 
   return {
+    favorites,
     records,
     sessions: {
       scan() {

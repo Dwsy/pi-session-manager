@@ -19,17 +19,7 @@ pub enum SessionBridgeSource {
 }
 
 impl SessionBridgeSource {
-    pub const ALL: [Self; 9] = [
-        Self::Pi,
-        Self::ClaudeCode,
-        Self::Codex,
-        Self::OpenCode,
-        Self::Gemini,
-        Self::Factory,
-        Self::ClawdBot,
-        Self::Cursor,
-        Self::Antigravity,
-    ];
+    pub const ALL: [Self; 9] = [Self::Pi, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot, Self::Cursor, Self::Antigravity];
 
     pub fn slug(self) -> &'static str {
         match self {

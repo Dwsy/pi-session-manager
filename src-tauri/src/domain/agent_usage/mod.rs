@@ -17,18 +17,10 @@ use std::collections::HashSet;
 
 /// Collect usage snapshots for the requested providers (or all supported ones).
 pub async fn get_agent_usage_status(provider_ids: Option<Vec<String>>) -> Result<AgentUsageStatus, String> {
-    let allowed = provider_ids.map(|ids| {
-        ids.into_iter()
-            .map(|id| id.trim().to_ascii_lowercase())
-            .filter(|id| !id.is_empty())
-            .collect::<HashSet<_>>()
-    });
+    let allowed = provider_ids.map(|ids| ids.into_iter().map(|id| id.trim().to_ascii_lowercase()).filter(|id| !id.is_empty()).collect::<HashSet<_>>());
 
     let providers = fetch_all_providers(allowed.as_ref()).await;
-    Ok(AgentUsageStatus {
-        providers,
-        fetched_at: chrono::Utc::now().to_rfc3339(),
-    })
+    Ok(AgentUsageStatus { providers, fetched_at: chrono::Utc::now().to_rfc3339() })
 }
 
 #[cfg(test)]

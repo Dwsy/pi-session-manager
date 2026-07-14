@@ -5,10 +5,7 @@ use std::sync::{OnceLock, RwLock};
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{json, Value};
 
-use crate::domain::casr_min::model::{
-    flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession,
-    MessageRole,
-};
+use crate::domain::casr_min::model::{flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole};
 
 const BUBBLE_TYPE_USER: i64 = 1;
 const BUBBLE_TYPE_ASSISTANT: i64 = 2;
@@ -38,15 +35,11 @@ pub fn session_roots() -> Vec<PathBuf> {
 }
 
 pub fn matches_path(path: &Path) -> bool {
-    is_db_path(path)
-        || path
-            .parent()
-            .is_some_and(|parent| parent.is_file() && parent.extension().and_then(|ext| ext.to_str()) == Some("vscdb"))
+    is_db_path(path) || path.parent().is_some_and(|parent| parent.is_file() && parent.extension().and_then(|ext| ext.to_str()) == Some("vscdb"))
 }
 
 pub fn is_db_path(path: &Path) -> bool {
-    path.file_name().and_then(|value| value.to_str()) == Some("state.vscdb")
-        || path.extension().and_then(|ext| ext.to_str()) == Some("vscdb")
+    path.file_name().and_then(|value| value.to_str()) == Some("state.vscdb") || path.extension().and_then(|ext| ext.to_str()) == Some("vscdb")
 }
 
 pub fn backing_store_path(path: &Path) -> PathBuf {
@@ -65,19 +58,10 @@ pub fn list_session_paths_in_db(db_path: &Path) -> Result<Vec<PathBuf>, String> 
     }
 
     let conn = open_db(db_path)?;
-    let session_paths = list_composer_ids(&conn)
-        .into_iter()
-        .map(|composer_id| virtual_session_path(db_path, &composer_id))
-        .collect::<Vec<_>>();
+    let session_paths = list_composer_ids(&conn).into_iter().map(|composer_id| virtual_session_path(db_path, &composer_id)).collect::<Vec<_>>();
 
     if let Ok(mut guard) = session_path_cache().write() {
-        guard.insert(
-            cache_key,
-            CursorPathListCacheEntry {
-                modified_at_ms,
-                session_paths: session_paths.clone(),
-            },
-        );
+        guard.insert(cache_key, CursorPathListCacheEntry { modified_at_ms, session_paths: session_paths.clone() });
     }
     Ok(session_paths)
 }
@@ -172,17 +156,13 @@ fn parse_virtual_path(path: &Path) -> Option<(PathBuf, String)> {
 }
 
 fn open_db(path: &Path) -> Result<Connection, String> {
-    let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX)
-        .map_err(|e| format!("Cursor: failed to open DB {}: {e}", path.display()))?;
-    conn.busy_timeout(std::time::Duration::from_secs(5))
-        .map_err(|e| format!("Cursor: failed to set busy timeout: {e}"))?;
+    let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|e| format!("Cursor: failed to open DB {}: {e}", path.display()))?;
+    conn.busy_timeout(std::time::Duration::from_secs(5)).map_err(|e| format!("Cursor: failed to set busy timeout: {e}"))?;
     Ok(conn)
 }
 
 fn table_exists(conn: &Connection, table: &str) -> bool {
-    conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1")
-        .and_then(|mut stmt| stmt.exists(rusqlite::params![table]))
-        .unwrap_or(false)
+    conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1").and_then(|mut stmt| stmt.exists(rusqlite::params![table])).unwrap_or(false)
 }
 
 fn list_composer_ids(conn: &Connection) -> Vec<String> {
@@ -228,24 +208,13 @@ fn fetch_bubbles(conn: &Connection, composer_id: &str) -> HashMap<String, Value>
 }
 
 fn read_composer_session(conn: &Connection, composer_id: &str, db_path: &Path) -> Result<CanonicalSession, String> {
-    let composer_json: String = conn
-        .query_row(
-            "SELECT value FROM cursorDiskKV WHERE key = ?1",
-            rusqlite::params![format!("composerData:{composer_id}")],
-            |row| row.get(0),
-        )
-        .map_err(|e| format!("Cursor: composerData not found for {composer_id}: {e}"))?;
+    let composer_json: String = conn.query_row("SELECT value FROM cursorDiskKV WHERE key = ?1", rusqlite::params![format!("composerData:{composer_id}")], |row| row.get(0)).map_err(|e| format!("Cursor: composerData not found for {composer_id}: {e}"))?;
     let composer: Value = serde_json::from_str(&composer_json).map_err(|e| format!("Cursor: invalid composerData JSON: {e}"))?;
     let bubbles = fetch_bubbles(conn, composer_id);
     parse_composer(composer_id, &composer, &bubbles, db_path)
 }
 
-fn parse_composer(
-    composer_id: &str,
-    composer: &Value,
-    bubbles: &HashMap<String, Value>,
-    source_path: &Path,
-) -> Result<CanonicalSession, String> {
+fn parse_composer(composer_id: &str, composer: &Value, bubbles: &HashMap<String, Value>, source_path: &Path) -> Result<CanonicalSession, String> {
     let mut messages: Vec<CanonicalMessage> = Vec::new();
     let mut model_counts: HashMap<String, usize> = HashMap::new();
     let mut started_at = composer.get("createdAt").and_then(parse_timestamp);
@@ -286,26 +255,12 @@ fn parse_composer(
         }
     } else if let Some(content) = extract_bubble_content(composer) {
         if !content.trim().is_empty() {
-            messages.push(CanonicalMessage {
-                idx: 0,
-                role: MessageRole::User,
-                content,
-                timestamp: started_at,
-                author: None,
-                tool_calls: Vec::new(),
-                tool_results: Vec::new(),
-                extra: composer.clone(),
-            });
+            messages.push(CanonicalMessage { idx: 0, role: MessageRole::User, content, timestamp: started_at, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: composer.clone() });
         }
     }
 
     reindex_messages(&mut messages);
-    let session_title = composer
-        .get("name")
-        .and_then(Value::as_str)
-        .filter(|s| !s.is_empty())
-        .map(String::from)
-        .or_else(|| messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100)));
+    let session_title = composer.get("name").and_then(Value::as_str).filter(|s| !s.is_empty()).map(String::from).or_else(|| messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100)));
     let model_name = model_counts.into_iter().max_by_key(|(_, count)| *count).map(|(name, _)| name);
     let mut metadata = serde_json::Map::new();
     metadata.insert("source".into(), Value::String("cursor".to_string()));
@@ -316,18 +271,7 @@ fn parse_composer(
         metadata.insert("unifiedMode".into(), Value::String(mode.to_string()));
     }
 
-    Ok(CanonicalSession {
-        session_id: composer_id.to_string(),
-        provider_slug: "cursor".to_string(),
-        workspace,
-        title: session_title,
-        started_at,
-        ended_at,
-        messages,
-        metadata: Value::Object(metadata),
-        source_path: virtual_session_path(source_path, composer_id),
-        model_name,
-    })
+    Ok(CanonicalSession { session_id: composer_id.to_string(), provider_slug: "cursor".to_string(), workspace, title: session_title, started_at, ended_at, messages, metadata: Value::Object(metadata), source_path: virtual_session_path(source_path, composer_id), model_name })
 }
 
 fn extract_bubble_content(bubble: &Value) -> Option<String> {
@@ -342,21 +286,10 @@ fn extract_bubble_content(bubble: &Value) -> Option<String> {
     None
 }
 
-fn parse_bubble(
-    bubble: &Value,
-    model_counts: &mut HashMap<String, usize>,
-    started_at: &mut Option<i64>,
-    ended_at: &mut Option<i64>,
-) -> Option<CanonicalMessage> {
+fn parse_bubble(bubble: &Value, model_counts: &mut HashMap<String, usize>, started_at: &mut Option<i64>, ended_at: &mut Option<i64>) -> Option<CanonicalMessage> {
     let content = extract_bubble_content(bubble)?;
     let role = determine_bubble_role(bubble);
-    let author = bubble
-        .get("modelType")
-        .and_then(Value::as_str)
-        .or_else(|| bubble.get("model").and_then(Value::as_str))
-        .or_else(|| bubble.pointer("/modelInfo/modelName").and_then(Value::as_str))
-        .filter(|s| !s.is_empty())
-        .map(String::from);
+    let author = bubble.get("modelType").and_then(Value::as_str).or_else(|| bubble.get("model").and_then(Value::as_str)).or_else(|| bubble.pointer("/modelInfo/modelName").and_then(Value::as_str)).filter(|s| !s.is_empty()).map(String::from);
     if let Some(ref model) = author {
         *model_counts.entry(model.clone()).or_insert(0) += 1;
     }
@@ -365,16 +298,7 @@ fn parse_bubble(
         *started_at = Some(started_at.map_or(ts, |s| s.min(ts)));
         *ended_at = Some(ended_at.map_or(ts, |e| e.max(ts)));
     }
-    Some(CanonicalMessage {
-        idx: 0,
-        role,
-        content,
-        timestamp,
-        author,
-        tool_calls: Vec::new(),
-        tool_results: Vec::new(),
-        extra: bubble.clone(),
-    })
+    Some(CanonicalMessage { idx: 0, role, content, timestamp, author, tool_calls: Vec::new(), tool_results: Vec::new(), extra: bubble.clone() })
 }
 
 fn determine_bubble_role(bubble: &Value) -> MessageRole {
@@ -423,12 +347,7 @@ fn extract_workspace_from_bubbles(bubbles: &HashMap<String, Value>) -> Option<Pa
 }
 
 fn extract_workspace_from_composer(composer: &Value) -> Option<PathBuf> {
-    composer
-        .get("workspacePath")
-        .or_else(|| composer.get("projectPath"))
-        .and_then(Value::as_str)
-        .filter(|s| !s.is_empty())
-        .map(PathBuf::from)
+    composer.get("workspacePath").or_else(|| composer.get("projectPath")).and_then(Value::as_str).filter(|s| !s.is_empty()).map(PathBuf::from)
 }
 
 fn parse_workspace_uri(uri: &str) -> Option<PathBuf> {
@@ -450,9 +369,7 @@ fn read_legacy_session(conn: &Connection, db_path: &Path) -> Result<CanonicalSes
     if !table_exists(conn, "ItemTable") {
         return Err(format!("Cursor: no cursorDiskKV or ItemTable found in {}", db_path.display()));
     }
-    let mut stmt = conn
-        .prepare("SELECT key, value FROM ItemTable WHERE key LIKE '%aichat%chatdata%' OR key LIKE '%composer%' ORDER BY key LIMIT 1")
-        .map_err(|e| format!("Cursor: failed to query legacy ItemTable: {e}"))?;
+    let mut stmt = conn.prepare("SELECT key, value FROM ItemTable WHERE key LIKE '%aichat%chatdata%' OR key LIKE '%composer%' ORDER BY key LIMIT 1").map_err(|e| format!("Cursor: failed to query legacy ItemTable: {e}"))?;
     let result: Option<(String, String)> = stmt
         .query_row([], |row| {
             let key: String = row.get(0)?;

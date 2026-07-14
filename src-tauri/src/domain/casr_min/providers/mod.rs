@@ -26,17 +26,7 @@ pub enum ProviderKind {
 }
 
 impl ProviderKind {
-    pub const ALL: [Self; 9] = [
-        Self::Pi,
-        Self::ClaudeCode,
-        Self::Codex,
-        Self::OpenCode,
-        Self::Gemini,
-        Self::Factory,
-        Self::ClawdBot,
-        Self::Cursor,
-        Self::Antigravity,
-    ];
+    pub const ALL: [Self; 9] = [Self::Pi, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot, Self::Cursor, Self::Antigravity];
 
     pub fn slug(self) -> &'static str {
         match self {
@@ -107,10 +97,7 @@ impl ProviderKind {
     pub fn matches_path(self, path: &Path) -> bool {
         let normalized = path.to_string_lossy().replace('\\', "/");
         match self {
-            Self::Pi => crate::paths::pi_agent_sessions_dir()
-                .ok()
-                .map(|path| path.to_string_lossy().replace('\\', "/"))
-                .is_some_and(|root| normalized.contains(&root)),
+            Self::Pi => crate::paths::pi_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
             Self::ClaudeCode => normalized.contains("/.claude/projects/"),
             Self::Codex => normalized.contains("/.codex/sessions/"),
             Self::OpenCode => opencode::matches_path(path),
@@ -204,17 +191,7 @@ impl ProviderKind {
 pub fn detect_provider(path_hint: Option<&Path>, content: &str) -> Option<ProviderKind> {
     if let Some(path) = path_hint {
         // Prefer path-specific detectors before content heuristics.
-        for provider in [
-            ProviderKind::Antigravity,
-            ProviderKind::Cursor,
-            ProviderKind::Pi,
-            ProviderKind::ClaudeCode,
-            ProviderKind::Codex,
-            ProviderKind::OpenCode,
-            ProviderKind::Gemini,
-            ProviderKind::Factory,
-            ProviderKind::ClawdBot,
-        ] {
+        for provider in [ProviderKind::Antigravity, ProviderKind::Cursor, ProviderKind::Pi, ProviderKind::ClaudeCode, ProviderKind::Codex, ProviderKind::OpenCode, ProviderKind::Gemini, ProviderKind::Factory, ProviderKind::ClawdBot] {
             if provider.matches_path(path) {
                 return Some(provider);
             }
@@ -226,11 +203,7 @@ pub fn detect_provider(path_hint: Option<&Path>, content: &str) -> Option<Provid
         return Some(ProviderKind::Codex);
     }
 
-    let first_value = trimmed
-        .lines()
-        .find(|line| !line.trim().is_empty())
-        .and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-        .or_else(|| serde_json::from_str::<serde_json::Value>(trimmed).ok())?;
+    let first_value = trimmed.lines().find(|line| !line.trim().is_empty()).and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok()).or_else(|| serde_json::from_str::<serde_json::Value>(trimmed).ok())?;
     let entry_type = first_value.get("type").and_then(serde_json::Value::as_str);
 
     if first_value.get("step_index").is_some()
@@ -248,11 +221,7 @@ pub fn detect_provider(path_hint: Option<&Path>, content: &str) -> Option<Provid
     if matches!(entry_type, Some("user") | Some("assistant") | Some("summary") | Some("progress")) || first_value.get("sessionId").is_some() || first_value.get("uuid").is_some() {
         return Some(ProviderKind::ClaudeCode);
     }
-    if first_value.get("session").is_some()
-        || first_value.get("items").is_some()
-        || matches!(entry_type, Some("session_meta") | Some("response_item") | Some("event_msg") | Some("turn_context"))
-        || first_value.get("payload").is_some()
-    {
+    if first_value.get("session").is_some() || first_value.get("items").is_some() || matches!(entry_type, Some("session_meta") | Some("response_item") | Some("event_msg") | Some("turn_context")) || first_value.get("payload").is_some() {
         return Some(ProviderKind::Codex);
     }
     if entry_type == Some("session_start") {

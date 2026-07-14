@@ -28,13 +28,7 @@ pub fn json_path<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a Value> {
 }
 
 pub fn json_string(value: &Value, keys: &[&str]) -> Option<String> {
-    json_path(value, keys)
-        .and_then(|item| {
-            item.as_str()
-                .map(|text| text.trim().to_string())
-                .filter(|text| !text.is_empty())
-                .or_else(|| item.as_i64().map(|n| n.to_string()))
-        })
+    json_path(value, keys).and_then(|item| item.as_str().map(|text| text.trim().to_string()).filter(|text| !text.is_empty()).or_else(|| item.as_i64().map(|n| n.to_string())))
 }
 
 pub fn first_string(candidates: impl IntoIterator<Item = Option<String>>) -> Option<String> {
@@ -77,16 +71,9 @@ pub fn read_sqlite_map(db_path: &Path, keys: &[&str]) -> Option<std::collections
     let placeholders = keys.iter().map(|_| "?").collect::<Vec<_>>().join(",");
     let sql = format!("SELECT key, value FROM ItemTable WHERE key IN ({placeholders})");
     let mut stmt = conn.prepare(&sql).ok()?;
-    let params = keys
-        .iter()
-        .map(|key| rusqlite::types::Value::Text((*key).to_string()))
-        .collect::<Vec<_>>();
+    let params = keys.iter().map(|key| rusqlite::types::Value::Text((*key).to_string())).collect::<Vec<_>>();
     let param_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|value| value as &dyn rusqlite::ToSql).collect();
-    let rows = stmt
-        .query_map(param_refs.as_slice(), |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })
-        .ok()?;
+    let rows = stmt.query_map(param_refs.as_slice(), |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))).ok()?;
     let mut map = std::collections::HashMap::new();
     for row in rows.flatten() {
         map.insert(row.0, row.1);

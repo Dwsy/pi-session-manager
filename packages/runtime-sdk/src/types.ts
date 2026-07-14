@@ -421,9 +421,61 @@ export interface PsmAppSidebarViewRegistration<TData = unknown> {
   render(props: PsmAppSidebarViewRenderProps<TData>): unknown;
 }
 
+export interface PsmFavoriteItem {
+  type: 'session' | 'project';
+  id: string;
+  name: string;
+  path: string;
+  addedAt: string;
+}
+
+export interface PsmSessionListActionRenderProps {
+  session: PsmSessionReference;
+  onActivate: () => void;
+}
+
+export interface PsmSessionListActionRegistration {
+  id: string;
+  title: string;
+  render(props: PsmSessionListActionRenderProps): unknown;
+}
+
+export interface PsmProjectListActionRenderProps {
+  project: {
+    path: string;
+    name: string;
+    sessionCount: number;
+    messageCount: number;
+    lastModified: number;
+    liveCount: number;
+  };
+  onActivate: () => void;
+}
+
+export interface PsmProjectListActionRegistration {
+  id: string;
+  title: string;
+  render(props: PsmProjectListActionRenderProps): unknown;
+}
+
+export interface PsmSessionContextMenuActionRenderProps {
+  session: PsmSessionReference;
+  close: () => void;
+  onActivate: () => void;
+}
+
+export interface PsmSessionContextMenuActionRegistration {
+  id: string;
+  title: string;
+  render(props: PsmSessionContextMenuActionRenderProps): unknown;
+}
+
 export interface PsmPluginUiRegistry {
   registerAppView(view: PsmAppViewRegistration): void;
   registerAppSidebarView(view: PsmAppSidebarViewRegistration): void;
+  registerSessionListAction(action: PsmSessionListActionRegistration): void;
+  registerProjectListAction(action: PsmProjectListActionRegistration): void;
+  registerSessionContextMenuAction(action: PsmSessionContextMenuActionRegistration): void;
   registerSessionToolbarItem(item: PsmSessionToolbarItemRegistration): void;
   registerSessionPanel(panel: PsmSessionPanelRegistration): void;
   registerSessionTreeView(view: PsmSessionTreeViewRegistration): void;
@@ -904,7 +956,14 @@ export interface PsmWindowsClient {
   open(params: PsmWindowOpenParams): Promise<PsmWindowHandle>;
 }
 
+export interface PsmFavoritesClient {
+  list(): Promise<PsmFavoriteItem[]>;
+  toggle(item: Omit<PsmFavoriteItem, 'addedAt'>): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
 export interface PsmCapabilityClient {
+  favorites: PsmFavoritesClient;
   records: PsmRecordsClient;
   sessions: PsmSessionsClient;
   search: PsmSearchClient;

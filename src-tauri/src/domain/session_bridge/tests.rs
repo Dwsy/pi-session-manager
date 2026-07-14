@@ -730,15 +730,7 @@ fn clawdbot_jsonl_previews_as_pi() {
 #[test]
 fn antigravity_transcript_previews_as_pi() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let path = temp
-        .path()
-        .join(".gemini")
-        .join("antigravity-cli")
-        .join("brain")
-        .join("f1e2d3c4-b5a6-4789-9abc-def012345678")
-        .join(".system_generated")
-        .join("logs")
-        .join("transcript.jsonl");
+    let path = temp.path().join(".gemini").join("antigravity-cli").join("brain").join("f1e2d3c4-b5a6-4789-9abc-def012345678").join(".system_generated").join("logs").join("transcript.jsonl");
     std::fs::create_dir_all(path.parent().unwrap()).expect("mkdir");
     let content = [
         serde_json::json!({
@@ -793,21 +785,9 @@ fn cursor_virtual_session_path_reads_composer() {
         });
         let bubble_user = serde_json::json!({"type": 1, "text": "hello cursor", "timestamp": 1_700_000_000_000i64});
         let bubble_assistant = serde_json::json!({"type": 2, "text": "hi from cursor", "timestamp": 1_700_000_100_000i64, "modelType": "gpt"});
-        conn.execute(
-            "INSERT INTO cursorDiskKV (key, value) VALUES (?1, ?2)",
-            rusqlite::params!["composerData:cmp-1", composer.to_string()],
-        )
-        .expect("insert composer");
-        conn.execute(
-            "INSERT INTO cursorDiskKV (key, value) VALUES (?1, ?2)",
-            rusqlite::params!["bubbleId:cmp-1:b1", bubble_user.to_string()],
-        )
-        .expect("insert bubble user");
-        conn.execute(
-            "INSERT INTO cursorDiskKV (key, value) VALUES (?1, ?2)",
-            rusqlite::params!["bubbleId:cmp-1:b2", bubble_assistant.to_string()],
-        )
-        .expect("insert bubble assistant");
+        conn.execute("INSERT INTO cursorDiskKV (key, value) VALUES (?1, ?2)", rusqlite::params!["composerData:cmp-1", composer.to_string()]).expect("insert composer");
+        conn.execute("INSERT INTO cursorDiskKV (key, value) VALUES (?1, ?2)", rusqlite::params!["bubbleId:cmp-1:b1", bubble_user.to_string()]).expect("insert bubble user");
+        conn.execute("INSERT INTO cursorDiskKV (key, value) VALUES (?1, ?2)", rusqlite::params!["bubbleId:cmp-1:b2", bubble_assistant.to_string()]).expect("insert bubble assistant");
     }
 
     let paths = expand_cursor_session_paths(&db_path);

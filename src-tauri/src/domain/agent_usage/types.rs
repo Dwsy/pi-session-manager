@@ -75,41 +75,13 @@ pub fn provider_meta(id: &str) -> Option<&'static ProviderMeta> {
 }
 
 pub fn unavailable(meta: &ProviderMeta, message: impl Into<String>) -> AgentUsageProvider {
-    AgentUsageProvider {
-        id: meta.id.to_string(),
-        name: meta.name.to_string(),
-        plan_name: None,
-        fetched_at: chrono::Utc::now().to_rfc3339(),
-        state: AgentUsageState::Unavailable,
-        message: Some(message.into()),
-        metrics: Vec::new(),
-    }
+    AgentUsageProvider { id: meta.id.to_string(), name: meta.name.to_string(), plan_name: None, fetched_at: chrono::Utc::now().to_rfc3339(), state: AgentUsageState::Unavailable, message: Some(message.into()), metrics: Vec::new() }
 }
 
 pub fn error_snapshot(meta: &ProviderMeta, message: impl Into<String>) -> AgentUsageProvider {
-    AgentUsageProvider {
-        id: meta.id.to_string(),
-        name: meta.name.to_string(),
-        plan_name: None,
-        fetched_at: chrono::Utc::now().to_rfc3339(),
-        state: AgentUsageState::Error,
-        message: Some(message.into()),
-        metrics: Vec::new(),
-    }
+    AgentUsageProvider { id: meta.id.to_string(), name: meta.name.to_string(), plan_name: None, fetched_at: chrono::Utc::now().to_rfc3339(), state: AgentUsageState::Error, message: Some(message.into()), metrics: Vec::new() }
 }
 
-pub fn available_snapshot(
-    meta: &ProviderMeta,
-    plan_name: Option<String>,
-    metrics: Vec<AgentUsageMetric>,
-) -> AgentUsageProvider {
-    AgentUsageProvider {
-        id: meta.id.to_string(),
-        name: meta.name.to_string(),
-        plan_name,
-        fetched_at: chrono::Utc::now().to_rfc3339(),
-        state: AgentUsageState::Available,
-        message: None,
-        metrics,
-    }
+pub fn available_snapshot(meta: &ProviderMeta, plan_name: Option<String>, metrics: Vec<AgentUsageMetric>) -> AgentUsageProvider {
+    AgentUsageProvider { id: meta.id.to_string(), name: meta.name.to_string(), plan_name, fetched_at: chrono::Utc::now().to_rfc3339(), state: AgentUsageState::Available, message: None, metrics }
 }

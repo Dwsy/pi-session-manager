@@ -132,16 +132,7 @@ fn read_envelopes(path: &Path, envelopes: Vec<Value>) -> Result<CanonicalSession
                             let name = p.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
                             let call_id = p.get("call_id").or_else(|| p.get("id")).and_then(|v| v.as_str()).map(String::from);
                             let arguments = p.get("input").or_else(|| p.get("arguments")).map(parse_arguments_value).unwrap_or(Value::Null);
-                            messages.push(CanonicalMessage {
-                                idx: 0,
-                                role: MessageRole::Assistant,
-                                content: String::new(),
-                                timestamp: ts,
-                                author: None,
-                                tool_calls: vec![ToolCall { id: call_id, name, arguments }],
-                                tool_results: vec![],
-                                extra: envelope,
-                            });
+                            messages.push(CanonicalMessage { idx: 0, role: MessageRole::Assistant, content: String::new(), timestamp: ts, author: None, tool_calls: vec![ToolCall { id: call_id, name, arguments }], tool_results: vec![], extra: envelope });
                         }
                         _ => {}
                     }
@@ -596,9 +587,7 @@ mod tests {
 {"type":"response_item","timestamp":"2026-01-01T00:00:02Z","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"done"}]}}
 "#;
         let session = read_session_from_str(Path::new("/tmp/rollout-tool.jsonl"), content).expect("parse");
-        assert!(session.messages.iter().any(|message| {
-            message.role == MessageRole::Assistant && message.tool_calls.iter().any(|call| call.name == "exec_command" && call.id.as_deref() == Some("call_legacy"))
-        }));
+        assert!(session.messages.iter().any(|message| { message.role == MessageRole::Assistant && message.tool_calls.iter().any(|call| call.name == "exec_command" && call.id.as_deref() == Some("call_legacy")) }));
         assert!(session.messages.iter().any(|message| message.role == MessageRole::Assistant && message.content.contains("done")));
     }
 }
