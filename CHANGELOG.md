@@ -4,7 +4,13 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-14
+
 ### Added
+
+- **Branch Atlas replay** — semantic checkpoint playback on the active branch path in full-screen Branch Atlas (play/pause, step, speed, scrub), with fork hints and map/Inspector focus
+- **Favorites plugin** — dedicated favorites surface in the plugin app views
+- **Skill invocation titles** — prettier skill titles in session lists and viewer
 
 - **Branch Atlas views** — integrated branch-aware session visualization with global maps, timeline views, navigation, and session-branch modeling
 - **Agent usage analytics** — added backend usage collection, provider parsers, runtime SDK support, and the built-in Agent Usage plugin
