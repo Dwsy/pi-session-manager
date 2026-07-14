@@ -65,6 +65,35 @@ function getStringArg(
   return "";
 }
 
+function getNestedEditPairs(args: Record<string, unknown>) {
+  const edits = args.edits;
+  if (!Array.isArray(edits)) return [];
+
+  const pairs: Array<{ oldText: string; newText: string }> = [];
+  for (const item of edits) {
+    const edit = asRecord(item);
+    const nestedOldText = getStringArg(
+      edit,
+      "old_string",
+      "oldStr",
+      "before",
+      "oldText",
+    );
+    const nestedNewText = getStringArg(
+      edit,
+      "new_string",
+      "newStr",
+      "after",
+      "newText",
+    );
+
+    if (nestedOldText || nestedNewText) {
+      pairs.push({ oldText: nestedOldText, newText: nestedNewText });
+    }
+  }
+  return pairs;
+}
+
 function getEditTextPair(args: Record<string, unknown>) {
   const oldText = getStringArg(
     args,
@@ -85,32 +114,15 @@ function getEditTextPair(args: Record<string, unknown>) {
     return { oldText, newText };
   }
 
-  const edits = args.edits;
-  if (!Array.isArray(edits)) return null;
+  const pairs = getNestedEditPairs(args);
+  if (pairs.length === 0) return null;
+  if (pairs.length === 1) return pairs[0];
 
-  for (const item of edits) {
-    const edit = asRecord(item);
-    const nestedOldText = getStringArg(
-      edit,
-      "old_string",
-      "oldStr",
-      "before",
-      "oldText",
-    );
-    const nestedNewText = getStringArg(
-      edit,
-      "new_string",
-      "newStr",
-      "after",
-      "newText",
-    );
-
-    if (nestedOldText || nestedNewText) {
-      return { oldText: nestedOldText, newText: nestedNewText };
-    }
-  }
-
-  return null;
+  // Multi-hunk Pi edit: keep every block when toolResult patch/diff is unavailable.
+  return {
+    oldText: pairs.map((pair) => pair.oldText).join("\n\n"),
+    newText: pairs.map((pair) => pair.newText).join("\n\n"),
+  };
 }
 
 function normalizeReviewToolName(name: string) {
@@ -340,15 +352,9 @@ function getEditFileContents(operation: FileOperation): {
   newFile: FileContents;
 } | null {
   const fileName = getPathBasename(operation.filePath);
-  const textPair = getEditTextPair(operation.args);
 
-  if (textPair) {
-    return {
-      oldFile: { name: fileName, contents: textPair.oldText },
-      newFile: { name: fileName, contents: textPair.newText },
-    };
-  }
-
+  // Prefer toolResult full-file diff over edit args. Nested `edits[]` may only
+  // contain partial hunks, while details.diff/patch covers every replacement.
   if (operation.diff) {
     const parsed = parsePiDiff(operation.diff);
     if (parsed) {
@@ -357,6 +363,14 @@ function getEditFileContents(operation: FileOperation): {
         newFile: { name: fileName, contents: parsed.newText },
       };
     }
+  }
+
+  const textPair = getEditTextPair(operation.args);
+  if (textPair) {
+    return {
+      oldFile: { name: fileName, contents: textPair.oldText },
+      newFile: { name: fileName, contents: textPair.newText },
+    };
   }
 
   return null;
@@ -471,7 +485,19 @@ export function extractFileOperations(
       );
       const args = asRecord(resolved.args ?? toolCall.arguments);
       const output = typeof resolved.output === "string" ? resolved.output : "";
-      const diff = typeof resolved.diff === "string" ? resolved.diff : "";
+      const resultEntry = toolCallId
+        ? toolResultByCallId.get(toolCallId)
+        : undefined;
+      const details = asRecord(resultEntry?.message?.details);
+      const detailsPatch =
+        typeof details.patch === "string" ? details.patch : "";
+      const resolvedDiff =
+        typeof resolved.diff === "string" ? resolved.diff : "";
+      // Prefer unified patch from toolResult when present; fall back to Pi diff.
+      const diff =
+        (detailsPatch && isUnifiedDiff(detailsPatch) ? detailsPatch : "") ||
+        resolvedDiff ||
+        detailsPatch;
       const images = resolved.images ?? [];
       const editTextPair = toolName === "edit" ? getEditTextPair(args) : null;
       const contentArg =

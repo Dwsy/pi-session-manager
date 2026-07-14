@@ -286,6 +286,110 @@ describe("ToolCallReviewModal data model", () => {
     });
   });
 
+  it("merges all nested Pi edit hunks instead of only the first one", () => {
+    const operations = extractFileOperations(
+      [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-pi-multi-edit",
+            name: "edit",
+            arguments: {
+              path: "CabinetSyncServiceImpl.java",
+              edits: [
+                {
+                  oldText: "import com.baomidou.mybatisplus.core.toolkit.Wrappers;\n",
+                  newText:
+                    "import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;\nimport com.baomidou.mybatisplus.core.toolkit.Wrappers;\n",
+                },
+                {
+                  oldText:
+                    "List<OperatorOrderInfo> orders = orderInfoMapper.selectList(\n                Wrappers.lambdaQuery(OperatorOrderInfo.class)\n",
+                  newText:
+                    "LambdaQueryWrapper<OperatorOrderInfo> orderQuery = Wrappers.lambdaQuery(OperatorOrderInfo.class)\n                .eq(OperatorOrderInfo::getDeviceCode, deviceCode);\n",
+                },
+              ],
+            },
+          },
+        ]),
+      ],
+      new Map(),
+    );
+
+    expect(operations[0]?.content).toContain("LambdaQueryWrapper");
+    expect(operations[0]?.content).toContain("orderQuery");
+    expect(operations[0]?.content).toContain("Wrappers");
+  });
+
+  it("prefers toolResult unified patch over partial nested edit args", () => {
+    const toolCallId = "call-pi-edit-with-patch";
+    const patch = [
+      "--- a/CabinetSyncServiceImpl.java",
+      "+++ b/CabinetSyncServiceImpl.java",
+      "@@ -1,7 +1,8 @@",
+      " package com.bestwond.order.service.impl;",
+      " ",
+      " import cn.hutool.core.bean.BeanUtil;",
+      "+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;",
+      " import com.baomidou.mybatisplus.core.toolkit.Wrappers;",
+      "@@ -129,17 +130,19 @@",
+      "-        List<OperatorOrderInfo> orders = orderInfoMapper.selectList(",
+      "-                Wrappers.lambdaQuery(OperatorOrderInfo.class)",
+      "+        LambdaQueryWrapper<OperatorOrderInfo> orderQuery = Wrappers.lambdaQuery(OperatorOrderInfo.class)",
+      "+                .eq(OperatorOrderInfo::getDeviceCode, deviceCode);",
+      "+        List<OperatorOrderInfo> orders = orderInfoMapper.selectList(orderQuery);",
+    ].join("\n");
+
+    const toolResult: SessionEntry = {
+      type: "message",
+      id: "tool-result-1",
+      timestamp: "2026-05-19T10:00:01.000Z",
+      message: {
+        role: "toolResult",
+        toolCallId,
+        toolName: "edit",
+        content: [{ type: "text", text: "Successfully replaced 2 block(s)." }],
+        details: {
+          patch,
+          diff: "+  4 import LambdaQueryWrapper\n-133 List orders\n+134 LambdaQueryWrapper orderQuery",
+        },
+      },
+    };
+
+    const operations = extractFileOperations(
+      [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: toolCallId,
+            name: "edit",
+            arguments: {
+              path: "CabinetSyncServiceImpl.java",
+              edits: [
+                {
+                  oldText: "import com.baomidou.mybatisplus.core.toolkit.Wrappers;\n",
+                  newText:
+                    "import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;\nimport com.baomidou.mybatisplus.core.toolkit.Wrappers;\n",
+                },
+                {
+                  oldText: "old query block",
+                  newText: "new query block",
+                },
+              ],
+            },
+          },
+        ]),
+      ],
+      new Map([[toolCallId, toolResult]]),
+    );
+
+    expect(operations[0]?.diff).toBe(patch);
+    expect(operations[0]?.metrics).toMatchObject({
+      additions: 4,
+      deletions: 2,
+    });
+  });
+
   it("extracts task operations with description fallback and output metrics", () => {
     const operations = extractFileOperations(
       [
