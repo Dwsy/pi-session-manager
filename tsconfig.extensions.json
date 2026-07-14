@@ -2,11 +2,23 @@
   "extends": "./tsconfig.json",
   "include": [
     "src/vite-env.d.ts",
+    "extensions/psm-ask-user-question-renderer/**/*.ts",
+    "extensions/psm-ask-user-question-renderer/**/*.tsx",
+    "extensions/psm-generative-ui-renderer/**/*.ts",
+    "extensions/psm-generative-ui-renderer/**/*.tsx",
+    "extensions/psm-word-cloud/**/*.ts",
+    "extensions/psm-word-cloud/**/*.tsx",
     "extensions/psm-code-review/**/*.ts",
-    "extensions/psm-code-review/**/*.tsx"
+    "extensions/psm-code-review/**/*.tsx",
+    "extensions/psm-favorites/**/*.ts",
+    "extensions/psm-favorites/**/*.tsx",
+    "packages/runtime-sdk/src/**/*.ts"
   ],
   "exclude": [
-    "extensions/psm-code-review/**/*.test.ts",
-    "extensions/psm-code-review/**/*.test.tsx"
+    "extensions/**/*.test.ts",
+    "extensions/**/*.test.tsx",
+    "packages/**/*.test.ts",
+    "packages/**/*.test.tsx",
+    "extensions/psm-word-cloud/vite.config.ts"
   ]
 }

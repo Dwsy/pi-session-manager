@@ -142,7 +142,7 @@ function TagNodeContent({
         ) : (
           <>
             <ColorPicker value={tag.color} onChange={(c) => { onStartEdit(tag); onSetEditColor(c) }} />
-            <span className="flex-1 text-sm text-foreground hover:text-info" onClick={() => onStartEdit(tag)}>{tag.name}</span>
+            <button type="button" className="flex-1 text-left text-sm text-foreground hover:text-info" onClick={() => onStartEdit(tag)}>{tag.name}</button>
             <button onClick={() => onCreateChild(tag.id)} className="p-1 text-muted-foreground/40 hover:text-info opacity-0 group-hover:opacity-100 motion-color motion-opacity motion-press focus-ring" title={t('components.tagManager.addChild')}>
               <Plus className="h-3 w-3" />
             </button>

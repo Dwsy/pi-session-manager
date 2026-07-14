@@ -53,7 +53,7 @@ pub async fn scan_skills_internal() -> Result<Vec<SkillInfo>, String> {
 
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_string();
             let skill_md = path.join("SKILL.md");
-            let description = if skill_md.exists() { read_first_line(&skill_md, None) } else { String::new() };
+            let description = if skill_md.exists() { fs::read_to_string(&skill_md).ok().and_then(|content| extract_frontmatter_field(&content, "description")).or_else(|| Some(read_first_line(&skill_md, None))).unwrap_or_default() } else { String::new() };
 
             skills.push(SkillInfo { name: name.clone(), path: format!("skills/{name}/SKILL.md"), description, enabled: true });
         }

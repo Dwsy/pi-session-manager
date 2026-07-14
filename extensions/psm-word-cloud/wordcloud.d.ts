@@ -11,7 +11,8 @@ declare module 'wordcloud' {
     drawOutOfBound?: boolean
     rotateRatio?: number
     shuffle?: boolean
-    wait?: number    shape?: string | ((theta: number) => number)
+    wait?: number
+    shape?: string | ((theta: number) => number)
     hover?: (item?: WordCloudListItem, dimension?: { x: number; y: number; w: number; h: number }, event?: MouseEvent) => void
     click?: (item: WordCloudListItem, dimension?: { x: number; y: number; w: number; h: number }, event?: MouseEvent) => void
     clearCanvas?: boolean

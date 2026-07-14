@@ -488,7 +488,7 @@ function GenerativeUiRenderer({ resolvedData, context }: PsmToolRenderProps) {
 
   return (
     <div className={`tool-execution ${statusClass}`.trim()} id={`entry-${resolvedData.entryId}`}>
-      <div className="tool-header select-none" onClick={toggleExpanded}>
+      <button type="button" className="tool-header select-none" onClick={toggleExpanded} aria-expanded={isExpanded}>
         <span className="tool-expand-indicator">{isExpanded ? '▾' : '▸'}</span>
         <span className="tool-name inline-flex items-center gap-1.5">
           <Monitor className="h-4 w-4" />
@@ -508,7 +508,7 @@ function GenerativeUiRenderer({ resolvedData, context }: PsmToolRenderProps) {
             Open
           </button>
         )}
-      </div>
+      </button>
 
       <div className={`tool-output-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
         <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>

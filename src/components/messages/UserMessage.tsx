@@ -146,7 +146,7 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
           </div>
         </div>
 
-        <div onClick={handleOpenModal} className="cursor-pointer">
+        <button type="button" onClick={handleOpenModal} className="cursor-pointer text-left w-full">
           {images.length > 0 && (
             <div className="message-images">
               {images.map((img, idx) => (
@@ -172,7 +172,7 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
               )}
             </div>
           )}
-        </div>
+        </button>
       </div>
 
       {isModalOpen && (

@@ -46,7 +46,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Frontend build
-        run: npx vite build
+        run: pnpm run build
 
       - name: Rust fmt (desktop)
         working-directory: src-tauri
@@ -64,8 +64,8 @@ jobs:
         working-directory: src-tauri-cli
         run: cargo clippy -- -D warnings
 
-      - name: TypeScript check
-        run: npx tsc --noEmit
+      - name: Frontend and extension verification
+        run: pnpm run verify
 
   check:
     needs: lint
@@ -119,7 +119,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Frontend build
-        run: npx vite build
+        run: pnpm run build
 
       - name: Rust check (desktop)
         working-directory: src-tauri
@@ -138,6 +138,10 @@ jobs:
             cargo test
           fi
         shell: bash
+
+      - name: Rust tests (CLI)
+        working-directory: src-tauri-cli
+        run: cargo test
 
       - name: Rust build CLI
         working-directory: src-tauri-cli
