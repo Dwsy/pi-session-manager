@@ -102,7 +102,7 @@ describe("tool review view model", () => {
     expect(getReviewTreePath(shell)).toBe("Shell/#8 pnpm test");
   });
 
-  it("builds CodeView file items from generated write content", () => {
+  it("builds CodeView diff items from generated write content", () => {
     const items = buildCodeViewItems([
       operation({
         id: "write-1",
@@ -116,11 +116,12 @@ describe("tool review view model", () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       id: "write-1",
-      type: "file",
+      type: "diff",
       version: 1,
-      file: {
+      fileDiff: {
         name: "new.ts",
-        contents: "export const value = 1;\n",
+        type: "new",
+        isPartial: false,
       },
     });
   });

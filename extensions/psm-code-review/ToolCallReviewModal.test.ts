@@ -314,6 +314,46 @@ describe("ToolCallReviewModal data model", () => {
     });
   });
 
+  it("extracts read image results for the review detail panel", () => {
+    const toolResult: SessionEntry = {
+      type: "message",
+      id: "tool-result-image",
+      timestamp: "2026-05-19T10:00:02.000Z",
+      message: {
+        role: "toolResult",
+        toolCallId: "call-read-image",
+        toolName: "read",
+        content: [
+          {
+            type: "image",
+            mimeType: "image/png",
+            data: "cG5n",
+          },
+        ],
+      },
+    };
+
+    const operations = extractFileOperations(
+      [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-read-image",
+            name: "read",
+            arguments: { path: "assets/screenshot.png" },
+          },
+        ]),
+      ],
+      new Map([["call-read-image", toolResult]]),
+    );
+
+    expect(operations[0]).toMatchObject({
+      toolName: "read",
+      filePath: "assets/screenshot.png",
+      images: [{ type: "image", mimeType: "image/png", data: "cG5n" }],
+    });
+  });
+
   it("marks operations as errors when matching tool result failed", () => {
     const toolResult: SessionEntry = {
       type: "message",
@@ -389,12 +429,10 @@ describe("ToolCallReviewModal UI behavior", () => {
     });
 
     expect(screen.getByText("Error")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Copy operation details" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy command" }));
 
     await waitFor(() => {
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        "pnpm build\n\ncommand failed",
-      );
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("pnpm build");
     });
   });
 
@@ -450,6 +488,149 @@ describe("ToolCallReviewModal UI behavior", () => {
       expect(document.body.textContent).toContain("export const second = true;");
     });
     expect(document.body.textContent).not.toContain("export const first = true;");
+
+    const shadowRoot = await getFileTreeShadowRoot();
+    const firstNode = shadowRoot.querySelector<HTMLElement>(
+      "[data-item-path='src/First.ts']",
+    );
+    expect(firstNode).toBeTruthy();
+    fireEvent.click(firstNode!);
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("export const first = true;");
+      expect(document.body.textContent).not.toContain("export const second = true;");
+    });
+  });
+
+  it("opens a shell tool call on the shell tab and selects it", async () => {
+    renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-read",
+            name: "read",
+            arguments: { path: "src/App.tsx" },
+          },
+          {
+            type: "toolCall",
+            id: "call-bash",
+            name: "bash",
+            arguments: { command: "pnpm build --filter api" },
+          },
+        ]),
+      ],
+      initialToolCallId: "call-bash",
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("radio", { name: /^Shell\s*1$/ }).getAttribute("aria-checked"),
+      ).toBe("true");
+      expect(document.body.textContent).toContain("pnpm build --filter api");
+    });
+    expect(screen.queryByText("No operations match this filter")).toBeNull();
+  });
+
+  it("keeps shell selection on the newly clicked command", async () => {
+    renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-bash-first",
+            name: "bash",
+            arguments: { command: "pnpm test" },
+          },
+          {
+            type: "toolCall",
+            id: "call-bash-second",
+            name: "bash",
+            arguments: { command: "pnpm build" },
+          },
+        ]),
+      ],
+      initialToolCallId: "call-bash-second",
+      toolResultByCallId: new Map([
+        [
+          "call-bash-first",
+          {
+            type: "message",
+            id: "tool-result-first",
+            timestamp: "2026-05-19T10:00:02.000Z",
+            message: {
+              role: "tool",
+              toolCallId: "call-bash-first",
+              toolName: "bash",
+              content: [{ type: "text", text: "first output" }],
+            },
+          },
+        ],
+        [
+          "call-bash-second",
+          {
+            type: "message",
+            id: "tool-result-second",
+            timestamp: "2026-05-19T10:00:03.000Z",
+            message: {
+              role: "tool",
+              toolCallId: "call-bash-second",
+              toolName: "bash",
+              content: [{ type: "text", text: "second output" }],
+            },
+          },
+        ],
+      ]),
+    });
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("second output");
+    });
+
+    const firstShell = await findShellListItem(/pnpm test/);
+    fireEvent.click(firstShell);
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("first output");
+      expect(document.body.textContent).not.toContain("second output");
+    });
+  });
+
+  it("renders read image results in the detail panel", async () => {
+    const toolResult: SessionEntry = {
+      type: "message",
+      id: "tool-result-image",
+      timestamp: "2026-05-19T10:00:02.000Z",
+      message: {
+        role: "tool",
+        toolCallId: "call-read-image",
+        toolName: "read",
+        content: [
+          {
+            type: "image",
+            mimeType: "image/png",
+            data: "cG5n",
+          },
+        ],
+      },
+    };
+
+    renderModal({
+      entries: [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "call-read-image",
+            name: "read",
+            arguments: { path: "assets/screenshot.png" },
+          },
+        ]),
+      ],
+      toolResultByCallId: new Map([["call-read-image", toolResult]]),
+    });
+
+    const image = await screen.findByRole("img", { name: "assets/screenshot.png 1" });
+    expect(image.getAttribute("src")).toBe("data:image/png;base64,cG5n");
   });
 
   it("keeps Inspector and read output on the CodeBlock fallback path", async () => {
@@ -519,13 +700,13 @@ describe("ToolCallReviewModal UI behavior", () => {
       ],
     });
 
-    expect(await screen.findByText("Patch")).toBeTruthy();
+    expect(await screen.findByText("Edit")).toBeTruthy();
+    expect(document.querySelector("[data-tool-review-code-view-frame='true']")).toBeTruthy();
     expect(screen.queryByText("Change review")).toBeNull();
     expect(screen.queryByText("Impact")).toBeNull();
-    expect(document.body.textContent).not.toContain("src/App.tsx");
   });
 
-  it("splits new file and edit operations into separate filters", async () => {
+  it("groups new file and edit operations into one changes filter", async () => {
     renderModal({
       entries: [
         assistantToolEntry([
@@ -558,11 +739,11 @@ describe("ToolCallReviewModal UI behavior", () => {
       ],
     });
 
-    expect(screen.getByRole("radio", { name: /New\s*1/ })).toBeTruthy();
-    expect(screen.getByRole("radio", { name: /Edit\s*1/ })).toBeTruthy();
-    expect(screen.queryByRole("radio", { name: /Changes/ })).toBeNull();
-
-    fireEvent.click(screen.getByRole("radio", { name: /New\s*1/ }));
+    const changesFilter = screen.getByRole("radio", { name: /Changes\s*2/ });
+    expect(changesFilter).toBeTruthy();
+    expect(screen.queryByRole("radio", { name: /New\s*1/ })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /Edit\s*1/ })).toBeNull();
+    fireEvent.click(changesFilter);
 
     const shadowRoot = await getFileTreeShadowRoot();
     await waitFor(() => {
@@ -570,8 +751,14 @@ describe("ToolCallReviewModal UI behavior", () => {
         .map((button) => `${button.textContent ?? ""} ${button.getAttribute("data-item-path") ?? ""}`)
         .join("\n");
       expect(treeText).toContain("NewFile.ts");
-      expect(treeText).not.toContain("ExistingFile.ts");
+      expect(treeText).toContain("ExistingFile.ts");
     });
+
+    await waitFor(() => {
+      expect(document.querySelectorAll("diffs-container").length).toBe(2);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all files" }));
+    expect(screen.getByRole("button", { name: "Expand all files" })).toBeTruthy();
   });
 
   it("selects shell tree nodes and keeps the detail panel on that command", async () => {
@@ -726,7 +913,11 @@ describe("ToolCallReviewModal UI behavior", () => {
       expect(screen.getAllByText("src/App.tsx").length).toBeGreaterThan(0),
     );
     fireEvent.keyDown(document, { key: "ArrowDown" });
-    await waitFor(() => expect(screen.getAllByText("User.java").length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("src/main/java/com/example/User.java").length,
+      ).toBeGreaterThan(0),
+    );
     fireEvent.keyDown(document, { key: "ArrowUp" });
     await waitFor(() =>
       expect(screen.getAllByText("src/App.tsx").length).toBeGreaterThan(0),

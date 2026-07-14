@@ -715,12 +715,20 @@ async fn search_psm_plugin_market_internal(query: &str, size: Option<usize>, fro
     Ok(PsmPluginMarketSearchResult { query, total: results.len() as u64, results })
 }
 
+fn npm_executable() -> &'static str {
+    if cfg!(windows) {
+        "npm.cmd"
+    } else {
+        "npm"
+    }
+}
+
 async fn run_npm_command(command: &str, package_name: Option<&str>) -> Result<(String, String), String> {
     let npm_dir = npm_extensions_dir()?;
     fs::create_dir_all(&npm_dir).map_err(|e| format!("Failed to create PSM npm extensions dir: {e}"))?;
     let args = npm_command_args(command, package_name, &npm_dir)?;
 
-    let mut process = Command::new("npm");
+    let mut process = Command::new(npm_executable());
     process.args(&args);
     let output = timeout(Duration::from_secs(NPM_COMMAND_TIMEOUT_SECS), process.output()).await.map_err(|_| format!("npm {command} timed out after {NPM_COMMAND_TIMEOUT_SECS}s"))?.map_err(|e| format!("Failed to run npm {command}: {e}"))?;
 
@@ -920,7 +928,7 @@ pub async fn build_dev_psm_plugin(project_path: String) -> Result<PsmPluginDevBu
     let canonical = normalize_dev_plugin_project_path(&project_path)?;
     let project_dir = PathBuf::from(&canonical);
 
-    let mut process = Command::new("npm");
+    let mut process = Command::new(npm_executable());
     process.args(["run", "build"]);
     process.current_dir(&project_dir);
     let output = timeout(Duration::from_secs(DEV_PLUGIN_BUILD_TIMEOUT_SECS), process.output()).await.map_err(|_| format!("npm run build timed out after {DEV_PLUGIN_BUILD_TIMEOUT_SECS}s"))?.map_err(|e| format!("Failed to run npm run build for PSM dev plugin: {e}"))?;
@@ -1115,6 +1123,14 @@ mod tests {
 
         assert!(npm_command_args("install", Some("--registry=https://evil.example"), &npm_dir).is_err());
         assert!(npm_command_args("install", Some("@acme/psm sidechat"), &npm_dir).is_err());
+    }
+
+    #[test]
+    fn npm_executable_matches_platform() {
+        #[cfg(windows)]
+        assert_eq!(npm_executable(), "npm.cmd");
+        #[cfg(not(windows))]
+        assert_eq!(npm_executable(), "npm");
     }
 
     #[test]

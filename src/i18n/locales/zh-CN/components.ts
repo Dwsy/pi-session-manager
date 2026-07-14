@@ -65,8 +65,7 @@ export const components = {
     },
     filters: {
       all: '全部',
-      writes: '新建',
-      edits: '编辑',
+      changes: '变更',
       reads: '读取',
       shell: '命令',
       errors: '错误',
@@ -84,6 +83,10 @@ export const components = {
       unifiedView: '统一视图',
       wrap: '自动换行',
       expandUnchanged: '展开未变更行',
+      collapseFile: '折叠文件',
+      expandFile: '展开文件',
+      collapseAllFiles: '折叠全部文件',
+      expandAllFiles: '展开全部文件',
     },
     fileContent: '文件内容',
     previewMode: {

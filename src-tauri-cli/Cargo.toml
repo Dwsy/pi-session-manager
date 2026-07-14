@@ -27,7 +27,7 @@ futures-util = "0.3"
 portable-pty = "0.9"
 notify = "6.1"
 notify-debouncer-full = "0.3"
-rust-embed = "8"
+rust-embed = { version = "8", features = ["compression"] }
 mime_guess = "2"
 
 [features]

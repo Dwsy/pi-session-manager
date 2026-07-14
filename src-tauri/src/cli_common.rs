@@ -89,7 +89,7 @@ pub struct ServerConfig {
     pub auth_enabled: bool,
     #[serde(default)]
     pub embedding_enabled: bool,
-    /// Whether to serve frontend assets via HTTP. None = auto (CLI: true, GUI: false).
+    /// Whether to serve frontend assets via HTTP. None defaults to enabled.
     #[serde(default)]
     pub serve_frontend: Option<bool>,
 }
@@ -97,6 +97,17 @@ pub struct ServerConfig {
 impl Default for ServerConfig {
     fn default() -> Self {
         Self { ws_enabled: true, http_enabled: true, ws_port: 52131, http_port: 52131, bind_addr: "127.0.0.1".to_string(), auth_enabled: true, embedding_enabled: false, serve_frontend: None }
+    }
+}
+
+impl ServerConfig {
+    /// Resolve whether the HTTP server should expose the embedded web UI.
+    ///
+    /// Both desktop and CLI builds embed the frontend. Keeping it enabled by
+    /// default makes the advertised HTTP address usable in either mode, while
+    /// an explicit `false` still supports API-only deployments.
+    pub fn should_serve_frontend(&self) -> bool {
+        self.serve_frontend.unwrap_or(true)
     }
 }
 
@@ -253,6 +264,13 @@ mod tests {
         assert_eq!(cfg.http_port, 52131);
         assert_eq!(cfg.bind_addr, "127.0.0.1");
         assert!(cfg.auth_enabled);
+        assert!(cfg.should_serve_frontend());
+    }
+
+    #[test]
+    fn test_explicitly_disables_frontend_serving() {
+        let cfg = ServerConfig { serve_frontend: Some(false), ..ServerConfig::default() };
+        assert!(!cfg.should_serve_frontend());
     }
 
     #[test]

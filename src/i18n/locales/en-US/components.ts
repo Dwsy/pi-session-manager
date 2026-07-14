@@ -65,8 +65,7 @@ export const components = {
     },
     filters: {
       all: 'All',
-      writes: 'New',
-      edits: 'Edit',
+      changes: 'Changes',
       reads: 'Reads',
       shell: 'Shell',
       errors: 'Errors',
@@ -84,6 +83,10 @@ export const components = {
       unifiedView: 'Unified view',
       wrap: 'Wrap lines',
       expandUnchanged: 'Expand context',
+      collapseFile: 'Collapse file',
+      expandFile: 'Expand file',
+      collapseAllFiles: 'Collapse all files',
+      expandAllFiles: 'Expand all files',
     },
     fileContent: 'File content',
     previewMode: {

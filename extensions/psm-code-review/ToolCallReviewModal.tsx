@@ -6,6 +6,8 @@ import {
   Brain,
   Braces,
   Check,
+  ChevronDown,
+  ChevronRight,
   Code2,
   Columns2,
   Copy,
@@ -13,6 +15,7 @@ import {
   FileEdit,
   FilePlus,
   FileText,
+  FoldVertical,
   Loader2,
   Maximize2,
   Minimize2,
@@ -166,19 +169,11 @@ const FILTER_OPTIONS: Array<{
     iconClass: "text-[var(--tool-color-bash)]",
   },
   {
-    id: "writes",
-    icon: FilePlus,
-    labelKey: "components.toolCallReview.filters.writes",
-    fallbackLabel: "New",
-    predicate: (operation) => operation.toolName === "write",
-    iconClass: "text-[var(--tool-color-write)]",
-  },
-  {
-    id: "edits",
+    id: "changes",
     icon: FileEdit,
-    labelKey: "components.toolCallReview.filters.edits",
-    fallbackLabel: "Edit",
-    predicate: (operation) => operation.toolName === "edit",
+    labelKey: "components.toolCallReview.filters.changes",
+    fallbackLabel: "Changes",
+    predicate: isChangeOperation,
     iconClass: "text-[var(--tool-color-edit)]",
   },
   {
@@ -201,8 +196,7 @@ const FILTER_OPTIONS: Array<{
 
 const FILTER_ACTIVE_ICON_COLOR: Partial<Record<ReviewFilter, string>> = {
   shell: "var(--tool-color-bash)",
-  writes: "var(--tool-color-write)",
-  edits: "var(--tool-color-edit)",
+  changes: "var(--tool-color-edit)",
   reads: "var(--tool-color-read)",
   errors: "rgb(var(--color-destructive))",
 };
@@ -299,6 +293,30 @@ const REVIEW_CODE_VIEW_UNSAFE_CSS = `
   [data-separator-content],
   [data-expand-button] {
     border-radius: 4px;
+  }
+
+  [data-tool-review-collapse] {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    margin-left: -4px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: rgb(var(--color-muted-foreground));
+    cursor: pointer;
+  }
+
+  [data-tool-review-collapse]:hover {
+    background: rgb(var(--color-surface) / 0.72);
+    color: rgb(var(--color-foreground));
+  }
+
+  [data-tool-review-collapse] svg {
+    width: 14px;
+    height: 14px;
   }
 `;
 
@@ -624,9 +642,11 @@ interface CodeViewControls {
   splitView: boolean;
   wrap: boolean;
   expandUnchanged: boolean;
+  allFilesCollapsed: boolean;
   setSplitView: (value: boolean) => void;
   setWrap: (value: boolean) => void;
   setExpandUnchanged: (value: boolean) => void;
+  toggleAllFiles: () => void;
 }
 
 function ViewControlsToolbar({ controls }: { controls: CodeViewControls }) {
@@ -665,6 +685,16 @@ function ViewControlsToolbar({ controls }: { controls: CodeViewControls }) {
       onClick: () => controls.setExpandUnchanged(!controls.expandUnchanged),
       labelKey: "components.toolCallReview.controls.expandUnchanged",
       fallback: "Expand context",
+    },
+    {
+      key: "collapse-files",
+      icon: controls.allFilesCollapsed ? UnfoldVertical : FoldVertical,
+      active: controls.allFilesCollapsed,
+      onClick: controls.toggleAllFiles,
+      labelKey: controls.allFilesCollapsed
+        ? "components.toolCallReview.controls.expandAllFiles"
+        : "components.toolCallReview.controls.collapseAllFiles",
+      fallback: controls.allFilesCollapsed ? "Expand all files" : "Collapse all files",
     },
   ];
 
@@ -776,6 +806,7 @@ function DetailPanel({
   onToggleInspector,
   onCloseInspector,
   onNavigateToPath,
+  onToggleCodeViewItem,
 }: {
   operation: FileOperation | null;
   codeViewItems: CodeViewItem[];
@@ -790,6 +821,7 @@ function DetailPanel({
   onToggleInspector: () => void;
   onCloseInspector: () => void;
   onNavigateToPath?: (path: string) => void;
+  onToggleCodeViewItem: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -837,11 +869,13 @@ function DetailPanel({
     : normalizeReviewPath(operation.filePath) || operation.filePath;
   const commandText = operation.toolName === "bash" ? operation.filePath : "";
   const hasCodeViewOutput = codeViewItems.length > 0;
+  const hasImages = operation.toolName === "read" && (operation.images?.length ?? 0) > 0;
   const hasPrimaryOutput = Boolean(
     hasCodeViewOutput ||
     operation.content ||
     operation.output ||
-    operation.diff,
+    operation.diff ||
+    hasImages,
   );
   const usesCodeView = isChangeOperation(operation) && hasCodeViewOutput;
   const showsDiffControls = usesCodeView && codeViewItems.some((item) => item.type === "diff");
@@ -1042,6 +1076,27 @@ function DetailPanel({
                   items={codeViewItems}
                   className="custom-scrollbar h-full min-h-0 overflow-auto bg-background"
                   style={REVIEW_CODE_VIEW_STYLE}
+                  renderHeaderPrefix={(item) => {
+                    const collapsed = item.collapsed === true;
+                    const label = collapsed
+                      ? t("components.toolCallReview.controls.expandFile", "Expand file")
+                      : t("components.toolCallReview.controls.collapseFile", "Collapse file");
+                    const CollapseIcon = collapsed ? ChevronRight : ChevronDown;
+                    return (
+                      <button
+                        type="button"
+                        data-tool-review-collapse="true"
+                        aria-label={label}
+                        title={label}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onToggleCodeViewItem(item.id);
+                        }}
+                      >
+                        <CollapseIcon aria-hidden="true" />
+                      </button>
+                    );
+                  }}
                   options={{
                     theme: { dark: "pierre-dark", light: "pierre-light" },
                     themeType,
@@ -1077,6 +1132,18 @@ function DetailPanel({
               />
             ) : operation.toolName === "read" ? (
               <div className="space-y-3">
+                {operation.images && operation.images.length > 0 && (
+                  <div className="tool-review-code-surface space-y-3 border border-border/45 bg-background p-3">
+                    {operation.images.map((image, index) => (
+                      <img
+                        key={`${image.mimeType}-${index}`}
+                        src={`data:${image.mimeType};base64,${image.data}`}
+                        alt={`${displayPath} ${index + 1}`}
+                        className="block max-h-[60vh] max-w-full rounded border border-border/40 object-contain"
+                      />
+                    ))}
+                  </div>
+                )}
                 {(operation.content || operation.output) ? (
                   <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
                     {markdownPreview && displayPath.toLowerCase().endsWith(".md") ? (
@@ -1094,7 +1161,7 @@ function DetailPanel({
                       />
                     )}
                   </div>
-                ) : (
+                ) : operation.images && operation.images.length > 0 ? null : (
                   <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
                     <div className="flex items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.45)] px-3 py-2">
                       <FileText className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
@@ -1188,6 +1255,9 @@ export default function ToolCallReviewModal({
   const [contentExpanded, setContentExpanded] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [collapsedCodeViewIds, setCollapsedCodeViewIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const appliedInitialToolCallRef = useRef<string | null>(null);
 
   // Initialize from plugin settings config if provided, otherwise use defaults
@@ -1207,25 +1277,12 @@ export default function ToolCallReviewModal({
     isOpen,
   ]);
 
-  const codeViewControls = useMemo<CodeViewControls>(
-    () => ({
-      splitView,
-      wrap,
-      expandUnchanged,
-      setSplitView,
-      setWrap,
-      setExpandUnchanged,
-    }),
-    [splitView, wrap, expandUnchanged],
-  );
-
   const allOperations = useMemo(
     () => extractFileOperations(entries, toolResultByCallId),
     [entries, toolResultByCallId],
   );
-  const pendingInitialOperation = useMemo(() => {
+  const initialOperation = useMemo(() => {
     if (!isOpen || !initialToolCallId) return null;
-    if (appliedInitialToolCallRef.current === initialToolCallId) return null;
     return allOperations.find(
       (operation) =>
         operation.toolCallId === initialToolCallId ||
@@ -1302,10 +1359,23 @@ export default function ToolCallReviewModal({
     );
   }, [isShellView, searchedOperations, selectedOperation]);
 
+  const codeViewOperations =
+    activeFilter === "changes" ? searchedOperations : selectedFileOperations;
   const selectedCodeViewItems = useMemo(
-    () => buildCodeViewItems(selectedFileOperations),
-    [selectedFileOperations],
+    () =>
+      buildCodeViewItems(codeViewOperations).map((item) => {
+        const collapsed = collapsedCodeViewIds.has(item.id);
+        return {
+          ...item,
+          collapsed,
+          version: (item.version ?? 0) * 2 + Number(collapsed),
+        };
+      }),
+    [codeViewOperations, collapsedCodeViewIds],
   );
+  const allCodeViewItemsCollapsed =
+    selectedCodeViewItems.length > 0 &&
+    selectedCodeViewItems.every((item) => item.collapsed === true);
 
   const selectedTreePath =
     !isShellView && selectedOperation && isFileReviewOperation(selectedOperation)
@@ -1332,19 +1402,31 @@ export default function ToolCallReviewModal({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!pendingInitialOperation) return;
+    if (!initialOperation) return;
     setSearchQuery("");
     setActiveFilter(
-      pendingInitialOperation.toolName === "bash" ? "shell" : DEFAULT_REVIEW_FILTER,
+      initialOperation.toolName === "bash"
+        ? "shell"
+        : isChangeOperation(initialOperation)
+          ? "changes"
+          : initialOperation.toolName === "read"
+            ? "reads"
+            : "all",
     );
-  }, [pendingInitialOperation]);
+  }, [initialOperation]);
 
   useEffect(() => {
-    if (!isOpen) return;
-    if (filterCounts[activeFilter] === 0 && allOperations.length > 0) {
-      setActiveFilter("all");
+    if (!isOpen || filterCounts[activeFilter] > 0 || allOperations.length === 0) {
+      return;
     }
-  }, [activeFilter, filterCounts, isOpen, allOperations.length]);
+    setActiveFilter(fileOperations.length > 0 ? "all" : "shell");
+  }, [
+    activeFilter,
+    allOperations.length,
+    fileOperations.length,
+    filterCounts,
+    isOpen,
+  ]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1353,14 +1435,14 @@ export default function ToolCallReviewModal({
       return;
     }
 
-    if (pendingInitialOperation) {
-      const initialOperation = searchedOperations.find(
-        (operation) => operation.id === pendingInitialOperation.id,
+    if (initialOperation && appliedInitialToolCallRef.current !== initialToolCallId) {
+      const visibleInitialOperation = searchedOperations.find(
+        (operation) => operation.id === initialOperation.id,
       );
-      if (!initialOperation) return;
+      if (!visibleInitialOperation) return;
       appliedInitialToolCallRef.current = initialToolCallId ?? initialOperation.toolCallId;
-      if (selectedId !== initialOperation.id) {
-        setSelectedId(initialOperation.id);
+      if (selectedId !== visibleInitialOperation.id) {
+        setSelectedId(visibleInitialOperation.id);
       }
       return;
     }
@@ -1371,7 +1453,7 @@ export default function ToolCallReviewModal({
     if (selectionStillVisible) return;
 
     setSelectedId(searchedOperations[0].id);
-  }, [searchedOperations, isOpen, selectedId, pendingInitialOperation, initialToolCallId]);
+  }, [searchedOperations, isOpen, selectedId, initialOperation, initialToolCallId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1424,6 +1506,7 @@ export default function ToolCallReviewModal({
     if (!isOpen) {
       setContentExpanded(false);
       setInspectorOpen(false);
+      setCollapsedCodeViewIds(new Set());
     }
   }, [isOpen]);
 
@@ -1456,6 +1539,48 @@ export default function ToolCallReviewModal({
       if (operation) setSelectedId(operation.id);
     },
     [filteredOperations],
+  );
+
+  const handleToggleCodeViewItem = useCallback((id: string) => {
+    setCollapsedCodeViewIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleToggleAllCodeViewItems = useCallback(() => {
+    const itemIds = selectedCodeViewItems.map((item) => item.id);
+    setCollapsedCodeViewIds((current) => {
+      const next = new Set(current);
+      const collapse = !itemIds.every((id) => next.has(id));
+      for (const id of itemIds) {
+        if (collapse) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }, [selectedCodeViewItems]);
+
+  const codeViewControls = useMemo<CodeViewControls>(
+    () => ({
+      splitView,
+      wrap,
+      expandUnchanged,
+      allFilesCollapsed: allCodeViewItemsCollapsed,
+      setSplitView,
+      setWrap,
+      setExpandUnchanged,
+      toggleAllFiles: handleToggleAllCodeViewItems,
+    }),
+    [
+      splitView,
+      wrap,
+      expandUnchanged,
+      allCodeViewItemsCollapsed,
+      handleToggleAllCodeViewItems,
+    ],
   );
 
   const handleCopy = useCallback(async (operation: FileOperation) => {
@@ -1692,6 +1817,7 @@ export default function ToolCallReviewModal({
               onToggleInspector={handleToggleInspector}
               onCloseInspector={handleCloseInspector}
               onNavigateToPath={handleTreeSelect}
+              onToggleCodeViewItem={handleToggleCodeViewItem}
             />
           </div>
         )}

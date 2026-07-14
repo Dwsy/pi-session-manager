@@ -52,10 +52,3 @@ tempfile = "3"
 
 [build-dependencies]
 vergen-gix = { version = "9", features = ["build", "cargo", "rustc"] }
-
-[profile.release]
-opt-level = "z"
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true

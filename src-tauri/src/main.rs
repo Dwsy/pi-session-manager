@@ -222,8 +222,7 @@ fn main() {
                 let http_state = app_state.clone();
                 let http_port = server_cfg.http_port;
                 let http_bind = server_cfg.bind_addr.clone();
-                // serve_frontend: explicit config > auto (CLI: true, GUI: false)
-                let serve_frontend = server_cfg.serve_frontend.unwrap_or(cli_mode);
+                let serve_frontend = server_cfg.should_serve_frontend();
                 tauri::async_runtime::spawn(async move {
                     if let Err(e) = pi_session_manager::server::http::init_http_adapter_with_options(http_state, &http_bind, http_port, serve_frontend).await {
                         eprintln!("Failed to init HTTP adapter: {e}");
@@ -434,6 +433,7 @@ fn main() {
             pi_session_manager::refresh_session_intelligence_record,
             pi_session_manager::upsert_plugin_record,
             pi_session_manager::plugin_fs_roots,
+            pi_session_manager::get_agent_usage_status_command,
             pi_session_manager::plugin_fs_list,
             pi_session_manager::plugin_fs_read,
             pi_session_manager::plugin_fs_stat,

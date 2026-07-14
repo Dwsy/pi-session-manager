@@ -79,7 +79,7 @@ pub async fn init_http_adapter_with_options(app_state: SharedAppState, bind_addr
 }
 
 pub async fn init_http_adapter_with_embedding(app_state: SharedAppState, bind_addr: &str, port: u16, serve_frontend: bool, embedding_service: Option<std::sync::Arc<crate::data::search::embedding::EmbeddingService>>) -> Result<(), String> {
-    let has_frontend = static_assets::has_frontend_assets();
+    let has_frontend = static_assets::has_frontend_assets(&app_state);
 
     if serve_frontend {
         if has_frontend {
@@ -119,10 +119,10 @@ pub async fn init_http_adapter_with_embedding(app_state: SharedAppState, bind_ad
         app = app.route("/v1/embedding", post(embedding::v1_embedding_handler)).route("/v1/embedding/batch", post(embedding::v1_embedding_batch_handler)).route("/v1/embedding/status", get(embedding::v1_embedding_status_handler)).layer(axum::Extension(svc));
     }
 
-    let mut app = app.with_state(app_state);
     if serve_frontend {
         app = app.fallback(get(static_assets::serve_static));
     }
+    let app = app.with_state(app_state);
 
     let addr = format!("{bind_addr}:{port}");
     let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|error| format!("Failed to bind HTTP: {error}"))?;

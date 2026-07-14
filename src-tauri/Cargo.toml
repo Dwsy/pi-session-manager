@@ -14,7 +14,7 @@ tauri-build = { version = "2.5.5", features = [] }
 
 [features]
 default = ["gui"]
-gui = ["dep:tauri", "dep:tauri-plugin-shell", "dep:tauri-plugin-dialog", "dep:tauri-plugin-deep-link", "dep:tauri-plugin-notification"]
+gui = ["dep:tauri", "dep:tauri-plugin-shell", "dep:tauri-plugin-dialog", "dep:tauri-plugin-deep-link", "dep:tauri-plugin-notification", "dep:tauri-plugin-updater"]
 cli = []
 custom-protocol = ["tauri?/custom-protocol"]
 
@@ -41,8 +41,6 @@ tokio-tungstenite = "0.21"
 futures-util = "0.3"
 log = "0.4"
 axum = { version = "0.7", features = ["ws"] }
-rust-embed = "8"
-mime_guess = "2"
 portable-pty = "0.9"
 async-stream = "0.3.6"
 flate2 = "1.0"
@@ -65,7 +63,7 @@ font-kit = "0.14"
 font-kit = { version = "0.14", features = ["source-fontconfig"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2"
+tauri-plugin-updater = { version = "2", optional = true }
 
 [lints.rust]
 dead_code = "allow"

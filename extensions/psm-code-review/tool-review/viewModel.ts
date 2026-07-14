@@ -181,16 +181,6 @@ function getGeneratedDiffCodeViewItem(operation: FileOperation): CodeViewItem | 
   const fileDiff = getOperationFileDiff(operation);
   if (!fileDiff) return null;
 
-  // write操作：直接显示文件内容，不使用diff视图
-  if (operation.toolName === "write") {
-    return {
-      id: operation.id,
-      type: "file",
-      file: fileDiff.newFile,
-      version: operation.sequence,
-    };
-  }
-
   return {
     id: operation.id,
     type: "diff",

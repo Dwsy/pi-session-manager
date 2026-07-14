@@ -11,6 +11,12 @@ export interface OperationMetrics {
   bytes: number;
 }
 
+export interface ReviewImage {
+  type: "image";
+  mimeType: string;
+  data: string;
+}
+
 export interface FileOperation {
   id: string;
   entryId: string;
@@ -21,6 +27,7 @@ export interface FileOperation {
   content?: string;
   output?: string;
   diff?: string;
+  images?: ReviewImage[];
   args: Record<string, unknown>;
   isError: boolean;
   timestamp: string;
@@ -28,7 +35,7 @@ export interface FileOperation {
   metrics: OperationMetrics;
 }
 
-export type ReviewFilter = "all" | "writes" | "edits" | "reads" | "shell" | "errors";
+export type ReviewFilter = "all" | "changes" | "reads" | "shell" | "errors";
 
 export const DEFAULT_REVIEW_FILTER: ReviewFilter = "all";
 
@@ -465,6 +472,7 @@ export function extractFileOperations(
       const args = asRecord(resolved.args ?? toolCall.arguments);
       const output = typeof resolved.output === "string" ? resolved.output : "";
       const diff = typeof resolved.diff === "string" ? resolved.diff : "";
+      const images = resolved.images ?? [];
       const editTextPair = toolName === "edit" ? getEditTextPair(args) : null;
       const contentArg =
         toolName === "edit"
@@ -491,6 +499,7 @@ export function extractFileOperations(
         content: contentArg || undefined,
         output: output || undefined,
         diff: diff || undefined,
+        images: images.length > 0 ? images : undefined,
         args,
         isError: Boolean(resolved.isError),
         timestamp: entry.timestamp,
