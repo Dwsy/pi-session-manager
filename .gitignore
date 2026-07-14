@@ -64,6 +64,7 @@ Thumbs.db
 *.tmp
 *.temp
 .cache/
+status-cache.json
 .claude/
 mktemp -d/
 

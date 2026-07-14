@@ -53,6 +53,10 @@ export const PSM_PERMISSION_META: Record<PsmPermission, { label: string; descrip
     label: 'Windows',
     description: 'Open host-managed popup windows',
   },
+  'usage:read': {
+    label: 'Agent usage',
+    description: 'Read local agent login credentials and fetch read-only subscription usage',
+  },
 }
 
 export function permissionLabel(permission: PsmPermission) {
@@ -73,6 +77,8 @@ export function requiredRuntimeRequestPermissions(command: string): PsmPermissio
     case 'plugin_window_open':
     case 'plugin_window_close':
       return ['windows:open']
+    case 'get_agent_usage_status':
+      return ['usage:read']
     default:
       return []
   }

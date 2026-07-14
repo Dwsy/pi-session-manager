@@ -5,6 +5,7 @@
 //! - terminal/: External terminal launching logic
 //! - stats/: Statistics aggregation
 
+pub mod agent_usage;
 pub mod casr_min;
 pub mod datasets;
 pub mod model_config;

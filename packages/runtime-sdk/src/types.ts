@@ -12,6 +12,7 @@ export type PsmPermission =
   | 'agent:invoke'
   | 'fs:read'
   | 'windows:open'
+  | 'usage:read'
 
 export interface PsmPermissionContext {
   pluginId?: string
@@ -360,12 +361,20 @@ export interface PsmAppViewRenderProps<TData = unknown> {
   data?: TData
 }
 
+export type PsmAppViewMainContentMode = 'replace' | 'keep'
+
 export interface PsmAppViewRegistration<TData = unknown> {
   id: string
   title: string
   route?: string
   icon?: string
   shortcut?: string
+  /**
+   * How opening this app view affects the desktop main pane.
+   * - `replace` (default): show the plugin main view when no session is selected
+   * - `keep`: leave the existing main pane (session/dashboard) unchanged; use with a sidebar list
+   */
+  mainContent?: PsmAppViewMainContentMode
   render(props: PsmAppViewRenderProps<TData>): unknown
 }
 
@@ -705,6 +714,37 @@ export interface PsmModelsClient {
   listOptions(): Promise<PsmModelOption[]>
 }
 
+export type PsmAgentUsageState = 'available' | 'unavailable' | 'error'
+
+export interface PsmAgentUsageMetric {
+  label: string
+  usedPercent?: number | null
+  resetAt?: string | null
+  detail?: string | null
+  remaining?: number | null
+  limit?: number | null
+  unit?: string | null
+}
+
+export interface PsmAgentUsageProvider {
+  id: string
+  name: string
+  planName?: string | null
+  fetchedAt: string
+  state: PsmAgentUsageState
+  message?: string | null
+  metrics: PsmAgentUsageMetric[]
+}
+
+export interface PsmAgentUsageStatus {
+  providers: PsmAgentUsageProvider[]
+  fetchedAt: string
+}
+
+export interface PsmAgentUsageClient {
+  getStatus(options?: { providerIds?: string[] }): Promise<PsmAgentUsageStatus>
+}
+
 export interface PsmJsonConfigReadOptions<TDefault = unknown> {
   defaultValue?: TDefault
 }
@@ -799,6 +839,7 @@ export interface PsmCapabilityClient {
   search: PsmSearchClient
   agent: PsmAgentClient
   models: PsmModelsClient
+  agentUsage: PsmAgentUsageClient
   tags: PsmTagsClient
   config: PsmJsonConfigClient
   fs: PsmFsClient

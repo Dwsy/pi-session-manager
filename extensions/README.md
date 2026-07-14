@@ -63,6 +63,7 @@ Current `ctx.psm` namespaces:
 | `widgets` | `list`, `get`, `readHtml` |
 | `fs` | `roots`, `list`, `read`, `stat` |
 | `windows` | `open` |
+| `agentUsage` | `getStatus` |
 
 AI plugins should use the host-managed Pi Agent bridge through `ctx.psm.agent`.
 Older `ctx.psm.ai`, `ctx.psm.sidechat`, and
@@ -81,6 +82,7 @@ the recommended plugin authoring path.
 | [psm-trace](./psm-trace/) | Session trace analytics main view parsed in the plugin runtime | `sessions:read` |
 | [psm-generative-ui-renderer](./psm-generative-ui-renderer/) | Renders saved `show_widget` HTML through the restricted filesystem widget root | `fs:read` |
 | [psm-word-cloud](./psm-word-cloud/) | Demonstrates Cmd+K plugin commands plus global/project user-message word cloud app views from session-list preview fields | `config:read`, `config:write` |
+| [psm-agent-usage](./psm-agent-usage/) | Default-off app view for local AI agent subscription / quota status via host-managed credential reads and official usage endpoints | `usage:read`, `config:read`, `config:write` |
 
 ## SDK Capability Notes
 

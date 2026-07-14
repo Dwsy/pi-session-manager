@@ -28,6 +28,7 @@ enum PluginPermission {
     AgentInvoke,
     FsRead,
     WindowsOpen,
+    UsageRead,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -67,6 +68,7 @@ fn parse_plugin_permission(value: &str) -> Option<PluginPermission> {
         "agent:invoke" => Some(PluginPermission::AgentInvoke),
         "fs:read" => Some(PluginPermission::FsRead),
         "windows:open" => Some(PluginPermission::WindowsOpen),
+        "usage:read" => Some(PluginPermission::UsageRead),
         _ => None,
     }
 }
@@ -98,6 +100,7 @@ fn required_permissions_for_command(command: &str) -> &'static [PluginPermission
         "plugin_agent_create_session" | "plugin_agent_run" | "plugin_agent_abort" | "plugin_agent_dispose" => &[PluginPermission::AgentInvoke],
         "plugin_fs_roots" | "plugin_fs_list" | "plugin_fs_read" | "plugin_fs_stat" => &[PluginPermission::FsRead],
         "plugin_window_open" | "plugin_window_close" => &[PluginPermission::WindowsOpen],
+        "get_agent_usage_status" => &[PluginPermission::UsageRead],
         _ => &[],
     }
 }
@@ -358,6 +361,17 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let index_values = payload.get("index_values").or_else(|| payload.get("indexValues")).cloned().map(serde_json::from_value).transpose().map_err(|e| format!("Invalid plugin record index values: {e}"))?;
             crate::upsert_plugin_record(record, index_values).await?;
             Ok(Value::Null)
+        }
+        "get_agent_usage_status" => {
+            let provider_ids = payload
+                .get("providerIds")
+                .or_else(|| payload.get("provider_ids"))
+                .cloned()
+                .map(serde_json::from_value)
+                .transpose()
+                .map_err(|e| format!("Invalid providerIds: {e}"))?;
+            let result = crate::get_agent_usage_status_command(provider_ids).await?;
+            Ok(to_val(result, "serialize agent usage status")?)
         }
         "plugin_fs_roots" => {
             let result = crate::plugin_fs_roots().await?;

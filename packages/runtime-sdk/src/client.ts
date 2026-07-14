@@ -12,6 +12,7 @@ import type {
   PsmAgentRunResult,
   PsmAgentRunStreamHandlers,
   PsmAgentSessionHandle,
+  PsmAgentUsageStatus,
   PsmCapabilityClient,
   PsmCreateTagParams,
   PsmFullTextSearchParams,
@@ -267,6 +268,13 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
     models: {
       listOptions() {
         return invoke<PsmModelOption[]>('list_model_options_fast')
+      },
+    },
+    agentUsage: {
+      getStatus(options) {
+        return invoke<PsmAgentUsageStatus>('get_agent_usage_status', {
+          providerIds: options?.providerIds,
+        })
       },
     },
     tags: {

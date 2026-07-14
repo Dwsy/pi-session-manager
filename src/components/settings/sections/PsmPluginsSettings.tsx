@@ -93,6 +93,7 @@ function permissionLabel(permission: PsmPermission, t: (key: string, defaultValu
     "agent:invoke": "Agent",
     "fs:read": "Files",
     "windows:open": "Windows",
+    "usage:read": "Agent usage",
   };
   return t(labelKey, labels[permission] ?? permission);
 }
@@ -113,6 +114,7 @@ function permissionDescription(permission: PsmPermission, t: (key: string, defau
     "agent:invoke": "Create and run host-managed agent sessions",
     "fs:read": "Read-only access to specific project path files",
     "windows:open": "Request host to open window dialogs",
+    "usage:read": "Read local agent credentials and fetch read-only subscription usage",
   };
   return t(descKey, descriptions[permission] ?? permission);
 }
@@ -479,7 +481,7 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
     const permissionOverrides = Object.fromEntries(
       (plugin.permissions ?? [])
         .map((item) => [item.permission, item.permission === permission ? granted : item.granted] as const)
-        .filter(([itemPermission, enabled]) => !enabled || (itemPermission === "fs:read" && enabled)),
+        .filter(([itemPermission, enabled]) => !enabled || ((itemPermission === "fs:read" || itemPermission === "usage:read") && enabled)),
     ) as Partial<Record<PsmPermission, boolean>>;
     try {
       await setPsmPluginPermissions({
@@ -942,7 +944,7 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
           {t("settings.psmPlugins.reload", "Reload")}
         </button>
       </div>
-      <div className="max-h-[420px] space-y-2 overflow-y-auto p-3">
+      <div className="space-y-2 p-3">
         {pluginsToRender.length === 0 && !loading ? (
           <div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
             {emptyText}

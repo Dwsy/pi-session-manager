@@ -77,6 +77,17 @@ describe('runtime-sdk manifest contract', () => {
     expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
   })
 
+  it('accepts agent usage permissions', () => {
+    const manifest: PsmPluginManifest = {
+      id: 'builtin.agent-usage',
+      name: 'Agent Usage',
+      version: '0.1.0',
+      permissions: ['usage:read', 'config:read', 'config:write'],
+    }
+
+    expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
+  })
+
   it('accepts agent invocation permissions', () => {
     const manifest: PsmPluginManifest = {
       id: 'builtin.agent-search',
@@ -159,6 +170,11 @@ describe('plugin capability client', () => {
   const agentPermissions: PsmPermissionContext = {
     pluginId: 'builtin.session-summary',
     permissions: ['records:read', 'records:write', 'sessions:read', 'search:read', 'tags:read', 'tags:write', 'model:invoke', 'agent:invoke'],
+  }
+
+  const usagePermissions: PsmPermissionContext = {
+    pluginId: 'builtin.agent-usage',
+    permissions: ['usage:read'],
   }
 
   it('sends typed record RPC through the provided PSM transport', async () => {
@@ -614,5 +630,43 @@ describe('plugin capability client', () => {
     expect(result.text).toBe('streamed by fallback')
     expect(deltas).toEqual(['streamed by fallback'])
     expect(done).toEqual(['streamed by fallback'])
+  })
+
+  it('requests agent usage status through the usage transport', async () => {
+    const calls: Array<{ command: string; payload?: unknown }> = []
+    const transport: PsmTransport = {
+      invoke: async (command, payload) => {
+        calls.push({ command, payload })
+        return {
+          fetchedAt: '2026-07-13T00:00:00Z',
+          providers: [
+            {
+              id: 'claude',
+              name: 'Claude Code',
+              fetchedAt: '2026-07-13T00:00:00Z',
+              state: 'available',
+              metrics: [{ label: '5h', usedPercent: 12 }],
+            },
+          ],
+        }
+      },
+    }
+
+    const client = createPluginCapabilityClient({ transport, permissions: usagePermissions })
+    const status = await client.agentUsage.getStatus({ providerIds: ['claude'] })
+
+    expect(status.providers[0]?.id).toBe('claude')
+    expect(calls).toEqual([
+      {
+        command: 'get_agent_usage_status',
+        payload: {
+          providerIds: ['claude'],
+          __psm: {
+            pluginId: 'builtin.agent-usage',
+            permissions: ['usage:read'],
+          },
+        },
+      },
+    ])
   })
 })

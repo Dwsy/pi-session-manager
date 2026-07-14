@@ -190,6 +190,7 @@ Plugin-safe permissions currently include:
 | `agent:invoke` | Create and run host-managed Pi Agent sessions through `ctx.psm.agent` |
 | `fs:read` | Read files through declared restricted filesystem roots, including saved widget HTML under the `widgets` root |
 | `windows:open` | Open host-managed popup windows |
+| `usage:read` | Read local AI agent login credentials and fetch read-only official subscription usage (opt-in, sensitive) |
 
 ## AI Plugin Guidance
 
@@ -265,6 +266,12 @@ features.
 | Method | Notes |
 | --- | --- |
 | `listOptions()` | Lists available model/provider combinations |
+
+### `agentUsage`
+
+| Method | Notes |
+| --- | --- |
+| `getStatus(options?)` | Returns local agent subscription/quota snapshots. Requires `usage:read`. Optional `providerIds` filters the host collector. Tokens never appear in the response. |
 
 ### `tags`
 

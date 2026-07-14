@@ -1,3 +1,4 @@
+mod agent_usage;
 mod auth;
 pub mod config_bundle;
 pub mod config_versions;
@@ -34,6 +35,7 @@ pub mod terminal;
 mod update;
 mod version_check;
 
+pub use agent_usage::*;
 pub use auth::*;
 pub use config_bundle::*;
 pub use config_versions::*;

@@ -20,6 +20,7 @@ const SUPPORTED_PERMISSIONS = new Set<PsmPermission>([
   'agent:invoke',
   'fs:read',
   'windows:open',
+  'usage:read',
 ])
 
 const SUPPORTED_SCOPES = new Set<PsmRecordScope>([

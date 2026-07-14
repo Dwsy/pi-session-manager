@@ -172,10 +172,14 @@ function settingsFor(manifest: PsmPluginManifest, entry: PsmPluginConfigEntry): 
   return { ...defaultSettingsFor(manifest), ...(entry.settings ?? {}) }
 }
 
+function isOptInPermission(permission: PsmPermission) {
+  return permission === 'fs:read' || permission === 'usage:read'
+}
+
 function permissionStatusesFor(manifest: PsmPluginManifest, entry: PsmPluginConfigEntry) {
   return (manifest.permissions ?? []).map((permission) => ({
     permission,
-    granted: permission === 'fs:read'
+    granted: isOptInPermission(permission)
       ? entry.permissionOverrides?.[permission] === true
       : entry.permissionOverrides?.[permission] !== false,
   }))
@@ -626,11 +630,11 @@ export class PsmPluginHost {
     permission: PsmPermission,
   ) {
     const explicitlyGranted = configEntry.permissionOverrides?.[permission] === true
-    if (permissions.permissions?.includes(permission) && (permission !== 'fs:read' || explicitlyGranted)) return
+    if (permissions.permissions?.includes(permission) && (!isOptInPermission(permission) || explicitlyGranted)) return
     if (!manifest.permissions?.includes(permission)) {
       throw new Error(`Plugin permission denied: ${manifest.id} did not declare ${permission}`)
     }
-    if (permission !== 'fs:read') {
+    if (!isOptInPermission(permission)) {
       throw new Error(`Plugin permission denied: ${manifest.id} missing ${permission}`)
     }
 

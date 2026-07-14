@@ -41,6 +41,7 @@ The injected `ctx.psm` client currently has these namespaces:
 | `search` | `fulltext`, `pluginRecords` |
 | `agent` | `createSession`, `run`, `runStream`, `abort`, `dispose` |
 | `models` | `listOptions` |
+| `agentUsage` | `getStatus` |
 | `tags` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` |
 | `config` | `read`, `write` |
 

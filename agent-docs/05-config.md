@@ -16,6 +16,7 @@
 | Pi model config | `~/.pi/agent/models.json` |
 | Pi settings | `~/.pi/agent/settings.json` |
 | Config snapshots | `~/.pi/pi-session-manager/history/config-versions/*.json` |
+| Plugin JSON config | `~/.pi/pi-session-manager/plugin-config/<pluginId>/<key>.json` |
 
 ## Tech Stack
 

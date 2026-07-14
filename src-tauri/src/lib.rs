@@ -121,6 +121,7 @@ pub fn run() {
             plugin_fs_list,
             plugin_fs_read,
             plugin_fs_stat,
+            get_agent_usage_status_command,
             plugin_window_open,
             plugin_window_close,
             load_psm_plugin_config,
