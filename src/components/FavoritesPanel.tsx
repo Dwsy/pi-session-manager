@@ -45,6 +45,10 @@ export default function FavoritesPanel({
     return <FavoritesSkeleton />
   }
 
+  if (loading) {
+    return <div className="flex-1 min-h-[120px]" aria-hidden="true" />
+  }
+
   if (favorites.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-4">

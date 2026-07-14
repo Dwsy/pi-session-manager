@@ -4,6 +4,9 @@ import type {
   PsmPluginSettingValue,
   PsmAppSidebarViewRegistration,
   PsmAppViewRegistration,
+  PsmProjectListActionRegistration,
+  PsmSessionContextMenuActionRegistration,
+  PsmSessionListActionRegistration,
   PsmSessionMainViewRegistration,
   PsmPluginCommandContext,
   PsmPluginCommandRegistration,
@@ -192,10 +195,25 @@ export interface PsmToolRendererRuntimeRegistration extends PsmToolRendererRegis
   pluginId: string
 }
 
+export interface PsmSessionListActionRuntimeRegistration extends PsmSessionListActionRegistration {
+  pluginId: string
+}
+
+export interface PsmProjectListActionRuntimeRegistration extends PsmProjectListActionRegistration {
+  pluginId: string
+}
+
+export interface PsmSessionContextMenuActionRuntimeRegistration extends PsmSessionContextMenuActionRegistration {
+  pluginId: string
+}
+
 export interface PsmPluginSessionUiSnapshot {
   ready: boolean
   appViews: PsmAppViewRuntimeRegistration[]
   appSidebarViews: PsmAppSidebarViewRuntimeRegistration[]
+  sessionListActions: PsmSessionListActionRuntimeRegistration[]
+  projectListActions: PsmProjectListActionRuntimeRegistration[]
+  sessionContextMenuActions: PsmSessionContextMenuActionRuntimeRegistration[]
   toolbarItems: PsmSessionToolbarItemRuntimeRegistration[]
   panels: PsmSessionPanelRuntimeRegistration[]
   treeViews: PsmSessionTreeViewRuntimeRegistration[]

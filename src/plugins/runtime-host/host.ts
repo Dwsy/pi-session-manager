@@ -55,6 +55,9 @@ import type {
   PsmPathPluginEntry,
   PsmAppSidebarViewRuntimeRegistration,
   PsmAppViewRuntimeRegistration,
+  PsmProjectListActionRuntimeRegistration,
+  PsmSessionContextMenuActionRuntimeRegistration,
+  PsmSessionListActionRuntimeRegistration,
   PsmPluginLoadEntry,
   PsmPluginSessionUiSnapshot,
   PsmPluginSource,
@@ -410,12 +413,15 @@ export class PsmPluginHost {
   private toolRenderers = new Map<string, PsmToolRendererRuntimeRegistration>()
   private appViews = new Map<string, PsmAppViewRuntimeRegistration>()
   private appSidebarViews = new Map<string, PsmAppSidebarViewRuntimeRegistration>()
+  private sessionListActions = new Map<string, PsmSessionListActionRuntimeRegistration>()
+  private projectListActions = new Map<string, PsmProjectListActionRuntimeRegistration>()
+  private sessionContextMenuActions = new Map<string, PsmSessionContextMenuActionRuntimeRegistration>()
   private sessionToolbarItems = new Map<string, PsmSessionToolbarItemRuntimeRegistration>()
   private sessionPanels = new Map<string, PsmSessionPanelRuntimeRegistration>()
   private sessionTreeViews = new Map<string, PsmSessionTreeViewRuntimeRegistration>()
   private sessionMainViews = new Map<string, PsmSessionMainViewRuntimeRegistration>()
   private commandSnapshot: PsmPluginCommandRuntimeRegistration[] = []
-  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { ready: false, appViews: [], appSidebarViews: [], toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
+  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { ready: false, appViews: [], appSidebarViews: [], sessionListActions: [], projectListActions: [], sessionContextMenuActions: [], toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
   private listeners = new Set<() => void>()
   private activePlugins = new Map<string, ActivePlugin>()
   private statuses = new Map<string, PsmPluginStatus>()
@@ -469,6 +475,18 @@ export class PsmPluginHost {
     return Array.from(this.appSidebarViews.values()).sort((a, b) => a.id.localeCompare(b.id))
   }
 
+  listSessionListActions(): PsmSessionListActionRuntimeRegistration[] {
+    return Array.from(this.sessionListActions.values()).sort((a, b) => a.id.localeCompare(b.id))
+  }
+
+  listProjectListActions(): PsmProjectListActionRuntimeRegistration[] {
+    return Array.from(this.projectListActions.values()).sort((a, b) => a.id.localeCompare(b.id))
+  }
+
+  listSessionContextMenuActions(): PsmSessionContextMenuActionRuntimeRegistration[] {
+    return Array.from(this.sessionContextMenuActions.values()).sort((a, b) => a.id.localeCompare(b.id))
+  }
+
   listSessionToolbarItems(): PsmSessionToolbarItemRuntimeRegistration[] {
     return Array.from(this.sessionToolbarItems.values()).sort((a, b) => a.id.localeCompare(b.id))
   }
@@ -515,6 +533,9 @@ export class PsmPluginHost {
       ready: true,
       appViews: this.listAppViews(),
       appSidebarViews: this.listAppSidebarViews(),
+      sessionListActions: this.listSessionListActions(),
+      projectListActions: this.listProjectListActions(),
+      sessionContextMenuActions: this.listSessionContextMenuActions(),
       toolbarItems: this.listSessionToolbarItems(),
       panels: this.listSessionPanels(),
       treeViews: this.listSessionTreeViews(),
@@ -560,6 +581,9 @@ export class PsmPluginHost {
     this.tools.clear()
     this.appViews.clear()
     this.appSidebarViews.clear()
+    this.sessionListActions.clear()
+    this.projectListActions.clear()
+    this.sessionContextMenuActions.clear()
     this.sessionToolbarItems.clear()
     this.sessionPanels.clear()
     this.sessionTreeViews.clear()
@@ -807,6 +831,9 @@ export class PsmPluginHost {
     const sessionEntryTransformerIds: string[] = []
     const appViewIds: string[] = []
     const appSidebarViewIds: string[] = []
+    const sessionListActionIds: string[] = []
+    const projectListActionIds: string[] = []
+    const sessionContextMenuActionIds: string[] = []
     const toolbarItemIds: string[] = []
     const panelIds: string[] = []
     const treeViewIds: string[] = []
@@ -847,6 +874,21 @@ export class PsmPluginHost {
           }
           this.appSidebarViews.set(view.id, { ...view, pluginId: manifest.id })
           appSidebarViewIds.push(view.id)
+        },
+        registerSessionListAction: (action) => {
+          if (this.sessionListActions.has(action.id)) return
+          this.sessionListActions.set(action.id, { ...action, pluginId: manifest.id })
+          sessionListActionIds.push(action.id)
+        },
+        registerProjectListAction: (action) => {
+          if (this.projectListActions.has(action.id)) return
+          this.projectListActions.set(action.id, { ...action, pluginId: manifest.id })
+          projectListActionIds.push(action.id)
+        },
+        registerSessionContextMenuAction: (action) => {
+          if (this.sessionContextMenuActions.has(action.id)) return
+          this.sessionContextMenuActions.set(action.id, { ...action, pluginId: manifest.id })
+          sessionContextMenuActionIds.push(action.id)
         },
         registerSessionToolbarItem: (item) => {
           if (this.sessionToolbarItems.has(item.id)) {
@@ -971,6 +1013,9 @@ export class PsmPluginHost {
       for (const id of sessionEntryTransformerIds) sessionEntryTransformers.unregister(id)
       for (const id of appViewIds) this.appViews.delete(id)
       for (const id of appSidebarViewIds) this.appSidebarViews.delete(id)
+      for (const id of sessionListActionIds) this.sessionListActions.delete(id)
+      for (const id of projectListActionIds) this.projectListActions.delete(id)
+      for (const id of sessionContextMenuActionIds) this.sessionContextMenuActions.delete(id)
       for (const id of toolbarItemIds) this.sessionToolbarItems.delete(id)
       for (const id of panelIds) this.sessionPanels.delete(id)
       for (const id of treeViewIds) this.sessionTreeViews.delete(id)

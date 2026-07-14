@@ -1,7 +1,7 @@
 import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
 
-import type { FavoriteItem, SessionInfo, SessionTag, Tag } from "@/types";
+import type { SessionInfo, SessionTag, Tag } from "@/types";
 import type { TerminalType } from "@/components/settings/types";
 import type { DeleteSessionRequestOptions } from "@/components/dialogs/deleteSessionTypes";
 
@@ -21,8 +21,7 @@ export interface AppPluginSurfaceData {
   onResumeSession?: (session: SessionInfo) => void | Promise<void>;
   onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>;
   onNewSession?: (cwd: string) => void | Promise<void>;
-  favorites?: FavoriteItem[];
-  onToggleFavorite?: (item: Omit<FavoriteItem, "addedAt">) => void;
+  onSelectProject?: (projectPath: string) => void;
   terminal?: TerminalType;
   piPath?: string;
   customCommand?: string;
