@@ -29,11 +29,15 @@ pub mod app_state;
 #[cfg(feature = "gui")]
 pub mod file_watcher;
 #[cfg(feature = "gui")]
+pub mod macos_dock;
+#[cfg(feature = "gui")]
 pub mod pi_agent_registry;
 #[cfg(feature = "gui")]
 pub mod terminal;
 #[cfg(feature = "gui")]
 pub mod tray;
+#[cfg(feature = "gui")]
+pub use macos_dock::update_macos_dock_recent_sessions;
 
 // Window dimension constants and helpers (shared between main.rs and tray.rs)
 pub const DEFAULT_WINDOW_WIDTH: f64 = 1400.0;
@@ -166,6 +170,7 @@ pub fn run() {
             get_lightweight_mode,
             set_lightweight_mode,
             open_session_in_terminal,
+            update_macos_dock_recent_sessions,
             list_available_terminals,
             scan_skills,
             scan_prompts,

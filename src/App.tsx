@@ -21,6 +21,7 @@ import { useDeepLink } from "./hooks/useDeepLink";
 import { useSessionBadges } from "./hooks/useSessionBadges";
 import { listSupportedSessionProviders } from "./utils/sessionProvidersApi";
 import { useSessions } from "./hooks/useSessions";
+import { useMacosDockRecentSessions } from "./hooks/useMacosDockRecentSessions";
 import { useDelayedLoading } from "./hooks/useDelayedLoading";
 import { useAppSettings } from "./hooks/useAppSettings";
 import { useSessionActions } from "./hooks/useSessionActions";
@@ -235,6 +236,7 @@ function App() {
     confirmDeleteSession,
     cancelDeleteSession,
   } = useSessions();
+  useMacosDockRecentSessions(selectedSession);
 
   const showScanningPage = useDelayedLoading(loading);
 

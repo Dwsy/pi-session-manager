@@ -56,6 +56,10 @@ casr = { package = "cross_agent_session_resumer", path = "crates/casr" }
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
 trash = "5.2"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+muda = "0.17.1"
+objc2 = "0.6.3"
+
 [target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
 font-kit = "0.14"
 

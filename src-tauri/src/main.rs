@@ -139,6 +139,14 @@ fn handle_native_menu_event(app: &tauri::AppHandle, event: tauri::menu::MenuEven
         if let Err(error) = app.emit("menu-check-update", ()) {
             log::warn!("Failed to emit check update event from native menu: {error}");
         }
+    } else if let Some(session_id) = event.id().as_ref().strip_prefix(pi_session_manager::macos_dock::DOCK_RECENT_SESSION_PREFIX) {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        let url = format!("pi-session://sessions/{}", urlencoding::encode(session_id));
+        if let Err(error) = app.emit("deep-link://navigate", url) {
+            log::warn!("Failed to open recent session from macOS Dock menu: {error}");
+        }
     }
 }
 
@@ -200,6 +208,9 @@ fn main() {
             if !cli_mode {
                 if let Err(error) = install_native_menu(app) {
                     log::warn!("Failed to install native menu: {error}");
+                }
+                if let Err(error) = pi_session_manager::macos_dock::install() {
+                    log::warn!("Failed to install macOS Dock menu: {error}");
                 }
             }
 
@@ -480,6 +491,7 @@ fn main() {
             pi_session_manager::get_lightweight_mode,
             pi_session_manager::set_lightweight_mode,
             pi_session_manager::open_session_in_terminal,
+            pi_session_manager::update_macos_dock_recent_sessions,
             pi_session_manager::list_available_terminals,
             pi_session_manager::scan_skills,
             pi_session_manager::scan_prompts,
