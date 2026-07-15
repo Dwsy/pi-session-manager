@@ -49,5 +49,16 @@ describe("settings registry selectors", () => {
     expect(
       getAvailableSettingsSections().map((section) => section.id),
     ).not.toContain("pi-agent");
+    expect(
+      getAvailableSettingsGroups("preferences").flatMap(
+        (group) => group.sections,
+      ),
+    ).toEqual(expect.arrayContaining(["app-behavior", "updates"]));
+    expect(
+      getAvailableSettingsSections().find((section) => section.id === "updates"),
+    ).toMatchObject({
+      group: "app",
+      saveMode: "app-settings",
+    });
   });
 });

@@ -5,17 +5,41 @@
 </p>
 
 <p align="center">
-  Manage <a href="https://github.com/badlogic/pi-mono">Pi</a> coding sessions with a Tauri desktop app, browser-accessible server mode, and static demo pages.
+  <strong>A local-first workbench for the sessions coding agents leave behind.</strong>
+</p>
+
+<p align="center">
+  Browse, search, understand, and continue work across Pi and other coding agents -- without putting another Agent GUI between you and them.
 </p>
 
 <p align="center">
   <a href="https://github.com/Dwsy/pi-session-manager/releases/latest">Releases</a> ·
   <a href="https://dwsy.github.io/pi-session-manager/">Documentation</a> ·
-  <a href="https://dwsy.github.io/pi-session-manager/cn/">zh</a> ·
+  <a href="README.zh.md">中文</a> ·
   <a href="https://dwsy.github.io/pi-session-manager/demo/">Demo</a> ·
   <a href="https://dwsy.github.io/pi-session-manager/dataset/">Dataset</a> ·
   <a href="extensions/README.md">Extensions</a>
 </p>
+
+## The Idea
+
+Coding agent sessions are more than disposable chat logs. They contain decisions, commands, failed attempts, tool traces, and the context needed to continue unfinished work.
+
+Pi Session Manager treats those sessions as durable, inspectable project artifacts. It indexes and organizes existing session sources while leaving execution to the agents and terminals that created them.
+
+> PSM manages the work around the agent, not the agent itself.
+
+| Session workspace | Knowledge layer | Observability layer |
+|-------------------|-----------------|---------------------|
+| Organize, tag, search, export, and resume past work. | Find decisions and context across sessions and datasets. | Inspect branches, tool calls, traces, activity, tokens, and cost. |
+
+## What PSM Is -- and Is Not
+
+| PSM is | PSM is not |
+|--------|------------|
+| A local-first library for coding-session history | Another Codex-style agent GUI |
+| A cross-agent index, viewer, and continuity layer | A replacement for Pi, Claude Code, Codex, or their native workflows |
+| An extensible surface for understanding session artifacts | A chat shell that requires AI features for basic session management |
 
 ## UI Preview
 
@@ -27,21 +51,24 @@
 |-------------|--------|
 | ![Session Tree](website/public/screenshots/session-tree.png) | ![Kanban](website/public/screenshots/kanban.png) |
 
-## Features
+## Core Capabilities
 
-Pi Session Manager is a focused workspace for browsing, searching, resuming, and extending Pi coding sessions.
+- Scan and index sessions from Pi and external sources including Claude Code, Codex, OpenCode, Gemini CLI, Cursor, and Antigravity.
+- Browse by list, project, tree, and kanban views; organize with tags, favorites, names, and metadata.
+- Search across sessions and in-session messages with full-text indexing, highlights, labels, and source filters.
+- Reconstruct work through conversation trees, Branch Atlas, tool-call rendering, compaction context, and trace views.
+- Resume, convert, or export sessions and hand work back to the original terminal or agent workflow.
+- Review activity through heatmaps, token trends, model usage, cost statistics, and session datasets.
+- Run as a Tauri desktop app, a browser-accessible headless server with HTTP/WebSocket APIs, or static demo and dataset builds.
+- Use the built-in `en-US`, `zh-CN`, `ja-JP`, `de-DE`, `fr-FR`, and `es-ES` language packs.
 
-- Browse sessions by list, project, tree, and kanban views.
-- Search sessions and in-session messages with full-text indexing, inline highlights, and source filters.
-- Resume sessions from the desktop app, browser-accessible server mode, or the standalone CLI.
-- Manage tags, favorites, rename state, exports, and session metadata.
-- Inspect activity through heatmaps, token trends, cost stats, and session trace views.
-- Browse external agent sessions from tools such as Claude and OpenCode.
-- Explore session datasets with local caching, search, tags, favorites, and statistics.
-- Use built-in i18n packs: `en-US`, `zh-CN`, `ja-JP`, `de-DE`, `fr-FR`, `es-ES`.
-- Try the app without local data through the static demo and dataset builds.
+## Install
 
-## CLI Install
+### Desktop App
+
+Download the latest build for macOS, Windows, or Linux from [GitHub Releases](https://github.com/Dwsy/pi-session-manager/releases/latest).
+
+### CLI / Headless Server
 
 macOS / Linux:
 
@@ -55,35 +82,27 @@ Windows PowerShell:
 iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
 ```
 
-Non-interactive examples:
+The installers download the latest `pi-session-cli`, verify SHA256 when available, configure the install path, and handle platform quarantine metadata.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.sh | bash -s -- --yes
-```
+## Extension Boundaries
 
-```powershell
-$env:PSM_INSTALL_YES="1"; iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
-```
+PSM keeps agent execution and session management separate through two extension layers:
 
-The installers detect platform, download the latest `pi-session-cli` release, verify SHA256 when available, guide install path selection, check `PATH`, and support Chinese/English output. macOS clears quarantine with `xattr`; Windows clears Mark-of-the-Web with `Unblock-File`.
+| Layer | Purpose |
+|------|---------|
+| Pi Agent extensions | Connect Pi runtime commands, status, naming, search, and resume workflows to the session library. |
+| PSM browser plugins | Add views, renderers, search, analysis, records, commands, and optional agent-assisted workflows around existing sessions. |
 
-## Extensibility
+Agent-assisted summaries, semantic search, review, and side chat are optional plugins. The core product remains useful without them: sessions can still be browsed, searched, understood, organized, and resumed.
 
-PSM has two extension layers:
-
-| Layer | What it extends | Examples |
-|------|------------------|----------|
-| Pi Agent extensions | Pi runtime commands, tools, status, and session workflow | `pi-session-bridge`, `resume-x`, `rename-nag` |
-| PSM browser plugins | App views, sidebars, session toolbar panels, tree views, tool renderers, commands, tools, records, search, and agent-powered workflows | `psm-sidechat`, `psm-session-summary`, `psm-semantic-search`, `psm-code-review`, `psm-kanban-board`, `psm-generative-ui-renderer`, `psm-word-cloud` |
-
-PSM browser plugins can be loaded from built-in packages, npm packages, local `.js` / `.mjs` files, or local dev projects through Settings -> PSM Plugins. Plugin permissions are declared in the manifest and surfaced in Settings.
+PSM browser plugins can come from built-in packages, npm packages, local `.js` / `.mjs` files, or local development projects. Permissions are declared in each manifest and surfaced in Settings -> PSM Plugins.
 
 Start here:
 
-- [extensions/README.md](extensions/README.md) - built-in extensions, plugin loading, SDK capability notes, and development workflow.
+- [extensions/README.md](extensions/README.md) - extension overview and development workflow.
 - [agent-docs/06-plugins.md](agent-docs/06-plugins.md) - plugin authoring boundaries and verification.
 - [docs/PSM_PLUGIN_SDK.md](docs/PSM_PLUGIN_SDK.md) - public browser-plugin SDK contract.
-- [docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md](docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md) - current SDK capabilities and remaining gaps.
+- [docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md](docs/PSM_PLUGIN_SDK_CAPABILITY_AUDIT.md) - current capabilities and remaining gaps.
 
 ## License
 

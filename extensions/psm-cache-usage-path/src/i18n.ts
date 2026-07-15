@@ -16,6 +16,7 @@ export const cacheUsageI18n: PsmPluginI18nResources = {
         loading: 'Loading cache usage...',
         empty: 'No assistant usage metrics found in this session.',
         tabs: {
+          overview: 'Overview',
           insights: 'Insights',
           trend: 'Trend',
           stats: 'Stats',
@@ -25,6 +26,9 @@ export const cacheUsageI18n: PsmPluginI18nResources = {
           perTurn: 'Per-turn %',
           cumulativePercent: 'Cum %',
           cumulativeTotal: 'Cum total',
+        },
+        overview: {
+          signals: 'Signals',
         },
         summary: {
           assistantTurns: 'Assistant turns',
@@ -125,6 +129,7 @@ export const cacheUsageI18n: PsmPluginI18nResources = {
         loading: '正在加载缓存使用...',
         empty: '当前会话没有可用的 assistant usage 指标。',
         tabs: {
+          overview: '概览',
           insights: '洞悉',
           trend: '趋势',
           stats: '统计',
@@ -134,6 +139,9 @@ export const cacheUsageI18n: PsmPluginI18nResources = {
           perTurn: '单轮 %',
           cumulativePercent: '累计 %',
           cumulativeTotal: '累计量',
+        },
+        overview: {
+          signals: '诊断信号',
         },
         summary: {
           assistantTurns: '助手轮次',

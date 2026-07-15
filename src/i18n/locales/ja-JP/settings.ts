@@ -76,6 +76,23 @@ export const settings = {
   language: {
     select: '言語を選択',
   },
+  psmPlugins: {
+    officialSourcesTitle: '内蔵ソース',
+    officialSourcesHint: 'PSM が選定した npm プラグインスイートです。各パッケージは複数の子プラグインを提供できます。',
+    officialSourceExports: '{{count}} 個の子プラグイン',
+    officialSourceAdd: 'ソースを追加',
+    officialSourceAdded: 'ソースを追加済み',
+    officialSourceSelectPlugins: '有効にするプラグインを選択',
+    officialSourceNoPlugins: '子プラグインが見つかりません。パッケージのインストール後にソースを再読み込みしてください。',
+    officialSourceEnablePlugin: '有効化',
+    officialSourceDisablePlugin: '無効化',
+    officialSources: {
+      piSessionManagerSuite: {
+        name: 'PSM プラグインスイート',
+        description: 'Pi Session Manager 用の npm プラグインスイートです。Pi Context Navigator から始まり、psm.extensions で拡張できます。',
+      },
+    },
+  },
   session: {
     autoRefresh: '自動更新',
     autoRefreshHelp: '新しいセッションを自動検出',

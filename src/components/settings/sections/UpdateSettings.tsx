@@ -24,7 +24,6 @@ import {
   Zap,
 } from 'lucide-react'
 import SettingsCard from '@/components/settings/SettingsCard'
-import SettingsField from '@/components/settings/SettingsField'
 import SettingsOptionGroup from '@/components/settings/SettingsOptionGroup'
 import SettingsToggleRow from '@/components/settings/SettingsToggleRow'
 import type { UpdateSettingsProps } from '@/components/settings/types'
@@ -214,7 +213,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
 
             <button
               onClick={handleCheck}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-info hover:bg-info/90 text-white text-sm font-medium motion-color motion-press focus-ring"
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground motion-color motion-press focus-ring hover:bg-primary/90"
             >
               <RefreshCw className="h-4 w-4" />
               {t('settings.update.checkNow', 'Check for updates now')}
@@ -307,7 +306,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
             <div className="flex flex-col gap-2">
               <button
                 onClick={desktopRuntime ? handleDownload : () => openReleasePage(state.update.releaseUrl)}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-info hover:bg-info/90 text-white text-sm font-medium motion-color motion-press focus-ring"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground motion-color motion-press focus-ring hover:bg-primary/90"
               >
                 <Download className="h-4 w-4" />
                 {desktopRuntime
@@ -393,7 +392,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
 
             <button
               onClick={handleRestart}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-success hover:bg-success/90 text-white text-sm font-medium motion-color motion-press focus-ring"
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-success px-3 py-2 text-xs font-medium text-white motion-color motion-press focus-ring hover:bg-success/90"
             >
               <Download className="h-4 w-4" />
               {t('settings.update.installAndRestart', 'Restart Now')}
@@ -452,7 +451,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <SettingsCard
         title={t('settings.update.title', 'Updates')}
         description={t(
@@ -460,58 +459,51 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
           'Manage app updates from release channel manifests',
         )}
         icon={<Download className="h-4 w-4" />}
+        contentClassName="p-0"
       >
-        <div className="space-y-5">
-          <SettingsToggleRow
-            title={t('settings.update.autoCheck', 'Auto Check Updates')}
-            description={t('settings.update.autoCheckHelp', 'Automatically check for updates on app startup')}
-            checked={settings.update.autoCheck !== false}
-            onChange={(enabled) => onUpdate('update', 'autoCheck', enabled)}
-            searchKey="update-auto-check"
-          />
-          {renderContent()}
-        </div>
-      </SettingsCard>
+        <div className="divide-y divide-border/40">
+          <div className="px-3 py-3">
+            <SettingsToggleRow
+              title={t('settings.update.autoCheck', 'Auto Check Updates')}
+              description={t('settings.update.autoCheckHelp', 'Automatically check for updates on app startup')}
+              checked={settings.update.autoCheck !== false}
+              onChange={(enabled) => onUpdate('update', 'autoCheck', enabled)}
+              descriptionClassName="mt-1 text-xs leading-relaxed text-muted-foreground"
+              searchKey="update-auto-check"
+            />
+          </div>
 
-      <SettingsCard
-        title={t('settings.update.channel.title', 'Update Channel')}
-        description={t(
-          'settings.update.channel.description',
-          'Choose which release track to receive updates from',
-        )}
-        icon={<Zap className="h-4 w-4" />}
-        searchKey="update-channel"
-      >
-        <SettingsField label={t('settings.update.channel.label', 'Channel')}>
-          <SettingsOptionGroup
-            options={['stable', 'beta'] as const}
-            value={channel}
-            onChange={(nextChannel) => onUpdate('update', 'channel', nextChannel)}
-            renderLabel={(optionChannel) => (
-              <span className="flex items-center gap-1.5">
-                {optionChannel === 'stable' ? (
-                  <>
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    {t('settings.update.channel.stable', 'Stable')}
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-3.5 w-3.5" />
-                    {t('settings.update.channel.beta', 'Beta')}
-                  </>
-                )}
-              </span>
-            )}
-            containerClassName="grid grid-cols-2 gap-2"
-            optionClassName="py-2"
-          />
-          <p className="text-xs text-muted-foreground mt-2">
-            {t(
-              'settings.update.channel.help',
-              'Stable: recommended for most users. Beta: early access to new features, may be unstable.',
-            )}
-          </p>
-        </SettingsField>
+          <div className="grid gap-3 px-3 py-3 md:grid-cols-[minmax(0,1fr)_minmax(240px,0.8fr)]" data-settings-search="update-channel">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Zap className="h-3.5 w-3.5 text-muted-foreground" />
+                {t('settings.update.channel.title', 'Update Channel')}
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {t('settings.update.channel.help', 'Stable: recommended for most users. Beta: early access to new features, may be unstable.')}
+              </p>
+            </div>
+            <SettingsOptionGroup
+              options={['stable', 'beta'] as const}
+              value={channel}
+              onChange={(nextChannel) => onUpdate('update', 'channel', nextChannel)}
+              renderLabel={(optionChannel) => (
+                <span className="flex items-center justify-center gap-1.5">
+                  {optionChannel === 'stable' ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+                  {optionChannel === 'stable'
+                    ? t('settings.update.channel.stable', 'Stable')
+                    : t('settings.update.channel.beta', 'Beta')}
+                </span>
+              )}
+              containerClassName="grid grid-cols-2 gap-1 rounded-md bg-secondary/35 p-1"
+              optionClassName="border-0 py-1.5 shadow-none"
+            />
+          </div>
+
+          <div className="px-3 py-3">
+            {renderContent()}
+          </div>
+        </div>
       </SettingsCard>
     </div>
   )

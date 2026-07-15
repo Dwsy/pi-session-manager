@@ -224,3 +224,39 @@ details[open] > .xml-details-summary::before {
     margin-bottom: 0;
   }
 }
+
+// Always-visible XML sections (e.g. read-files / modified-files)
+.xml-section-block {
+  margin: 12px 0;
+  border: 1px solid rgba(var(--accent-rgb), 0.12);
+  border-radius: 6px;
+  background: transparent;
+  overflow: hidden;
+}
+
+.xml-section-title {
+  padding: 6px 10px;
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--borderAccent, #00d7ff);
+  background: transparent;
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.xml-section-content {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-secondary, #d4d4d8);
+  line-height: 1.6;
+  background: transparent;
+
+  p:first-child {
+    margin-top: 0;
+  }
+  p:last-child {
+    margin-bottom: 0;
+  }
+}

@@ -449,7 +449,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   // ── Update ──
   {
     id: "update-auto-check",
-    section: "app-behavior",
+    section: "updates",
     labelKey: "settings.update.autoCheck",
     fallbackLabel: "Auto Check Updates",
     extraKeys: ["settings.update.autoCheckHelp"],
@@ -457,7 +457,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "update-channel",
-    section: "app-behavior",
+    section: "updates",
     labelKey: "settings.update.channel.title",
     fallbackLabel: "Update Channel",
     extraKeys: [

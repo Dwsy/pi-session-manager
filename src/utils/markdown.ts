@@ -407,16 +407,30 @@ function preprocessXmlBlocks(text: string): string {
 
   // Now process the XML blocks in the masked text
   const xmlBlockRegex = /<(read-files|modified-files|read-file|write-file|task|goals|plan|file|files|details)\s*>([\s\S]*?)<\/\1>/gi;
+  const alwaysVisibleTags = new Set(['read-files', 'modified-files'])
 
   maskedText = maskedText.replace(xmlBlockRegex, (_, tagName, innerContent) => {
     // Parse the inner content as markdown.
     const parsedInner = marked.parse(innerContent.trim()) as string;
+    const safeTagName = escapeHtml(tagName)
+
+    // File inventory blocks stay fully expanded; other XML blocks remain collapsible.
+    if (alwaysVisibleTags.has(String(tagName).toLowerCase())) {
+      return `
+<section class="xml-section-block">
+  <div class="xml-section-title">${safeTagName}</div>
+  <div class="xml-section-content">
+    ${parsedInner}
+  </div>
+</section>
+`;
+    }
 
     // Convert to collapsible <details> tag with Tokyo Night styling
     return `
 <details class="xml-details-block" open>
   <summary class="xml-details-summary">
-    <span class="xml-details-title">${escapeHtml(tagName)}</span>
+    <span class="xml-details-title">${safeTagName}</span>
   </summary>
   <div class="xml-details-content">
     ${parsedInner}

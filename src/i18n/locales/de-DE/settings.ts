@@ -73,6 +73,23 @@ export const settings = {
   language: {
     select: 'Sprache auswählen',
   },
+  psmPlugins: {
+    officialSourcesTitle: 'Integrierte Quellen',
+    officialSourcesHint: 'Von PSM kuratierte npm-Plugin-Suiten. Jedes Paket kann mehrere Unterplugins bereitstellen.',
+    officialSourceExports: '{{count}} Unterplugins',
+    officialSourceAdd: 'Quelle hinzufügen',
+    officialSourceAdded: 'Quelle hinzugefügt',
+    officialSourceSelectPlugins: 'Zu aktivierende Plugins auswählen',
+    officialSourceNoPlugins: 'Keine Unterplugins gefunden. Laden Sie die Quelle nach der Paketinstallation erneut.',
+    officialSourceEnablePlugin: 'Aktivieren',
+    officialSourceDisablePlugin: 'Deaktivieren',
+    officialSources: {
+      piSessionManagerSuite: {
+        name: 'PSM-Plugin-Suite',
+        description: 'Eine npm-Plugin-Suite für Pi Session Manager. Sie beginnt mit Pi Context Navigator und kann über psm.extensions erweitert werden.',
+      },
+    },
+  },
   session: {
     autoRefresh: 'Automatisch aktualisieren',
     autoRefreshHelp: 'Neue Sitzungen automatisch erkennen',

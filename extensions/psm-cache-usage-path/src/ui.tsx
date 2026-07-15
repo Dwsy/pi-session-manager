@@ -19,7 +19,7 @@ import { hostReact } from './host-react'
 const React = hostReact()
 const { useEffect, useMemo, useRef, useState } = React
 
-type CacheUsageTab = 'insights' | 'trend' | 'stats' | 'recent'
+type CacheUsageTab = 'overview' | 'trend' | 'stats' | 'recent'
 type CacheUsageTrendView = 'per-turn' | 'cumulative-percent' | 'cumulative-total'
 
 interface SessionsClientLike {
@@ -54,29 +54,29 @@ const MAX_PANEL_WIDTH = 620
 const CHART_HEIGHT = 170
 
 function toolbarButtonClass(open: boolean) {
-  return `inline-flex h-7 items-center gap-1.5 rounded-lg border px-2 text-xs transition-colors ${
+  return `inline-flex h-7 items-center gap-1.5 border px-2 text-xs transition-colors ${
     open
-      ? 'border-primary/35 bg-primary/12 text-foreground hover:bg-primary/16'
-      : 'border-border/70 bg-secondary text-muted-foreground hover:bg-secondary-hover hover:text-foreground'
+      ? 'border-primary/35 bg-primary/10 text-foreground'
+      : 'border-border/70 bg-transparent text-muted-foreground hover:bg-secondary hover:text-foreground'
   }`
 }
 
 function iconButtonClass() {
-  return 'inline-flex h-7 min-w-7 items-center justify-center rounded-md border border-border/70 bg-secondary px-2 text-muted-foreground hover:bg-secondary-hover hover:text-foreground'
+  return 'inline-flex h-7 min-w-7 items-center justify-center border border-border/70 bg-transparent px-2 text-muted-foreground hover:bg-secondary hover:text-foreground'
 }
 
 function tabButtonClass(active: boolean) {
-  return `inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
+  return `inline-flex h-8 items-center border-b-2 px-2 text-[11px] font-medium transition-colors ${
     active
-      ? 'border-primary/30 bg-primary/12 text-foreground'
-      : 'border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-secondary hover:text-foreground'
+      ? 'border-primary text-foreground'
+      : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
   }`
 }
 
-function statCardTone(value: number) {
-  if (value > 0) return 'text-foreground border-primary/30 bg-primary/8'
-  if (value < 0) return 'text-foreground border-warning/30 bg-warning/10'
-  return 'text-foreground border-border bg-card'
+function metricTone(value: number) {
+  if (value > 0) return 'border-l-2 border-primary/70'
+  if (value < 0) return 'border-l-2 border-warning/80'
+  return 'border-l-2 border-border'
 }
 
 function formatTimestamp(value: string, language: string) {
@@ -154,9 +154,9 @@ function insightTitle(insight: CacheUsageInsight, t: PsmPluginI18nClient['t']) {
 }
 
 function insightTone(severity: CacheUsageInsight['severity']) {
-  if (severity === 'warning') return 'border-warning/30 bg-warning/10'
-  if (severity === 'success') return 'border-primary/25 bg-primary/10'
-  return 'border-info/25 bg-info/10'
+  if (severity === 'warning') return 'border-l-2 border-warning/80'
+  if (severity === 'success') return 'border-l-2 border-primary/70'
+  return 'border-l-2 border-info/70'
 }
 
 function deltaTotals(stats: CacheUsageStats) {
@@ -385,7 +385,7 @@ function StatSection({
     : <span className="font-mono text-foreground">{formatInt(value, locale)}</span>
 
   return (
-    <section className="border border-border bg-card p-3">
+    <section className="border-b border-border/70 pb-3">
       <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{title}</div>
       <div className="space-y-2 text-xs">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3"><span className="text-muted-foreground">{t('session.cacheUsage.stats.assistantMessages', 'Assistant turns')}</span>{renderValue(totals.assistantMessages)}</div>
@@ -423,26 +423,26 @@ function CostSummary({ stats, locale, t }: { stats: CacheUsageStats; locale: str
   const coverage = total > 0 ? (known / total) * 100 : 0
 
   return (
-    <section className="border border-border bg-card p-3">
+    <section className="border-b border-border/70 pb-3">
       <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{t('session.cacheUsage.cost.title', 'Cost analysis')}</div>
       <div className="grid grid-cols-2 gap-2 text-xs">
-        <div className="border border-border/30 bg-secondary px-2.5 py-2">
+        <div className="border-l border-border/70 px-2.5 py-2">
           <div className="text-muted-foreground">{t('session.cacheUsage.cost.activeBranch', 'Branch cost')}</div>
           <div className="mt-1">
             <CostValue value={stats.activeBranchTotals.cost.total} knownMessages={stats.activeBranchTotals.cost.knownMessages} unknownMessages={stats.activeBranchTotals.cost.unknownMessages} locale={locale} t={t} />
           </div>
         </div>
-        <div className="border border-border/30 bg-secondary px-2.5 py-2">
+        <div className="border-l border-border/70 px-2.5 py-2">
           <div className="text-muted-foreground">{t('session.cacheUsage.cost.wholeTree', 'Tree cost')}</div>
           <div className="mt-1">
             <CostValue value={stats.treeTotals.cost.total} knownMessages={stats.treeTotals.cost.knownMessages} unknownMessages={stats.treeTotals.cost.unknownMessages} locale={locale} t={t} />
           </div>
         </div>
-        <div className="border border-border/30 bg-secondary px-2.5 py-2">
+        <div className="border-l border-border/70 px-2.5 py-2">
           <div className="text-muted-foreground">{t('session.cacheUsage.cost.coverage', 'Cost coverage')}</div>
           <div className="mt-1 font-mono text-foreground">{formatPercent(coverage, locale)}</div>
         </div>
-        <div className="border border-border/30 bg-secondary px-2.5 py-2">
+        <div className="border-l border-border/70 px-2.5 py-2">
           <div className="text-muted-foreground">{t('session.cacheUsage.cost.unknownTurns', 'Unknown cost turns')}</div>
           <div className="mt-1 font-mono text-warning">{formatInt(stats.treeTotals.cost.unknownMessages, locale)}</div>
         </div>
@@ -455,14 +455,14 @@ function ModelStatsTable({ models, locale, t }: { models: CacheUsageModelStat[];
   if (models.length === 0) return null
 
   return (
-    <section className="border border-border bg-card p-3">
+    <section className="border-b border-border/70 pb-3">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{t('session.cacheUsage.models.title', 'Model breakdown')}</div>
         <div className="text-[11px] text-muted-foreground">{t('session.cacheUsage.models.count', '{{count}} models', { count: models.length })}</div>
       </div>
       <div className="space-y-2">
         {models.slice(0, 6).map((model) => (
-          <div key={model.key} className="border border-border/30 bg-secondary px-2.5 py-2">
+          <div key={model.key} className="border-l-2 border-border/70 bg-transparent px-3 py-2">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium text-foreground">{model.label}</div>
@@ -490,7 +490,7 @@ function ModelStatsTable({ models, locale, t }: { models: CacheUsageModelStat[];
 
 function InsightCard({ insight, locale, t }: { insight: CacheUsageInsight; locale: string; t: PsmPluginI18nClient['t'] }) {
   return (
-    <div className={`border px-3 py-2.5 ${insightTone(insight.severity)}`}>
+    <div className={`px-3 py-2.5 ${insightTone(insight.severity)}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-medium text-foreground">{insightTitle(insight, t)}</div>
@@ -555,7 +555,7 @@ export function CacheUsagePanel({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<CacheUsageStats | null>(null)
-  const [activeTab, setActiveTab] = useState<CacheUsageTab>('insights')
+  const [activeTab, setActiveTab] = useState<CacheUsageTab>('overview')
   const [trendView, setTrendView] = useState<CacheUsageTrendView>('per-turn')
   const [isResizing, setIsResizing] = useState(false)
   const resizeStartRef = useRef<{ x: number; width: number } | null>(null)
@@ -673,15 +673,14 @@ export function CacheUsagePanel({
   const branchSpread = stats ? stats.activeBranchHitRate - stats.treeHitRate : 0
   const latestHitRate = stats?.activeBranchHitRate ?? 0
   const treeHitRate = stats?.treeHitRate ?? 0
-  const latestHitTone = statCardTone(latestHitRate)
-  const treeHitTone = statCardTone(treeHitRate)
-  const spreadTone = statCardTone(branchSpread)
+  const treeHitTone = metricTone(treeHitRate)
+  const spreadTone = metricTone(branchSpread)
   const latestPoint = stats?.messages[stats.messages.length - 1]?.hitRate ?? 0
   const minHit = stats?.messages.length ? Math.min(...stats.messages.map((message) => message.hitRate)) : 0
   const maxHit = stats?.messages.length ? Math.max(...stats.messages.map((message) => message.hitRate)) : 0
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-surface-dark/75" data-no-window-drag>
+    <div className="relative flex h-full min-h-0 flex-col bg-background" data-no-window-drag>
       <div
         onPointerDown={handleResizeStart}
         className={`absolute -left-[3px] top-0 h-full w-[6px] cursor-ew-resize ${isResizing ? 'bg-primary/30' : 'hover:bg-primary/15'}`}
@@ -690,15 +689,15 @@ export function CacheUsagePanel({
         aria-label={t('session.cacheUsage.title', 'Cache usage')}
       />
 
-      <div className="border-b border-border/70 bg-background/30 px-3 py-2.5">
+      <header className="border-b border-border/70 px-3 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[12px] font-medium uppercase tracking-[0.14em] text-foreground/92">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
               {t('session.cacheUsage.title', 'Cache usage')}
             </div>
-            <div className="mt-1 truncate text-[11px] text-muted-foreground">{session.name || session.path}</div>
+            <div className="mt-1 truncate text-xs text-muted-foreground">{session.name || session.path}</div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={() => void handleRefresh()}
@@ -719,116 +718,118 @@ export function CacheUsagePanel({
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <div className={`border px-2.5 py-2 ${latestHitTone}`}>
-            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{branchTitle}</div>
-            <div className="mt-1 text-base font-semibold">{formatPercent(latestHitRate, language)}</div>
+        <div className="mt-4 flex items-end justify-between gap-3">
+          <div>
+            <div className="text-[11px] text-muted-foreground">{branchTitle}</div>
+            <div className="mt-0.5 text-3xl font-semibold tracking-tight text-foreground">{formatPercent(latestHitRate, language)}</div>
           </div>
-          <div className={`border px-2.5 py-2 ${treeHitTone}`}>
-            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{t('session.cacheUsage.wholeTree', 'Whole tree')}</div>
-            <div className="mt-1 text-base font-semibold">{formatPercent(treeHitRate, language)}</div>
-          </div>
-          <div className={`border px-2.5 py-2 ${spreadTone}`}>
+          <div className={`border-l-2 px-3 py-1 text-right ${spreadTone}`}>
             <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{t('session.cacheUsage.spread', 'Spread')}</div>
-            <div className="mt-1 text-base font-semibold">{branchSpread > 0 ? '+' : ''}{formatPercent(branchSpread, language)}</div>
+            <div className="mt-1 font-mono text-sm text-foreground">{branchSpread > 0 ? '+' : ''}{formatPercent(branchSpread, language)}</div>
           </div>
         </div>
 
-        <div className="mt-2 text-[11px] text-muted-foreground">{t('session.cacheUsage.formula', 'cacheRead / (input + cacheRead + cacheWrite)')}</div>
-      </div>
-
-      <div className="border-b border-border bg-background/15 px-2 py-2">
-        <div className="flex items-center gap-1">
-          <button type="button" onClick={() => setActiveTab('insights')} className={tabButtonClass(activeTab === 'insights')}>{t('session.cacheUsage.tabs.insights', 'Insights')}</button>
-          <button type="button" onClick={() => setActiveTab('trend')} className={tabButtonClass(activeTab === 'trend')}>{t('session.cacheUsage.tabs.trend', 'Trend')}</button>
-          <button type="button" onClick={() => setActiveTab('stats')} className={tabButtonClass(activeTab === 'stats')}>{t('session.cacheUsage.tabs.stats', 'Stats')}</button>
-          <button type="button" onClick={() => setActiveTab('recent')} className={tabButtonClass(activeTab === 'recent')}>{t('session.cacheUsage.tabs.recent', 'Recent')}</button>
+        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-border/60 pt-3 text-xs">
+          <div className={`border-l-2 px-2 ${treeHitTone}`}>
+            <div className="text-muted-foreground">{t('session.cacheUsage.wholeTree', 'Whole tree')}</div>
+            <div className="mt-0.5 font-mono text-foreground">{formatPercent(treeHitRate, language)}</div>
+          </div>
+          <div className="border-l-2 border-border px-2">
+            <div className="text-muted-foreground">{t('session.cacheUsage.cost.recorded', 'Recorded cost')}</div>
+            <div className="mt-0.5"><CostValue value={stats?.treeTotals.cost.total ?? 0} knownMessages={stats?.treeTotals.cost.knownMessages ?? 0} unknownMessages={stats?.treeTotals.cost.unknownMessages ?? 0} locale={language} t={t} /></div>
+          </div>
         </div>
-      </div>
+
+        <div className="mt-3 flex items-center gap-2 text-[10px] text-muted-foreground">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+          <span>{t('session.cacheUsage.formula', 'cacheRead / (input + cacheRead + cacheWrite)')}</span>
+        </div>
+      </header>
+
+      <nav className="flex shrink-0 items-center gap-2 border-b border-border/70 px-3" aria-label={t('session.cacheUsage.title', 'Cache usage')}>
+        <button type="button" onClick={() => setActiveTab('overview')} className={tabButtonClass(activeTab === 'overview')}>{t('session.cacheUsage.tabs.overview', 'Overview')}</button>
+        <button type="button" onClick={() => setActiveTab('trend')} className={tabButtonClass(activeTab === 'trend')}>{t('session.cacheUsage.tabs.trend', 'Trend')}</button>
+        <button type="button" onClick={() => setActiveTab('stats')} className={tabButtonClass(activeTab === 'stats')}>{t('session.cacheUsage.tabs.stats', 'Stats')}</button>
+        <button type="button" onClick={() => setActiveTab('recent')} className={tabButtonClass(activeTab === 'recent')}>{t('session.cacheUsage.tabs.recent', 'Recent')}</button>
+      </nav>
 
       <div className="min-h-0 flex-1 overflow-auto">
         {loading ? (
-          <div className="px-3 py-3 text-sm text-muted-foreground">{t('session.cacheUsage.loading', 'Loading cache usage...')}</div>
+          <div className="px-3 py-4 text-sm text-muted-foreground">{t('session.cacheUsage.loading', 'Loading cache usage...')}</div>
         ) : error ? (
-          <div className="m-3 border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>
+          <div className="m-3 border-l-2 border-destructive px-3 py-2 text-sm text-destructive">{error}</div>
         ) : !stats || stats.assistantMessages === 0 ? (
-          <div className="m-3 border border-border bg-secondary px-3 py-3 text-sm text-muted-foreground">
+          <div className="m-3 border-l-2 border-border px-3 py-3 text-sm text-muted-foreground">
             <p>{t('session.cacheUsage.empty', 'No assistant usage metrics found in this session.')}</p>
             <p className="mt-2 text-xs text-muted-foreground/80">{branchHint}</p>
           </div>
-        ) : activeTab === 'insights' ? (
-          <div className="space-y-3 px-3 py-3">
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="border border-border bg-card px-2.5 py-2">
-                <div className="text-muted-foreground">{t('session.cacheUsage.insights.switches', 'Model switches')}</div>
-                <div className="mt-1 font-mono text-foreground">{formatInt(stats.modelSwitches.length, language)}</div>
+        ) : activeTab === 'overview' ? (
+          <div className="space-y-4 px-3 py-4">
+            <section className="border-b border-border/70 pb-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{t('session.cacheUsage.overview.signals', 'Signals')}</div>
+                <div className="font-mono text-[11px] text-muted-foreground">{formatInt(stats.insights.length, language)}</div>
               </div>
-              <div className="border border-border bg-card px-2.5 py-2">
-                <div className="text-muted-foreground">{t('session.cacheUsage.cost.recorded', 'Recorded cost')}</div>
-                <div className="mt-1">
-                  <CostValue value={stats.treeTotals.cost.total} knownMessages={stats.treeTotals.cost.knownMessages} unknownMessages={stats.treeTotals.cost.unknownMessages} locale={language} t={t} />
+              {stats.insights.length > 0 ? (
+                <div className="space-y-2">
+                  {stats.insights.map((insight) => (
+                    <InsightCard key={insight.id} insight={insight} locale={language} t={t} />
+                  ))}
                 </div>
-              </div>
-            </div>
-
-            {stats.insights.length > 0 ? (
-              <div className="space-y-2">
-                {stats.insights.map((insight) => (
-                  <InsightCard key={insight.id} insight={insight} locale={language} t={t} />
-                ))}
-              </div>
-            ) : (
-              <div className="border border-border bg-secondary px-3 py-3 text-sm text-muted-foreground">
-                {t('session.cacheUsage.insights.empty', 'No cache anomalies detected in this session.')}
-              </div>
-            )}
+              ) : (
+                <div className="border-l-2 border-primary/70 px-3 py-2 text-sm text-muted-foreground">
+                  {t('session.cacheUsage.insights.empty', 'No cache anomalies detected in this session.')}
+                </div>
+              )}
+            </section>
 
             <ModelStatsTable models={stats.modelStats} locale={language} t={t} />
+
             <CostSummary stats={stats} locale={language} t={t} />
-            <div className="text-[11px] text-muted-foreground">{branchHint}</div>
+            <div className="text-[11px] leading-relaxed text-muted-foreground">{branchHint}</div>
           </div>
         ) : activeTab === 'trend' ? (
-          <div className="px-3 py-3">
-            <div className="mb-3 flex flex-wrap items-center gap-1">
-              <button type="button" onClick={() => setTrendView('per-turn')} className={tabButtonClass(trendView === 'per-turn')}>{t('session.cacheUsage.views.perTurn', 'Per-turn %')}</button>
-              <button type="button" onClick={() => setTrendView('cumulative-percent')} className={tabButtonClass(trendView === 'cumulative-percent')}>{t('session.cacheUsage.views.cumulativePercent', 'Cum %')}</button>
-              <button type="button" onClick={() => setTrendView('cumulative-total')} className={tabButtonClass(trendView === 'cumulative-total')}>{t('session.cacheUsage.views.cumulativeTotal', 'Cum total')}</button>
+          <div className="space-y-4 px-3 py-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{t('session.cacheUsage.tabs.trend', 'Trend')}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{t('session.cacheUsage.summary.assistantTurns', 'Assistant turns')}: {formatInt(stats.messages.length, language)}</div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button type="button" onClick={() => setTrendView('per-turn')} className={tabButtonClass(trendView === 'per-turn')}>{t('session.cacheUsage.views.perTurn', 'Per-turn %')}</button>
+                <button type="button" onClick={() => setTrendView('cumulative-percent')} className={tabButtonClass(trendView === 'cumulative-percent')}>{t('session.cacheUsage.views.cumulativePercent', 'Cum %')}</button>
+                <button type="button" onClick={() => setTrendView('cumulative-total')} className={tabButtonClass(trendView === 'cumulative-total')}>{t('session.cacheUsage.views.cumulativeTotal', 'Cum total')}</button>
+              </div>
             </div>
 
-            <div className="border border-border bg-card px-2 py-2">
+            <div className="border-y border-border/70 py-3">
               {trendData?.kind === 'bars' ? (
                 <PercentBarChart values={trendData.values} width={width} locale={language} />
               ) : trendData?.kind === 'line' ? (
                 <PercentLineChart values={trendData.values} width={width} locale={language} />
               ) : trendData?.kind === 'stacked' ? (
                 <>
-                  <StackedTotalsChart
-                    input={trendData.input}
-                    cacheWrite={trendData.cacheWrite}
-                    cacheRead={trendData.cacheRead}
-                    width={width}
-                    locale={language}
-                  />
+                  <StackedTotalsChart input={trendData.input} cacheWrite={trendData.cacheWrite} cacheRead={trendData.cacheRead} width={width} locale={language} />
                   <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
-                    <span><span className="mr-1 inline-block h-2.5 w-2.5 bg-muted" />{t('session.cacheUsage.stats.input', 'Input (uncached)')}</span>
-                    <span><span className="mr-1 inline-block h-2.5 w-2.5 bg-warning" />{t('session.cacheUsage.stats.cacheWrite', 'Cache write')}</span>
-                    <span><span className="mr-1 inline-block h-2.5 w-2.5 bg-primary/70" />{t('session.cacheUsage.stats.cacheRead', 'Cache hit')}</span>
+                    <span><span className="mr-1 inline-block h-2 w-2 bg-muted" />{t('session.cacheUsage.stats.input', 'Input (uncached)')}</span>
+                    <span><span className="mr-1 inline-block h-2 w-2 bg-warning" />{t('session.cacheUsage.stats.cacheWrite', 'Cache write')}</span>
+                    <span><span className="mr-1 inline-block h-2 w-2 bg-primary/70" />{t('session.cacheUsage.stats.cacheRead', 'Cache hit')}</span>
                   </div>
                 </>
               ) : null}
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-              <div className="border border-border bg-card px-2.5 py-2"><div className="text-muted-foreground">{t('session.cacheUsage.summary.latest', 'Latest')}</div><div className="mt-1 font-mono text-foreground">{formatPercent(latestPoint, language)}</div></div>
-              <div className="border border-border bg-card px-2.5 py-2"><div className="text-muted-foreground">{t('session.cacheUsage.summary.min', 'Min')}</div><div className="mt-1 font-mono text-foreground">{formatPercent(minHit, language)}</div></div>
-              <div className="border border-border bg-card px-2.5 py-2"><div className="text-muted-foreground">{t('session.cacheUsage.summary.max', 'Max')}</div><div className="mt-1 font-mono text-foreground">{formatPercent(maxHit, language)}</div></div>
-              <div className="border border-border bg-card px-2.5 py-2"><div className="text-muted-foreground">{t('session.cacheUsage.summary.turns', 'Turns')}</div><div className="mt-1 font-mono text-foreground">{formatInt(stats.messages.length, language)}</div></div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-b border-border/70 pb-4 text-xs sm:grid-cols-4">
+              <div className="border-l-2 border-primary/70 px-2"><div className="text-muted-foreground">{t('session.cacheUsage.summary.latest', 'Latest')}</div><div className="mt-1 font-mono text-foreground">{formatPercent(latestPoint, language)}</div></div>
+              <div className="border-l-2 border-border px-2"><div className="text-muted-foreground">{t('session.cacheUsage.summary.min', 'Min')}</div><div className="mt-1 font-mono text-foreground">{formatPercent(minHit, language)}</div></div>
+              <div className="border-l-2 border-border px-2"><div className="text-muted-foreground">{t('session.cacheUsage.summary.max', 'Max')}</div><div className="mt-1 font-mono text-foreground">{formatPercent(maxHit, language)}</div></div>
+              <div className="border-l-2 border-border px-2"><div className="text-muted-foreground">{t('session.cacheUsage.summary.turns', 'Turns')}</div><div className="mt-1 font-mono text-foreground">{formatInt(stats.messages.length, language)}</div></div>
             </div>
 
-            <div className="mt-3 text-[11px] text-muted-foreground">{branchHint}</div>
+            <div className="text-[11px] leading-relaxed text-muted-foreground">{branchHint}</div>
           </div>
         ) : activeTab === 'stats' ? (
-          <div className="space-y-3 px-3 py-3">
+          <div className="space-y-4 px-3 py-4">
             <StatSection title={branchTitle} totals={stats.activeBranchTotals} locale={language} t={t} />
             <StatSection title={t('session.cacheUsage.stats.wholeTree', 'Whole tree')} totals={stats.treeTotals} locale={language} t={t} />
             <StatSection title={t('session.cacheUsage.stats.delta', 'Delta')} totals={deltaTotals(stats)} locale={language} t={t} delta />
@@ -836,35 +837,31 @@ export function CacheUsagePanel({
             <CostSummary stats={stats} locale={language} t={t} />
           </div>
         ) : (
-          <div className="px-3 py-3">
-            <div className="mb-3 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{t('session.cacheUsage.recentTurns', 'Recent {{count}} turns', { count: recentMessages.length })}</div>
+          <div className="px-3 py-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{t('session.cacheUsage.recentTurns', 'Recent {{count}} turns', { count: recentMessages.length })}</div>
+              <div className="font-mono text-[11px] text-muted-foreground">{formatInt(recentMessages.length, language)}</div>
+            </div>
             {recentMessages.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-0">
                 {recentMessages.map((message) => (
-                  <div key={message.id} className="border border-border bg-card px-3 py-2.5">
+                  <div key={message.id} className="relative border-l border-border/70 py-3 pl-3 first:pt-0 last:pb-0">
+                    <span className={`absolute -left-[4px] top-4 h-1.5 w-1.5 rounded-full ${message.modelChanged || message.cacheWriteSpike ? 'bg-warning' : 'bg-primary/70'}`} aria-hidden="true" />
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono text-[11px] text-muted-foreground">{t('session.cacheUsage.sequence', '#{{value}}', { value: message.sequence })}</span>
-                          {message.isOnActiveBranch && (
-                            <span className="border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-foreground">{t('session.cacheUsage.branchBadge', 'Latest branch')}</span>
-                          )}
-                          {message.modelChanged && (
-                            <span className="border border-info/25 bg-info/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-foreground">{t('session.cacheUsage.reasons.modelSwitch', 'Model switch')}</span>
-                          )}
                           <span className="truncate text-sm font-medium text-foreground">{providerModelLabel(message, t('session.cacheUsage.modelFallback', 'assistant'))}</span>
                         </div>
                         <div className="mt-1 text-[11px] text-muted-foreground">{formatTimestamp(message.timestamp, language)}</div>
                         {message.reasons.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
                             {message.reasons.map((reason) => (
-                              <span key={reason} className="border border-border/30 bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                {reasonLabel(reason, t)}
-                              </span>
+                              <span key={reason} className="border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">{reasonLabel(reason, t)}</span>
                             ))}
                           </div>
                         )}
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                           <span>{t('session.cacheUsage.stats.input', 'Input (uncached)')}: <span className="font-mono text-foreground">{formatInt(message.input, language)}</span></span>
                           <span>{t('session.cacheUsage.stats.output', 'Output')}: <span className="font-mono text-foreground">{formatInt(message.output, language)}</span></span>
                           <span>{t('session.cacheUsage.stats.cacheRead', 'Cache hit')}: <span className="font-mono text-foreground">{formatInt(message.cacheRead, language)}</span></span>
@@ -882,9 +879,7 @@ export function CacheUsagePanel({
                 ))}
               </div>
             ) : (
-              <div className="border border-border bg-secondary px-3 py-3 text-sm text-muted-foreground">
-                {t('session.cacheUsage.noRecentTurns', 'No recent assistant turns.')}
-              </div>
+              <div className="border-l-2 border-border px-3 py-3 text-sm text-muted-foreground">{t('session.cacheUsage.noRecentTurns', 'No recent assistant turns.')}</div>
             )}
           </div>
         )}

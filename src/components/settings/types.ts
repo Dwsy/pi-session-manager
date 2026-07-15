@@ -278,6 +278,7 @@ export type SettingsSection =
   | "session-viewer"
   | "search-export"
   | "app-behavior"
+  | "updates"
   | "data-sources"
   | "local-session-paths"
   | "external-agent-sessions"

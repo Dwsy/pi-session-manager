@@ -1,5 +1,6 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 import { i18n } from './i18n';
+import { t } from './landing-i18n';
 
 export const gitConfig = {
   user: 'Dwsy',
@@ -9,6 +10,7 @@ export const gitConfig = {
 
 export function baseOptions(lang?: string): BaseLayoutProps {
   const prefix = lang ? `/${lang}` : '';
+  const nav = t(lang ?? 'en').nav;
 
   return {
     i18n,
@@ -16,17 +18,14 @@ export function baseOptions(lang?: string): BaseLayoutProps {
       title: 'Pi Session Manager',
     },
     links: [
-      { text: lang === 'cn' ? '功能' : 'Features', url: `${prefix}/#features` },
-      { text: lang === 'cn' ? '文档' : 'Docs', url: `${prefix}/docs` },
-      { text: lang === 'cn' ? '下载' : 'Download', url: `${prefix}/#download` },
+      { text: nav.philosophy, url: `${prefix}/#philosophy` },
+      { text: nav.capabilities, url: `${prefix}/#capabilities` },
+      { text: nav.sources, url: `${prefix}/#sources` },
+      { text: nav.docs, url: `${prefix}/docs` },
+      { text: nav.download, url: `${prefix}/#download` },
       {
-        text: lang === 'cn' ? '预览' : 'Preview',
+        text: nav.demo,
         url: 'https://dwsy.github.io/pi-session-manager/demo/',
-        external: true,
-      },
-      {
-        text: 'GitHub',
-        url: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
         external: true,
       },
     ],

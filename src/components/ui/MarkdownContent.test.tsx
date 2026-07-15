@@ -55,7 +55,7 @@ describe('MarkdownContent link handling', () => {
     expect(invokeMock).not.toHaveBeenCalled()
   })
 
-  it('renders custom XML tags as collapsible details blocks and parses markdown inside them', () => {
+  it('renders read-files / modified-files as always-visible sections and parses markdown inside them', () => {
     const content = `
 Before XML
 <read-files>
@@ -66,20 +66,34 @@ After XML
 `
     const { container } = render(<MarkdownContent content={content} />)
 
-    // Check that we have a details element
-    const details = container.querySelector('details.xml-details-block')
-    expect(details).not.toBeNull()
-    expect(details?.getAttribute('open')).not.toBeNull()
+    const section = container.querySelector('section.xml-section-block')
+    expect(section).not.toBeNull()
+    expect(container.querySelector('details.xml-details-block')).toBeNull()
 
-    // Check summary tag and title
-    const summary = details?.querySelector('summary.xml-details-summary')
-    expect(summary).not.toBeNull()
-    expect(summary?.textContent?.trim()).toContain('read-files')
+    const title = section?.querySelector('.xml-section-title')
+    expect(title).not.toBeNull()
+    expect(title?.textContent?.trim()).toContain('read-files')
 
     // Check parsed markdown content inside
     const link = screen.getByRole('link', { name: 'file1' })
     expect(link).not.toBeNull()
     expect(link.getAttribute('data-markdown-href')).toBe('file:///path/to/file1')
+  })
+
+  it('keeps non-file XML tags collapsible', () => {
+    const content = `
+<task>
+- do the thing
+</task>
+`
+    const { container } = render(<MarkdownContent content={content} />)
+
+    const details = container.querySelector('details.xml-details-block')
+    expect(details).not.toBeNull()
+    expect(details?.getAttribute('open')).not.toBeNull()
+
+    const summary = details?.querySelector('summary.xml-details-summary')
+    expect(summary?.textContent?.trim()).toContain('task')
   })
 
   it('does not parse XML tags inside markdown code blocks', () => {

@@ -257,6 +257,7 @@ export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
   const entries: SessionEntry[] = [
     {
       type: 'session',
+      version: 3,
       id: `${seed.id}-session`,
       timestamp: seed.created,
     },
@@ -328,6 +329,55 @@ export function buildSessionEntries(seed: DemoSessionSeed): SessionEntry[] {
       },
     },
   ]
+
+  if (seed.includeBranchFork) {
+    entries.push(
+      {
+        type: 'message',
+        id: `${seed.id}-branch-fast-path`,
+        parentId: `${seed.id}-assistant-2`,
+        timestamp: toIsoWithOffset(seed.created, 7),
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'What is the smallest safe change if the canary window closes today?' }],
+        },
+      },
+      {
+        type: 'message',
+        id: `${seed.id}-branch-fast-answer`,
+        parentId: `${seed.id}-branch-fast-path`,
+        timestamp: toIsoWithOffset(seed.created, 8),
+        message: {
+          role: 'assistant',
+          provider: seed.provider,
+          model: seed.model,
+          content: [{ type: 'text', text: 'Ship the evidence-preserving handoff first, then defer historical compression to a follow-up.' }],
+        },
+      },
+      {
+        type: 'message',
+        id: `${seed.id}-branch-audit-path`,
+        parentId: `${seed.id}-assistant-2`,
+        timestamp: toIsoWithOffset(seed.created, 9),
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'What evidence must remain if another agent resumes this work tomorrow?' }],
+        },
+      },
+      {
+        type: 'message',
+        id: `${seed.id}-branch-audit-answer`,
+        parentId: `${seed.id}-branch-audit-path`,
+        timestamp: toIsoWithOffset(seed.created, 10),
+        message: {
+          role: 'assistant',
+          provider: seed.provider,
+          model: seed.model,
+          content: [{ type: 'text', text: 'Keep the acceptance criteria, unresolved risks, current decision, and exact validation commands.' }],
+        },
+      },
+    )
+  }
 
   const subagentResultEntry = buildSubagentToolResult(seed)
 

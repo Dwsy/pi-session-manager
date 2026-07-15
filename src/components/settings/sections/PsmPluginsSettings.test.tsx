@@ -133,6 +133,15 @@ const installedPlugin = {
   packageName: '@acme/new-plugin',
 }
 
+const officialSourcePlugin = {
+  ...npmPlugin,
+  id: 'dwsy.psm-pi-context',
+  name: 'Pi Context Navigator',
+  packageName: 'pi-session-manager-plugin',
+  enabled: false,
+  state: 'disabled' as const,
+}
+
 const pathPlugin = {
   id: 'path.local',
   name: 'Path Local',
@@ -226,6 +235,34 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
 
     await screen.findByText('Installed plugins')
     expect(mocks.searchPsmPluginMarket).not.toHaveBeenCalled()
+  })
+
+  it('adds a built-in npm source with its child plugin disabled until selected', async () => {
+    mocks.reload
+      .mockResolvedValueOnce([builtinPlugin, npmPlugin])
+      .mockResolvedValueOnce([builtinPlugin, npmPlugin, officialSourcePlugin])
+      .mockResolvedValueOnce([builtinPlugin, npmPlugin, { ...officialSourcePlugin, enabled: true, state: 'active' as const }])
+
+    render(<PsmPluginsSettings mode="market" />)
+
+    await screen.findByText('Built-in sources')
+    fireEvent.click(screen.getByRole('button', { name: 'Add source PSM Plugin Suite' }))
+
+    await waitFor(() => expect(mocks.installPsmPlugin).toHaveBeenCalledWith('pi-session-manager-plugin'))
+    await screen.findByText('Choose plugins to enable')
+    expect(screen.getByRole('button', { name: 'Enable Pi Context Navigator' })).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enable Pi Context Navigator' }))
+
+    await waitFor(() => expect(mocks.setPsmPluginEnabled).toHaveBeenCalledWith({
+      pluginId: 'dwsy.psm-pi-context',
+      enabled: true,
+      source: 'npm',
+      packageName: 'pi-session-manager-plugin',
+      entryPath: null,
+      projectPath: null,
+    }))
+    expect(mocks.reload).toHaveBeenCalledTimes(3)
   })
 
   it('installs npm package and refreshes host state', async () => {

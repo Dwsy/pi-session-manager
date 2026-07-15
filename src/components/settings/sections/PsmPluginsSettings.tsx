@@ -43,6 +43,7 @@ import {
   type PsmPluginStatus,
 } from "@/plugins/runtime-host";
 import type { PsmPermission, PsmPluginSettingDefinition, PsmPluginSettingValue } from "@pi-session-manager/plugin-sdk";
+import { OFFICIAL_PSM_PLUGIN_SOURCES, type PsmOfficialPluginSource } from "@/plugins/runtime-host/officialSources";
 import { SETTINGS_NAVIGATE_EVENT } from "../navigation";
 import { useModelOptions } from "./pi-config/useModelOptions";
 import { usePiSettingsFull } from "./pi-config/usePiSettingsFull";
@@ -188,6 +189,14 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
   const visiblePlugins = useMemo(
     () => plugins.filter((plugin) => plugin.id !== "npm-discovery"),
     [plugins],
+  );
+  const installedNpmPackages = useMemo(
+    () => new Set(
+      visiblePlugins
+        .filter((plugin) => plugin.source === "npm" && typeof plugin.packageName === "string")
+        .map((plugin) => plugin.packageName as string),
+    ),
+    [visiblePlugins],
   );
   const activePluginCount = useMemo(
     () => visiblePlugins.filter((plugin) => plugin.enabled && plugin.state === "active").length,
@@ -361,20 +370,28 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
     }
   };
 
-  const installPlugin = async () => {
-    if (!trimmedPackageName) return;
-    setNpmAction("install");
+  const installNpmPackage = async (packageName: string, action: string) => {
+    setNpmAction(action);
     setError(null);
     setMarketError(null);
     try {
-      await installPsmPlugin(trimmedPackageName);
+      await installPsmPlugin(packageName);
       applyPluginsSnapshot(await psmPluginHost.reload());
-      setPackageNameInput("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setNpmAction(null);
     }
+  };
+
+  const installPlugin = async () => {
+    if (!trimmedPackageName) return;
+    await installNpmPackage(trimmedPackageName, "install");
+    setPackageNameInput("");
+  };
+
+  const installOfficialSource = async (source: PsmOfficialPluginSource) => {
+    await installNpmPackage(source.packageName, `official-install:${source.id}`);
   };
 
   const addPathPlugin = async () => {
@@ -956,6 +973,118 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
     </section>
   );
 
+  const renderOfficialSourcesSection = () => (
+    <section data-settings-search="psm-plugin-official-sources" className="rounded-lg border border-border/60 bg-background/45 p-3">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+        <Package className="h-4 w-4 text-info" />
+        {t("settings.psmPlugins.officialSourcesTitle", "Built-in sources")}
+      </div>
+      <div className="mb-3 text-xs text-muted-foreground">
+        {t("settings.psmPlugins.officialSourcesHint", "Curated npm plugin suites maintained by PSM. Each package can provide multiple child plugins.")}
+      </div>
+      <div className="space-y-2">
+        {OFFICIAL_PSM_PLUGIN_SOURCES.map((source) => {
+          const installed = installedNpmPackages.has(source.packageName);
+          const busy = npmBusy || npmAction === `official-install:${source.id}`;
+          const sourcePlugins = visiblePlugins.filter((plugin) => (
+            plugin.source === "npm" && plugin.packageName === source.packageName
+          ));
+          const sourceName = t(source.nameKey, source.defaultName);
+          const sourceDescription = t(source.descriptionKey, source.defaultDescription);
+          return (
+            <div key={source.id} className="rounded-md border border-border/60 bg-surface/35 p-2.5">
+              <div className="flex gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-info/25 bg-info/10 text-info">
+                <Package className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">{sourceName}</span>
+                  <span className="rounded border border-border/60 bg-background/45 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">npm</span>
+                  {installed ? (
+                    <span className="rounded border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-300">
+                      {t("settings.psmPlugins.marketInstalled", "Installed")}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{sourceDescription}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className="font-mono">{source.packageName}</span>
+                  <span>{t("settings.psmPlugins.officialSourceExports", "{{count}} child plugins", { count: source.childPluginIds.length })}</span>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-start gap-1">
+                <a
+                  href={source.npmUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/50 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                  title={t("settings.psmPlugins.marketOpenNpm", "Open npm page")}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => void installOfficialSource(source)}
+                  disabled={busy || installed}
+                  aria-label={`${installed
+                    ? t("settings.psmPlugins.officialSourceAdded", "Source added")
+                    : t("settings.psmPlugins.officialSourceAdd", "Add source")} ${sourceName}`}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background/50 px-2.5 text-[11px] font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {installed
+                    ? t("settings.psmPlugins.officialSourceAdded", "Source added")
+                    : t("settings.psmPlugins.officialSourceAdd", "Add source")}
+                </button>
+              </div>
+              </div>
+              {installed ? (
+                <div className="mt-3 border-t border-border/50 pt-2.5">
+                  <div className="mb-2 text-[11px] font-medium text-muted-foreground">
+                    {t("settings.psmPlugins.officialSourceSelectPlugins", "Choose plugins to enable")}
+                  </div>
+                  {sourcePlugins.length === 0 ? (
+                    <div className="text-xs text-muted-foreground">
+                      {t("settings.psmPlugins.officialSourceNoPlugins", "No child plugins were discovered. Reload the source after the package finishes installing.")}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {sourcePlugins.map((plugin) => {
+                        const childName = t(`${pluginI18nBase(plugin)}.name`, plugin.name);
+                        const childBusy = updatingId === plugin.id || npmBusy;
+                        const action = plugin.enabled
+                          ? t("settings.psmPlugins.officialSourceDisablePlugin", "Disable")
+                          : t("settings.psmPlugins.officialSourceEnablePlugin", "Enable");
+                        return (
+                          <div key={plugin.id} className="flex items-center justify-between gap-3 rounded border border-border/50 bg-background/35 px-2 py-1.5">
+                            <div className="min-w-0">
+                              <div className="truncate text-xs font-medium text-foreground">{childName}</div>
+                              <div className="truncate font-mono text-[10px] text-muted-foreground">{plugin.id}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void togglePlugin(plugin, !plugin.enabled)}
+                              disabled={childBusy}
+                              aria-label={`${action} ${childName}`}
+                              className="inline-flex h-7 shrink-0 items-center rounded-md border border-border bg-surface px-2 text-[11px] font-medium text-foreground hover:bg-surface-hover disabled:opacity-60"
+                            >
+                              {action}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+
   const renderNpmInstallSection = () => (
     <section data-settings-search="psm-plugin-marketplace" className="rounded-lg border border-border/60 bg-background/45 p-3">
       <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -1272,6 +1401,7 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
       <div className="space-y-4">
         {renderError()}
         {renderPathsBar()}
+        {renderOfficialSourcesSection()}
         {renderNpmInstallSection()}
         {renderMarketSection()}
       </div>

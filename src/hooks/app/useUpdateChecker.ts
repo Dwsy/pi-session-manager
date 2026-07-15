@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSettings } from '@/hooks/useSettings'
 import { listen } from '@/transport'
+import { checkAppUpdate } from '@/utils/appUpdater'
 import {
-  checkForUpdates,
   dismissUpdateVersion,
   getDismissedUpdateVersion,
   type AvailableUpdateInfo,
@@ -40,12 +40,18 @@ export function useUpdateChecker(options?: UseUpdateCheckerOptions): UseUpdateCh
 
     let active = true
     const run = async () => {
-      const result = await checkForUpdates(channel)
-      if (!active || result.status !== 'update') return
+      try {
+        // Must share the same path as Settings manual check:
+        // desktop uses Tauri installed version; browser falls back to frontend check.
+        const update = await checkAppUpdate(channel)
+        if (!active || !update) return
 
-      const dismissedVersion = getDismissedUpdateVersion(channel)
-      if (dismissedVersion === result.update.latestVersion) return
-      setUpdateInfo(result.update)
+        const dismissedVersion = getDismissedUpdateVersion(channel)
+        if (dismissedVersion === update.latestVersion) return
+        setUpdateInfo(update)
+      } catch {
+        // Startup auto-check is silent on network / updater failures.
+      }
     }
 
     void run()

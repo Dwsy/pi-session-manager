@@ -143,6 +143,7 @@ export interface LegacySessionStats {
 
 export interface SessionEntry {
   type: string;
+  version?: number;
   id: string;
   parentId?: string;
   timestamp: string;

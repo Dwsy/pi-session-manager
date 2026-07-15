@@ -178,13 +178,12 @@ interface TauriManifest {
 }
 
 async function fetchReleaseFromManifest(channel: UpdateChannel): Promise<GithubRelease & { tag_name: string }> {
+  // Keep order aligned with Tauri updater endpoints:
+  // raw.githubusercontent first (fresh), then jsDelivr (cached CDN fallback).
   const urls = getChannelManifestUrls(channel)
-  // Try JSdelivr CDN first (urls[1]) because it's cached, fast, and does not hit GitHub rate limits.
-  // Then try GitHub Raw (urls[0]).
-  const urlsToTry = [urls[1], urls[0]].filter(Boolean)
   let lastError: Error | null = null
 
-  for (const url of urlsToTry) {
+  for (const url of urls) {
     try {
       const manifest = await fetchJson<TauriManifest>(url)
       if (manifest && manifest.version) {

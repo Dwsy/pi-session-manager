@@ -1,88 +1,84 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Apple, Monitor, Download } from 'lucide-react';
+import { ArrowRight, BookOpen, Download, Play } from 'lucide-react';
 import { t } from '@/lib/landing-i18n';
 
-type OS = 'mac' | 'windows' | 'linux' | 'unknown';
+type OS = 'macOS' | 'Windows' | 'Linux' | null;
+
+const releasesHref = 'https://github.com/Dwsy/pi-session-manager/releases/latest';
+const demoHref = 'https://dwsy.github.io/pi-session-manager/demo/';
 
 function detectOS(): OS {
-  if (typeof navigator === 'undefined') return 'unknown';
-  const ua = navigator.userAgent.toLowerCase();
-  if (ua.includes('mac')) return 'mac';
-  if (ua.includes('win')) return 'windows';
-  if (ua.includes('linux')) return 'linux';
-  return 'unknown';
+  if (typeof navigator === 'undefined') return null;
+  const userAgent = navigator.userAgent.toLowerCase();
+  if (userAgent.includes('mac')) return 'macOS';
+  if (userAgent.includes('win')) return 'Windows';
+  if (userAgent.includes('linux')) return 'Linux';
+  return null;
 }
 
-const REPO = 'https://github.com/Dwsy/pi-session-manager/releases/latest';
-
-const downloads: { os: OS; label: string; icon: typeof Apple; suffix: string }[] = [
-  { os: 'mac', label: 'macOS', icon: Apple, suffix: '.dmg' },
-  { os: 'windows', label: 'Windows', icon: Monitor, suffix: '.msi' },
-  { os: 'linux', label: 'Linux', icon: Monitor, suffix: '.AppImage' },
-];
-
 export function DownloadSection({ lang = 'en' }: { lang?: string }) {
-  const [currentOS, setCurrentOS] = useState<OS>('unknown');
+  const [currentOS, setCurrentOS] = useState<OS>(null);
   const i = t(lang).download;
+  const docsHref = `/${lang}/docs/installation`;
 
   useEffect(() => {
     setCurrentOS(detectOS());
   }, []);
 
-  const sorted = [...downloads].sort((a, b) => {
-    if (a.os === currentOS) return -1;
-    if (b.os === currentOS) return 1;
-    return 0;
-  });
-
   return (
-    <section id="download" className="px-4 py-20 sm:py-28">
-      <div className="mx-auto max-w-4xl text-center">
-        <h2 className="animate-fade-in-up text-3xl font-bold tracking-tight text-fd-foreground sm:text-4xl">
-          {i.title}
-        </h2>
-        <p className="animate-fade-in-up stagger-1 mt-4 text-lg text-fd-muted-foreground">
-          {i.subtitle}
-        </p>
+    <section id="download" className="scroll-mt-24 px-4 py-20 sm:py-28">
+      <div className="landing-download mx-auto max-w-7xl overflow-hidden">
+        <div className="landing-download-grid" aria-hidden="true" />
+        <div className="relative z-10 grid gap-10 px-6 py-10 sm:px-10 sm:py-14 lg:grid-cols-[1fr_auto] lg:items-end lg:px-14 lg:py-16">
+          <div className="max-w-3xl">
+            <p className="landing-kicker">{i.kicker}</p>
+            <h2 className="landing-display mt-5 text-balance text-4xl font-semibold tracking-[-0.045em] text-fd-foreground sm:text-5xl lg:text-6xl">
+              {i.title}
+            </h2>
+            <p className="mt-5 max-w-2xl text-pretty text-lg leading-8 text-fd-muted-foreground">
+              {i.description}
+            </p>
+          </div>
 
-        <div className="animate-fade-in-up stagger-2 mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          {sorted.map((d) => {
-            const isPrimary = d.os === currentOS;
-            return (
-              <a
-                key={d.os}
-                href={REPO}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`inline-flex items-center gap-3 rounded-lg px-6 py-3.5 text-base font-semibold transition-colors ${
-                  isPrimary
-                    ? 'bg-teal-500 hover:bg-teal-600 dark:bg-teal-500 dark:hover:bg-teal-400 text-white dark:text-teal-950 shadow-lg shadow-teal-500/20'
-                    : 'border border-fd-border bg-fd-card hover:bg-fd-accent text-fd-foreground'
-                }`}
-              >
-                <d.icon className="h-5 w-5" />
-                {d.label}
-                {isPrimary && (
-                  <span className="rounded-full bg-white/20 dark:bg-black/10 px-2 py-0.5 text-xs">
-                    {i.recommended}
-                  </span>
-                )}
-              </a>
-            );
-          })}
+          <div className="flex min-w-64 flex-col gap-3">
+            <a
+              href={releasesHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="landing-action landing-action-primary w-full justify-between"
+            >
+              <span className="flex items-center gap-2">
+                <Download className="h-4 w-4" aria-hidden="true" />
+                {currentOS ? `${i.downloadFor} ${currentOS}` : i.viewReleases}
+              </span>
+              {currentOS ? (
+                <span className="landing-mono rounded-sm border border-current/25 px-1.5 py-0.5 text-[9px] tracking-[0.12em]">
+                  {i.recommended}
+                </span>
+              ) : (
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              )}
+            </a>
+            <a
+              href={demoHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="landing-action landing-action-secondary w-full justify-between"
+            >
+              <span className="flex items-center gap-2">
+                <Play className="h-4 w-4" aria-hidden="true" />
+                {i.demoAction}
+              </span>
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </a>
+            <a href={docsHref} className="landing-text-link mt-1 justify-center">
+              <BookOpen className="h-4 w-4" aria-hidden="true" />
+              {i.docsAction}
+            </a>
+          </div>
         </div>
-
-        <a
-          href={REPO}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="animate-fade-in-up stagger-3 mt-6 inline-flex items-center gap-2 text-sm text-fd-muted-foreground hover:text-teal-500 transition-colors"
-        >
-          <Download className="h-4 w-4" />
-          {i.viewAll}
-        </a>
       </div>
     </section>
   );

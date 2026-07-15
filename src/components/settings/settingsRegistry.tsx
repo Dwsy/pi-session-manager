@@ -46,6 +46,7 @@ import ShortcutSettings from "./sections/ShortcutSettings";
 import TagManagerSettings from "./sections/TagManagerSettings";
 import TerminalSettings from "./sections/TerminalSettings";
 import LanguageSettings from "./sections/LanguageSettings";
+import UpdateSettings from "./sections/UpdateSettings";
 import { resolveSettingsSectionId } from "./navigation";
 
 export interface SettingsAreaMeta {
@@ -237,7 +238,18 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     labelKey: "settings.sections.appBehavior",
     fallbackLabel: "App Behavior",
     descriptionKey: "settings.sectionDescriptions.appBehavior",
-    fallbackDescription: "Window behavior and update channel",
+    fallbackDescription: "Window and background behavior",
+    saveMode: "app-settings",
+  },
+  {
+    id: "updates",
+    area: "preferences",
+    group: "app",
+    icon: <Download className="h-4 w-4" />,
+    labelKey: "settings.sections.updates",
+    fallbackLabel: "Updates",
+    descriptionKey: "settings.sectionDescriptions.updates",
+    fallbackDescription: "Version checks, release channel and installation",
     saveMode: "app-settings",
   },
   {
@@ -459,7 +471,7 @@ export const SETTINGS_GROUPS: SettingsGroupMeta[] = [
     area: "preferences",
     labelKey: "settings.groups.app",
     fallbackLabel: "App",
-    sections: ["terminal", "app-behavior"],
+    sections: ["terminal", "app-behavior", "updates"],
   },
   {
     id: "sources",
@@ -531,6 +543,7 @@ const STANDALONE_DATASET_SECTION_IDS: SettingsSection[] = [
   "tags",
   "shortcuts",
   "app-behavior",
+  "updates",
   "data-sources",
   "local-session-paths",
   "external-agent-sessions",
@@ -642,6 +655,8 @@ export function renderSettingsSection(
       return <ShortcutSettings />;
     case "app-behavior":
       return <AppBehaviorSettings settings={settings} onUpdate={onUpdate} />;
+    case "updates":
+      return <UpdateSettings settings={settings} onUpdate={onUpdate} />;
     case "data-sources":
       return <DataSourcesSettings settings={settings} onUpdate={onUpdate} />;
     case "local-session-paths":

@@ -1,17 +1,13 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Settings2 } from "lucide-react";
+import { AppWindow, PanelTopClose } from "lucide-react";
 
 import SettingsCard from "@/components/settings/SettingsCard";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
 import type { UpdateSettingsProps } from "@/components/settings/types";
 import { invoke } from "@/transport";
-import UpdateSettings from "./UpdateSettings";
 
-export default function AppBehaviorSettings({
-  settings,
-  onUpdate,
-}: UpdateSettingsProps) {
+export default function AppBehaviorSettings(_: UpdateSettingsProps) {
   const { t } = useTranslation();
   const [lightweightMode, setLightweightMode] = useState(false);
 
@@ -32,30 +28,34 @@ export default function AppBehaviorSettings({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <SettingsCard
         title={t("settings.appBehavior.title", "App behavior")}
         description={t(
           "settings.appBehavior.description",
           "Control window behavior and everyday app-level defaults.",
         )}
-        icon={<Settings2 className="h-4 w-4" />}
+        icon={<AppWindow className="h-4 w-4" />}
+        contentClassName="p-0"
       >
-        <SettingsToggleRow
-          title={t("settings.advanced.lightweightMode", "Lightweight mode")}
-          description={t(
-            "settings.advanced.lightweightModeDesc",
-            "When enabled, closing the window minimizes to system tray instead of quitting. Tray menu: Show / Open Web / Quit",
-          )}
-          checked={lightweightMode}
-          onChange={handleToggleLightweightMode}
-          className="items-start py-1"
-          descriptionClassName="text-xs text-muted-foreground mt-0.5"
-          searchKey="advanced-lightweightMode"
-        />
+        <div className="flex gap-3 px-3 py-3">
+          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/40 bg-secondary/35 text-muted-foreground">
+            <PanelTopClose className="h-4 w-4" />
+          </div>
+          <SettingsToggleRow
+            title={t("settings.advanced.lightweightMode", "Lightweight mode")}
+            description={t(
+              "settings.advanced.lightweightModeDesc",
+              "When enabled, closing the window minimizes to system tray instead of quitting. Tray menu: Show / Open Web / Quit",
+            )}
+            checked={lightweightMode}
+            onChange={handleToggleLightweightMode}
+            className="min-w-0 flex-1 items-start"
+            descriptionClassName="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground"
+            searchKey="advanced-lightweightMode"
+          />
+        </div>
       </SettingsCard>
-
-      <UpdateSettings settings={settings} onUpdate={onUpdate} />
     </div>
   );
 }
