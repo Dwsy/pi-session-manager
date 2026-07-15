@@ -21,26 +21,6 @@
   <a href="extensions/README.md">Extensions</a>
 </p>
 
-## The Idea
-
-Coding agent sessions are more than disposable chat logs. They contain decisions, commands, failed attempts, tool traces, and the context needed to continue unfinished work.
-
-Pi Session Manager treats those sessions as durable, inspectable project artifacts. It indexes and organizes existing session sources while leaving execution to the agents and terminals that created them.
-
-> PSM manages the work around the agent, not the agent itself.
-
-| Session workspace | Knowledge layer | Observability layer |
-|-------------------|-----------------|---------------------|
-| Organize, tag, search, export, and resume past work. | Find decisions and context across sessions and datasets. | Inspect branches, tool calls, traces, activity, tokens, and cost. |
-
-## What PSM Is -- and Is Not
-
-| PSM is | PSM is not |
-|--------|------------|
-| A local-first library for coding-session history | Another Codex-style agent GUI |
-| A cross-agent index, viewer, and continuity layer | A replacement for Pi, Claude Code, Codex, or their native workflows |
-| An extensible surface for understanding session artifacts | A chat shell that requires AI features for basic session management |
-
 ## UI Preview
 
 | Home | Session Page |
@@ -51,16 +31,6 @@ Pi Session Manager treats those sessions as durable, inspectable project artifac
 |-------------|--------|
 | ![Session Tree](website/public/screenshots/session-tree.png) | ![Kanban](website/public/screenshots/kanban.png) |
 
-## Core Capabilities
-
-- Scan and index sessions from Pi and external sources including Claude Code, Codex, OpenCode, Gemini CLI, Cursor, and Antigravity.
-- Browse by list, project, tree, and kanban views; organize with tags, favorites, names, and metadata.
-- Search across sessions and in-session messages with full-text indexing, highlights, labels, and source filters.
-- Reconstruct work through conversation trees, Branch Atlas, tool-call rendering, compaction context, and trace views.
-- Resume, convert, or export sessions and hand work back to the original terminal or agent workflow.
-- Review activity through heatmaps, token trends, model usage, cost statistics, and session datasets.
-- Run as a Tauri desktop app, a browser-accessible headless server with HTTP/WebSocket APIs, or static demo and dataset builds.
-- Use the built-in `en-US`, `zh-CN`, `ja-JP`, `de-DE`, `fr-FR`, and `es-ES` language packs.
 
 ## Install
 
@@ -83,6 +53,41 @@ iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts
 ```
 
 The installers download the latest `pi-session-cli`, verify SHA256 when available, configure the install path, and handle platform quarantine metadata.
+
+## Core Capabilities
+
+- Scan and index sessions from Pi and external sources including Claude Code, Codex, OpenCode, Gemini CLI, Cursor, and Antigravity.
+- Browse by list, project, tree, and kanban views; organize with tags, favorites, names, and metadata.
+- Search across sessions and in-session messages with full-text indexing, highlights, labels, and source filters.
+- Reconstruct work through conversation trees, Branch Atlas, tool-call rendering, compaction context, and trace views.
+- Resume, convert, or export sessions and hand work back to the original terminal or agent workflow.
+- Review activity through heatmaps, token trends, model usage, cost statistics, and session datasets.
+- Run as a Tauri desktop app, a browser-accessible headless server with HTTP/WebSocket APIs, or static demo and dataset builds.
+- Use the built-in `en-US`, `zh-CN`, `ja-JP`, `de-DE`, `fr-FR`, and `es-ES` language packs.
+
+
+
+## The Idea
+
+Coding agent sessions are more than disposable chat logs. They contain decisions, commands, failed attempts, tool traces, and the context needed to continue unfinished work.
+
+Pi Session Manager treats those sessions as durable, inspectable project artifacts. It indexes and organizes existing session sources while leaving execution to the agents and terminals that created them.
+
+> PSM manages the work around the agent, not the agent itself.
+
+| Session workspace | Knowledge layer | Observability layer |
+|-------------------|-----------------|---------------------|
+| Organize, tag, search, export, and resume past work. | Find decisions and context across sessions and datasets. | Inspect branches, tool calls, traces, activity, tokens, and cost. |
+
+## What PSM Is -- and Is Not
+
+| PSM is | PSM is not |
+|--------|------------|
+| A local-first library for coding-session history | Another Codex-style agent GUI |
+| A cross-agent index, viewer, and continuity layer | A replacement for Pi, Claude Code, Codex, or their native workflows |
+| An extensible surface for understanding session artifacts | A chat shell that requires AI features for basic session management |
+
+
 
 ## Extension Boundaries
 
