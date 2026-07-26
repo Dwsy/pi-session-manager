@@ -29,6 +29,7 @@ export function ConfirmDialog({
         if (!confirming) onCancel();
       }}
       widthClass="max-w-md"
+      overlayClassName="z-[60]"
       footer={
         <>
           <button

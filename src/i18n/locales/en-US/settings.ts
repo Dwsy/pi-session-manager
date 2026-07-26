@@ -1139,6 +1139,7 @@ export const settings = {
       loadingCatalog: "Loading models.dev...",
       loadingRemoteModels: "Fetching provider /models ...",
       alreadyAdded: "Added",
+      pendingRemove: "Pending remove",
       manualSaveHint:
         "Manual save required. Click Save Config to persist changes.",
     },
@@ -1170,6 +1171,12 @@ export const settings = {
       delete: "Delete",
       deleteModel: "Delete model",
       deleteProvider: "Delete provider",
+      copyProvider: "Copy provider",
+      confirmCopyProvider: "Confirm copy",
+      uncheckToRemoveModel: "Uncheck to mark for removal, then confirm",
+      uncheckVisibleExisting: "Uncheck visible added",
+      clearPendingRemove: "Undo pending remove",
+      removeUncheckedModels: "Remove unchecked ({{count}})",
       restore: "Restore",
       createBackup: "Create Backup",
       importFile: "Import File",
@@ -1320,9 +1327,14 @@ export const settings = {
       importContentTitle: "Import JSON Content",
       importContentDesc:
         "Paste the full models.json content here and apply it using the selected import mode.",
+      copyProviderTitle: "Copy provider",
+      copyProviderDesc:
+        'Choose a new name for the copy of "{{name}}". You can edit the default name before confirming.',
       deleteProviderTitle: "Delete this provider?",
       deleteProviderDesc:
         'This removes provider "{{name}}" and all of its models from the current draft.',
+      deleteModelsTitle: "Delete {{count}} model(s)?",
+      deleteModelsDesc: "This removes from the current draft: {{names}}",
       pricingFuzzyTitle: "Use fuzzy pricing match?",
       pricingFuzzyDesc:
         'No exact match for "{{id}}". Apply fuzzy match "{{matched}}" ({{similarity}}% similar)?',
@@ -1346,9 +1358,11 @@ export const settings = {
       providerCreated: "Provider created: {{name}}",
       providerRenamed: "Provider renamed to {{name}}",
       providerDeleted: "Provider removed: {{name}}",
+      providerCopied: "Provider copied: {{from}} → {{to}}",
       modelCreated: "A new model draft was created",
       modelDeleted: 'Removed model "{{name}}"',
       modelRemoved: 'Removed model "{{name}}"',
+      modelsRemoved: "Removed {{count}} model(s)",
       selectProviderFirst: "Select a provider first",
       catalogModelsAdded:
         "Added {{added}} model(s) from models.dev (skipped {{skipped}})",

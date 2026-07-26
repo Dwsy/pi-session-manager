@@ -27,6 +27,8 @@ interface ProviderRemoteModelsModalProps {
   existingModelIds: string[];
   onClose: () => void;
   onConfirm: (models: ProviderRemoteModel[]) => void;
+  /** Unchecked already-added models → parent confirms bulk delete. */
+  onRequestRemoveExisting: (modelIds: string[]) => void;
 }
 
 export function ProviderRemoteModelsModal({
@@ -36,6 +38,7 @@ export function ProviderRemoteModelsModal({
   existingModelIds,
   onClose,
   onConfirm,
+  onRequestRemoveExisting,
 }: ProviderRemoteModelsModalProps) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -43,6 +46,10 @@ export function ProviderRemoteModelsModal({
   const [result, setResult] = useState<ProviderRemoteModelsResult | null>(null);
   const [modelFilter, setModelFilter] = useState("");
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  /** Existing models the user unchecked (pending bulk remove). */
+  const [pendingRemoveIds, setPendingRemoveIds] = useState<Set<string>>(
     () => new Set(),
   );
 
@@ -59,11 +66,23 @@ export function ProviderRemoteModelsModal({
   useEffect(() => {
     if (!open) return;
     setSelectedModelIds(new Set());
+    setPendingRemoveIds(new Set());
     setModelFilter("");
     setError(null);
     setResult(null);
     void loadRemoteModels();
   }, [open, providerName]);
+
+  // Drop pending removals that are no longer existing (deleted via confirm).
+  useEffect(() => {
+    setPendingRemoveIds((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set(
+        [...prev].filter((id) => existingIdSet.has(id.trim().toLowerCase())),
+      );
+      return next.size === prev.size ? prev : next;
+    });
+  }, [existingIdSet]);
 
   const models = result?.models ?? [];
 
@@ -81,6 +100,14 @@ export function ProviderRemoteModelsModal({
     (model) => !existingIdSet.has(model.id.trim().toLowerCase()),
   );
   const selectedCount = selectedModelIds.size;
+  const pendingRemoveCount = pendingRemoveIds.size;
+  const existingVisibleIds = useMemo(
+    () =>
+      filteredModels
+        .filter((model) => existingIdSet.has(model.id.trim().toLowerCase()))
+        .map((model) => model.id),
+    [filteredModels, existingIdSet],
+  );
 
   async function loadRemoteModels() {
     if (!providerEntry?.baseUrl?.trim()) {
@@ -108,7 +135,17 @@ export function ProviderRemoteModelsModal({
 
   function toggleModel(model: ProviderRemoteModel) {
     const key = model.id.trim().toLowerCase();
-    if (!key || existingIdSet.has(key)) return;
+    if (!key) return;
+    // Existing: uncheck → pending remove; re-check → cancel pending
+    if (existingIdSet.has(key)) {
+      setPendingRemoveIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(model.id)) next.delete(model.id);
+        else next.add(model.id);
+        return next;
+      });
+      return;
+    }
     setSelectedModelIds((prev) => {
       const next = new Set(prev);
       if (next.has(model.id)) next.delete(model.id);
@@ -127,6 +164,23 @@ export function ProviderRemoteModelsModal({
 
   function clearSelection() {
     setSelectedModelIds(new Set());
+  }
+
+  function markVisibleExistingForRemove() {
+    setPendingRemoveIds((prev) => {
+      const next = new Set(prev);
+      for (const id of existingVisibleIds) next.add(id);
+      return next;
+    });
+  }
+
+  function clearPendingRemove() {
+    setPendingRemoveIds(new Set());
+  }
+
+  function commitPendingRemove() {
+    if (pendingRemoveIds.size === 0) return;
+    onRequestRemoveExisting([...pendingRemoveIds]);
   }
 
   function handleConfirm() {
@@ -224,6 +278,40 @@ export function ProviderRemoteModelsModal({
               "清空选择",
             )}
           </button>
+          <button
+            type="button"
+            onClick={markVisibleExistingForRemove}
+            disabled={existingVisibleIds.length === 0}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 text-[11px] font-medium text-foreground hover:bg-surface transition-colors focus-ring disabled:opacity-60"
+          >
+            {t(
+              "settings.modelConfigCenter.actions.uncheckVisibleExisting",
+              "取消可见已添加",
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={clearPendingRemove}
+            disabled={pendingRemoveCount === 0}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 text-[11px] font-medium text-foreground hover:bg-surface transition-colors focus-ring disabled:opacity-60"
+          >
+            {t(
+              "settings.modelConfigCenter.actions.clearPendingRemove",
+              "撤销待删",
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={commitPendingRemove}
+            disabled={pendingRemoveCount === 0}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 text-[11px] font-medium text-red-600 dark:text-red-300 hover:bg-red-500/15 transition-colors focus-ring disabled:opacity-60"
+          >
+            {t(
+              "settings.modelConfigCenter.actions.removeUncheckedModels",
+              "删除已取消 ({{count}})",
+              { count: pendingRemoveCount },
+            )}
+          </button>
           {result?.url ? (
             <span className="max-w-full truncate font-mono text-[11px] text-muted-foreground">
               GET {result.url}
@@ -270,29 +358,43 @@ export function ProviderRemoteModelsModal({
             ) : (
               filteredModels.map((model) => {
                 const exists = existingIdSet.has(model.id.trim().toLowerCase());
-                const checked = selectedModelIds.has(model.id);
+                const pendingRemove = pendingRemoveIds.has(model.id);
+                const checked = exists
+                  ? !pendingRemove
+                  : selectedModelIds.has(model.id);
                 return (
                   <button
                     key={model.id}
                     type="button"
                     onClick={() => toggleModel(model)}
-                    disabled={exists}
-                    className={`flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left transition-colors ${
+                    title={
                       exists
-                        ? "cursor-not-allowed border-transparent bg-surface/40 opacity-60"
+                        ? t(
+                            "settings.modelConfigCenter.actions.uncheckToRemoveModel",
+                            "取消勾选将标记删除，确认后移除",
+                          )
+                        : undefined
+                    }
+                    className={`flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left transition-colors ${
+                      pendingRemove
+                        ? "border-red-500/25 bg-red-500/5"
                         : checked
-                          ? "border-primary/30 bg-primary/10"
+                          ? exists
+                            ? "border-primary/20 bg-primary/5"
+                            : "border-primary/30 bg-primary/10"
                           : "border-transparent hover:bg-accent/10"
                     }`}
                   >
                     <span
                       className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                        checked || exists
+                        checked
                           ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border/70 bg-background"
+                          : pendingRemove
+                            ? "border-red-500/50 bg-background"
+                            : "border-border/70 bg-background"
                       }`}
                     >
-                      {(checked || exists) && <Check className="h-3 w-3" />}
+                      {checked && <Check className="h-3 w-3" />}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
@@ -300,11 +402,19 @@ export function ProviderRemoteModelsModal({
                         <span className="truncate text-xs font-medium">
                           {model.id}
                         </span>
-                        {exists && (
+                        {exists && !pendingRemove && (
                           <span className="rounded border border-border/50 px-1 py-px text-[9px] text-muted-foreground">
                             {t(
                               "settings.modelConfigCenter.status.alreadyAdded",
                               "已添加",
+                            )}
+                          </span>
+                        )}
+                        {pendingRemove && (
+                          <span className="rounded border border-red-500/30 px-1 py-px text-[9px] text-red-600 dark:text-red-300">
+                            {t(
+                              "settings.modelConfigCenter.status.pendingRemove",
+                              "待删除",
                             )}
                           </span>
                         )}

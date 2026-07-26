@@ -57,6 +57,11 @@ export default function ModelConfigCenter() {
     setConfigDetailTab,
     showAddProviderModal,
     setShowAddProviderModal,
+    providerModalMode,
+    copySourceProvider,
+    openAddProviderModal,
+    openCopyProviderModal,
+    handleProviderModalConfirm,
     showCatalogModal,
     setShowCatalogModal,
     showRemoteModelsModal,
@@ -81,7 +86,6 @@ export default function ModelConfigCenter() {
     updateSelectedProviderEntry,
     updateSelectedModelEntry,
     commitProviderRename,
-    handleCreateProvider,
     requestDeleteProvider,
     addModel,
     openCatalogBrowser,
@@ -91,6 +95,7 @@ export default function ModelConfigCenter() {
     fillSelectedModelPricing,
     fillProviderPricing,
     requestDeleteModel,
+    requestDeleteModelsByIds,
     saveConfig,
     refreshConfig,
     createBackup,
@@ -268,7 +273,8 @@ export default function ModelConfigCenter() {
             setSelectedProvider={setSelectedProvider}
             setConfigDetailTab={setConfigDetailTab}
             requestDeleteProvider={requestDeleteProvider}
-            setShowAddProviderModal={setShowAddProviderModal}
+            openCopyProviderModal={openCopyProviderModal}
+            openAddProviderModal={openAddProviderModal}
             selectedProviderModels={selectedProviderModels}
             selectedModel={selectedModel}
             setSelectedModel={setSelectedModel}
@@ -345,10 +351,14 @@ export default function ModelConfigCenter() {
 
       <AddProviderModal
         open={showAddProviderModal}
+        mode={providerModalMode}
+        sourceProviderName={copySourceProvider}
         newProviderName={newProviderName}
         onNewProviderNameChange={setNewProviderName}
-        onClose={() => setShowAddProviderModal(false)}
-        onConfirm={handleCreateProvider}
+        onClose={() => {
+          setShowAddProviderModal(false);
+        }}
+        onConfirm={handleProviderModalConfirm}
       />
 
       <CatalogBrowserModal
@@ -357,6 +367,7 @@ export default function ModelConfigCenter() {
         existingModelIds={selectedProviderModels.map((model) => model.id)}
         onClose={() => setShowCatalogModal(false)}
         onConfirm={addModelsFromCatalog}
+        onRequestRemoveExisting={requestDeleteModelsByIds}
       />
 
       <ProviderRemoteModelsModal
@@ -366,6 +377,7 @@ export default function ModelConfigCenter() {
         existingModelIds={selectedProviderModels.map((model) => model.id)}
         onClose={() => setShowRemoteModelsModal(false)}
         onConfirm={addModelsFromRemote}
+        onRequestRemoveExisting={requestDeleteModelsByIds}
       />
 
       <ImportModal

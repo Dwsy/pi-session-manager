@@ -74,6 +74,10 @@ export function useModelConfig() {
     useState<ConfigDetailTab>("model");
 
   const [showAddProviderModal, setShowAddProviderModal] = useState(false);
+  const [providerModalMode, setProviderModalMode] = useState<"create" | "copy">(
+    "create",
+  );
+  const [copySourceProvider, setCopySourceProvider] = useState("");
   const [showCatalogModal, setShowCatalogModal] = useState(false);
   const [showRemoteModelsModal, setShowRemoteModelsModal] = useState(false);
   const [newProviderName, setNewProviderName] = useState("");
@@ -386,6 +390,31 @@ export function useModelConfig() {
     );
   }
 
+  function uniqueProviderName(base: string): string {
+    let nextName = base;
+    let suffix = 2;
+    while (config.providers[nextName]) {
+      nextName = `${base}-${suffix}`;
+      suffix += 1;
+    }
+    return nextName;
+  }
+
+  function openAddProviderModal() {
+    setProviderModalMode("create");
+    setCopySourceProvider("");
+    setNewProviderName("");
+    setShowAddProviderModal(true);
+  }
+
+  function openCopyProviderModal(providerName: string) {
+    if (!config.providers[providerName]) return;
+    setProviderModalMode("copy");
+    setCopySourceProvider(providerName);
+    setNewProviderName(uniqueProviderName(`${providerName}-copy`));
+    setShowAddProviderModal(true);
+  }
+
   function handleCreateProvider() {
     const name = newProviderName.trim();
     if (!name) {
@@ -427,6 +456,8 @@ export function useModelConfig() {
     setConfigDetailTab("provider");
     setShowAddProviderModal(false);
     setNewProviderName("");
+    setProviderModalMode("create");
+    setCopySourceProvider("");
     pushFeedback(
       "success",
       t(
@@ -435,6 +466,69 @@ export function useModelConfig() {
         { name },
       ),
     );
+  }
+
+  function handleCopyProviderConfirm() {
+    const sourceName = copySourceProvider;
+    const source = config.providers[sourceName];
+    if (!source) {
+      setShowAddProviderModal(false);
+      return;
+    }
+
+    const name = newProviderName.trim();
+    if (!name) {
+      pushFeedback(
+        "warning",
+        t(
+          "settings.modelConfigCenter.feedback.providerNameRequired",
+          "Provider name cannot be empty",
+        ),
+      );
+      return;
+    }
+
+    if (config.providers[name]) {
+      pushFeedback(
+        "error",
+        t(
+          "settings.modelConfigCenter.feedback.providerNameExists",
+          "Provider name already exists: {{name}}",
+          { name },
+        ),
+      );
+      return;
+    }
+
+    const cloned = JSON.parse(JSON.stringify(source)) as ProviderEntry;
+    setConfig((prev) => ({
+      ...prev,
+      providers: {
+        ...prev.providers,
+        [name]: cloned,
+      },
+    }));
+    setSelectedProvider(name);
+    setSelectedModel("0");
+    setMainTab("configure");
+    setConfigDetailTab("provider");
+    setShowAddProviderModal(false);
+    setNewProviderName("");
+    setProviderModalMode("create");
+    setCopySourceProvider("");
+    pushFeedback(
+      "success",
+      t(
+        "settings.modelConfigCenter.feedback.providerCopied",
+        "Provider copied: {{from}} → {{to}}",
+        { from: sourceName, to: name },
+      ),
+    );
+  }
+
+  function handleProviderModalConfirm() {
+    if (providerModalMode === "copy") handleCopyProviderConfirm();
+    else handleCreateProvider();
   }
 
   function requestDeleteProvider(providerName: string) {
@@ -866,6 +960,69 @@ export function useModelConfig() {
             {
               name: modelLabel,
             },
+          ),
+        );
+      },
+    });
+  }
+
+  function requestDeleteModelById(modelId: string) {
+    requestDeleteModelsByIds([modelId]);
+  }
+
+  function requestDeleteModelsByIds(modelIds: string[]) {
+    if (!selectedProvider || modelIds.length === 0) return;
+
+    const keySet = new Set(
+      modelIds.map((id) => id.trim().toLowerCase()).filter(Boolean),
+    );
+    if (keySet.size === 0) return;
+
+    const targets = selectedProviderModels.filter((model) =>
+      keySet.has(model.id.trim().toLowerCase()),
+    );
+    if (targets.length === 0) return;
+
+    const labels = targets.map(
+      (model) =>
+        model.name?.trim() ||
+        model.id?.trim() ||
+        t("settings.modelConfigCenter.status.unnamedModel", "Unnamed Model"),
+    );
+    const preview =
+      labels.length <= 3
+        ? labels.join(", ")
+        : `${labels.slice(0, 3).join(", ")}… (+${labels.length - 3})`;
+
+    openConfirm({
+      title: t(
+        "settings.modelConfigCenter.dialogs.deleteModelsTitle",
+        "删除 {{count}} 个模型？",
+        { count: targets.length },
+      ),
+      description: t(
+        "settings.modelConfigCenter.dialogs.deleteModelsDesc",
+        "这会从当前草稿中移除：{{names}}",
+        { names: preview },
+      ),
+      confirmLabel: t("settings.modelConfigCenter.actions.delete", "Delete"),
+      tone: "danger",
+      onConfirm: () => {
+        const removeKeys = new Set(
+          targets.map((model) => model.id.trim().toLowerCase()),
+        );
+        updateSelectedProviderEntry((provider) => ({
+          ...provider,
+          models: (provider.models ?? []).filter(
+            (model) => !removeKeys.has(model.id.trim().toLowerCase()),
+          ),
+        }));
+        pushFeedback(
+          "success",
+          t(
+            "settings.modelConfigCenter.feedback.modelsRemoved",
+            "已移除 {{count}} 个模型",
+            { count: targets.length },
           ),
         );
       },
@@ -1372,6 +1529,11 @@ export function useModelConfig() {
     setConfigDetailTab,
     showAddProviderModal,
     setShowAddProviderModal,
+    providerModalMode,
+    copySourceProvider,
+    openAddProviderModal,
+    openCopyProviderModal,
+    handleProviderModalConfirm,
     showCatalogModal,
     setShowCatalogModal,
     showRemoteModelsModal,
@@ -1410,6 +1572,8 @@ export function useModelConfig() {
     fillSelectedModelPricing,
     fillProviderPricing,
     requestDeleteModel,
+    requestDeleteModelById,
+    requestDeleteModelsByIds,
     saveConfig,
     refreshConfig,
     createBackup,

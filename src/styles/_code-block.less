@@ -262,6 +262,13 @@
 }
 
 .tool-review-shell-snippet {
+  // Keep gutter and code on identical metrics so line numbers cannot drift.
+  --shell-snippet-font-size: 11px;
+  --shell-snippet-line-height: 1.5;
+  --shell-snippet-row-height: calc(
+    var(--shell-snippet-font-size) * var(--shell-snippet-line-height)
+  );
+
   position: relative;
   margin: 0;
   padding: 10px 12px;
@@ -323,14 +330,16 @@
     padding-right: 10px;
     text-align: right;
     font-family: var(--font-family-mono);
-    font-size: 10px;
-    line-height: 1.5;
+    font-size: var(--shell-snippet-font-size);
+    line-height: var(--shell-snippet-row-height);
     color: rgb(var(--color-muted-foreground) / 0.75);
     user-select: none;
   }
 
   &__line-no {
-    min-height: 1.5em;
+    height: var(--shell-snippet-row-height);
+    min-height: var(--shell-snippet-row-height);
+    line-height: var(--shell-snippet-row-height);
   }
 
   &__code {
@@ -344,10 +353,14 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     word-break: break-word;
-    font-size: 11px;
-    line-height: 1.5;
+    font-family: var(--font-family-mono);
+    font-size: var(--shell-snippet-font-size);
+    line-height: var(--shell-snippet-row-height);
 
     code {
+      font-family: inherit;
+      font-size: inherit;
+      line-height: inherit;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       word-break: break-word;
@@ -355,12 +368,17 @@
   }
 
   &--compact {
+    --shell-snippet-font-size: 10px;
+    --shell-snippet-line-height: 1.45;
     padding: 4px 0;
   }
 
-  &--compact &__code {
-    font-size: 10px;
-    line-height: 1.45;
+  // Numbered mode keeps one visual row per logical line so the gutter never drifts.
+  &--numbered &__code,
+  &--numbered &__code code {
+    white-space: pre;
+    overflow-wrap: normal;
+    word-break: normal;
   }
 
   &--scrollable {

@@ -1077,6 +1077,7 @@ export const settings = {
       loadingCatalog: "加载 models.dev...",
       loadingRemoteModels: "正在请求供应商 /models ...",
       alreadyAdded: "已添加",
+      pendingRemove: "待删除",
       manualSaveHint: "此页面不会自动保存，请点击保存配置写入磁盘。",
     },
     actions: {
@@ -1107,6 +1108,12 @@ export const settings = {
       delete: "删除",
       deleteModel: "删除模型",
       deleteProvider: "删除 Provider",
+      copyProvider: "复制 Provider",
+      confirmCopyProvider: "确认复制",
+      uncheckToRemoveModel: "取消勾选将标记删除，确认后移除",
+      uncheckVisibleExisting: "取消可见已添加",
+      clearPendingRemove: "撤销待删",
+      removeUncheckedModels: "删除已取消 ({{count}})",
       restore: "恢复",
       createBackup: "立即备份",
       importFile: "导入文件",
@@ -1246,9 +1253,13 @@ export const settings = {
       importContentTitle: "导入 JSON 内容",
       importContentDesc:
         "把完整的 models.json 内容粘贴进来，并按当前导入模式应用。",
+      copyProviderTitle: "复制 Provider",
+      copyProviderDesc: "为“{{name}}”的副本指定新名称，可改默认名后确认。",
       deleteProviderTitle: "删除 Provider？",
       deleteProviderDesc:
         "这会从当前草稿中移除 Provider“{{name}}”及其所有模型。",
+      deleteModelsTitle: "删除 {{count}} 个模型？",
+      deleteModelsDesc: "这会从当前草稿中移除：{{names}}",
       pricingFuzzyTitle: "使用模糊定价匹配？",
       pricingFuzzyDesc:
         "未找到“{{id}}”的精确匹配。是否应用模糊匹配“{{matched}}”（相似度 {{similarity}}%）？",
@@ -1270,9 +1281,11 @@ export const settings = {
       providerCreated: "已创建 Provider：{{name}}",
       providerRenamed: "Provider 已重命名为 {{name}}",
       providerDeleted: "已移除 Provider：{{name}}",
+      providerCopied: "已复制 Provider：{{from}} → {{to}}",
       modelCreated: "已新增一个模型草稿",
       modelDeleted: "已移除模型“{{name}}”",
       modelRemoved: "已移除模型“{{name}}”",
+      modelsRemoved: "已移除 {{count}} 个模型",
       selectProviderFirst: "请先选择 Provider",
       catalogModelsAdded:
         "已从 models.dev 添加 {{added}} 个模型（跳过 {{skipped}} 个）",

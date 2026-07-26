@@ -220,18 +220,10 @@ export function buildActivePathIds(
     }
 
     const parentEntry = entriesById.get(parentId as string);
-    if (parentEntry) {
-      currentId = parentEntry.id;
-      continue;
+    if (!parentEntry) {
+      break;
     }
-
-    const entryIndex = entries.findIndex((candidate) => candidate.id === currentId);
-    if (entryIndex > 0) {
-      currentId = entries[entryIndex - 1]?.id;
-      continue;
-    }
-
-    break;
+    currentId = parentEntry.id;
   }
 
   return ids;

@@ -20,6 +20,7 @@ use tracing::error;
 mod file_watcher;
 mod run;
 mod terminal;
+mod updater;
 use terminal::TerminalManager;
 
 #[derive(Embed)]

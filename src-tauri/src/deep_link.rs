@@ -17,6 +17,25 @@ impl DeepLinkState {
 }
 
 pub fn handle_deep_link_payload<R: Runtime>(app: &AppHandle<R>, state: &DeepLinkState, payload: &str) {
+    // Defer off the current call stack.
+    //
+    // On macOS, `RunEvent::Opened` runs while Tauri holds `manager.plugins` (non-reentrant).
+    // The deep-link plugin emits `deep-link://new-url` from that hook; synchronous
+    // `show_or_create_window` can re-enter `plugins.lock` via webview init and hang the UI.
+    // Hop to a worker first so `run_on_main_thread` queues via the event-loop proxy
+    // instead of running inline under the held plugins lock.
+    let app = app.clone();
+    let state = state.clone();
+    let payload = payload.to_string();
+    tauri::async_runtime::spawn(async move {
+        let app_for_main = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            handle_deep_link_payload_now(&app_for_main, &state, &payload);
+        });
+    });
+}
+
+fn handle_deep_link_payload_now<R: Runtime>(app: &AppHandle<R>, state: &DeepLinkState, payload: &str) {
     crate::tray::show_or_create_window(app);
     for url in parse_deep_link_payload(payload) {
         emit_or_queue(app, state, url);

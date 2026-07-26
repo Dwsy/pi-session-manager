@@ -43,6 +43,7 @@ pi-session-cli -p <port>
 - `settings`: Settings related commands
 - `dataset`: Dataset related commands
 - `config`: Config related commands
+- `update`: Check and install CLI updates (self-update)
 - `search`: Search sessions
 
 ## Examples
@@ -196,6 +197,38 @@ To search sessions, run:
 ```bash
 pi-session-cli search "my query"
 ```
+
+## Self-Update
+
+The CLI can check for and install updates directly (no running server required).
+
+Check for updates:
+
+```bash
+pi-session-cli update check
+pi-session-cli update check --channel beta
+```
+
+Download and install the latest version:
+
+```bash
+pi-session-cli update install
+pi-session-cli update install --channel beta --yes
+```
+
+Force reinstall the current version:
+
+```bash
+pi-session-cli update install --force
+```
+
+> **Note:** Self-update is supported on macOS and Linux. On Windows, the running
+> executable is locked by the OS, so you will be prompted to use the install
+> script instead:
+>
+> ```powershell
+> iwr -useb https://raw.githubusercontent.com/Dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+> ```
 
 ## Troubleshooting
 

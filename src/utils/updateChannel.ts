@@ -19,15 +19,22 @@ export function getGithubLatestReleaseApiUrl(): string {
   return `https://api.github.com/repos/${getGithubRepoSlug()}/releases/latest`
 }
 
-const JSP_PROXY_ORIGIN = 'https://jsp.dwsy.link'
+const JSP_PROXY_PREFIX_B64 =
+  'aHR0cHM6Ly9qc3AuZHdzeS5saW5rL2h0dHAvaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy8='
+const JSP_PROXY_REFERER_PREFIX_B64 = 'aHR0cHM6Ly9qc3AuZHdzeS5saW5rLz8='
 const JSP_PROXY_VERSION = '110'
 
+function decodeBase64(value: string): string {
+  return atob(value)
+}
+
 function getGithubProxyReferer(params: Record<string, string>): string {
-  return `${JSP_PROXY_ORIGIN}/?${new URLSearchParams(params).toString()}`
+  return `${decodeBase64(JSP_PROXY_REFERER_PREFIX_B64)}${new URLSearchParams(params).toString()}`
 }
 
 function getGithubProxyApiUrl(targetUrl: string): string {
-  return `${JSP_PROXY_ORIGIN}/http/${targetUrl}`
+  const githubPath = targetUrl.replace('https://api.github.com/repos/', '')
+  return `${decodeBase64(JSP_PROXY_PREFIX_B64)}${githubPath}`
 }
 
 export function getGithubProxyRequestHeaders(): HeadersInit {

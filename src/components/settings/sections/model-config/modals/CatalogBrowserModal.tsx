@@ -25,6 +25,8 @@ interface CatalogBrowserModalProps {
   existingModelIds: string[];
   onClose: () => void;
   onConfirm: (models: CatalogModelOption[]) => void;
+  /** Unchecked already-added models → parent confirms bulk delete. */
+  onRequestRemoveExisting: (modelIds: string[]) => void;
 }
 
 export function CatalogBrowserModal({
@@ -33,6 +35,7 @@ export function CatalogBrowserModal({
   existingModelIds,
   onClose,
   onConfirm,
+  onRequestRemoveExisting,
 }: CatalogBrowserModalProps) {
   const { t } = useTranslation();
   const [catalog, setCatalog] = useState<ModelsDevCatalog | null>(null);
@@ -42,6 +45,9 @@ export function CatalogBrowserModal({
   const [modelFilter, setModelFilter] = useState("");
   const [selectedCatalogProvider, setSelectedCatalogProvider] = useState("");
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [pendingRemoveIds, setPendingRemoveIds] = useState<Set<string>>(
     () => new Set(),
   );
 
@@ -58,9 +64,20 @@ export function CatalogBrowserModal({
   useEffect(() => {
     if (!open) return;
     setSelectedModelIds(new Set());
+    setPendingRemoveIds(new Set());
     setError(null);
     void loadCatalog();
   }, [open]);
+
+  useEffect(() => {
+    setPendingRemoveIds((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set(
+        [...prev].filter((id) => existingIdSet.has(id.trim().toLowerCase())),
+      );
+      return next.size === prev.size ? prev : next;
+    });
+  }, [existingIdSet]);
 
   const providers = useMemo(
     () => (catalog ? listCatalogProviders(catalog) : []),
@@ -112,6 +129,14 @@ export function CatalogBrowserModal({
     (model) => !existingIdSet.has(model.id.trim().toLowerCase()),
   );
   const selectedCount = selectedModelIds.size;
+  const pendingRemoveCount = pendingRemoveIds.size;
+  const existingVisibleIds = useMemo(
+    () =>
+      filteredModels
+        .filter((model) => existingIdSet.has(model.id.trim().toLowerCase()))
+        .map((model) => model.id),
+    [filteredModels, existingIdSet],
+  );
 
   async function loadCatalog(force = false) {
     setLoading(true);
@@ -128,7 +153,16 @@ export function CatalogBrowserModal({
 
   function toggleModel(model: CatalogModelOption) {
     const key = model.id.trim().toLowerCase();
-    if (!key || existingIdSet.has(key)) return;
+    if (!key) return;
+    if (existingIdSet.has(key)) {
+      setPendingRemoveIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(model.id)) next.delete(model.id);
+        else next.add(model.id);
+        return next;
+      });
+      return;
+    }
 
     setSelectedModelIds((prev) => {
       const next = new Set(prev);
@@ -153,6 +187,23 @@ export function CatalogBrowserModal({
 
   function clearSelection() {
     setSelectedModelIds(new Set());
+  }
+
+  function markVisibleExistingForRemove() {
+    setPendingRemoveIds((prev) => {
+      const next = new Set(prev);
+      for (const id of existingVisibleIds) next.add(id);
+      return next;
+    });
+  }
+
+  function clearPendingRemove() {
+    setPendingRemoveIds(new Set());
+  }
+
+  function commitPendingRemove() {
+    if (pendingRemoveIds.size === 0) return;
+    onRequestRemoveExisting([...pendingRemoveIds]);
   }
 
   function handleConfirm() {
@@ -246,6 +297,40 @@ export function CatalogBrowserModal({
               "清空选择",
             )}
           </button>
+          <button
+            type="button"
+            onClick={markVisibleExistingForRemove}
+            disabled={existingVisibleIds.length === 0}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 text-[11px] font-medium text-foreground hover:bg-surface transition-colors focus-ring disabled:opacity-60"
+          >
+            {t(
+              "settings.modelConfigCenter.actions.uncheckVisibleExisting",
+              "取消可见已添加",
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={clearPendingRemove}
+            disabled={pendingRemoveCount === 0}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 text-[11px] font-medium text-foreground hover:bg-surface transition-colors focus-ring disabled:opacity-60"
+          >
+            {t(
+              "settings.modelConfigCenter.actions.clearPendingRemove",
+              "撤销待删",
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={commitPendingRemove}
+            disabled={pendingRemoveCount === 0}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 text-[11px] font-medium text-red-600 dark:text-red-300 hover:bg-red-500/15 transition-colors focus-ring disabled:opacity-60"
+          >
+            {t(
+              "settings.modelConfigCenter.actions.removeUncheckedModels",
+              "删除已取消 ({{count}})",
+              { count: pendingRemoveCount },
+            )}
+          </button>
           <span className="text-[11px] text-muted-foreground">
             Source: models.dev/api.json
           </span>
@@ -330,29 +415,43 @@ export function CatalogBrowserModal({
             <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1">
               {filteredModels.map((model) => {
                 const exists = existingIdSet.has(model.id.trim().toLowerCase());
-                const checked = selectedModelIds.has(model.id);
+                const pendingRemove = pendingRemoveIds.has(model.id);
+                const checked = exists
+                  ? !pendingRemove
+                  : selectedModelIds.has(model.id);
                 return (
                   <button
                     key={model.id}
                     type="button"
                     onClick={() => toggleModel(model)}
-                    disabled={exists}
-                    className={`flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left transition-colors ${
+                    title={
                       exists
-                        ? "cursor-not-allowed border-transparent bg-surface/40 opacity-60"
+                        ? t(
+                            "settings.modelConfigCenter.actions.uncheckToRemoveModel",
+                            "取消勾选将标记删除，确认后移除",
+                          )
+                        : undefined
+                    }
+                    className={`flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left transition-colors ${
+                      pendingRemove
+                        ? "border-red-500/25 bg-red-500/5"
                         : checked
-                          ? "border-primary/30 bg-primary/10"
+                          ? exists
+                            ? "border-primary/20 bg-primary/5"
+                            : "border-primary/30 bg-primary/10"
                           : "border-transparent hover:bg-accent/10"
                     }`}
                   >
                     <span
                       className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                        checked || exists
+                        checked
                           ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border/70 bg-background"
+                          : pendingRemove
+                            ? "border-red-500/50 bg-background"
+                            : "border-border/70 bg-background"
                       }`}
                     >
-                      {(checked || exists) && <Check className="h-3 w-3" />}
+                      {checked && <Check className="h-3 w-3" />}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
@@ -363,11 +462,19 @@ export function CatalogBrowserModal({
                         {model.reasoning && (
                           <Sparkles className="h-3 w-3 text-amber-500" />
                         )}
-                        {exists && (
+                        {exists && !pendingRemove && (
                           <span className="rounded border border-border/50 px-1 py-px text-[9px] text-muted-foreground">
                             {t(
                               "settings.modelConfigCenter.status.alreadyAdded",
                               "已添加",
+                            )}
+                          </span>
+                        )}
+                        {pendingRemove && (
+                          <span className="rounded border border-red-500/30 px-1 py-px text-[9px] text-red-600 dark:text-red-300">
+                            {t(
+                              "settings.modelConfigCenter.status.pendingRemove",
+                              "待删除",
                             )}
                           </span>
                         )}

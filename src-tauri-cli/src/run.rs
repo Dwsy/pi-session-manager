@@ -263,15 +263,15 @@ enum ConfigCommands {
 }
 
 #[derive(Subcommand)]
-#[command(after_help = "EXAMPLES:\n  pi-session-cli update check\n  pi-session-cli update install --channel beta")]
+#[command(after_help = "EXAMPLES:\n  pi-session-cli update check\n  pi-session-cli update check --channel beta\n  pi-session-cli update install\n  pi-session-cli update install --channel beta --yes")]
 enum UpdateCommands {
-    /// Check for updates
+    /// Check for updates (standalone, no server required)
     Check {
         /// Update channel (stable or beta)
         #[arg(short, long, default_value = "stable")]
         channel: String,
     },
-    /// Download and install update (manual download mode for CLI)
+    /// Download and install the latest CLI binary (self-update)
     Install {
         /// Update channel (stable or beta)
         #[arg(short, long, default_value = "stable")]
@@ -279,6 +279,9 @@ enum UpdateCommands {
         /// Skip confirmation prompt
         #[arg(long)]
         yes: bool,
+        /// Force reinstall even if already up to date
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -477,10 +480,10 @@ pub async fn run() -> Result<()> {
         },
         Some(Commands::Update { command }) => match command {
             UpdateCommands::Check { channel } => {
-                handle_update_check(&client, &base_url, &channel).await?;
+                handle_update_check(&channel).await?;
             }
-            UpdateCommands::Install { channel, yes } => {
-                handle_update_install(&client, &base_url, &channel, yes).await?;
+            UpdateCommands::Install { channel, yes, force } => {
+                handle_update_install(&channel, yes, force).await?;
             }
         },
         Some(Commands::Search { query }) => {
@@ -495,32 +498,37 @@ pub async fn run() -> Result<()> {
     Ok(())
 }
 
-/// Handle update check command
-async fn handle_update_check(client: &Client, base_url: &str, channel: &str) -> Result<()> {
+/// Handle update check command (standalone — no running server required)
+async fn handle_update_check(channel: &str) -> Result<()> {
     println!("{} Checking for updates (channel: {})...", "→".cyan(), channel.yellow());
 
-    let data = request_command(client, base_url, "check_app_update", json!({ "channel": channel })).await?;
+    let info = match crate::updater::check_update(channel).await {
+        Ok(info) => info,
+        Err(e) => {
+            println!("{} {}", "✗".red(), format!("Failed to check for updates: {e}").red());
+            return Ok(());
+        }
+    };
 
-    if data.is_null() || data.as_null().is_some() {
-        println!("{}", "✓ No updates available. You are running the latest version.".green());
+    if !info.update_available {
+        println!("{}", "✓ Already up to date.".green());
+        println!("  Version: {} (channel: {})", info.current_version.cyan(), channel.yellow());
         return Ok(());
     }
 
-    let current_version = data["currentVersion"].as_str().unwrap_or("unknown");
-    let new_version = data["version"].as_str().unwrap_or("unknown");
-    let body = data["body"].as_str().unwrap_or("");
-
     println!("{}", "⚠ Update available!".yellow().bold());
-    println!("  Current version: {}", current_version.cyan());
-    println!("  Latest version:  {}", new_version.green().bold());
+    println!("  Current version: {}", info.current_version.cyan());
+    println!("  Latest version:  {}", info.latest_version.green().bold());
 
-    if !body.is_empty() {
-        println!("\n{}", "Release notes:".dimmed());
-        for line in body.lines().take(10) {
-            println!("  {}", line.dimmed());
-        }
-        if body.lines().count() > 10 {
-            println!("  {}", "...".dimmed());
+    if let Some(body) = &info.body {
+        if !body.is_empty() {
+            println!("\n{}", "Release notes:".dimmed());
+            for line in body.lines().take(10) {
+                println!("  {}", line.dimmed());
+            }
+            if body.lines().count() > 10 {
+                println!("  {}", "...".dimmed());
+            }
         }
     }
 
@@ -529,59 +537,65 @@ async fn handle_update_check(client: &Client, base_url: &str, channel: &str) -> 
     Ok(())
 }
 
-/// Handle update install command
-async fn handle_update_install(client: &Client, base_url: &str, channel: &str, skip_confirm: bool) -> Result<()> {
-    // First check if update is available
-    let data = request_command(client, base_url, "check_app_update", json!({ "channel": channel })).await?;
-
-    if data.is_null() || data.as_null().is_some() {
-        println!("{}", "✓ No updates available. You are running the latest version.".green());
-        return Ok(());
+/// Handle update install command (self-update — downloads and replaces binary)
+async fn handle_update_install(channel: &str, skip_confirm: bool, force: bool) -> Result<()> {
+    // Windows: self-update not supported (running exe is locked)
+    #[cfg(target_os = "windows")]
+    {
+        let _ = (channel, skip_confirm, force);
+        println!("{}", "✗ Windows 不支持 CLI 自更新（运行中的 exe 文件被系统锁定）".red().bold());
+        println!();
+        println!("{}", "请使用安装脚本重新安装最新版本：".yellow());
+        println!("  {}", "iwr -useb https://raw.githubusercontent.com/Dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex".cyan());
+        println!();
+        println!("{}", "或手动从 GitHub Releases 下载：".dimmed());
+        println!("  {}", "https://github.com/Dwsy/pi-session-manager/releases/latest".cyan().underline());
+        std::process::exit(1);
     }
 
-    let current_version = data["currentVersion"].as_str().unwrap_or("unknown");
-    let new_version = data["version"].as_str().unwrap_or("unknown");
+    #[cfg(not(target_os = "windows"))]
+    {
+        println!("{} Checking for updates (channel: {})...", "→".cyan(), channel.yellow());
 
-    println!("{}", "⚠ Update found:".yellow().bold());
-    println!("  {} → {}", current_version.cyan(), new_version.green().bold());
+        let info = crate::updater::check_update(channel).await?;
 
-    // CLI mode: provide download URL and instructions
-    let update_channels_json = include_str!("../../src/runtime-data/update-channels.json");
-    let config: Value = serde_json::from_str(update_channels_json)?;
-    let owner = config["owner"].as_str().unwrap_or("Dwsy");
-    let repo = config["repo"].as_str().unwrap_or("pi-session-manager");
-
-    let release_url = format!("https://github.com/{}/{}/releases/tag/v{}", owner, repo, new_version);
-
-    println!("\n{}", "Note: CLI self-update requires manual download.".dimmed());
-    println!("{}", "Download the new version from:".dimmed());
-    println!("  {}", release_url.cyan().underline());
-
-    if !skip_confirm {
-        print!("\n{} Open browser to download page? [y/N] ", "?".yellow());
-        std::io::stdout().flush()?;
-
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
-
-        if input.trim().to_lowercase() != "y" {
-            println!("{}", "Cancelled.".dimmed());
+        if !info.update_available && !force {
+            println!("{}", "✓ Already up to date.".green());
+            println!("  Version: {}", info.current_version.cyan());
             return Ok(());
         }
+
+        if info.update_available {
+            println!("{}", "⚠ Update found:".yellow().bold());
+            println!("  {} → {}", info.current_version.cyan(), info.latest_version.green().bold());
+        } else {
+            println!("{} (force reinstall {})", "→ Reinstalling current version".cyan(), info.current_version.yellow());
+        }
+
+        // Confirmation prompt
+        if !skip_confirm {
+            print!("\n{} Download and install? [Y/n] ", "?".yellow());
+            std::io::stdout().flush()?;
+
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+
+            let answer = input.trim().to_lowercase();
+            if answer == "n" || answer == "no" {
+                println!("{}", "Cancelled.".dimmed());
+                return Ok(());
+            }
+        }
+
+        // Download and install
+        println!();
+        crate::updater::download_and_install(&info, channel).await?;
+
+        println!();
+        println!("{}", "✓ Update complete!".green().bold());
+        println!("  Version: {}", info.latest_version.green());
+        println!("  Run {} to verify.", "pi-session-cli --version".cyan());
+
+        Ok(())
     }
-
-    // Try to open browser
-    #[cfg(target_os = "macos")]
-    let open_cmd = "open";
-    #[cfg(target_os = "linux")]
-    let open_cmd = "xdg-open";
-    #[cfg(target_os = "windows")]
-    let open_cmd = "start";
-
-    let _ = std::process::Command::new(open_cmd).arg(&release_url).spawn();
-
-    println!("{}", "Opening browser...".green());
-    println!("\n{}", "After downloading, replace the binary with the new version.".dimmed());
-
-    Ok(())
 }

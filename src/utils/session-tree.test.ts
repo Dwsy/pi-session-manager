@@ -276,6 +276,19 @@ describe("session tree active path", () => {
       "u2",
     ]);
   });
+
+  it("stops at a broken parent chain instead of falling back to file order", () => {
+    const entries = [
+      message("u1", "user", "root"),
+      message("a1", "assistant", "reply", "u1"),
+      message("orphan", "user", "orphaned", "missing-parent"),
+    ];
+
+    // orphan's parentId points to a non-existent entry; path should stop there
+    expect([...buildActivePathIds("orphan", entries)]).toEqual(["orphan"]);
+    // a1 should NOT be pulled in via file-order fallback
+    expect(buildActivePathIds("orphan", entries).has("a1")).toBe(false);
+  });
 });
 
 describe("session tree foldability", () => {

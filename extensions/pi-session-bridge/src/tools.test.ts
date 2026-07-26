@@ -9,16 +9,20 @@ vi.mock("./connection-manager.js", () => ({
 }));
 
 const fullTextSearch = vi.fn();
+const scanSessions = vi.fn();
+const getSessionEntries = vi.fn();
 
 vi.mock("./psm-client.js", () => ({
-  scanSessions: vi.fn(),
-  getSessionEntries: vi.fn(),
+  scanSessions,
+  getSessionEntries,
   fullTextSearch,
 }));
 
 describe("pi-session-bridge tools", () => {
   beforeEach(() => {
     fullTextSearch.mockReset();
+    scanSessions.mockReset();
+    getSessionEntries.mockReset();
     vi.resetModules();
   });
 
@@ -96,6 +100,76 @@ describe("pi-session-bridge tools", () => {
       project_path: "/Users/me/project/demo",
       source_filter: "content_only",
     }));
+  });
+
+  it("truncates oversized session_recall entries before returning them to context", async () => {
+    fullTextSearch.mockResolvedValue({
+      hits: [{
+        session_id: "abcdef123456",
+        session_path: "/tmp/session.jsonl",
+        session_name: "Long Session",
+        entry_id: "entry-1",
+        role: "user",
+        source_type: "user",
+        content: "oversized recall match",
+        timestamp: "2026-05-22T00:00:00Z",
+        score: 1,
+      }],
+      total_hits: 1,
+      has_more: false,
+    });
+    scanSessions.mockResolvedValue([]);
+    getSessionEntries.mockResolvedValue([{
+      type: "message",
+      id: "entry-1",
+      message: { role: "user", content: [{ type: "text", text: "x".repeat(20_000) }] },
+    }]);
+    const { sessionRecallTool } = await import("./tools.js");
+
+    const result = await sessionRecallTool.execute("call-1", {
+      query: "oversized",
+      maxResults: 1,
+      before: 0,
+      after: 0,
+    });
+    const output = result.content[0].text;
+
+    expect(output).toContain("[entry truncated: 18000 characters omitted]");
+    expect(output.length).toBeLessThan(2_500);
+  });
+
+  it("caps total session_recall output across multiple windows", async () => {
+    fullTextSearch.mockResolvedValue({
+      hits: Array.from({ length: 5 }, (_, index) => ({
+        session_id: `session-${index}`,
+        session_path: `/tmp/session-${index}.jsonl`,
+        session_name: `Session ${index}`,
+        entry_id: `entry-${index}`,
+        role: "user",
+        source_type: "user",
+        content: "recall match",
+        timestamp: "2026-05-22T00:00:00Z",
+        score: 1,
+      })),
+      total_hits: 5,
+      has_more: false,
+    });
+    scanSessions.mockResolvedValue([]);
+    getSessionEntries.mockImplementation((sessionPath: string) => {
+      const index = sessionPath.match(/session-(\d+)/)?.[1] || "0";
+      return Promise.resolve([
+        { type: "message", id: `before-${index}`, message: { role: "user", content: [{ type: "text", text: "a".repeat(3_000) }] } },
+        { type: "message", id: `entry-${index}`, message: { role: "user", content: [{ type: "text", text: "b".repeat(3_000) }] } },
+        { type: "message", id: `after-${index}`, message: { role: "assistant", content: [{ type: "text", text: "c".repeat(3_000) }] } },
+      ]);
+    });
+    const { sessionRecallTool } = await import("./tools.js");
+
+    const result = await sessionRecallTool.execute("call-1", { query: "recall", maxResults: 5 });
+    const output = result.content[0].text;
+
+    expect(output).toContain("[output truncated:");
+    expect(output.length).toBeLessThan(12_100);
   });
 
   it("sets an existing session tag through local Kanban files", async () => {

@@ -56,6 +56,7 @@ function ShellCodeSnippet({
     compact ? "tool-review-shell-snippet--compact" : "",
     scrollable ? "tool-review-shell-snippet--scrollable" : "",
     copyOnHover ? "tool-review-shell-snippet--copyable" : "",
+    showLineNumbers ? "tool-review-shell-snippet--numbered" : "",
     className,
   ]
     .filter(Boolean)

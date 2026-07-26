@@ -13,6 +13,7 @@ import {
   Server,
   Shield,
   Sparkles,
+  Copy,
   Trash2,
   Type,
 } from "lucide-react";
@@ -53,7 +54,8 @@ interface ConfigureTabProps {
   setSelectedProvider: (provider: string) => void;
   setConfigDetailTab: (tab: ConfigDetailTab) => void;
   requestDeleteProvider: (provider: string) => void;
-  setShowAddProviderModal: (show: boolean) => void;
+  openCopyProviderModal: (provider: string) => void;
+  openAddProviderModal: () => void;
   selectedProviderModels: ModelEntry[];
   selectedModel: string;
   setSelectedModel: (model: string) => void;
@@ -87,7 +89,8 @@ export function ConfigureTab({
   setSelectedProvider,
   setConfigDetailTab,
   requestDeleteProvider,
-  setShowAddProviderModal,
+  openCopyProviderModal,
+  openAddProviderModal,
   selectedProviderModels,
   selectedModel,
   setSelectedModel,
@@ -268,7 +271,7 @@ export function ConfigureTab({
           </button>
           <button
             type="button"
-            onClick={() => setShowAddProviderModal(true)}
+            onClick={openAddProviderModal}
             className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md settings-accent-bg-soft px-2 text-[11px] font-semibold settings-accent-fg transition-all duration-150 hover:settings-accent-bg-strong hover:text-primary-foreground active:scale-95 focus-ring"
             title={t("settings.modelConfigCenter.actions.addProvider", "新增")}
           >
@@ -563,17 +566,30 @@ export function ConfigureTab({
             )}
 
             {configDetailTab === "provider" && selectedProviderEntry && (
-              <button
-                type="button"
-                onClick={() => requestDeleteProvider(selectedProvider)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-border/60 bg-background/50 text-muted-foreground hover:bg-red-500/15 hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/30 transition-all active:scale-95"
-                title={t(
-                  "settings.modelConfigCenter.actions.deleteProvider",
-                  "删除 Provider",
-                )}
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => openCopyProviderModal(selectedProvider)}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-border/60 bg-background/50 text-muted-foreground hover:bg-accent/15 hover:text-foreground hover:border-border transition-all active:scale-95"
+                  title={t(
+                    "settings.modelConfigCenter.actions.copyProvider",
+                    "复制 Provider",
+                  )}
+                >
+                  <Copy className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => requestDeleteProvider(selectedProvider)}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-border/60 bg-background/50 text-muted-foreground hover:bg-red-500/15 hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/30 transition-all active:scale-95"
+                  title={t(
+                    "settings.modelConfigCenter.actions.deleteProvider",
+                    "删除 Provider",
+                  )}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </>
             )}
           </div>
         </div>

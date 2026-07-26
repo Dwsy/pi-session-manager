@@ -17,6 +17,15 @@ import type { FullTextSearchResponse, SessionEntry, SessionInfo, TagItem } from 
 
 let cachedSessions: SessionInfo[] | null = null;
 
+const MAX_RECALL_ENTRY_CHARS = 2_000;
+const MAX_RECALL_OUTPUT_CHARS = 12_000;
+
+function truncateRecallText(text: string, maxChars: number, scope: "entry" | "output"): string {
+  const normalized = text.trim();
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, maxChars)}\n… [${scope} truncated: ${normalized.length - maxChars} characters omitted]`;
+}
+
 async function getSessions(): Promise<SessionInfo[]> {
   if (cachedSessions) return cachedSessions;
   try {
@@ -253,10 +262,14 @@ export const sessionRecallTool = {
                 .slice(start, end)
                 .map((e, j) => {
                   const role = e.message?.role || "unknown";
-                  const text = (e.message?.content || [])
-                    .filter((b) => b?.type === "text" && b.text)
-                    .map((b) => b.text!.trim())
-                    .join("\n");
+                  const text = truncateRecallText(
+                    (e.message?.content || [])
+                      .filter((b) => b?.type === "text" && b.text)
+                      .map((b) => b.text!.trim())
+                      .join("\n"),
+                    MAX_RECALL_ENTRY_CHARS,
+                    "entry",
+                  );
                   const marker = idx === start + j ? "->" : "  ";
                   return `${marker} ${role}: ${text || "(no text)"}`;
                 })
@@ -270,8 +283,9 @@ export const sessionRecallTool = {
         );
       }
 
+      const output = [`Session recall for: ${query}`, "", ...sections].join("\n\n");
       return {
-        content: [{ type: "text", text: [`Session recall for: ${query}`, "", ...sections].join("\n\n") }],
+        content: [{ type: "text", text: truncateRecallText(output, MAX_RECALL_OUTPUT_CHARS, "output") }],
       };
     } catch (err) {
       return { content: [{ type: "text", text: `Recall failed: ${err}` }], isError: true };

@@ -8,6 +8,7 @@ export function ModalShell({
   footer,
   onClose,
   widthClass = "max-w-lg",
+  overlayClassName = "z-50",
 }: {
   title: string;
   description: string;
@@ -15,10 +16,12 @@ export function ModalShell({
   footer: ReactNode;
   onClose: () => void;
   widthClass?: string;
+  /** Overlay stacking class; raise for nested confirms over other modals. */
+  overlayClassName?: string;
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
+      className={`fixed inset-0 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px] ${overlayClassName}`}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();

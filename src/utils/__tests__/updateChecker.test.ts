@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { compareVersions, checkForUpdates } from '../updateChecker'
+import {
+  getGithubLatestReleaseProxyApiUrl,
+  getGithubProxyRequestHeaders,
+} from '../updateChannel'
 
 describe('compareVersions', () => {
   it('compares major versions', () => {
@@ -28,6 +32,15 @@ describe('compareVersions', () => {
   it('handles prerelease versions', () => {
     expect(compareVersions('1.0.0-beta.1', '1.0.0-alpha.1')).toBe(1)
     expect(compareVersions('1.0.0', '1.0.0-beta.1')).toBe(1)
+  })
+})
+
+describe('GitHub proxy URL encoding', () => {
+  it('decodes only the proxy prefix and keeps repository path readable', () => {
+    expect(getGithubLatestReleaseProxyApiUrl()).toBe(
+      'https://jsp.dwsy.link/http/https://api.github.com/repos/Dwsy/pi-session-manager/releases/latest',
+    )
+    expect(getGithubProxyRequestHeaders().Referer).toContain('https://jsp.dwsy.link/?')
   })
 })
 
