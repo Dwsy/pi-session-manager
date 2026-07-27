@@ -9,5 +9,5 @@ debug = 1
 [profile.release]
 # 优化二进制大小
 opt-level = "z"
-lto = true
+lto = false
 codegen-units = 1
