@@ -104,7 +104,7 @@ export default function StorageSettingsTab({
                           buildSessionDirs(includeDefaultDir, nextDirs),
                         );
                       }}
-                      className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg motion-color motion-press focus-ring"
+                      className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg motion-color focus-ring"
                       title={t("settings.advanced.removeSessionDir", "Remove")}
                     >
                       <X className="h-4 w-4" />
@@ -119,7 +119,7 @@ export default function StorageSettingsTab({
                     buildSessionDirs(includeDefaultDir, [...extraDirs, ""]),
                   );
                 }}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-info hover:bg-info/10 rounded-lg motion-color motion-press focus-ring"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-info hover:bg-info/10 rounded-lg motion-color focus-ring"
               >
                 <Plus className="h-4 w-4" />
                 {t("settings.advanced.addSessionDir", "Add path")}
@@ -209,13 +209,13 @@ export default function StorageSettingsTab({
                     ),
                   );
                 }}
-                className="px-4 py-2 bg-info/10 text-info hover:bg-info/20 rounded-lg text-sm font-medium motion-color motion-press focus-ring"
+                className="px-4 py-2 bg-info/10 text-info hover:bg-info/20 rounded-lg text-sm font-medium motion-color focus-ring"
               >
                 {t("settings.advanced.showOnboarding", "Show onboarding again")}
               </button>
               <button
                 onClick={onClearCache}
-                className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium motion-color motion-press focus-ring"
+                className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium motion-color focus-ring"
               >
                 {t("settings.advanced.clearCache", "Clear cache")}
               </button>

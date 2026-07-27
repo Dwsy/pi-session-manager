@@ -66,6 +66,8 @@ export function AtlasDialog({
   onActivateNode,
   onClose,
 }: AtlasDialogProps): React.ReactElement | null {
+  const dialogRef = useRef<HTMLElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const mapShellRef = useRef<HTMLElement>(null);
   const canvasLayerRef = useRef<HTMLDivElement>(null);
   const shellSize = useElementSize(mapShellRef);
@@ -132,6 +134,19 @@ export function AtlasDialog({
 
   useEffect(() => {
     if (!open) return;
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const frame = requestAnimationFrame(() => dialogRef.current?.focus());
+    return () => {
+      cancelAnimationFrame(frame);
+      previouslyFocusedRef.current?.focus();
+      previouslyFocusedRef.current = null;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -139,16 +154,36 @@ export function AtlasDialog({
         onClose();
         return;
       }
+      if (event.key === "Tab") {
+        trapFocusWithinDialog(event, dialogRef.current);
+        return;
+      }
+      if (isInteractiveShortcutTarget(event.target)) return;
       if (event.key === " ") {
         event.preventDefault();
         replay.playPause();
         return;
       }
-      if (event.key.toLowerCase() === "f") focus(selectedUid);
-      if (event.key === "0") setView(fitView);
-      if (event.key === "1") setSidebarTab("branches");
-      if (event.key === "2") setSidebarTab("forks");
-      if (event.key === "3") setSidebarTab("notes");
+      if (event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        focus(selectedUid);
+      }
+      if (event.key === "0") {
+        event.preventDefault();
+        setView(fitView);
+      }
+      if (event.key === "1") {
+        event.preventDefault();
+        setSidebarTab("branches");
+      }
+      if (event.key === "2") {
+        event.preventDefault();
+        setSidebarTab("forks");
+      }
+      if (event.key === "3") {
+        event.preventDefault();
+        setSidebarTab("notes");
+      }
     };
     document.addEventListener("keydown", handleKeyDown, true);
     const previousOverflow = document.body.style.overflow;
@@ -200,16 +235,18 @@ export function AtlasDialog({
       }}
     >
       <section
+        ref={dialogRef}
         className="atlas-dialog branch-atlas-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="Pi Branch Atlas"
+        aria-labelledby="branch-atlas-title"
+        tabIndex={-1}
       >
         <header
           className={`atlas-header branch-atlas-header ${isMacTauri ? "is-macos-tauri" : ""}`}
         >
           <div className="atlas-heading">
-            <strong>
+            <strong id="branch-atlas-title">
               PI BRANCH ATLAS <span>分支地图</span>
             </strong>
             <small>
@@ -242,6 +279,7 @@ export function AtlasDialog({
               type="button"
               className="icon-button"
               onClick={() => adjustZoom(1 / 1.35)}
+              aria-label="缩小地图"
               title="缩小"
             >
               <ZoomOutIcon />
@@ -250,6 +288,7 @@ export function AtlasDialog({
               type="button"
               className="icon-button"
               onClick={() => adjustZoom(1.35)}
+              aria-label="放大地图"
               title="放大"
             >
               <ZoomInIcon />
@@ -258,6 +297,7 @@ export function AtlasDialog({
               type="button"
               className="icon-button"
               onClick={onClose}
+              aria-label="关闭分支地图"
               title="关闭"
             >
               <CloseIcon />
@@ -271,7 +311,7 @@ export function AtlasDialog({
             settings={settings}
             onSettingsChange={onSettingsChange}
           />
-          <div className="atlas-replay-controls" aria-label="分支回放">
+          <div className="atlas-replay-controls" role="group" aria-label="分支回放">
             <button
               type="button"
               className="icon-button"
@@ -411,7 +451,12 @@ export function AtlasDialog({
           <aside className="atlas-sidebar branch-atlas-sidebar">
             <div className="atlas-sidebar-tabs" role="tablist">
               <button
+                id="branch-atlas-tab-branches"
                 type="button"
+                role="tab"
+                aria-selected={sidebarTab === "branches"}
+                aria-controls="branch-atlas-panel-branches"
+                tabIndex={sidebarTab === "branches" ? 0 : -1}
                 className={sidebarTab === "branches" ? "is-active" : ""}
                 onClick={() => setSidebarTab("branches")}
               >
@@ -419,7 +464,12 @@ export function AtlasDialog({
                 <kbd>1</kbd>
               </button>
               <button
+                id="branch-atlas-tab-forks"
                 type="button"
+                role="tab"
+                aria-selected={sidebarTab === "forks"}
+                aria-controls="branch-atlas-panel-forks"
+                tabIndex={sidebarTab === "forks" ? 0 : -1}
                 className={sidebarTab === "forks" ? "is-active" : ""}
                 onClick={() => setSidebarTab("forks")}
               >
@@ -427,7 +477,12 @@ export function AtlasDialog({
                 <kbd>2</kbd>
               </button>
               <button
+                id="branch-atlas-tab-notes"
                 type="button"
+                role="tab"
+                aria-selected={sidebarTab === "notes"}
+                aria-controls="branch-atlas-panel-notes"
+                tabIndex={sidebarTab === "notes" ? 0 : -1}
                 className={sidebarTab === "notes" ? "is-active" : ""}
                 onClick={() => setSidebarTab("notes")}
               >
@@ -437,26 +492,32 @@ export function AtlasDialog({
             </div>
 
             {sidebarTab === "branches" ? (
-              <BranchSidebar
-                model={model}
-                activeLeafUid={activeLeafUid}
-                activeTerminalIndex={activeTerminalIndex}
-                selectedSegmentUid={selectedSegment?.uid || ""}
-                onFocus={selectAndFocus}
-                onActivate={onActivateNode}
-              />
+              <div id="branch-atlas-panel-branches" className="atlas-sidebar-panel" role="tabpanel" aria-labelledby="branch-atlas-tab-branches">
+                <BranchSidebar
+                  model={model}
+                  activeLeafUid={activeLeafUid}
+                  activeTerminalIndex={activeTerminalIndex}
+                  selectedSegmentUid={selectedSegment?.uid || ""}
+                  onFocus={selectAndFocus}
+                  onActivate={onActivateNode}
+                />
+              </div>
             ) : sidebarTab === "forks" ? (
-              <ForkSidebar
-                model={model}
-                onFocus={selectAndFocus}
-                onActivate={onActivateNode}
-              />
+              <div id="branch-atlas-panel-forks" className="atlas-sidebar-panel" role="tabpanel" aria-labelledby="branch-atlas-tab-forks">
+                <ForkSidebar
+                  model={model}
+                  onFocus={selectAndFocus}
+                  onActivate={onActivateNode}
+                />
+              </div>
             ) : (
-              <NotesSidebar
-                notesByType={notesByType}
-                enabledNotes={enabledNotes}
-                onNoteClick={handleNoteClick}
-              />
+              <div id="branch-atlas-panel-notes" className="atlas-sidebar-panel" role="tabpanel" aria-labelledby="branch-atlas-tab-notes">
+                <NotesSidebar
+                  notesByType={notesByType}
+                  enabledNotes={enabledNotes}
+                  onNoteClick={handleNoteClick}
+                />
+              </div>
             )}
           </aside>
         </div>
@@ -825,4 +886,31 @@ function scopeLabel(scope: GlobalMapSettings["scope"]): string {
   if (scope === "structure") return "仅分支骨架";
   if (scope === "conversation") return "对话事件";
   return "全部 entry 事件";
+}
+
+
+function isInteractiveShortcutTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return Boolean(target.closest('input, textarea, select, button, a, summary, [contenteditable="true"], [role="button"], [role="tab"], [role="slider"]'));
+}
+
+function trapFocusWithinDialog(event: KeyboardEvent, dialog: HTMLElement | null): void {
+  if (!dialog) return;
+  const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])'));
+  if (!focusable.length) {
+    event.preventDefault();
+    dialog.focus();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  if (event.shiftKey && (active === first || !dialog.contains(active))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }

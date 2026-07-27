@@ -16,7 +16,7 @@ function SettingsTabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex-none min-w-[88px] sm:flex-1 sm:min-w-0 min-h-[40px] flex items-center justify-center gap-1.5 px-3 text-xs font-medium rounded-md motion-surface motion-color motion-press focus-ring whitespace-nowrap ${
+      className={`flex-none min-w-[88px] sm:flex-1 sm:min-w-0 min-h-[40px] flex items-center justify-center gap-1.5 px-3 text-xs font-medium rounded-md motion-surface motion-color focus-ring whitespace-nowrap ${
         active
           ? "settings-accent-bg-strong text-primary-foreground shadow-xs"
           : "text-muted-foreground hover:bg-surface/70 hover:text-foreground"

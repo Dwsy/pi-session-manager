@@ -45,19 +45,21 @@ function AppPluginSidebarPane({
   }
 
   return (
-    <PluginContributionBoundary
-      pluginId={sidebarView.pluginId}
-      contributionId={sidebarView.id}
-      title={sidebarView.title}
-    >
-      <PluginContributionSlot
-        render={() => sidebarView.render({
-          viewId: sidebarView.id,
-          active: true,
-          data: appData,
-        })}
-      />
-    </PluginContributionBoundary>
+    <div className="app-plugin-sidebar-host" data-plugin-sidebar-id={sidebarView.id}>
+      <PluginContributionBoundary
+        pluginId={sidebarView.pluginId}
+        contributionId={sidebarView.id}
+        title={sidebarView.title}
+      >
+        <PluginContributionSlot
+          render={() => sidebarView.render({
+            viewId: sidebarView.id,
+            active: true,
+            data: appData,
+          })}
+        />
+      </PluginContributionBoundary>
+    </div>
   );
 }
 

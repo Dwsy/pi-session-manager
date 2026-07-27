@@ -87,7 +87,7 @@ export default function ApiKeysSettingsTab({
                     </div>
                     <button
                       onClick={() => onRevokeKey(k.key_preview)}
-                      className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg motion-color motion-press focus-ring flex-shrink-0"
+                      className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg motion-color focus-ring flex-shrink-0"
                       title={t("settings.advanced.revokeKey", "Revoke")}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -114,7 +114,7 @@ export default function ApiKeysSettingsTab({
                       onCopyToClipboard(newKeyValue);
                       onNewKeyValueChange(null);
                     }}
-                    className="p-2 text-info hover:bg-info/10 rounded-lg motion-color motion-press focus-ring flex-shrink-0"
+                    className="p-2 text-info hover:bg-info/10 rounded-lg motion-color focus-ring flex-shrink-0"
                     title={t("settings.advanced.copyKey", "Copy")}
                   >
                     <Copy className="h-4 w-4" />
@@ -135,14 +135,14 @@ export default function ApiKeysSettingsTab({
                     onManualKeyChange("");
                     onManualValueChange("");
                   }}
-                  className={`px-3 py-1.5 text-xs rounded-md motion-color motion-press focus-ring ${keyMode === "auto" ? "bg-info text-white" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`px-3 py-1.5 text-xs rounded-md motion-color focus-ring ${keyMode === "auto" ? "bg-info text-white" : "text-muted-foreground hover:text-foreground"}`}
                 >
                   {t("settings.advanced.keyModeAuto", "Auto generate")}
                 </button>
                 <button
                   type="button"
                   onClick={() => onKeyModeChange("manual")}
-                  className={`px-3 py-1.5 text-xs rounded-md motion-color motion-press focus-ring ${keyMode === "manual" ? "bg-info text-white" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`px-3 py-1.5 text-xs rounded-md motion-color focus-ring ${keyMode === "manual" ? "bg-info text-white" : "text-muted-foreground hover:text-foreground"}`}
                 >
                   {t("settings.advanced.keyModeManual", "Manual Setup")}
                 </button>
@@ -205,7 +205,7 @@ export default function ApiKeysSettingsTab({
               <button
                 onClick={onCreateKey}
                 disabled={creating}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-info hover:bg-info/90 text-white rounded-lg motion-color motion-press focus-ring disabled:opacity-50 shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-info hover:bg-info/90 text-white rounded-lg motion-color focus-ring disabled:opacity-50 shadow-sm"
               >
                 <Plus className="h-4 w-4" />
                 {t("settings.advanced.createKey", "Create Key")}

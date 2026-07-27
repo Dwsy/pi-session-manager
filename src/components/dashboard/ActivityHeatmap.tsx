@@ -104,7 +104,6 @@ export default function ActivityHeatmap({
   return (
     <DashboardCardShell
       className="rounded-xl p-3"
-      overlayClassName="bg-gradient-to-br from-success/5 via-transparent to-transparent"
     >
         {displayTitle && (
           <div className="flex items-center justify-between mb-3">

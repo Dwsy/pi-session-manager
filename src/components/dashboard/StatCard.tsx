@@ -1,4 +1,4 @@
-import { LucideIcon } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 interface StatCardProps {
@@ -11,83 +11,54 @@ interface StatCardProps {
   onClick?: () => void
 }
 
-export default function StatCard({ icon: Icon, label, value, color, change, trend = 'neutral', onClick }: StatCardProps) {
-  const getTrendColor = () => {
-    if (trend === 'up') return 'text-success'
-    if (trend === 'down') return 'text-destructive'
-    return 'text-muted-foreground'
-  }
-
-  const getTrendIcon = () => {
-    if (trend === 'up') return '↑'
-    if (trend === 'down') return '↓'
-    return ''
-  }
-
-  const getGlowClass = () => {
-    if (color === '#569cd6') return 'group-hover:shadow-[0_0_30px_rgba(86,156,214,0.25)]'
-    if (color === '#7ee787') return 'group-hover:shadow-[0_0_30px_rgba(126,231,135,0.25)]'
-    if (color === '#ffa657') return 'group-hover:shadow-[0_0_30px_rgba(255,166,87,0.25)]'
-    if (color === '#ff6b6b') return 'group-hover:shadow-[0_0_30px_rgba(255,107,107,0.25)]'
-    return ''
-  }
+export default function StatCard({
+  icon: Icon,
+  label,
+  value,
+  color,
+  change,
+  trend = 'neutral',
+  onClick,
+}: StatCardProps) {
+  const trendClass =
+    trend === 'up'
+      ? 'text-success'
+      : trend === 'down'
+        ? 'text-destructive'
+        : 'text-muted-foreground'
+  const trendMark = trend === 'up' ? '↑' : trend === 'down' ? '↓' : ''
 
   const content = (
     <>
-      {/* Subtle gradient overlay */}
-      <div
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 motion-opacity"
-        style={{
-          background: `radial-gradient(circle at top right, ${color}08 0%, transparent 70%)`
-        }}
-      />
-
-      <div className="relative z-10">
-        <div className="flex items-start justify-between mb-2">
-          <div
-            className="p-2 rounded-lg motion-transform group-hover:scale-110"
-            style={{
-              backgroundColor: `${color}15`,
-              boxShadow: `0 2px 8px ${color}10`
-            }}
-          >
-            <Icon className="h-4 w-4 motion-transform group-hover:rotate-3" style={{ color }} />
-          </div>
-          {change && (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full bg-background/80 border border-foreground/5 ${getTrendColor()} flex items-center gap-0.5 backdrop-blur-sm`}>
-              {getTrendIcon()} {change}
-            </span>
-          )}
-        </div>
-        <div className="text-xl font-bold mb-0.5 text-gradient">{value}</div>
-        <div className="text-[11px] md:text-[10px] text-muted-foreground uppercase tracking-wider font-medium">{label}</div>
+      <div className="flex items-start justify-between gap-3">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-border/60 bg-background/45">
+          <Icon className="h-3.5 w-3.5" style={{ color }} aria-hidden="true" />
+        </span>
+        {change ? (
+          <span className={`text-[10px] tabular-nums ${trendClass}`}>
+            {trendMark} {change}
+          </span>
+        ) : null}
       </div>
-
-      {/* Bottom glow line */}
-      <div
-        className="absolute bottom-0 left-0 right-0 h-[2px] opacity-0 group-hover:opacity-100 motion-opacity"
-        style={{
-          background: `linear-gradient(90deg, transparent 0%, ${color}60 50%, transparent 100%)`
-        }}
-      />
+      <div className="mt-3 text-xl font-semibold leading-none tabular-nums text-foreground">
+        {value}
+      </div>
+      <div className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+        {label}
+      </div>
     </>
   )
 
+  const className =
+    'w-full rounded-md border border-border/60 bg-card/45 p-3 text-left motion-surface focus-ring'
+
   if (onClick) {
     return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={`glass-card glass-card-hover rounded-lg p-3 group relative overflow-hidden w-full text-left motion-press focus-ring ${getGlowClass()}`}
-      >
+      <button type="button" onClick={onClick} className={`${className} hover:bg-card/70`}>
         {content}
       </button>
     )
   }
 
-  return (
-    <div className={`glass-card glass-card-hover rounded-lg p-3 group relative overflow-hidden ${getGlowClass()}`}>
-      {content}
-    </div>
-  )
+  return <div className={className}>{content}</div>
 }

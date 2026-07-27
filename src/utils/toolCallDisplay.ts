@@ -258,7 +258,13 @@ export function resolveToolCallDisplayData(
   const toolCallId = toolCall.id || ''
   const result = toolCallId ? toolResultByCallId.get(toolCallId) : undefined
   const toolResultContent = (result?.message?.content?.[0] || null) as ToolResultContent | null
-  const isError = result?.message?.isError || toolResultContent?.isError || false
+  const resultExitCode = result?.message?.exitCode
+  const isError = Boolean(
+    result?.message?.isError ||
+    result?.message?.cancelled ||
+    (typeof resultExitCode === 'number' && resultExitCode !== 0) ||
+    toolResultContent?.isError
+  )
   const output = getRenderableToolOutput(result)
   const detailsWithDiff = result?.message?.details as { diff?: string } | undefined
   const diff =

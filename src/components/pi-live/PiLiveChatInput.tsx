@@ -406,7 +406,7 @@ export default function PiLiveChatInput({
   if (!isActive) return null;
 
   return (
-    <div className="border-t border-border/50 bg-surface/60 px-4 py-3 backdrop-blur-sm">
+    <div className="border-t border-border/50 bg-surface/60 px-4 py-3">
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Slash className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/70" />

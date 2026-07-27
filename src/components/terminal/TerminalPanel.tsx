@@ -514,12 +514,12 @@ export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cw
           <button
             onClick={() => addTab()}
             disabled={tabs.length >= MAX_TERMINAL_TABS}
-            className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-color motion-press focus-ring"
+            className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 motion-color focus-ring"
             title={tabs.length >= MAX_TERMINAL_TABS ? t('components.terminalPanel.maxTabs', 'Maximum terminal tabs reached') : t('components.terminalPanel.newTerminal')}
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); setShowShellMenu(!showShellMenu) }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground motion-color motion-press focus-ring" title={t('components.terminalPanel.selectShell')}>
+          <button onClick={(e) => { e.stopPropagation(); setShowShellMenu(!showShellMenu) }} className="p-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground motion-color focus-ring" title={t('components.terminalPanel.selectShell')}>
             <ChevronDown className="h-3 w-3" />
           </button>
           {showShellMenu && (
@@ -532,12 +532,12 @@ export function TerminalPanel({ isOpen, scopeKey, onClose, onMaximizedChange, cw
             </div>
           )}
           <div className="w-px h-3.5 bg-border mx-0.5" />
-          <button onClick={toggleMaximize} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground motion-color motion-press focus-ring" title={maximized ? 'Restore panel' : 'Maximize panel'}>
+          <button onClick={toggleMaximize} className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground motion-color focus-ring" title={maximized ? 'Restore panel' : 'Maximize panel'}>
             {maximized ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
           </button>
           <button
             onClick={requestPanelClose}
-            className={`p-1 rounded hover:bg-secondary motion-color motion-press focus-ring ${panelCloseRequested ? 'text-destructive' : 'text-muted-foreground hover:text-foreground'}`}
+            className={`p-1 rounded hover:bg-secondary motion-color focus-ring ${panelCloseRequested ? 'text-destructive' : 'text-muted-foreground hover:text-foreground'}`}
             title={panelCloseRequested ? t('components.terminalPanel.confirmHidePanel', 'Click again to hide terminal panel') : t('components.terminalPanel.hidePanel', 'Hide terminal panel')}
             aria-label={panelCloseRequested ? t('components.terminalPanel.confirmHidePanel', 'Click again to hide terminal panel') : t('components.terminalPanel.hidePanel', 'Hide terminal panel')}
           >

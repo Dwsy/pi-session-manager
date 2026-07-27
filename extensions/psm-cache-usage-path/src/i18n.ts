@@ -14,6 +14,11 @@ export const cacheUsageI18n: PsmPluginI18nResources = {
         activeBranchHint: 'Active branch follows the entry currently selected in the viewer.',
         branchHint: 'Latest branch is inferred from the newest message lineage in this session file.',
         loading: 'Loading cache usage...',
+        refreshing: 'Refreshing cache usage...',
+        refreshFailed: 'Refresh failed: {{message}}',
+        retry: 'Retry',
+        updated: 'Updated {{time}}',
+        resize: 'Resize cache usage panel',
         empty: 'No assistant usage metrics found in this session.',
         tabs: {
           overview: 'Overview',
@@ -127,6 +132,11 @@ export const cacheUsageI18n: PsmPluginI18nResources = {
         activeBranchHint: '“当前分支”跟随会话查看器当前选中的节点。',
         branchHint: '“最新分支”依据当前会话文件中最新消息的父链推导。',
         loading: '正在加载缓存使用...',
+        refreshing: '正在刷新缓存使用...',
+        refreshFailed: '刷新失败：{{message}}',
+        retry: '重试',
+        updated: '更新于 {{time}}',
+        resize: '调整缓存面板宽度',
         empty: '当前会话没有可用的 assistant usage 指标。',
         tabs: {
           overview: '概览',

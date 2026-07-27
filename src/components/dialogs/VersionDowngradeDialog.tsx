@@ -81,17 +81,17 @@ export default function VersionDowngradeDialog({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-background border border-border rounded-2xl p-0 shadow-2xl w-[32rem] max-w-[95vw] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="version-downgrade-title" className="max-h-[92vh] w-[32rem] max-w-full overflow-y-auto rounded-lg border border-border bg-background shadow-xl">
         {/* Warning Header */}
-        <div className="bg-gradient-to-r from-orange-500/20 via-red-500/20 to-orange-500/20 px-6 py-5 border-b border-border">
+        <div className="border-b border-border px-5 py-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-500/20 rounded-xl">
-                <AlertTriangle className="h-6 w-6 text-orange-500" />
+              <div className="mt-0.5 text-warning">
+                <AlertTriangle className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-foreground">
+                <h2 id="version-downgrade-title" className="text-lg font-semibold text-foreground">
                   {t('versionDowngrade.title', 'Version Downgrade Detected')}
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
@@ -100,8 +100,10 @@ export default function VersionDowngradeDialog({
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              aria-label={t('common.close', 'Close')}
+              className="focus-ring rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <X className="h-5 w-5" />
             </button>
@@ -109,9 +111,9 @@ export default function VersionDowngradeDialog({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-5">
+        <div className="space-y-4 p-5">
           {/* Warning Message */}
-          <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4">
+          <div className="border-l-2 border-warning/50 pl-3">
             <p className="text-sm text-foreground leading-relaxed">
               {t(
                 'versionDowngrade.message',
@@ -123,26 +125,26 @@ export default function VersionDowngradeDialog({
 
           {/* Version Info */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-secondary/50 rounded-xl p-4">
+            <div className="rounded-md border border-border p-3">
               <div className="flex items-center gap-2 mb-2">
                 <HardDrive className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   {t('versionDowngrade.databaseSchema', 'Database Schema')}
                 </span>
               </div>
-              <p className="text-2xl font-bold text-orange-500">v{downgradeInfo.stored_schema_version}</p>
+              <p className="text-xl font-semibold tabular-nums text-warning">v{downgradeInfo.stored_schema_version}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 {t('versionDowngrade.fromApp', 'from')} v{downgradeInfo.stored_app_version}
               </p>
             </div>
-            <div className="bg-secondary/50 rounded-xl p-4">
+            <div className="rounded-md border border-border p-3">
               <div className="flex items-center gap-2 mb-2">
                 <Database className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   {t('versionDowngrade.maxSupported', 'Max Supported')}
                 </span>
               </div>
-              <p className="text-2xl font-bold text-primary">v{downgradeInfo.max_supported_schema_version}</p>
+              <p className="text-xl font-semibold tabular-nums text-foreground">v{downgradeInfo.max_supported_schema_version}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 {t('versionDowngrade.currentApp', 'app')} v{currentVersion}
               </p>
@@ -150,7 +152,7 @@ export default function VersionDowngradeDialog({
           </div>
 
           {/* Database Path */}
-          <div className="bg-secondary/30 rounded-lg px-4 py-2.5">
+          <div className="rounded-md border border-border px-3 py-2.5">
             <p className="text-xs text-muted-foreground truncate">
               <span className="font-medium">{t('versionDowngrade.dbPath', 'Database')}:</span>{' '}
               {downgradeInfo.db_path}
@@ -158,12 +160,12 @@ export default function VersionDowngradeDialog({
           </div>
 
           {/* Last Updated */}
-          <p className="text-xs text-muted-foreground text-center">
+          <p className="text-xs text-muted-foreground">
             {t('versionDowngrade.lastUpdated', 'Last updated')}: {formatDate(downgradeInfo.updated_at)}
           </p>
 
           {/* Instructions */}
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+          <div className="border-t border-border pt-4">
             <p className="text-sm font-medium text-foreground mb-2">
               {t('versionDowngrade.instructions.title', 'How to proceed:')}
             </p>
@@ -177,17 +179,17 @@ export default function VersionDowngradeDialog({
           {/* Operation Status */}
           {state.phase !== 'idle' && (
             <div
-              className={`rounded-xl p-4 ${
+              className={`rounded-md border p-3 ${
                 state.phase === 'error'
-                  ? 'bg-red-500/10 border border-red-500/20'
+                  ? 'border-destructive/30 bg-destructive/5'
                   : state.phase === 'backup_success' || state.phase === 'reset_success'
-                  ? 'bg-green-500/10 border border-green-500/20'
-                  : 'bg-blue-500/10 border border-blue-500/20'
+                  ? 'border-success/30 bg-success/5'
+                  : 'border-info/30 bg-info/5'
               }`}
             >
               {state.phase === 'backing_up' && (
                 <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                  <Loader2 className="h-4 w-4 animate-spin text-info" />
                   <span className="text-sm text-foreground">
                     {t('versionDowngrade.backingUp', 'Backing up database...')}
                   </span>
@@ -196,7 +198,7 @@ export default function VersionDowngradeDialog({
               {state.phase === 'backup_success' && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <CheckCircle2 className="h-4 w-4 text-success" />
                     <span className="text-sm font-medium text-foreground">
                       {t('versionDowngrade.backupSuccess', 'Backup completed!')}
                     </span>
@@ -208,7 +210,7 @@ export default function VersionDowngradeDialog({
               )}
               {state.phase === 'resetting' && (
                 <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                  <Loader2 className="h-4 w-4 animate-spin text-info" />
                   <span className="text-sm text-foreground">
                     {t('versionDowngrade.resetting', 'Resetting database...')}
                   </span>
@@ -217,7 +219,7 @@ export default function VersionDowngradeDialog({
               {state.phase === 'reset_success' && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <CheckCircle2 className="h-4 w-4 text-success" />
                     <span className="text-sm font-medium text-foreground">
                       {t('versionDowngrade.resetSuccess', 'Database reset successfully!')}
                     </span>
@@ -227,8 +229,8 @@ export default function VersionDowngradeDialog({
               )}
               {state.phase === 'error' && (
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                  <span className="text-sm text-red-500">{state.message}</span>
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  <span className="text-sm text-destructive">{state.message}</span>
                 </div>
               )}
             </div>
@@ -236,14 +238,14 @@ export default function VersionDowngradeDialog({
         </div>
 
         {/* Actions */}
-        <div className="px-6 pb-6 space-y-3">
+        <div className="space-y-2 border-t border-border px-5 py-4">
           {/* Backup Button */}
           <button
             onClick={handleBackup}
             disabled={state.phase === 'backing_up' || state.phase === 'resetting'}
-            className="w-full px-4 py-3 bg-secondary hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl motion-context flex items-center justify-center gap-2 group"
+            className="focus-ring flex w-full items-center justify-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Download className="h-4 w-4 group-hover:scale-110 motion-transform" />
+            <Download className="h-4 w-4" />
             <span className="font-medium">
               {state.phase === 'backing_up'
                 ? t('versionDowngrade.backingUp', 'Backing up...')
@@ -257,9 +259,9 @@ export default function VersionDowngradeDialog({
           <button
             onClick={handleReset}
             disabled={state.phase === 'backing_up' || state.phase === 'resetting' || state.phase === 'reset_success'}
-            className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl motion-context flex items-center justify-center gap-2 group shadow-lg shadow-orange-500/25"
+            className="focus-ring flex w-full items-center justify-center gap-2 rounded-md bg-destructive px-4 py-2.5 text-sm text-destructive-foreground hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <RefreshCw className="h-4 w-4 group-hover:rotate-180 motion-transform" />
+            <RefreshCw className="h-4 w-4" />
             <span className="font-medium">
               {state.phase === 'resetting'
                 ? t('versionDowngrade.resetting', 'Resetting...')
@@ -274,7 +276,7 @@ export default function VersionDowngradeDialog({
             onClick={() => {
               void onContinue()
             }}
-            className="w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="focus-ring w-full rounded-md px-4 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             {t('versionDowngrade.continueAnyway', 'Continue anyway (not recommended)')}
           </button>

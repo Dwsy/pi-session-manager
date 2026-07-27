@@ -5,6 +5,9 @@ import { defaultResolveData } from '@/plugins/tools-render/utils/resolveData'
 import { renderCodeHtml } from '@/utils/markdown'
 import { highlightSearchInHTML } from '@/utils/search'
 import CodeBlock from '@/components/ui/CodeBlock'
+import ToolHeader from '@/components/tool-calls/ToolHeader'
+import ToolSectionHeader from '@/components/tool-calls/ToolSectionHeader'
+import { getToolExecutionClass, getToolRenderStatus, getToolStatusLabel } from '@/plugins/tools-render/utils/status'
 
 /** Maximum height for tool output in pixels */
 const OUTPUT_MAX_HEIGHT = 450
@@ -19,7 +22,8 @@ function BashExecution({
   context,
 }: ToolRenderProps) {
   const { args, output, result, entryId } = resolvedData
-  const { isExpanded, toggleExpanded, copyToClipboard, disableSuccessStyle } = context
+  const { isExpanded, toggleExpanded, copyToClipboard, disableSuccessStyle, t } = context
+  const status = getToolRenderStatus(resolvedData)
 
   const [commandCopied, setCommandCopied] = useState(false)
 
@@ -44,31 +48,47 @@ function BashExecution({
     }
   }
 
-  const statusClass = cancelled || (exitCode !== undefined && exitCode !== null && exitCode !== 0)
-    ? 'error'
-    : disableSuccessStyle ? ''
-    : 'success'
-
   return (
-    <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
-      <div
-        className="tool-header tool-header-bash select-none"
-        onClick={toggleExpanded}
+    <div className={`tool-execution ${getToolExecutionClass(resolvedData, disableSuccessStyle)}`} id={`entry-${entryId}`}>
+      <ToolHeader
+        className="tool-header-bash"
+        expandable={Boolean(command || output)}
+        expanded={isExpanded}
+        onToggle={toggleExpanded}
+        ariaLabel={`Bash: ${getToolStatusLabel(status, t)}`}
+        actions={
+          <button
+            type="button"
+            onClick={() => void handleCopyCommand()}
+            className="tool-copy-button bash-inline-copy-button"
+            aria-label={commandCopied ? 'Copied!' : 'Copy command'}
+          >
+            {commandCopied ? (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            )}
+          </button>
+        }
       >
         <span className="tool-expand-indicator">
           {isExpanded ? '▾' : '▸'}
         </span>
-        <pre className="bash-command-inline">
+        <span className="bash-command-inline" title={command}>
           <span className="bash-command-prefix" aria-hidden="true">$ </span>
           <code
             className="shiki language-bash"
             dangerouslySetInnerHTML={{ __html: highlightedCommand }}
           />
-        </pre>
+        </span>
 
         {exitCode !== undefined && exitCode !== null && (
           <span
-            className="tool-meta"
+            className="tool-detail"
             style={{ color: exitCode === 0 ? 'var(--success)' : 'var(--error)' }}
           >
             exit {exitCode}
@@ -76,43 +96,49 @@ function BashExecution({
         )}
 
         {cancelled && (
-          <span className="tool-meta" style={{ color: 'var(--warning)' }}>
+          <span className="tool-detail" style={{ color: 'var(--warning)' }}>
             cancelled
           </span>
         )}
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            void handleCopyCommand()
-          }}
-          className="tool-copy-button bash-inline-copy-button"
-          aria-label={commandCopied ? 'Copied!' : 'Copy command'}
-        >
-          {commandCopied ? (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          )}
-        </button>
-      </div>
+        <span className={`tool-status tool-status-${status}`}>{getToolStatusLabel(status, t)}</span>
+      </ToolHeader>
+
+      {command && isExpanded && (
+        <div className="tool-command-detail">
+          <ToolSectionHeader
+            label={t('components.toolCall.command', 'Command')}
+            text={command}
+            copyText={copyToClipboard}
+          />
+          <pre className="tool-command-expanded">
+            <code
+              className="shiki language-bash"
+              dangerouslySetInnerHTML={{ __html: highlightedCommand }}
+            />
+          </pre>
+        </div>
+      )}
 
       {output && (
         <div className={`tool-output-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
             {isExpanded && (
-              <CodeBlock
-                code={output}
-                language="shell"
-                showLineNumbers={true}
-                scrollable
-                maxHeight={OUTPUT_MAX_HEIGHT}
-                searchQuery={searchQuery}
-              />
+              <>
+                <ToolSectionHeader
+                  label={t('components.toolCall.output', 'Output')}
+                  text={output}
+                  copyText={copyToClipboard}
+                />
+                <CodeBlock
+                  code={output}
+                  language="shell"
+                  showLineNumbers={true}
+                  scrollable
+                  maxHeight={OUTPUT_MAX_HEIGHT}
+                  searchQuery={searchQuery}
+                />
+              </>
             )}
           </div>
         </div>

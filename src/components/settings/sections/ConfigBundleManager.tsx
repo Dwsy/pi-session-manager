@@ -253,7 +253,7 @@ export function ConfigBundleManager() {
     <div className="space-y-6 relative">
       {/* Feedback Toast */}
       {feedback && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-md shadow-lg text-sm font-medium ${
           feedback.tone === 'success' ? 'bg-success text-success-foreground' :
           feedback.tone === 'error' ? 'bg-destructive text-destructive-foreground' :
           'bg-info text-info-foreground'
@@ -264,8 +264,8 @@ export function ConfigBundleManager() {
 
       {/* Confirm Dialog */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-background border border-border rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="config-bundle-confirm-title" className="mx-4 w-full max-w-md rounded-md border border-border bg-background p-6 shadow-xl">
             <div className="flex items-start gap-3 mb-4">
               <AlertTriangle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
                 confirmDialog.tone === 'danger' ? 'text-destructive' :
@@ -273,14 +273,14 @@ export function ConfigBundleManager() {
                 'text-info'
               }`} />
               <div>
-                <h3 className="text-base font-semibold text-foreground">{confirmDialog.title}</h3>
+                <h3 id="config-bundle-confirm-title" className="text-base font-semibold text-foreground">{confirmDialog.title}</h3>
                 <p className="text-sm text-muted-foreground mt-1">{confirmDialog.description}</p>
               </div>
             </div>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setConfirmDialog(null)}
-                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg border border-border motion-color motion-press focus-ring"
+                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md border border-border focus-ring"
               >
                 {t('common.cancel', 'Cancel')}
               </button>
@@ -288,10 +288,10 @@ export function ConfigBundleManager() {
                 onClick={() => {
                   void Promise.resolve(confirmDialog.onConfirm());
                 }}
-                className={`px-4 py-2 text-sm text-white rounded-lg motion-color motion-press focus-ring ${
+                className={`px-4 py-2 text-sm text-white rounded-md focus-ring ${
                   confirmDialog.tone === 'danger' ? 'bg-destructive hover:bg-destructive/90' :
                   confirmDialog.tone === 'warning' ? 'bg-amber-500 hover:bg-amber-600' :
-                  'bg-info hover:bg-info/90'
+                  'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
               >
                 {confirmDialog.confirmLabel}
@@ -314,7 +314,7 @@ export function ConfigBundleManager() {
           <button
             onClick={handleExport}
             disabled={isBusy}
-            className="px-4 py-2 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring shadow-sm disabled:opacity-50"
+            className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium rounded-md focus-ring shadow-sm disabled:opacity-50"
           >
             {t('settings.importExport.exportSection.button', 'Export Configuration')}
           </button>
@@ -334,7 +334,7 @@ export function ConfigBundleManager() {
           <button
             onClick={handleSelectFile}
             disabled={isBusy}
-            className="px-4 py-2 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring shadow-sm disabled:opacity-50"
+            className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium rounded-md focus-ring shadow-sm disabled:opacity-50"
           >
             {t('settings.importExport.importSection.button', 'Select File')}
           </button>
@@ -355,7 +355,7 @@ export function ConfigBundleManager() {
               <span className="text-sm text-muted-foreground">{t('settings.importExport.history.records', { count: importHistory.length })}</span>
               <button
                 onClick={handleClearHistory}
-                className="text-sm text-destructive hover:text-destructive/80 hover:bg-destructive/10 px-2 py-1 rounded-lg motion-color motion-press focus-ring"
+                className="text-sm text-destructive hover:text-destructive/80 hover:bg-destructive/10 px-2 py-1 rounded-md focus-ring"
               >
                 {t('settings.importExport.history.clearHistory', 'Clear History')}
               </button>
@@ -364,7 +364,7 @@ export function ConfigBundleManager() {
               {importHistory.map((entry) => (
                 <li
                   key={entry.id}
-                  className="flex items-center justify-between p-3 bg-surface/50 border border-border rounded-lg hover:border-border-hover/50 motion-surface motion-color"
+                  className="flex items-center justify-between p-3 bg-background border border-border rounded-md hover:border-border-hover/50"
                 >
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-foreground">{entry.timestamp}</div>
@@ -375,7 +375,7 @@ export function ConfigBundleManager() {
                   <button
                     onClick={() => handleRestoreBackup(entry)}
                     disabled={isBusy}
-                    className="px-3 py-1.5 text-sm text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg motion-color motion-press focus-ring disabled:opacity-50 flex-shrink-0"
+                    className="px-3 py-1.5 text-sm text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-md focus-ring disabled:opacity-50 flex-shrink-0"
                   >
                     {t('settings.importExport.history.restore', 'Restore')}
                   </button>
@@ -402,7 +402,7 @@ export function ConfigBundleManager() {
             )}
             {lastImportResult.warnings.length > 0 && (
               <details className="text-sm">
-                <summary className="cursor-pointer text-amber-400 hover:text-amber-300 motion-color">
+                <summary className="cursor-pointer text-amber-400 hover:text-amber-300">
                   {t('settings.importExport.lastResult.warnings', { count: lastImportResult.warnings.length })}
                 </summary>
                 <ul className="mt-2 space-y-1 text-muted-foreground">
@@ -418,15 +418,15 @@ export function ConfigBundleManager() {
 
       {/* Preview Dialog */}
       {showPreview && preview && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-background border border-border rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/60 bg-background/50">
-              <h3 className="text-base font-semibold text-foreground tracking-tight">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div role="dialog" aria-modal="true" aria-labelledby="config-bundle-preview-title" className="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-md border border-border bg-background shadow-xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-background">
+              <h3 id="config-bundle-preview-title" className="text-base font-semibold tracking-tight text-foreground">
                 {t('settings.importExport.preview.title', 'Bundle Preview')}
               </h3>
               <button
                 onClick={() => setShowPreview(false)}
-                className="p-2 text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg motion-color motion-press focus-ring"
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md focus-ring"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -439,7 +439,7 @@ export function ConfigBundleManager() {
                   {preview.created_at && ` · ${t('settings.importExport.preview.created', { time: preview.created_at })}`}
                 </div>
 
-                <div className="border border-border rounded-lg overflow-hidden">
+                <div className="border border-border rounded-md overflow-hidden">
                   <table className="w-full text-sm">
                     <thead className="bg-surface/60">
                       <tr className="border-b border-border">
@@ -450,7 +450,7 @@ export function ConfigBundleManager() {
                     </thead>
                     <tbody>
                       {preview.files.map((file) => (
-                        <tr key={file.name} className="border-b border-border last:border-b-0 hover:bg-surface/30 motion-surface">
+                        <tr key={file.name} className="border-b border-border last:border-b-0 hover:bg-muted/30">
                           <td className="py-2.5 px-4 font-mono text-foreground">{file.name}</td>
                           <td className="py-2.5 px-4 text-right text-muted-foreground">{formatBytes(file.size)}</td>
                           <td className="py-2.5 px-4 text-center">
@@ -469,13 +469,13 @@ export function ConfigBundleManager() {
                 <div className="flex justify-end gap-3 pt-2">
                   <button
                     onClick={() => setShowPreview(false)}
-                    className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-surface rounded-lg border border-border motion-color motion-press focus-ring"
+                    className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md border border-border focus-ring"
                   >
                     {t('settings.importExport.preview.cancel', 'Cancel')}
                   </button>
                   <button
                     onClick={handleConfirmImport}
-                    className="px-4 py-2 text-sm text-white bg-info hover:bg-info/90 rounded-lg motion-color motion-press focus-ring shadow-sm"
+                    className="px-4 py-2 text-sm text-primary-foreground bg-primary hover:bg-primary/90 rounded-md focus-ring shadow-sm"
                   >
                     {t('settings.importExport.preview.import', 'Import & Backup')}
                   </button>

@@ -148,7 +148,7 @@ function AppMobileLayout({
       </div>
 
       {!showSessionLayer && (
-        <nav className="flex-shrink-0 border-t border-border bg-background/95 backdrop-blur-sm flex items-center justify-around px-1 safe-area-bottom">
+        <nav className="flex-shrink-0 border-t border-border bg-background/95 flex items-center justify-around px-1 safe-area-bottom">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -161,7 +161,7 @@ function AppMobileLayout({
                 }
                 onMobileTabChange(tab.id);
               }}
-              className={`flex flex-col items-center gap-1 py-1 px-1 rounded-lg motion-color motion-press focus-ring flex-1 min-w-0 max-w-[76px] ${
+              className={`flex flex-col items-center gap-1 py-1 px-1 rounded-lg motion-color focus-ring flex-1 min-w-0 max-w-[76px] ${
                 mobileTab === tab.id && !(tab.id === "settings" && settingsActionOnly)
                   ? "text-primary"
                   : "text-muted-foreground"

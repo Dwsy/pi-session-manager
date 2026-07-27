@@ -53,7 +53,7 @@ export function ImportModal({
             type="button"
             onClick={onClose}
             disabled={isImporting}
-            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color motion-press focus-ring disabled:opacity-60"
+            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color focus-ring disabled:opacity-60"
           >
             {t("settings.modelConfigCenter.actions.cancel", "Cancel")}
           </button>
@@ -61,7 +61,7 @@ export function ImportModal({
             type="button"
             onClick={onImport}
             disabled={isImporting}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all motion-press focus-ring disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all focus-ring disabled:opacity-60"
           >
             {isImporting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -117,7 +117,7 @@ export function ImportModal({
           <button
             type="button"
             onClick={onPasteClipboard}
-            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-surface motion-color motion-press focus-ring"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-surface motion-color focus-ring"
           >
             <Copy className="h-4 w-4" />
             {t(

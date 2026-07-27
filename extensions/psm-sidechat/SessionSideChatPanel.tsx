@@ -9,7 +9,6 @@ import {
   Settings2,
   Sparkles,
   Trash2,
-  X,
 } from "lucide-react";
 
 import {
@@ -20,13 +19,18 @@ import {
   type PsmSideChatCitation,
 } from "@pi-session-manager/plugin-sdk";
 import { askSideChatWithAgent } from "./agentSidechat";
-import { sideChatStyles } from "./styles";
 import ModelSelector, { type RPCModel } from "../../src/components/ModelSelector";
+import {
+  SessionPluginPanel,
+  SessionPluginPanelBody,
+  SessionPluginPanelFooter,
+  SessionPluginPanelHeader,
+  SessionPluginPanelState,
+  sessionPluginPanelIconButtonClass,
+} from "../../src/components/session-viewer/SessionPluginPanel";
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
 const SNIPPET_LIMIT_OPTIONS = [4, 6, 8, 10, 12] as const;
-const MIN_PANEL_WIDTH = 320;
-const MAX_PANEL_WIDTH = 640;
 const MODEL_OPTIONS_TIMEOUT_MS = 5000;
 const SIDECHAT_RECORD_TYPE = "sidechat.thread";
 const SIDECHAT_SCHEMA_VERSION = 1;
@@ -250,8 +254,6 @@ export default function SessionSideChatPanel({
   open,
   onClose,
   settings,
-  width = settings.panelWidth,
-  onWidthChange,
 }: SessionSideChatPanelProps) {
   const { t, language } = i18n;
   const [input, setInput] = useState("");
@@ -264,14 +266,12 @@ export default function SessionSideChatPanel({
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelLoadFailed, setModelLoadFailed] = useState(false);
   const [requestedModels, setRequestedModels] = useState(Boolean(cachedModelOptions));
-  const [isResizing, setIsResizing] = useState(false);
   const [options, setOptions] = useState<SideChatOptionsState>({
     provider: settings.provider,
     model: settings.model,
     thinkingLevel: settings.thinkingLevel,
     limit: settings.snippetLimit,
   });
-  const resizeStartRef = useRef<{ x: number; width: number } | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const requestSeqRef = useRef(0);
@@ -310,30 +310,6 @@ export default function SessionSideChatPanel({
     if (!list) return;
     list.scrollTop = list.scrollHeight;
   }, []);
-
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const start = resizeStartRef.current;
-      if (!start) return;
-      const delta = start.x - event.clientX;
-      const nextWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, start.width + delta));
-      onWidthChange?.(nextWidth);
-    };
-
-    const handlePointerUp = () => {
-      setIsResizing(false);
-      resizeStartRef.current = null;
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp, { once: true });
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-    };
-  }, [isResizing, onWidthChange]);
 
   const modelRequestSeqRef = useRef(0);
 
@@ -450,12 +426,6 @@ export default function SessionSideChatPanel({
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom, status]);
-
-  const handleResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    resizeStartRef.current = { x: event.clientX, width };
-    setIsResizing(true);
-  };
 
   const updateAssistantMessage = useCallback((messageId: string, updater: (message: SideChatMessage) => SideChatMessage) => {
     setMessages((prev) => prev.map((message) => (message.id === messageId ? updater(message) : message)));
@@ -576,54 +546,32 @@ export default function SessionSideChatPanel({
   if (!open) return null;
 
   return (
-    <aside className={sideChatStyles.panel} style={{ width }}>
-      <div
-        onPointerDown={handleResizeStart}
-        className={sideChatStyles.resizeHandle(isResizing)}
-        role="separator"
-        aria-orientation="vertical"
-        aria-label={t("session.sideChat.resize", "Resize side chat panel")}
+    <SessionPluginPanel label={t("session.sideChat.title", "Side chat")}>
+      <SessionPluginPanelHeader
+        icon={<PanelsRightBottom className="h-4 w-4" />}
+        title={t("session.sideChat.title", "Side chat")}
+        subtitle={status === "submitted"
+          ? t("session.sideChat.searching", "Searching context")
+          : status === "streaming"
+            ? t("session.sideChat.streaming", "Streaming")
+            : selectedModelLabel}
+        actions={
+          <button
+            type="button"
+            onClick={handleResetThread}
+            className={sessionPluginPanelIconButtonClass}
+            aria-label={t("session.sideChat.clearHistory", "Clear history")}
+            title={t("session.sideChat.clearHistory", "Clear history")}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        }
+        onClose={onClose}
+        closeLabel={t("common.close", "Close")}
       />
 
-      <div className="border-b border-border/70 bg-background/35 px-3.5 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <PanelsRightBottom className="h-4 w-4 shrink-0 text-primary" />
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium text-foreground">
-                {t("session.sideChat.title", "Side chat")}
-              </div>
-              <div className="truncate text-[11px] text-muted-foreground">
-                {status === "submitted"
-                  ? t("session.sideChat.searching", "Searching context")
-                  : status === "streaming"
-                    ? t("session.sideChat.streaming", "Streaming")
-                    : selectedModelLabel}
-              </div>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <button
-              type="button"
-              onClick={handleResetThread}
-              className={sideChatStyles.iconButton}
-              aria-label={t("session.sideChat.clearHistory", "Clear history")}
-              title={t("session.sideChat.clearHistory", "Clear history")}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className={sideChatStyles.iconButton}
-              aria-label={t("common.close", "Close")}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-3 flex items-center gap-2">
+      <div className="border-b border-border/70 px-3 py-2.5">
+        <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
             <ModelSelector
               models={rpcModels}
@@ -637,7 +585,7 @@ export default function SessionSideChatPanel({
           <button
             type="button"
             onClick={() => setOptionsOpen((value) => !value)}
-            className={sideChatStyles.iconButton}
+            className={sessionPluginPanelIconButtonClass}
             aria-label={t("session.sideChat.options", "Options")}
             title={t("session.sideChat.options", "Options")}
           >
@@ -666,11 +614,11 @@ export default function SessionSideChatPanel({
         )}
       </div>
 
-      <div ref={listRef} className="min-h-0 flex-1 overflow-auto px-3.5 py-3">
+      <SessionPluginPanelBody ref={listRef} className="px-3 py-3">
         {error && (
-          <div className="mb-3 rounded-lg border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <SessionPluginPanelState tone="error" className="mb-3" role="alert">
             {error}
-          </div>
+          </SessionPluginPanelState>
         )}
 
         {!historyLoaded && messages.length === 0 ? (
@@ -702,9 +650,9 @@ export default function SessionSideChatPanel({
             </div>
           </div>
         )}
-      </div>
+      </SessionPluginPanelBody>
 
-      <div className="border-t border-border/70 bg-background/40 px-3.5 py-3">
+      <SessionPluginPanelFooter>
         {settings.showQuickPrompts && messages.length === 0 && (
           <div className="mb-2 flex flex-wrap gap-1.5">
             {quickPrompts.map((prompt) => (
@@ -747,8 +695,8 @@ export default function SessionSideChatPanel({
           <span>{t("session.sideChat.hint", "Uses search and snippets, not full-context injection.")}</span>
           <span>{messages.length > 0 ? t("session.sideChat.historyCount", "{{count}} messages", { count: messages.length }) : ""}</span>
         </div>
-      </div>
-    </aside>
+      </SessionPluginPanelFooter>
+    </SessionPluginPanel>
   );
 }
 

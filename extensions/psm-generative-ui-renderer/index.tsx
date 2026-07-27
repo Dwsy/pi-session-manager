@@ -1,6 +1,15 @@
-import { ImageIcon, Monitor, SquareArrowOutUpRight, TriangleAlert, X } from 'lucide-react'
+import { ImageIcon, Monitor, SquareArrowOutUpRight, TriangleAlert } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { MouseEvent } from 'react'
+import ToolHeader from '@/components/tool-calls/ToolHeader'
+import {
+  SessionPluginPanel,
+  SessionPluginPanelBody,
+  SessionPluginPanelHeader,
+  SessionPluginPanelState,
+  sessionPluginPanelActionButtonClass,
+} from '@/components/session-viewer/SessionPluginPanel'
+import { getToolExecutionClass, getToolRenderStatus, getToolStatusLabel } from '@/plugins/tools-render/utils/status'
 import type {
   PsmPluginHostContext,
   PsmPluginManifest,
@@ -274,6 +283,7 @@ function WidgetsToolbarButton({ open, onToggle }: WidgetsToolbarButtonProps) {
       title="Widgets"
       aria-label="Widgets"
       aria-expanded={open}
+      aria-pressed={open}
     >
       <Monitor className="h-3.5 w-3.5" />
       <span className="font-medium">Widgets</span>
@@ -345,39 +355,31 @@ function GenerativeUiWidgetsPanel({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background/10 text-sm">
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border/70 bg-background/25 px-3">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-foreground">Widgets</div>
-          <div className="truncate text-[11px] text-muted-foreground">{loading ? 'loading…' : `${items.length} items`}</div>
-        </div>
-        <button
-          type="button"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border/70 bg-background/35 text-muted-foreground hover:bg-background/55 hover:text-foreground"
-          onClick={onClose}
-          aria-label="Close widgets"
-          title="Close widgets"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
+    <SessionPluginPanel label="Widgets">
+      <SessionPluginPanelHeader
+        icon={<Monitor className="h-4 w-4" />}
+        title="Widgets"
+        subtitle={loading ? 'Loading…' : `${items.length} items`}
+        onClose={onClose}
+        closeLabel="Close widgets"
+      />
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <SessionPluginPanelBody>
         <div className="space-y-2">
           {error && (
-            <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-3 text-xs text-destructive">
+            <SessionPluginPanelState tone="error" role="alert">
               {error}
-            </div>
+            </SessionPluginPanelState>
           )}
           {windowError && (
-            <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-3 text-xs text-destructive">
+            <SessionPluginPanelState tone="error" role="alert">
               {windowError}
-            </div>
+            </SessionPluginPanelState>
           )}
           {!loading && !error && items.length === 0 && (
-            <div className="rounded-lg border border-border/60 bg-background/35 p-4 text-sm text-muted-foreground">
+            <SessionPluginPanelState role="status">
               当前会话还没有 widget 记录。
-            </div>
+            </SessionPluginPanelState>
           )}
           {items.map((item) => {
             const active = activeEntryId === item.rowEntryId
@@ -387,16 +389,16 @@ function GenerativeUiWidgetsPanel({
             return (
               <div
                 key={item.key}
-                className={`flex items-stretch gap-2 rounded-xl border p-2 ${
+                className={`flex items-stretch gap-2 rounded-md border p-2 ${
                   active
-                    ? 'border-primary/35 bg-primary/10'
-                    : 'border-border/60 bg-background/35'
+                    ? 'border-primary/35 bg-primary/8'
+                    : 'border-border/70 bg-transparent'
                 }`}
               >
                 <button
                   type="button"
                   onClick={() => handleReveal(item)}
-                  className="min-w-0 flex-1 rounded-lg px-2 py-2 text-left transition-colors hover:bg-background/35"
+                  className="min-w-0 flex-1 rounded px-2 py-2 text-left transition-colors hover:bg-secondary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45"
                 >
                   <div className="flex items-center gap-2">
                     <Monitor className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -413,7 +415,7 @@ function GenerativeUiWidgetsPanel({
                 </button>
                 <button
                   type="button"
-                  className="shrink-0 rounded-lg border border-border/70 bg-background/45 px-2.5 text-xs text-foreground transition-colors hover:bg-background/65 disabled:cursor-not-allowed disabled:opacity-50"
+                  className={`${sessionPluginPanelActionButtonClass} shrink-0 self-stretch disabled:cursor-not-allowed disabled:opacity-50`}
                   onClick={(event) => handleOpenWindow(event, item)}
                   disabled={!canOpen}
                   title={canOpen ? '在新窗口打开' : '当前项不可打开'}
@@ -427,13 +429,13 @@ function GenerativeUiWidgetsPanel({
             )
           })}
         </div>
-      </div>
-    </div>
+      </SessionPluginPanelBody>
+    </SessionPluginPanel>
   )
 }
 
 function GenerativeUiRenderer({ resolvedData, context }: PsmToolRenderProps) {
-  const { isExpanded, toggleExpanded, disableSuccessStyle } = context
+  const { isExpanded, toggleExpanded, disableSuccessStyle, t } = context
   const file = useMemo(() => getWidgetFile(resolvedData), [resolvedData])
   const fallbackHtml = useMemo(() => getFallbackHtml(resolvedData), [resolvedData])
   const [widget, setWidget] = useState<PsmWidgetHtml | null>(null)
@@ -473,7 +475,11 @@ function GenerativeUiRenderer({ resolvedData, context }: PsmToolRenderProps) {
   const title = getWidgetTitle(resolvedData, widget)
   const height = getPreviewHeight(resolvedData, widget)
   const width = getPreviewWidth(resolvedData, widget)
-  const statusClass = resolvedData.isError || (error && !html) ? 'error' : disableSuccessStyle ? '' : 'success'
+  const statusData = {
+    ...resolvedData,
+    isError: resolvedData.isError || Boolean(error && !html),
+  }
+  const status = getToolRenderStatus(statusData)
   const summary = file ?? (width ? `${width} x ${height}` : `${height}px`)
   const unavailableText = error ?? (resolvedData.output || 'Widget preview unavailable')
   const openPreviewWindow = async (event: MouseEvent<HTMLButtonElement>) => {
@@ -487,28 +493,34 @@ function GenerativeUiRenderer({ resolvedData, context }: PsmToolRenderProps) {
   }
 
   return (
-    <div className={`tool-execution ${statusClass}`.trim()} id={`entry-${resolvedData.entryId}`}>
-      <div className="tool-header select-none" onClick={toggleExpanded}>
+    <div className={`tool-execution ${getToolExecutionClass(statusData, disableSuccessStyle)}`.trim()} id={`entry-${resolvedData.entryId}`}>
+      <ToolHeader
+        expandable
+        expanded={isExpanded}
+        onToggle={toggleExpanded}
+        ariaLabel={`${title}: ${getToolStatusLabel(status, t)}`}
+        actions={html ? (
+          <button
+            type="button"
+            className="tool-copy-button"
+            aria-label={windowsClient ? 'Open preview in new window' : 'Preview window is unavailable'}
+            title={windowsClient ? 'Open preview in new window' : 'Preview window is unavailable'}
+            disabled={!windowsClient}
+            onClick={openPreviewWindow}
+          >
+            <SquareArrowOutUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        ) : null}
+      >
         <span className="tool-expand-indicator">{isExpanded ? '▾' : '▸'}</span>
         <span className="tool-name inline-flex items-center gap-1.5">
           <Monitor className="h-4 w-4" />
           {title}
         </span>
-        <span className="tool-meta">{summary}</span>
-        {loading && <span className="tool-meta">loading</span>}
-        {html && (
-          <button
-            type="button"
-            className="ml-auto inline-flex h-7 items-center gap-1 rounded border border-border/70 bg-surface/55 px-2 text-xs text-muted-foreground transition-colors hover:bg-surface hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-            title={windowsClient ? 'Open preview in new window' : 'Preview window is unavailable'}
-            disabled={!windowsClient}
-            onClick={openPreviewWindow}
-          >
-            <SquareArrowOutUpRight className="h-3.5 w-3.5" />
-            Open
-          </button>
-        )}
-      </div>
+        <span className="tool-detail">{summary}</span>
+        {loading && <span className="tool-detail">{t('components.toolCall.previewLoading', 'Loading preview')}</span>}
+        <span className={`tool-status tool-status-${status}`}>{getToolStatusLabel(status, t)}</span>
+      </ToolHeader>
 
       <div className={`tool-output-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
         <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>

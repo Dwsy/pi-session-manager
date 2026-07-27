@@ -16,9 +16,9 @@ export function ConfirmDialog({
   onConfirm: () => void;
 }) {
   const palette = {
-    danger: "bg-red-600 hover:bg-red-700 text-white",
-    warning: "bg-amber-500 hover:bg-amber-600 text-black",
-    info: "bg-info hover:bg-info/90 text-white",
+    danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+    warning: "bg-warning text-warning-foreground hover:bg-warning/90",
+    info: "bg-primary text-primary-foreground hover:bg-primary/90",
   } as const;
 
   return (
@@ -36,7 +36,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={confirming}
-            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color motion-press focus-ring disabled:opacity-60"
+            className="focus-ring rounded-md px-4 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60"
           >
             {cancelLabel}
           </button>
@@ -44,7 +44,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={confirming}
-            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium motion-color motion-press focus-ring disabled:opacity-60 ${palette[dialog.tone]}`}
+            className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium focus-ring disabled:opacity-60 ${palette[dialog.tone]}`}
           >
             {confirming && <Loader2 className="h-4 w-4 animate-spin" />}
             {dialog.confirmLabel}
@@ -52,9 +52,6 @@ export function ConfirmDialog({
         </>
       }
     >
-      <div className="rounded-lg border border-border/60 bg-background/40 px-4 py-3 text-sm text-muted-foreground">
-        {dialog.description}
-      </div>
     </ModalShell>
   );
 }

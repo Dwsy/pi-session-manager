@@ -7,7 +7,6 @@ import {
   RefreshCw,
   Sparkles,
   Target,
-  X,
 } from "lucide-react";
 
 import {
@@ -19,6 +18,13 @@ import {
 } from "@pi-session-manager/plugin-sdk";
 import { refreshSessionSummaryWithAgent } from "./agentSummary";
 import ModelSelector, { type RPCModel } from "../../src/components/ModelSelector";
+import {
+  SessionPluginPanel,
+  SessionPluginPanelBody,
+  SessionPluginPanelHeader,
+  SessionPluginPanelState,
+  sessionPluginPanelActionButtonClass,
+} from "../../src/components/session-viewer/SessionPluginPanel";
 
 const SESSION_INTELLIGENCE_RECORD = "session.intelligence";
 const MODEL_OPTIONS_TIMEOUT_MS = 5000;
@@ -333,79 +339,63 @@ export default function SessionIntelligenceToolbarPanel({
     : t("session.intelligence.generate", "Generate");
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-surface-dark/75">
-      <div className="border-b border-border/70 bg-background/30 px-4 py-3">
-        <div className="flex items-start justify-between gap-3">
+    <SessionPluginPanel label={t("session.intelligence.title", "Session intelligence")}>
+      <SessionPluginPanelHeader
+        icon={<Brain className="h-4 w-4" />}
+        title={t("session.intelligence.title", "Session intelligence")}
+        subtitle={session.name || session.path}
+        meta={hasPayload ? <span className="text-[11px] text-muted-foreground">{status}</span> : null}
+        actions={
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className={`${sessionPluginPanelActionButtonClass} disabled:cursor-not-allowed disabled:opacity-60`}
+          >
+            {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            <span>{actionLabel}</span>
+          </button>
+        }
+        onClose={onClose}
+        closeLabel={t("common.close", "Close")}
+      />
+
+      <div className="border-b border-border/70 px-3 py-2.5">
+        <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.12em] text-foreground/92">
-              <Brain className="h-4 w-4 text-primary" />
-              <span>{t("session.intelligence.title", "Session intelligence")}</span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-              {hasPayload && (
-                <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-foreground">
-                  {status}
-                </span>
-              )}
-              {updatedAt && (
-                <span className="rounded-full border border-border/60 bg-background/75 px-2 py-1">
-                  {t("session.intelligence.updatedAt", "Updated {{time}}", { time: updatedAt })}
-                </span>
-              )}
-              {defaultChips.map((chip) => (
-                <span key={chip} className="rounded-full border border-border/60 bg-background/75 px-2 py-1">
-                  {chip}
-                </span>
-              ))}
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <ModelSelector
-                  models={rpcModels}
-                  currentModel={currentModel}
-                  onSelect={handleModelSelect}
-                  loading={modelsLoading}
-                  className="w-full max-w-none justify-between h-8 border-border/70 bg-background/75"
-                />
-              </div>
-              {modelStatus}
-            </div>
+            <ModelSelector
+              models={rpcModels}
+              currentModel={currentModel}
+              onSelect={handleModelSelect}
+              loading={modelsLoading}
+              className="h-8 w-full max-w-none justify-between border-border/70 bg-background"
+            />
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-primary/30 bg-primary/12 px-3 text-sm text-foreground hover:bg-primary/16 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              <span>{actionLabel}</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border/70 bg-secondary text-muted-foreground hover:bg-secondary-hover hover:text-foreground"
-              aria-label={t("common.close", "Close")}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+          {modelStatus}
         </div>
+        {(updatedAt || defaultChips.length > 0) && (
+          <div className="mt-2 flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+            {updatedAt && (
+              <span>{t("session.intelligence.updatedAt", "Updated {{time}}", { time: updatedAt })}</span>
+            )}
+            {defaultChips.map((chip) => <span key={chip}>{chip}</span>)}
+          </div>
+        )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto p-4 text-sm">
+      <SessionPluginPanelBody className="text-sm">
         {loading ? (
-          <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/60 px-3 py-3 text-muted-foreground">
+          <SessionPluginPanelState role="status" className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span>{t("session.intelligence.loading", "Loading intelligence...")}</span>
-          </div>
+          </SessionPluginPanelState>
         ) : error ? (
           <div className="space-y-4">
-            <div className="rounded-xl border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <SessionPluginPanelState tone="error" role="alert">
               {error}
-            </div>
+            </SessionPluginPanelState>
             {hasDraft && (
-              <section className="rounded-2xl border border-primary/20 bg-primary/8 p-4">
+              <section className="border-l-2 border-primary/45 py-2 pl-3">
                 <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   {t("session.intelligence.streamingPreview", "Streaming preview")}
@@ -419,7 +409,7 @@ export default function SessionIntelligenceToolbarPanel({
         ) : payload || refreshing || hasDraft ? (
           <div className="space-y-4">
             {(refreshing || hasDraft) && (
-              <section className="rounded-2xl border border-primary/20 bg-primary/8 p-4">
+              <section className="border-l-2 border-primary/45 py-2 pl-3">
                 <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   {t("session.intelligence.streamingPreview", "Streaming preview")}
@@ -432,7 +422,7 @@ export default function SessionIntelligenceToolbarPanel({
 
             {payload && (
               <>
-                <section className="rounded-2xl border border-border/60 bg-background/65 p-4">
+                <section className="border-b border-border/70 pb-4">
                   <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     {t("session.intelligence.summary", "Summary")}
@@ -444,24 +434,24 @@ export default function SessionIntelligenceToolbarPanel({
 
                 {settings.showMetadata && (
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                    <div className="border-l-2 border-border px-3 py-2">
                       <div className="text-muted-foreground">{t("session.intelligence.status", "Status")}</div>
                       <div className="mt-1 truncate text-foreground">{payload.status || "unknown"}</div>
                     </div>
                     {typeof payload.confidence === "number" && (
-                      <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                      <div className="border-l-2 border-border px-3 py-2">
                         <div className="text-muted-foreground">{t("session.intelligence.confidence", "Confidence")}</div>
                         <div className="mt-1 text-foreground">{Math.round(payload.confidence * 100)}%</div>
                       </div>
                     )}
                     {messageCount !== undefined && (
-                      <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                      <div className="border-l-2 border-border px-3 py-2">
                         <div className="text-muted-foreground">{t("session.intelligence.messages", "Messages")}</div>
                         <div className="mt-1 text-foreground">{messageCount}</div>
                       </div>
                     )}
                     {(provider || model) && (
-                      <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                      <div className="border-l-2 border-border px-3 py-2">
                         <div className="text-muted-foreground">{t("session.intelligence.model", "Model")}</div>
                         <div className="mt-1 break-words text-foreground" title={[provider, model].filter(Boolean).join(" / ")}>
                           {[provider, model].filter(Boolean).join(" / ")}
@@ -472,7 +462,7 @@ export default function SessionIntelligenceToolbarPanel({
                 )}
 
                 {payload.objective && (
-                  <section className="rounded-2xl border border-border/60 bg-background/50 p-4">
+                  <section className="border-b border-border/70 pb-4">
                     <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                       <Target className="h-3.5 w-3.5" />
                       {t("session.intelligence.objective", "Objective")}
@@ -482,13 +472,13 @@ export default function SessionIntelligenceToolbarPanel({
                 )}
 
                 {settings.showTopics && topics.length > 0 && (
-                  <section className="rounded-2xl border border-border/60 bg-background/50 p-4">
+                  <section className="border-b border-border/70 pb-4">
                     <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                       {t("session.intelligence.topics", "Topics")}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {topics.map((topic) => (
-                        <span key={topic} className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs text-foreground">
+                        <span key={topic} className="rounded border border-border/70 bg-secondary/45 px-2 py-1 text-xs text-foreground">
                           {topic}
                         </span>
                       ))}
@@ -497,7 +487,7 @@ export default function SessionIntelligenceToolbarPanel({
                 )}
 
                 {settings.showNextSteps && nextSteps.length > 0 && (
-                  <section className="rounded-2xl border border-border/60 bg-background/50 p-4">
+                  <section className="border-b border-border/70 pb-4">
                     <div className="mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                       <ListChecks className="h-3.5 w-3.5" />
                       {t("session.intelligence.nextSteps", "Next steps")}
@@ -514,7 +504,7 @@ export default function SessionIntelligenceToolbarPanel({
                 )}
 
                 {settings.showUnresolved && unresolvedTasks.length > 0 && (
-                  <section className="rounded-2xl border border-warning/30 bg-warning/10 p-4">
+                  <section className="border-l-2 border-warning/70 py-2 pl-3">
                     <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                       {t("session.intelligence.unresolved", "Unresolved")}
                     </div>
@@ -533,7 +523,7 @@ export default function SessionIntelligenceToolbarPanel({
           </div>
         ) : (
           <div className="space-y-4">
-            <section className="rounded-2xl border border-border/70 bg-background/60 p-4 text-sm text-muted-foreground">
+            <SessionPluginPanelState role="status">
               <div className="mb-2 flex items-center gap-2 text-foreground">
                 <Brain className="h-4 w-4 text-primary" />
                 <span className="font-medium">{t("session.intelligence.emptyTitle", "No AI summary yet")}</span>
@@ -543,28 +533,28 @@ export default function SessionIntelligenceToolbarPanel({
                 type="button"
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="mt-4 inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-primary/35 bg-primary/12 px-3 text-sm text-foreground hover:bg-primary/16 disabled:cursor-not-allowed disabled:opacity-60"
+                className={`${sessionPluginPanelActionButtonClass} mt-4 disabled:cursor-not-allowed disabled:opacity-60`}
               >
-                {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                 {t("session.intelligence.generate", "Generate")}
               </button>
-            </section>
+            </SessionPluginPanelState>
 
-            <section className="rounded-2xl border border-border/60 bg-background/50 p-4">
+            <section className="border-t border-border/70 pt-4">
               <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                 {t("session.intelligence.whatYouWillGet", "What you will get")}
               </div>
               <div className="grid gap-2 text-sm text-foreground/90">
-                <div className="rounded-xl border border-border/50 bg-background/70 px-3 py-2">{t("session.intelligence.summary", "Summary")}</div>
-                <div className="rounded-xl border border-border/50 bg-background/70 px-3 py-2">{t("session.intelligence.objective", "Objective")}</div>
-                <div className="rounded-xl border border-border/50 bg-background/70 px-3 py-2">{t("session.intelligence.topics", "Topics")}</div>
-                <div className="rounded-xl border border-border/50 bg-background/70 px-3 py-2">{t("session.intelligence.nextSteps", "Next steps")}</div>
-                <div className="rounded-xl border border-border/50 bg-background/70 px-3 py-2">{t("session.intelligence.unresolved", "Unresolved")}</div>
+                <div className="border-l-2 border-border px-3 py-1.5">{t("session.intelligence.summary", "Summary")}</div>
+                <div className="border-l-2 border-border px-3 py-1.5">{t("session.intelligence.objective", "Objective")}</div>
+                <div className="border-l-2 border-border px-3 py-1.5">{t("session.intelligence.topics", "Topics")}</div>
+                <div className="border-l-2 border-border px-3 py-1.5">{t("session.intelligence.nextSteps", "Next steps")}</div>
+                <div className="border-l-2 border-border px-3 py-1.5">{t("session.intelligence.unresolved", "Unresolved")}</div>
               </div>
             </section>
           </div>
         )}
-      </div>
-    </div>
+      </SessionPluginPanelBody>
+    </SessionPluginPanel>
   );
 }

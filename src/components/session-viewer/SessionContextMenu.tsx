@@ -1,13 +1,25 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Terminal, Globe, Star, Trash2, Check, Copy, ArrowRightLeft, X, GitBranch, Pencil } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
+import {
+  ArrowRightLeft,
+  Check,
+  Copy,
+  GitBranch,
+  Globe,
+  Pencil,
+  Star,
+  Terminal,
+  Trash2,
+  X,
+} from 'lucide-react'
 import type { Tag } from '@/types'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
 
 const CONFIRM_TIMEOUT_MS = 3000
-
-
+const MENU_WIDTH = 224
+const MENU_ESTIMATED_HEIGHT = 420
+const VIEWPORT_GUTTER = 8
 
 interface SessionContextMenuProps {
   x: number
@@ -30,15 +42,51 @@ interface SessionContextMenuProps {
   onClose: () => void
 }
 
+interface MenuActionProps {
+  icon: ReactNode
+  label: ReactNode
+  onSelect: () => void
+  danger?: boolean
+}
+
+function MenuAction({ icon, label, onSelect, danger = false }: MenuActionProps) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className={`session-context-menu__item ${danger ? 'session-context-menu__item--danger' : ''}`}
+      onClick={onSelect}
+    >
+      <span className="session-context-menu__icon" aria-hidden="true">{icon}</span>
+      <span className="session-context-menu__text">{label}</span>
+    </button>
+  )
+}
+
 export default function SessionContextMenu({
-  x, y, tags, sessionTagIds,
-  onToggleTag, onOpenTerminal, onOpenBrowser,
-  onConvert, onToggleFavorite, onCopyResume, onFork, onRename, onDelete, onDeleteDirect, pluginActions, isFavorite, onClose,
+  x,
+  y,
+  sessionId,
+  tags,
+  sessionTagIds,
+  onToggleTag,
+  onOpenTerminal,
+  onOpenBrowser,
+  onConvert,
+  onToggleFavorite,
+  onCopyResume,
+  onFork,
+  onRename,
+  onDelete,
+  onDeleteDirect,
+  pluginActions,
+  isFavorite,
+  onClose,
 }: SessionContextMenuProps) {
   const { t } = useTranslation()
-  const ref = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const clearConfirmTimeout = useCallback(() => {
     if (timeoutRef.current) {
@@ -55,164 +103,220 @@ export default function SessionContextMenu({
   }, [clearConfirmTimeout])
 
   useEffect(() => {
-    return () => clearConfirmTimeout()
-  }, [clearConfirmTimeout])
-
-  const handleDeleteClick = useCallback(() => {
-    if (isDeleteConfirming && onDeleteDirect) {
-      // Second click - execute delete
-      clearConfirmTimeout()
-      setIsDeleteConfirming(false)
-      onDeleteDirect()
-      onClose()
-    } else if (isDeleteConfirming && onDelete) {
-      // Second click for popover mode - execute delete directly without popover
-      clearConfirmTimeout()
-      setIsDeleteConfirming(false)
-      onDelete()
-      onClose()
-    } else {
-      // First click - show confirm
-      setIsDeleteConfirming(true)
-      startConfirmTimeout()
-    }
-  }, [isDeleteConfirming, onDeleteDirect, onDelete, clearConfirmTimeout, startConfirmTimeout, onClose])
+    const frame = requestAnimationFrame(() => {
+      menuRef.current
+        ?.querySelector<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"]')
+        ?.focus()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
   useEffect(() => {
-    const handler = (e: MouseEvent | TouchEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    const handleOutsidePress = (event: MouseEvent | TouchEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) onClose()
     }
-    const keyHandler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('mousedown', handler)
-    document.addEventListener('touchstart', handler)
-    document.addEventListener('keydown', keyHandler)
+    document.addEventListener('mousedown', handleOutsidePress)
+    document.addEventListener('touchstart', handleOutsidePress)
     return () => {
-      document.removeEventListener('mousedown', handler)
-      document.removeEventListener('touchstart', handler)
-      document.removeEventListener('keydown', keyHandler)
+      document.removeEventListener('mousedown', handleOutsidePress)
+      document.removeEventListener('touchstart', handleOutsidePress)
     }
   }, [onClose])
 
-  // Clamp position to viewport
-  const menuW = 200, menuH = 300
-  const left = Math.min(x, window.innerWidth - menuW - 8)
-  const top = Math.min(y, window.innerHeight - menuH - 8)
+  useEffect(() => () => clearConfirmTimeout(), [clearConfirmTimeout])
+
+  const runAndClose = useCallback((action: () => void) => {
+    action()
+    onClose()
+  }, [onClose])
+
+  const handleDeleteClick = useCallback(() => {
+    if (!isDeleteConfirming) {
+      setIsDeleteConfirming(true)
+      startConfirmTimeout()
+      return
+    }
+
+    clearConfirmTimeout()
+    setIsDeleteConfirming(false)
+    if (onDeleteDirect) onDeleteDirect()
+    else onDelete?.()
+    onClose()
+  }, [clearConfirmTimeout, isDeleteConfirming, onClose, onDelete, onDeleteDirect, startConfirmTimeout])
+
+  const focusMenuItem = useCallback((direction: 'first' | 'last' | 'next' | 'previous') => {
+    const menu = menuRef.current
+    if (!menu) return
+    const items = Array.from(
+      menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled]), [role="menuitemcheckbox"]:not([disabled])'),
+    )
+    if (items.length === 0) return
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement)
+    let nextIndex = 0
+    if (direction === 'last') nextIndex = items.length - 1
+    else if (direction === 'next') nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length
+    else if (direction === 'previous') nextIndex = currentIndex <= 0 ? items.length - 1 : currentIndex - 1
+    items[nextIndex]?.focus()
+  }, [])
+
+  const left = Math.max(
+    VIEWPORT_GUTTER,
+    Math.min(x, window.innerWidth - MENU_WIDTH - VIEWPORT_GUTTER),
+  )
+  const top = Math.max(
+    VIEWPORT_GUTTER,
+    Math.min(y, window.innerHeight - MENU_ESTIMATED_HEIGHT - VIEWPORT_GUTTER),
+  )
 
   return (
     <div
-      ref={ref}
-      className="fixed z-[9999] w-52 bg-card border border-border rounded-lg shadow-xl overflow-hidden py-1"
+      ref={menuRef}
+      role="menu"
+      aria-label={`Session ${sessionId}`}
+      className="session-context-menu fixed z-[9999]"
       style={{ left, top }}
+      onKeyDown={(event) => {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault()
+          focusMenuItem('next')
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault()
+          focusMenuItem('previous')
+        } else if (event.key === 'Home') {
+          event.preventDefault()
+          focusMenuItem('first')
+        } else if (event.key === 'End') {
+          event.preventDefault()
+          focusMenuItem('last')
+        } else if (event.key === 'Escape' || event.key === 'Tab') {
+          onClose()
+        }
+      }}
     >
-      {/* Tag submenu */}
-      <div className="px-2 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-        {t('tags.contextMenu.labels')}
-      </div>
-      <div className="max-h-40 overflow-y-auto">
-        {tags.map(tag => {
-          const assigned = sessionTagIds.includes(tag.id)
-          const isHex = tag.color.startsWith('#')
-          return (
-            <button
-              key={tag.id}
-              onClick={() => onToggleTag(tag.id, assigned)}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring"
-            >
-              <span
-                className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${isHex ? '' : getColorClass(tag.color)}`}
-                style={getColorStyle(tag.color)}
-              />
-              <span className="flex-1 text-xs text-foreground truncate">{tag.name}</span>
-              {assigned && <Check className="h-3 w-3 text-info" />}
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="border-t border-border/50 my-1" />
-
-      {onOpenTerminal && (
-        <button onClick={() => { onOpenTerminal(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
-          <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-foreground">{t('tags.contextMenu.openTerminal')}</span>
-        </button>
-      )}
-      {onOpenBrowser && (
-        <button onClick={() => { onOpenBrowser(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
-          <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-foreground">{t('tags.contextMenu.openBrowser')}</span>
-        </button>
-      )}
-      {onConvert && (
-        <button onClick={() => { onConvert(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
-          <ArrowRightLeft className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-foreground">{t('session.convert.title')}</span>
-        </button>
-      )}
-      {onToggleFavorite && (
-        <button onClick={() => { onToggleFavorite(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
-          <Star className={`h-3.5 w-3.5 ${isFavorite ? 'text-yellow-400 fill-current' : 'text-muted-foreground'}`} />
-          <span className="text-xs text-foreground">{t('tags.contextMenu.favorite')}</span>
-        </button>
-      )}
-      {pluginActions}
-      {onCopyResume && (
-        <button onClick={() => { onCopyResume(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
-          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-foreground">{t('tags.contextMenu.copyResume')}</span>
-        </button>
-      )}
-      {onFork && (
-        <button onClick={() => { onFork(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
-          <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-foreground">{t('tags.contextMenu.fork')}</span>
-        </button>
-      )}
-      {onRename && (
-        <button onClick={() => { onRename(); onClose() }} className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-secondary motion-color motion-press focus-ring">
-          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-foreground">{t('tags.contextMenu.rename', { defaultValue: t('common.rename') })}</span>
-        </button>
-      )}
-
-      {(onDelete || onDeleteDirect) && (
+      {tags.length > 0 ? (
         <>
-          <div className="border-t border-border/50 my-1" />
+          <div className="session-context-menu__label" role="presentation">
+            {t('tags.contextMenu.labels')}
+          </div>
+          <div className="session-context-menu__tags" role="group" aria-label={t('tags.contextMenu.labels')}>
+            {tags.map((tag) => {
+              const assigned = sessionTagIds.includes(tag.id)
+              const isHex = tag.color.startsWith('#')
+              return (
+                <button
+                  key={tag.id}
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={assigned}
+                  className="session-context-menu__item"
+                  onClick={() => onToggleTag(tag.id, assigned)}
+                >
+                  <span
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${isHex ? '' : getColorClass(tag.color)}`}
+                    style={getColorStyle(tag.color)}
+                    aria-hidden="true"
+                  />
+                  <span className="session-context-menu__text">{tag.name}</span>
+                  {assigned ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
+                </button>
+              )
+            })}
+          </div>
+          <div className="session-context-menu__separator" role="separator" />
+        </>
+      ) : null}
+
+      {onOpenTerminal ? (
+        <MenuAction
+          icon={<Terminal />}
+          label={t('tags.contextMenu.openTerminal')}
+          onSelect={() => runAndClose(onOpenTerminal)}
+        />
+      ) : null}
+      {onOpenBrowser ? (
+        <MenuAction
+          icon={<Globe />}
+          label={t('tags.contextMenu.openBrowser')}
+          onSelect={() => runAndClose(onOpenBrowser)}
+        />
+      ) : null}
+      {onConvert ? (
+        <MenuAction
+          icon={<ArrowRightLeft />}
+          label={t('session.convert.title')}
+          onSelect={() => runAndClose(onConvert)}
+        />
+      ) : null}
+      {onToggleFavorite ? (
+        <MenuAction
+          icon={<Star className={isFavorite ? 'fill-current text-warning' : undefined} />}
+          label={t('tags.contextMenu.favorite')}
+          onSelect={() => runAndClose(onToggleFavorite)}
+        />
+      ) : null}
+
+      {pluginActions ? <div className="session-context-menu__plugin-actions" role="presentation">{pluginActions}</div> : null}
+
+      {onCopyResume ? (
+        <MenuAction
+          icon={<Copy />}
+          label={t('tags.contextMenu.copyResume')}
+          onSelect={() => runAndClose(onCopyResume)}
+        />
+      ) : null}
+      {onFork ? (
+        <MenuAction
+          icon={<GitBranch />}
+          label={t('tags.contextMenu.fork')}
+          onSelect={() => runAndClose(onFork)}
+        />
+      ) : null}
+      {onRename ? (
+        <MenuAction
+          icon={<Pencil />}
+          label={t('tags.contextMenu.rename', { defaultValue: t('common.rename') })}
+          onSelect={() => runAndClose(onRename)}
+        />
+      ) : null}
+
+      {onDelete || onDeleteDirect ? (
+        <>
+          <div className="session-context-menu__separator" role="separator" />
           {isDeleteConfirming ? (
-            <div className="px-3 py-1.5">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleDeleteClick}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded bg-red-600 px-2 py-1.5 text-[10px] text-white hover:bg-red-700 motion-color motion-press focus-ring"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  <span>{t('common.confirm', { defaultValue: 'Confirm?' })}</span>
-                </button>
-                <button
-                  onClick={() => {
-                    clearConfirmTimeout()
-                    setIsDeleteConfirming(false)
-                  }}
-                  className="rounded p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary motion-color motion-press focus-ring"
-                  title={t('common.cancel')}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
+            <div className="session-context-menu__confirm" role="group" aria-label={t('tags.contextMenu.delete')}>
+              <button
+                type="button"
+                role="menuitem"
+                className="session-context-menu__confirm-button"
+                onClick={handleDeleteClick}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>{t('common.confirm', { defaultValue: 'Confirm?' })}</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="session-context-menu__cancel-button"
+                onClick={() => {
+                  clearConfirmTimeout()
+                  setIsDeleteConfirming(false)
+                }}
+                aria-label={t('common.cancel')}
+                title={t('common.cancel')}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
           ) : (
-            <button
-              onClick={handleDeleteClick}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-red-500/10 motion-color motion-press focus-ring"
-            >
-              <Trash2 className="h-3.5 w-3.5 text-red-500" />
-              <span className="text-xs text-red-500">{t('tags.contextMenu.delete')}</span>
-            </button>
+            <MenuAction
+              danger
+              icon={<Trash2 />}
+              label={t('tags.contextMenu.delete')}
+              onSelect={handleDeleteClick}
+            />
           )}
         </>
-      )}
+      ) : null}
     </div>
   )
 }

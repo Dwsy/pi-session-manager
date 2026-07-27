@@ -273,14 +273,14 @@ function CollapsedProcessSummary({
   );
 
   return (
-    <div className="group/process-summary relative flex h-9 w-full overflow-hidden rounded-sm border border-border/70 bg-secondary/30 transition-colors hover:bg-secondary/45">
+    <div className={`conversation-process-summary ${expanded ? "is-expanded" : ""}`.trim()}>
       <button
         type="button"
         onClick={onToggle}
-        className="flex min-w-0 flex-1 items-center gap-2 px-3 text-left text-xs text-muted-foreground focus-ring"
+        className="conversation-process-summary__toggle focus-ring"
         aria-expanded={expanded}
       >
-        <span className="inline-flex w-14 flex-shrink-0 items-center gap-1.5 font-medium text-foreground/80">
+        <span className="conversation-process-summary__action">
           {expanded ? (
             <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" />
           ) : (
@@ -292,11 +292,11 @@ function CollapsedProcessSummary({
               : t("session.preview.show", "Show")}
           </span>
         </span>
-        <span className="flex min-w-0 flex-1 items-center gap-x-2 overflow-hidden whitespace-nowrap">
+        <span className="conversation-process-summary__items">
           {summaryItems.map((item) => (
             <span
               key={item.key}
-              className="inline-flex flex-shrink-0 items-center gap-1 text-muted-foreground"
+              className="conversation-process-summary__item"
             >
               <InlineToolIcon kind={item.icon} />
               <span>{item.label}</span>
@@ -309,7 +309,7 @@ function CollapsedProcessSummary({
         type="button"
         onClick={handleReview}
         disabled={!hasReviewableOps}
-        className="inline-flex h-full flex-shrink-0 items-center gap-1.5 border-l border-border/55 px-2.5 text-[11px] font-medium text-muted-foreground motion-color focus-ring hover:bg-surface/60 hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+        className="conversation-process-summary__review focus-ring"
         aria-label={t("session.preview.review", "Review tool calls")}
         title={t("session.preview.review", "Review tool calls")}
       >
@@ -320,6 +320,14 @@ function CollapsedProcessSummary({
       </button>
     </div>
   );
+}
+
+function getProcessEntryKind(entry: SessionEntry): "tool" | "thinking" | "event" {
+  if (entry.type !== "message" || entry.message?.role !== "assistant") return "event";
+  const content = entry.message.content ?? [];
+  if (content.some((item) => item.type === "toolCall")) return "tool";
+  if (content.some((item) => item.type === "thinking")) return "thinking";
+  return "event";
 }
 
 function splitProcessEntries(entries: SessionEntry[]): {
@@ -392,8 +400,8 @@ function ConversationPreviewTurnView({
       )}
 
       {expanded && foldableEntries.length > 0 && (
-        <div className="conversation-preview-process space-y-1">
-          <div className="sticky top-2 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-1">
+        <div className="conversation-preview-process">
+          <div className="conversation-preview-process__header">
             <CollapsedProcessSummary
               entries={foldableEntries}
               expanded={expanded}
@@ -401,17 +409,25 @@ function ConversationPreviewTurnView({
               toolResultByCallId={toolResultByCallId}
             />
           </div>
-          {foldableEntries.map((entry, index) => (
-            <SessionEntryRenderer
-              key={`${entry.id}:${entry.type}:${index}`}
-              entry={entry}
-              toolResultByCallId={toolResultByCallId}
-              searchQuery={searchQuery}
-              isStreaming={entry.id === streamingId}
-              previewMode={false}
-              processEntries={turn.processEntries}
-            />
-          ))}
+          <div className="conversation-preview-process__list" role="list">
+            {foldableEntries.map((entry, index) => (
+              <div
+                key={`${entry.id}:${entry.type}:${index}`}
+                className="conversation-preview-process__entry"
+                data-process-kind={getProcessEntryKind(entry)}
+                role="listitem"
+              >
+                <SessionEntryRenderer
+                  entry={entry}
+                  toolResultByCallId={toolResultByCallId}
+                  searchQuery={searchQuery}
+                  isStreaming={entry.id === streamingId}
+                  previewMode={false}
+                  processEntries={turn.processEntries}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

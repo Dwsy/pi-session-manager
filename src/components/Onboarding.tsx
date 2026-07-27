@@ -145,48 +145,48 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
   const steps: StepConfig[] = [
     {
-      icon: <Sparkles className="h-12 w-12 text-info" />,
+      icon: <Sparkles className="h-6 w-6" />,
       titleKey: 'onboarding.steps.welcome.title',
       descriptionKey: 'onboarding.steps.welcome.description',
     },
     {
-      icon: <FolderOpen className="h-12 w-12 text-blue-400" />,
+      icon: <FolderOpen className="h-6 w-6" />,
       titleKey: 'onboarding.steps.browse.title',
       descriptionKey: 'onboarding.steps.browse.description',
       hintKey: 'onboarding.steps.browse.hint',
     },
     {
-      icon: <Search className="h-12 w-12 text-emerald-400" />,
+      icon: <Search className="h-6 w-6" />,
       titleKey: 'onboarding.steps.search.title',
       descriptionKey: 'onboarding.steps.search.description',
       hintKey: 'onboarding.steps.search.hint',
     },
     {
-      icon: <GitBranch className="h-12 w-12 text-purple-400" />,
+      icon: <GitBranch className="h-6 w-6" />,
       titleKey: 'onboarding.steps.tree.title',
       descriptionKey: 'onboarding.steps.tree.description',
       hintKey: 'onboarding.steps.tree.hint',
     },
     {
-      icon: <Server className="h-12 w-12 text-orange-400" />,
+      icon: <Server className="h-6 w-6" />,
       titleKey: 'onboarding.steps.services.title',
       descriptionKey: 'onboarding.steps.services.description',
       interactiveKind: 'services',
     },
     {
-      icon: <Bot className="h-12 w-12 text-cyan-400" />,
+      icon: <Bot className="h-6 w-6" />,
       titleKey: 'onboarding.steps.subagents.title',
       descriptionKey: 'onboarding.steps.subagents.description',
       interactiveKind: 'subagents',
     },
     {
-      icon: <Puzzle className="h-12 w-12 text-pink-400" />,
+      icon: <Puzzle className="h-6 w-6" />,
       titleKey: 'onboarding.steps.plugins.title',
       descriptionKey: 'onboarding.steps.plugins.description',
       interactiveKind: 'plugins',
     },
     {
-      icon: <Settings className="h-12 w-12 text-amber-400" />,
+      icon: <Settings className="h-6 w-6" />,
       titleKey: 'onboarding.steps.settings.title',
       descriptionKey: 'onboarding.steps.settings.description',
       hintKey: 'onboarding.steps.settings.hint',
@@ -267,35 +267,35 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const step = steps[currentStep]
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md">
-      <div className={`relative ${isMobile ? 'w-[95vw]' : 'w-[520px]'} bg-surface-dark rounded-2xl border border-border shadow-2xl overflow-hidden`}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="onboarding-step-title" className={`relative max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-background shadow-xl ${isMobile ? 'w-full' : 'w-[560px]'}`}>
         <button
+          type="button"
           onClick={handleSkip}
-          className="absolute top-4 right-4 p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors z-10"
+          aria-label={t('common.close', 'Close')}
+          className="focus-ring absolute right-3 top-3 z-10 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <X className="h-4 w-4" />
         </button>
 
-        <div className="h-1.5 bg-gradient-to-r from-info via-purple-500 to-emerald-500" />
-
-        <div className="px-10 pt-10 pb-6 text-center">
-          <div className="flex items-center justify-center mb-6">
-            <div className="p-5 rounded-2xl bg-surface border border-border">
+        <div className="px-6 pb-5 pt-6 text-left">
+          <div className="mb-4 flex items-center justify-start">
+            <div className="text-muted-foreground">
               {step.icon}
             </div>
           </div>
 
-          <h2 className="text-xl font-bold text-foreground mb-3">
+          <h2 id="onboarding-step-title" className="mb-2 text-lg font-semibold text-foreground">
             {t(step.titleKey)}
           </h2>
 
-          <p className="text-sm text-muted-foreground leading-relaxed mb-4 max-w-sm mx-auto">
+          <p className="max-w-lg text-sm leading-relaxed text-muted-foreground mb-4">
             {t(step.descriptionKey)}
           </p>
 
           {step.hintKey && (
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-lg">
-              <span className="text-xs text-info font-medium">
+            <div className="mb-4 border-l-2 border-primary/40 pl-3">
+              <span className="text-xs text-muted-foreground">
                 {t(step.hintKey)}
               </span>
             </div>
@@ -303,13 +303,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
           {step.interactiveKind === 'services' && (
             <div className="mt-4 space-y-3 text-left max-w-xs mx-auto">
-              <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
+              <div className="space-y-1 rounded-md border border-border px-3 py-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-foreground">{t('settings.advanced.bindAddr', 'Bind Address')}</span>
                   <select
                     value={serverSettings.bind_addr}
                     onChange={(e) => setServerSettings((s) => ({ ...s, bind_addr: e.target.value }))}
-                    className="px-2 py-1 bg-background border border-border rounded text-xs text-foreground"
+                    className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
                   >
                     <option value="127.0.0.1">127.0.0.1</option>
                     <option value="0.0.0.0">0.0.0.0</option>
@@ -339,13 +339,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 checked={terminalEnabled}
                 onChange={setTerminalEnabled}
               />
-              <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
+              <div className="space-y-1 rounded-md border border-border px-3 py-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-foreground">{t('settings.session.openPosition', 'Task positioning open position')}</span>
                   <select
                     value={openPosition}
                     onChange={(e) => setOpenPosition(e.target.value as OpenPosition)}
-                    className="px-2 py-1 bg-background border border-border rounded text-xs text-foreground"
+                    className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
                   >
                     <option value="top">{t('settings.session.openPositions.top', 'Top')}</option>
                     <option value="bottom">{t('settings.session.openPositions.bottom', 'Bottom')}</option>
@@ -365,7 +365,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
           {step.interactiveKind === 'subagents' && (
             <div className="mt-4 space-y-3 text-left max-w-sm mx-auto">
-              <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
+              <div className="space-y-1 rounded-md border border-border px-3 py-2">
                 <div className="text-sm text-foreground font-medium">
                   {t('onboarding.steps.subagents.modeLabel', 'Compatibility mode')}
                 </div>
@@ -381,7 +381,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                         : undefined,
                     }))
                   }}
-                  className="mt-2 w-full px-2 py-1 bg-background border border-border rounded text-xs text-foreground"
+                  className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
                 >
                   <option value="smart">{t('onboarding.steps.subagents.smartMode', 'Smart (Recommended)')}</option>
                   <option value="forced">{t('onboarding.steps.subagents.forcedMode', 'Forced')}</option>
@@ -394,7 +394,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               </div>
 
               {subagentSettings.mode === 'forced' && (
-                <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
+                <div className="space-y-1 rounded-md border border-border px-3 py-2">
                   <div className="text-sm text-foreground font-medium">
                     {t('onboarding.steps.subagents.providerLabel', 'Forced provider')}
                   </div>
@@ -404,7 +404,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                       ...prev,
                       forcedProvider: e.target.value as ForcedSubagentProvider,
                     }))}
-                    className="mt-2 w-full px-2 py-1 bg-background border border-border rounded text-xs text-foreground"
+                    className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
                   >
                     {FORCED_PROVIDER_OPTIONS.map((provider) => (
                       <option key={provider} value={provider}>{provider}</option>
@@ -413,7 +413,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 </div>
               )}
 
-              <div className="space-y-1 py-2 px-3 bg-surface rounded-lg border border-border">
+              <div className="space-y-1 rounded-md border border-border px-3 py-2">
                 <div className="text-sm text-foreground font-medium">
                   {t('onboarding.steps.subagents.detectedTitle', 'Detected from Pi settings')}
                 </div>
@@ -433,7 +433,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               {plugins.filter(p => p.manifest?.configuration?.properties?.some(prop => prop.onboarding)).map(plugin => {
                 const onboardingProps = plugin.manifest?.configuration?.properties?.filter(prop => prop.onboarding) || [];
                 return (
-                  <div key={plugin.id} className="space-y-3 rounded-lg border border-border bg-surface p-3">
+                  <div key={plugin.id} className="space-y-3 rounded-md border border-border p-3">
                     <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 border-b border-border/50 pb-1.5 mb-1">
                       <Puzzle className="h-3.5 w-3.5 text-pink-400" />
                       <span>{t(`plugins.${plugin.id}.configuration.title`, plugin.manifest?.configuration?.title ?? plugin.name)}</span>
@@ -467,7 +467,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                                   }}
                                   className="sr-only peer"
                                 />
-                                <div className="w-10 h-5 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-info" />
+                                <div className="w-10 h-5 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary" />
                               </label>
                             </div>
                           ) : prop.type === 'select' ? (
@@ -487,7 +487,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                                     }
                                   }));
                                 }}
-                                className="px-2 py-1 bg-background border border-border rounded text-xs text-foreground max-w-[150px]"
+                                className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground max-w-[150px]"
                               >
                                 {(prop.options ?? []).map(opt => (
                                   <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
@@ -513,7 +513,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                                     }
                                   }));
                                 }}
-                                className="w-full px-2 py-1 bg-background border border-border rounded text-xs text-foreground"
+                                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground"
                               />
                             </div>
                           )}
@@ -532,17 +532,18 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           )}
         </div>
 
-        <div className="flex items-center justify-between px-10 pb-8">
+        <div className="flex items-center justify-between border-t border-border px-6 py-4">
           <div className="flex items-center gap-2">
             {steps.map((_, i) => (
               <div
                 key={i}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
+                aria-label={t('onboarding.stepProgress', 'Step {{current}} of {{total}}', { current: i + 1, total: steps.length })}
+                className={`h-1.5 ${
                   i === currentStep
-                    ? 'w-6 bg-info'
+                    ? 'w-6 bg-primary'
                     : i < currentStep
-                    ? 'w-1.5 bg-info/40'
-                    : 'w-1.5 bg-secondary'
+                    ? 'w-1.5 bg-primary/40'
+                    : 'w-1.5 bg-muted'
                 }`}
               />
             ))}
@@ -552,7 +553,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             {!isFirst && (
               <button
                 onClick={handlePrev}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="focus-ring flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <ChevronLeft className="h-4 w-4" />
                 {t('onboarding.prev')}
@@ -561,14 +562,14 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             {isFirst && (
               <button
                 onClick={handleSkip}
-                className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="focus-ring rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 {t('onboarding.skip')}
               </button>
             )}
             <button
               onClick={handleNext}
-              className="flex items-center gap-1 px-5 py-2 bg-info hover:bg-info/80 text-white text-sm font-medium rounded-lg transition-colors"
+              className="focus-ring flex items-center gap-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               {isLast ? t('onboarding.finish') : t('onboarding.next')}
               {!isLast && <ChevronRight className="h-4 w-4" />}
@@ -587,7 +588,7 @@ function ToggleRow({ label, hint, checked, onChange }: {
   onChange: (v: boolean) => void
 }) {
   return (
-    <div className="flex items-center justify-between py-2 px-3 bg-surface rounded-lg border border-border">
+    <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
       <div>
         <span className="text-sm text-foreground">{label}</span>
         <p className="text-xs text-muted-foreground">{hint}</p>
@@ -599,7 +600,7 @@ function ToggleRow({ label, hint, checked, onChange }: {
           onChange={(e) => onChange(e.target.checked)}
           className="sr-only peer"
         />
-        <div className="w-10 h-5 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-info" />
+        <div className="w-10 h-5 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary" />
       </label>
     </div>
   )

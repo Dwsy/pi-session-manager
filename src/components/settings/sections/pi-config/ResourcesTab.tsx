@@ -478,10 +478,10 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex h-6 items-center gap-1 rounded-md border px-1.5 text-[11px] font-medium motion-color motion-press focus-ring ${
+      className={`inline-flex h-6 items-center gap-1 rounded-md border px-1.5 text-[11px] font-medium focus-ring ${
         active
-          ? "settings-accent-bg-soft settings-accent-fg border-[rgb(var(--color-ring)/0.35)]"
-          : "border-border/60 bg-background/40 text-muted-foreground hover:text-foreground hover:bg-accent/10"
+          ? "border-primary/40 bg-primary/10 text-primary"
+          : "border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent/10"
       }`}
     >
       <span>{label}</span>
@@ -533,7 +533,7 @@ function ScopeGroup({
           return (
             <div
               key={key}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-md border motion-surface motion-color group min-w-0 ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-md border group min-w-0 ${
                 item.enabled
                   ? "border-transparent hover:bg-[rgb(var(--color-ring)/0.08)]"
                   : "border-border/40 bg-surface/30 hover:bg-surface/55"
@@ -543,7 +543,7 @@ function ScopeGroup({
                 onClick={() => onToggle(item)}
                 disabled={isToggling}
                 aria-pressed={item.enabled}
-                className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center motion-surface motion-color motion-press focus-ring ${
+                className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center focus-ring ${
                   item.enabled
                     ? "settings-accent-bg-strong border-transparent text-primary-foreground"
                     : "border-border/80 bg-background text-muted-foreground group-hover:border-[rgb(var(--color-ring)/0.55)]"
@@ -587,7 +587,7 @@ function ScopeGroup({
               {hasFile && (
                 <button
                   onClick={() => onView(item)}
-                  className="p-1 rounded text-muted-foreground/50 hover:settings-accent-fg hover:bg-[rgb(var(--color-ring)/0.12)] opacity-0 group-hover:opacity-100 motion-color motion-opacity motion-press focus-ring flex-shrink-0"
+                  className="p-1 rounded text-muted-foreground/50 hover:bg-muted hover:text-primary opacity-0 group-hover:opacity-100 motion-opacity focus-ring flex-shrink-0"
                   title={t("components.piConfig.view")}
                 >
                   <Eye className="h-3.5 w-3.5" />
@@ -634,7 +634,9 @@ function ResourceViewerModal({
       }}
     >
       <div
-        className="bg-background border border-border rounded-xl shadow-2xl w-[80%] max-w-2xl max-h-[80vh] flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        className="flex max-h-[80vh] w-[80%] max-w-2xl flex-col rounded-lg border border-border bg-background shadow-xl"
         style={{ zIndex: 99999 }}
       >
         {/* Header */}
@@ -649,7 +651,7 @@ function ResourceViewerModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface motion-surface motion-color motion-press focus-ring"
+            className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>

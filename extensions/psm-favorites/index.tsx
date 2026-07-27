@@ -10,6 +10,11 @@ import type {
 
 import type { AppPluginSurfaceData } from '@/components/app/AppPluginSurfaceData'
 import FavoritesPanel from '@/components/FavoritesPanel'
+import {
+  AppPluginSidebarBody,
+  AppPluginSidebarHeader,
+  AppPluginSidebarShell,
+} from '@/components/app/AppPluginSidebarShell'
 import { Star } from 'lucide-react'
 import { manifest } from './manifest'
 import { configureFavoritesStore, removeFavorite, toggleFavorite, useFavorites } from './store'
@@ -87,7 +92,30 @@ function FavoriteContextAction({ session, close }: PsmSessionContextMenuActionRe
 }
 
 function FavoritesSidebar({ data }: PsmAppSidebarViewRenderProps<AppPluginSurfaceData>) {
-  return <FavoritesView data={data} viewId={SIDEBAR_ID} active />
+  const { favorites, loading } = useFavorites()
+  if (!data) return null
+  return (
+    <AppPluginSidebarShell label="Favorites">
+      <AppPluginSidebarHeader
+        icon={<Star className="h-4 w-4" />}
+        title="Favorites"
+        meta={`${favorites.length}`}
+      />
+      <AppPluginSidebarBody className="p-0">
+        <FavoritesPanel
+          sessions={data.sessions}
+          favorites={favorites}
+          selectedSession={data.selectedSession}
+          onSelectSession={data.onSelectSession}
+          onRemoveFavorite={(item) => void removeFavorite(item.id)}
+          onSelectProject={data.onSelectProject}
+          liveSessionIds={data.liveSessionIds}
+          loading={loading}
+          compact
+        />
+      </AppPluginSidebarBody>
+    </AppPluginSidebarShell>
+  )
 }
 
 export default function activate(ctx: PsmPluginHostContext) {

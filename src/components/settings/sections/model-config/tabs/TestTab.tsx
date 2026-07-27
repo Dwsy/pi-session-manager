@@ -57,8 +57,8 @@ export function TestTab({
     >
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-          <div className="rounded-xl border border-border/60 bg-card/50 px-4 py-3 shadow-sm backdrop-blur-sm">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <div className="rounded-md border border-border bg-card px-4 py-3">
+            <div className="text-xs font-medium text-muted-foreground">
               {t(
                 "settings.modelConfigCenter.fields.selectedProvider",
                 "Current Provider",
@@ -68,8 +68,8 @@ export function TestTab({
               {selectedProvider || "-"}
             </div>
           </div>
-          <div className="rounded-xl border border-border/60 bg-card/50 px-4 py-3 shadow-sm backdrop-blur-sm">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <div className="rounded-md border border-border bg-card px-4 py-3">
+            <div className="text-xs font-medium text-muted-foreground">
               {t(
                 "settings.modelConfigCenter.fields.selectedModel",
                 "Current Model",
@@ -79,8 +79,8 @@ export function TestTab({
               {selectedModelEntry?.id?.trim() || activeModelLabel || "-"}
             </div>
           </div>
-          <div className="rounded-xl border border-border/60 bg-card/50 px-4 py-3 shadow-sm backdrop-blur-sm">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <div className="rounded-md border border-border bg-card px-4 py-3">
+            <div className="text-xs font-medium text-muted-foreground">
               API
             </div>
             <div className="mt-1 truncate text-base font-bold text-primary font-mono">
@@ -90,7 +90,7 @@ export function TestTab({
         </div>
 
         {!selectedProviderEntry && (
-          <div className="rounded-xl border border-dashed border-border/60 p-8 text-center text-sm text-muted-foreground bg-card/20">
+          <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground bg-card/20">
             {t(
               "settings.modelConfigCenter.empty.testEmpty",
               "Go to config page to select Provider and model first, then come back to run test.",
@@ -99,7 +99,7 @@ export function TestTab({
         )}
 
         {!selectedModelEntry?.id?.trim() && selectedProviderEntry && (
-          <div className="flex items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/15 px-4 py-3.5 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 shadow-sm">
+          <div className="flex items-center gap-3 rounded-md border border-amber-500/40 bg-amber-500/15 px-4 py-3.5 text-sm font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
             <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-500" />
             <span>
               {t(
@@ -110,7 +110,7 @@ export function TestTab({
           </div>
         )}
 
-        <div className="rounded-xl border border-border/60 bg-card/40 p-5 shadow-sm space-y-4">
+        <div className="rounded-md border border-border bg-card p-5 space-y-4">
           <SettingsField
             label={t(
               "settings.modelConfigCenter.fields.prompt",
@@ -136,7 +136,7 @@ export function TestTab({
                 !selectedModelEntry?.id?.trim() ||
                 busy === "http-test"
               }
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all duration-150 active:scale-95 focus-ring disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-ring disabled:opacity-60"
             >
               {busy === "http-test" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -152,7 +152,7 @@ export function TestTab({
               <button
                 type="button"
                 onClick={() => void onCopyCurlCommand()}
-                className="inline-flex items-center gap-2 rounded-xl border border-border/70 bg-surface/60 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-surface hover:border-border transition-all duration-150 active:scale-95 focus-ring"
+                className="inline-flex items-center gap-2 rounded-md border border-border/70 bg-surface/60 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-surface hover:border-border focus-ring"
               >
                 <Copy className="h-4 w-4" />
                 {t(
@@ -164,7 +164,7 @@ export function TestTab({
             <button
               type="button"
               onClick={onBackToConfigure}
-              className="inline-flex items-center gap-2 rounded-xl border border-border/70 bg-background/50 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-surface hover:border-border transition-all duration-150 active:scale-95 focus-ring"
+              className="inline-flex items-center gap-2 rounded-md border border-border/70 bg-background/50 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-surface hover:border-border focus-ring"
             >
               <FileJson className="h-4 w-4" />
               {t(
@@ -176,11 +176,11 @@ export function TestTab({
         </div>
 
         {testResult && (
-          <div className="rounded-2xl border border-border/60 bg-card/60 p-5 shadow-lg backdrop-blur-md space-y-5 animate-in fade-in duration-200">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 pb-3">
+          <div className="rounded-lg border border-border bg-card p-5 space-y-5 ">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
               <div className="flex items-center gap-3">
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold shadow-sm ${
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
                     testResult.ok
                       ? "border border-green-500/30 bg-green-500/15 text-green-700 dark:text-green-300"
                       : "border border-red-500/30 bg-red-500/15 text-red-700 dark:text-red-300"
@@ -208,7 +208,7 @@ export function TestTab({
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-xs">
-              <div className="rounded-xl border border-border/50 bg-background/40 px-3.5 py-2.5">
+              <div className="rounded-md border border-border/50 bg-background/40 px-3.5 py-2.5">
                 <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   API Protocol
                 </div>
@@ -216,7 +216,7 @@ export function TestTab({
                   {testResult.api}
                 </div>
               </div>
-              <div className="rounded-xl border border-border/50 bg-background/40 px-3.5 py-2.5">
+              <div className="rounded-md border border-border/50 bg-background/40 px-3.5 py-2.5">
                 <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Request Style
                 </div>
@@ -224,7 +224,7 @@ export function TestTab({
                   {testResult.requestStyle}
                 </div>
               </div>
-              <div className="rounded-xl border border-border/50 bg-background/40 px-3.5 py-2.5">
+              <div className="rounded-md border border-border/50 bg-background/40 px-3.5 py-2.5">
                 <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   Attempts
                 </div>
@@ -236,12 +236,12 @@ export function TestTab({
             </div>
 
             {testResult.responsePreview && (
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-sm font-medium text-emerald-800 dark:text-emerald-200 shadow-sm">
+              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-sm font-medium text-emerald-800 dark:text-emerald-200">
                 {testResult.responsePreview}
               </div>
             )}
             {testResult.error && (
-              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-sm font-medium text-red-800 dark:text-red-300 shadow-sm">
+              <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3.5 text-sm font-medium text-red-800 dark:text-red-300">
                 {testResult.error}
               </div>
             )}
@@ -252,7 +252,7 @@ export function TestTab({
                   <Terminal className="h-3.5 w-3.5" />
                   <span>cURL Command</span>
                 </summary>
-                <pre className="mt-2.5 whitespace-pre-wrap break-all rounded-xl border border-border/60 bg-background/80 p-4 font-mono text-xs text-foreground/90 shadow-inner overflow-x-auto">
+                <pre className="mt-2.5 whitespace-pre-wrap break-all rounded-md border border-border bg-background/80 p-4 font-mono text-xs text-foreground/90 overflow-x-auto">
                   {testResult.curlCommand}
                 </pre>
               </details>
@@ -261,7 +261,7 @@ export function TestTab({
                   <Terminal className="h-3.5 w-3.5" />
                   <span>Request Body</span>
                 </summary>
-                <pre className="mt-2.5 whitespace-pre-wrap break-all rounded-xl border border-border/60 bg-background/80 p-4 font-mono text-xs text-foreground/90 shadow-inner overflow-x-auto">
+                <pre className="mt-2.5 whitespace-pre-wrap break-all rounded-md border border-border bg-background/80 p-4 font-mono text-xs text-foreground/90 overflow-x-auto">
                   {testResult.requestBody}
                 </pre>
               </details>
@@ -270,7 +270,7 @@ export function TestTab({
                   <Terminal className="h-3.5 w-3.5" />
                   <span>Response Body</span>
                 </summary>
-                <pre className="mt-2.5 max-h-[320px] overflow-y-auto whitespace-pre-wrap break-all rounded-xl border border-border/60 bg-background/80 p-4 font-mono text-xs text-foreground/90 shadow-inner">
+                <pre className="mt-2.5 max-h-[320px] overflow-y-auto whitespace-pre-wrap break-all rounded-md border border-border bg-background/80 p-4 font-mono text-xs text-foreground/90">
                   {testResult.responseBody || "(empty)"}
                 </pre>
               </details>

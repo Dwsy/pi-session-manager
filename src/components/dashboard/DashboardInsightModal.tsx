@@ -11,7 +11,6 @@ import {
   FolderGit2,
   Clock,
   MessageSquare,
-  Sparkles,
   ChevronsDown,
   ChevronRight,
   Search,
@@ -178,7 +177,7 @@ function InsightRow({
   tone?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border/20 bg-background/40 p-3">
+    <div className="rounded-md border border-border bg-background p-3">
       <div className="flex items-center justify-between gap-3 mb-2">
         <div className="min-w-0">
           <div className="text-sm text-foreground truncate">{label}</div>
@@ -677,27 +676,27 @@ export default function DashboardInsightModal({
       </div>
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
+        <div className="rounded-md border border-border bg-muted/15 p-3.5">
           <div className="text-xs font-medium text-foreground mb-3">{t("dashboard.insight.sessionConcentration", "Session concentration")}</div>
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-lg bg-background/45 border border-border/15 p-3">
+            <div className="rounded-md bg-background/45 border border-border/15 p-3">
               <div className="text-muted-foreground mb-1">{t("dashboard.insight.medianLength", "Median length")}</div>
               <div className="text-lg font-semibold text-foreground tabular-nums">{formatNumber(sessionOverview.medianMessages)}</div>
             </div>
-            <div className="rounded-lg bg-background/45 border border-border/15 p-3">
+            <div className="rounded-md bg-background/45 border border-border/15 p-3">
               <div className="text-muted-foreground mb-1">{t("dashboard.insight.longestSession", "Longest session")}</div>
               <div className="text-lg font-semibold text-foreground tabular-nums">{formatNumber(sessionOverview.topSession?.message_count ?? 0)}</div>
             </div>
           </div>
           {sessionOverview.topSession ? (
-            <div className="mt-3 rounded-lg border border-border/15 bg-background/35 p-3">
+            <div className="mt-3 rounded-md border border-border/15 bg-background/35 p-3">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{t("dashboard.insight.longestSessionPath", "Longest session path")}</div>
               <div className="text-xs text-foreground truncate" title={sessionOverview.topSession.path}>{sessionOverview.topSession.path}</div>
             </div>
           ) : null}
         </div>
 
-        <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
+        <div className="rounded-md border border-border bg-muted/15 p-3.5">
           <div className="text-xs font-medium text-foreground mb-3">{t("dashboard.insight.topProjectsBySessions", "Top projects by sessions")}</div>
           <div className="space-y-2">
             {sessionOverview.topProjects.map(([projectPath, count]) => (
@@ -728,7 +727,7 @@ export default function DashboardInsightModal({
         <MetricCard icon={Target} label={t("dashboard.insight.assistantUserRatio", "Assistant / User")} value={`1:${messageMix.ratio.toFixed(1)}`} tone="text-warning" />
       </div>
 
-      <section className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
+      <section className="rounded-md border border-border bg-muted/15 p-3.5">
         <div className="text-xs font-medium text-foreground mb-3">{t("dashboard.insight.roleBalance", "Role balance")}</div>
         <div className="space-y-3">
           <InsightRow label={t("dashboard.insight.userMessages", "User messages")} value={formatNumber(displayStats.user_messages)} percent={messageMix.userPercent} tone="bg-info" />
@@ -736,7 +735,7 @@ export default function DashboardInsightModal({
         </div>
       </section>
 
-      <section className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
+      <section className="rounded-md border border-border bg-muted/15 p-3.5">
         <div className="text-xs font-medium text-foreground mb-3">{t("dashboard.insight.busiestMessageDays", "Busiest message days")}</div>
         <div className="space-y-2">
           {messageMix.topMessageDays.map(([date, count]) => (
@@ -766,7 +765,7 @@ export default function DashboardInsightModal({
       </div>
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
+        <div className="rounded-md border border-border bg-muted/15 p-3.5">
           <div className="text-xs font-medium text-foreground mb-3">{t("dashboard.insight.topActiveHours", "Top active hours")}</div>
           <div className="space-y-2">
             {activityRhythm.topHours.map((point) => (
@@ -784,7 +783,7 @@ export default function DashboardInsightModal({
           </div>
         </div>
 
-        <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5">
+        <div className="rounded-md border border-border bg-muted/15 p-3.5">
           <div className="text-xs font-medium text-foreground mb-3">{t("dashboard.insight.weekdayRhythm", "Weekday rhythm")}</div>
           <div className="space-y-2">
             {activityRhythm.topWeekdays.map(([day, count]) => (
@@ -813,24 +812,23 @@ export default function DashboardInsightModal({
       onClick={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm ui-enter-fade"
+        className="absolute inset-0 bg-black/50"
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-6xl rounded-2xl border border-border/25 bg-background/95 shadow-[0_20px_50px_rgba(0,0,0,0.35)] ui-enter-fade ui-enter-zoom overflow-hidden">
-        <div className="px-5 py-4 border-b border-border/20 flex items-start justify-between gap-3">
+      <div role="dialog" aria-modal="true" aria-labelledby="dashboard-insight-title" className="relative w-full max-w-6xl overflow-hidden rounded-md border border-border bg-background shadow-xl">
+        <div className="px-5 py-4 border-b border-border flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 text-xs text-muted-foreground mb-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-warning" />
               {t("dashboard.insight.title", "Dashboard Insight")}
             </div>
-            <h3 className="text-lg font-semibold text-foreground truncate">
+            <h3 id="dashboard-insight-title" className="truncate text-lg font-semibold text-foreground">
               {getModalTitle(mode, t, selectedModel)}
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg border border-border/20 bg-muted/15 p-2 text-muted-foreground hover:text-foreground hover:bg-muted/30 motion-surface motion-color motion-press focus-ring"
+            className="focus-ring rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -871,15 +869,16 @@ export default function DashboardInsightModal({
               {/* Date Range Filter + Search Bar */}
               <div className="flex items-center gap-2 mb-2">
                 <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                <div className="flex items-center gap-1 bg-muted/20 rounded-lg p-0.5">
+                <div className="flex overflow-hidden rounded-md border border-border">
                   {DATE_RANGE_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
                       onClick={() => setDateRange(opt.value)}
-                      className={`px-2 py-1 text-[11px] font-medium rounded-md motion-surface motion-color transition-colors ${
+                      aria-pressed={dateRange === opt.value}
+                      className={`border-r border-border px-2 py-1.5 text-[11px] font-medium last:border-r-0 ${
                         dateRange === opt.value
-                          ? "bg-background text-foreground shadow-sm border border-border/30"
-                          : "text-muted-foreground hover:text-foreground"
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       }`}
                     >
                       {t(opt.labelKey, opt.label)}
@@ -903,7 +902,7 @@ export default function DashboardInsightModal({
                       onFocus={() => searchQuery.trim() && setShowSuggestions(true)}
                       onKeyDown={handleSearchKeyDown}
                       placeholder={t("dashboard.insight.searchPlaceholder", "Search providers or models...")}
-                      className="w-full pl-9 pr-4 py-2 rounded-lg border border-border/30 bg-background/50 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-info/30 focus:border-info/50"
+                      className="focus-ring w-full rounded-md border border-border bg-background py-2 pl-9 pr-9 text-sm text-foreground placeholder:text-muted-foreground"
                     />
                     {searchQuery && (
                       <button
@@ -928,7 +927,7 @@ export default function DashboardInsightModal({
                 {showSuggestions && suggestions.length > 0 && (
                   <div
                     ref={suggestionsRef}
-                    className="absolute top-full left-0 right-0 mt-1 bg-background border border-border/30 rounded-lg shadow-lg z-20 max-h-64 overflow-y-auto"
+                    className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-border bg-popover shadow-lg"
                   >
                     {suggestions.map((suggestion, index) => (
                       <button
@@ -954,8 +953,8 @@ export default function DashboardInsightModal({
                 )}
               </div>
 
-              <section className="rounded-xl border border-border/20 bg-background/35 overflow-hidden">
-                <div className="px-3.5 py-2.5 border-b border-border/20 bg-muted/20 text-[11px] text-muted-foreground flex items-center justify-between">
+              <section className="rounded-md border border-border bg-background/35 overflow-hidden">
+                <div className="px-3.5 py-2.5 border-b border-border bg-muted/20 text-[11px] text-muted-foreground flex items-center justify-between">
                   <span>{t("dashboard.insight.providerGroupedTable", "Provider grouped usage table")}</span>
                   <span>
                     {t("dashboard.insight.providersModelsCount", "{{providers}} providers, {{models}} models", {
@@ -967,7 +966,7 @@ export default function DashboardInsightModal({
 
                 <div className="max-h-[46vh] overflow-y-auto">
                   <table className="w-full min-w-[860px] text-xs">
-                    <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border/20">
+                    <thead className="sticky top-0 z-10 bg-background border-b border-border">
                       <tr className="text-muted-foreground">
                         <th
                           className="px-3 py-2 text-left font-medium hover:bg-muted/30 select-none"
@@ -1063,7 +1062,7 @@ export default function DashboardInsightModal({
                   </table>
                 </div>
 
-                <div className="border-t border-border/20 bg-background/90">
+                <div className="border-t border-border bg-background/90">
                   <table className="w-full min-w-[860px] text-xs">
                     <tbody>
                       <tr className="font-semibold text-foreground">
@@ -1097,7 +1096,7 @@ export default function DashboardInsightModal({
             </>
           ) : mode === "model_projects" ? (
             <>
-              <div className="rounded-xl border border-border/20 bg-muted/15 p-3.5 text-xs text-muted-foreground">
+              <div className="rounded-md border border-border bg-muted/15 p-3.5 text-xs text-muted-foreground">
                 {t("dashboard.insight.modelProjectsDescription", "Shows which projects used this model, sorted by number of sessions using that model.")}
               </div>
 
@@ -1110,7 +1109,7 @@ export default function DashboardInsightModal({
                     return (
                       <div
                         key={`${selectedModel}-${projectPath}`}
-                        className="rounded-xl border border-border/20 bg-background/40 p-3"
+                        className="rounded-md border border-border bg-background p-3"
                       >
                         <div className="flex items-center justify-between gap-3 mb-1.5">
                           <div className="min-w-0 flex items-center gap-2">
@@ -1125,7 +1124,7 @@ export default function DashboardInsightModal({
                         </div>
                         <div className="h-1.5 bg-muted/60 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-gradient-to-r from-info to-[#7db7ff] rounded-full"
+                            className="h-full rounded-full bg-primary"
                             style={{ width: `${percent}%` }}
                           />
                         </div>
@@ -1137,7 +1136,7 @@ export default function DashboardInsightModal({
                   })}
                 </div>
               ) : (
-                <div className="rounded-xl border border-border/20 bg-muted/15 p-4 text-sm text-muted-foreground text-center">
+                <div className="rounded-md border border-border bg-muted/15 p-4 text-sm text-muted-foreground text-center">
                   {t("dashboard.topModels.noProjectUsage", "No project-level usage found for this model.")}
                 </div>
               )}
@@ -1248,7 +1247,7 @@ function MetricCard({
   tone: string;
 }) {
   return (
-    <div className="rounded-xl border border-border/20 bg-background/50 p-3.5">
+    <div className="rounded-md border border-border bg-background/50 p-3.5">
       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
         <Icon className={`w-3.5 h-3.5 ${tone}`} />
         {label}

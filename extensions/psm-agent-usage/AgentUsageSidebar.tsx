@@ -15,6 +15,14 @@ import {
   sortProviders,
   stateLabel,
 } from './format'
+import {
+  AppPluginSidebarBody,
+  AppPluginSidebarFooter,
+  AppPluginSidebarHeader,
+  AppPluginSidebarShell,
+  AppPluginSidebarState,
+  appPluginSidebarIconButtonClass,
+} from '@/components/app/AppPluginSidebarShell'
 import { ProviderIcon } from './providerIcons'
 import {
   readAgentUsageStatusCache,
@@ -100,58 +108,50 @@ export default function AgentUsageSidebar({
   const availableCount = providers.filter((provider) => provider.state === 'available').length
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="border-b border-border/70 px-3 py-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-foreground">
-              {t('plugins.agentUsage.title', 'Agent Usage')}
-            </div>
-            <div className="mt-0.5 text-[11px] text-muted-foreground">
-              {availableCount}/{providers.length || 0} live
-              {status?.fetchedAt
-                ? ` · ${formatResetAt(status.fetchedAt, language)}`
-                : ''}
-            </div>
-          </div>
+    <AppPluginSidebarShell label={t('plugins.agentUsage.title', 'Agent Usage')}>
+      <AppPluginSidebarHeader
+        title={t('plugins.agentUsage.title', 'Agent Usage')}
+        subtitle={status?.fetchedAt ? formatResetAt(status.fetchedAt, language) : undefined}
+        meta={`${availableCount}/${providers.length || 0} live`}
+        actions={
           <button
             type="button"
             onClick={() => void refresh()}
             disabled={loading}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border/70 bg-secondary text-muted-foreground hover:bg-secondary-hover hover:text-foreground disabled:opacity-60"
+            className={`${appPluginSidebarIconButtonClass} disabled:opacity-60`}
             title={t('plugins.agentUsage.refresh', 'Refresh')}
             aria-label={t('plugins.agentUsage.refresh', 'Refresh')}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <AppPluginSidebarBody>
         {error && (
-          <div className="m-2 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-xs text-destructive">
+          <AppPluginSidebarState tone="error" role="alert">
             <div>{error}</div>
-            <div className="mt-1 text-[11px] text-destructive/80">
+            <div className="mt-1 text-[10px] opacity-80">
               {t(
                 'plugins.agentUsage.grantHint',
                 'Enable this plugin and grant the Agent usage permission in Settings → PSM Plugins.',
               )}
             </div>
-          </div>
+          </AppPluginSidebarState>
         )}
 
         {!status && !error && (
-          <div className="m-2 rounded-md border border-dashed border-border/70 px-3 py-6 text-center text-xs text-muted-foreground">
+          <AppPluginSidebarState role="status">
             {loading
               ? t('plugins.agentUsage.refreshing', 'Refreshing…')
               : t('plugins.agentUsage.empty', 'No usage data yet. Click Refresh after granting usage:read.')}
-          </div>
+          </AppPluginSidebarState>
         )}
 
         {status && providers.length === 0 && (
-          <div className="m-2 rounded-md border border-dashed border-border/70 px-3 py-6 text-center text-xs text-muted-foreground">
+          <AppPluginSidebarState role="status">
             {t('plugins.agentUsage.empty', 'No usage data yet. Click Refresh after granting usage:read.')}
-          </div>
+          </AppPluginSidebarState>
         )}
 
         <div className="space-y-0.5 p-1.5">
@@ -189,10 +189,10 @@ export default function AgentUsageSidebar({
             )
           })}
         </div>
-      </div>
+      </AppPluginSidebarBody>
 
       {selected && (
-        <div className="border-t border-border/70 bg-surface/20 p-2.5">
+        <AppPluginSidebarFooter>
           <div className="mb-2 flex items-center gap-2">
             <ProviderIcon id={selected.id} className="h-4 w-4" />
             <div className="min-w-0">
@@ -237,8 +237,8 @@ export default function AgentUsageSidebar({
               ))}
             </div>
           )}
-        </div>
+        </AppPluginSidebarFooter>
       )}
-    </div>
+    </AppPluginSidebarShell>
   )
 }

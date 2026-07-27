@@ -7,6 +7,9 @@ import type {
 } from "@/plugins/tools-render/types";
 import { defaultResolveData } from "@/plugins/tools-render/utils/resolveData";
 import MarkdownContent from "@/components/ui/MarkdownContent";
+import ToolHeader from "@/components/tool-calls/ToolHeader";
+import ToolSectionHeader from "@/components/tool-calls/ToolSectionHeader";
+import { getToolExecutionClass, getToolRenderStatus, getToolStatusLabel } from "@/plugins/tools-render/utils/status";
 import { escapeHtml } from "@/utils/markdown";
 import { highlightSearchInHTML } from "@/utils/search";
 
@@ -127,8 +130,10 @@ function GenericToolCall({
   searchQuery,
   context,
 }: ToolRenderProps) {
-  const { name, args: rawArgs, output, isError, entryId } = resolvedData;
-  const { isExpanded, toggleExpanded, disableSuccessStyle } = context;
+  const { name, args: rawArgs, output, entryId } = resolvedData;
+  const { isExpanded, toggleExpanded, disableSuccessStyle, t, copyToClipboard } = context;
+  const status = getToolRenderStatus(resolvedData);
+  const expandable = hasMeaningfulValue(rawArgs) || Boolean(output);
 
   const args = normalizeToolArguments(rawArgs);
   const argsText = formatToolValue(args);
@@ -156,12 +161,14 @@ function GenericToolCall({
 
   return (
     <div
-      className={`tool-execution ${isError ? "error" : disableSuccessStyle ? "" : "success"}`.trim()}
+      className={`tool-execution ${getToolExecutionClass(resolvedData, disableSuccessStyle)}`.trim()}
       id={`entry-${entryId}`}
     >
-      <div
-        className={`tool-header ${hasArgs || hasOutput ? "select-none" : ""}`}
-        onClick={hasArgs || hasOutput ? toggleExpanded : undefined}
+      <ToolHeader
+        expandable={expandable}
+        expanded={isExpanded}
+        onToggle={toggleExpanded}
+        ariaLabel={`${name}: ${getToolStatusLabel(status, t)}`}
       >
         {(hasArgs || hasOutput) && (
           <span className="tool-expand-indicator">
@@ -193,21 +200,24 @@ function GenericToolCall({
         {hasArgs && (
           <span
             className="tool-generic-args-preview"
-            title={escapeHtml(argsText)}
+            title={argsText}
           >
             {buildCollapsedArgs(args)}
           </span>
         )}
-      </div>
+        <span className={`tool-status tool-status-${status}`}>{getToolStatusLabel(status, t)}</span>
+      </ToolHeader>
 
       {hasArgs && (
         <div className={`tool-output-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
             {isExpanded && (
               <>
-                <div className="tool-output-header">
-                  <span className="tool-output-label">Arguments</span>
-                </div>
+                <ToolSectionHeader
+                  label={t('components.toolCall.arguments', 'Arguments')}
+                  text={argsText}
+                  copyText={copyToClipboard}
+                />
                 <div
                   className="tool-arguments"
                   style={{
@@ -274,15 +284,17 @@ function GenericToolCall({
           <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
             {isExpanded && (
               <>
-                <div className="tool-output-header">
-                  <span className="tool-output-label">Output</span>
-                </div>
+                <ToolSectionHeader
+                  label={t('components.toolCall.output', 'Output')}
+                  text={output}
+                  copyText={copyToClipboard}
+                />
                 <div
                   className="tool-output"
                   style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: "auto" }}
                 >
                   <pre
-                    className="whitespace-pre-wrap m-0"
+                    className="tool-output-plain"
                     dangerouslySetInnerHTML={{ __html: highlightedOutput }}
                   />
                 </div>

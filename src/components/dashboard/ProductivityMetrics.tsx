@@ -157,7 +157,7 @@ export default function ProductivityMetrics({ stats, title = 'Productivity Metri
             {Array.from({ length: Math.min(streak, 30) }).map((_, i) => (
               <div
                 key={i}
-                className="flex-1 h-2 rounded-sm motion-transform hover:scale-y-125"
+                className="flex-1 h-2 rounded-sm"
                 style={{
                   backgroundColor: streak >= 30
                     ? '#7ee787'

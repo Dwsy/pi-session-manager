@@ -16,6 +16,9 @@ import type {
 import { escapeHtml } from "@/utils/markdown";
 import { highlightSearchInHTML } from "@/utils/search";
 import { manifest } from "./manifest";
+import ToolHeader from "@/components/tool-calls/ToolHeader";
+import ToolSectionHeader from "@/components/tool-calls/ToolSectionHeader";
+import { getToolExecutionClass, getToolRenderStatus, getToolStatusLabel } from "@/plugins/tools-render/utils/status";
 
 type CrossAgentKind =
   | "shell"
@@ -139,7 +142,8 @@ function CrossAgentToolRenderer({
   searchQuery,
   context,
 }: PsmToolRenderProps) {
-  const { name, output, isError, entryId } = resolvedData;
+  const { name, output, entryId } = resolvedData;
+  const status = getToolRenderStatus(resolvedData);
   const args = normalizeArgs(resolvedData.args);
   const kind = getKind(name);
   const title = getTitle(kind, name);
@@ -147,11 +151,6 @@ function CrossAgentToolRenderer({
   const argsText = formatArgs(args);
   const hasArgs = Object.keys(args).length > 0;
   const hasDetails = hasArgs || Boolean(output);
-  const statusClass = isError
-    ? "error"
-    : context.disableSuccessStyle
-      ? ""
-      : "success";
   const Icon =
     kind === "shell"
       ? Terminal
@@ -165,12 +164,14 @@ function CrossAgentToolRenderer({
 
   return (
     <div
-      className={`tool-execution ${statusClass}`.trim()}
+      className={`tool-execution ${getToolExecutionClass(resolvedData, context.disableSuccessStyle)}`.trim()}
       id={`entry-${entryId}`}
     >
-      <div
-        className={`tool-header ${hasDetails ? "select-none" : ""}`}
-        onClick={hasDetails ? context.toggleExpanded : undefined}
+      <ToolHeader
+        expandable={hasDetails}
+        expanded={context.isExpanded}
+        onToggle={context.toggleExpanded}
+        ariaLabel={`${title}: ${getToolStatusLabel(status, context.t)}`}
       >
         {hasDetails && (
           <span className="tool-expand-indicator">
@@ -184,7 +185,8 @@ function CrossAgentToolRenderer({
         <span className="tool-path" title={primaryText}>
           {primaryText}
         </span>
-      </div>
+        <span className={`tool-status tool-status-${status}`}>{getToolStatusLabel(status, context.t)}</span>
+      </ToolHeader>
 
       {hasDetails && (
         <div
@@ -197,10 +199,12 @@ function CrossAgentToolRenderer({
               <div className="space-y-3 p-3 text-sm">
                 {hasArgs && (
                   <div className="tool-output">
-                    <div className="tool-output-header">
-                      <span className="tool-output-label">Arguments</span>
-                    </div>
-                    <pre className="m-0 whitespace-pre-wrap">
+                    <ToolSectionHeader
+                      label={context.t('components.toolCall.arguments', 'Arguments')}
+                      text={argsText}
+                      copyText={context.copyToClipboard}
+                    />
+                    <pre className="tool-output-plain">
                       <code
                         dangerouslySetInnerHTML={{
                           __html: highlighted(argsText, searchQuery),
@@ -211,11 +215,13 @@ function CrossAgentToolRenderer({
                 )}
                 {output && (
                   <div className="tool-output">
-                    <div className="tool-output-header">
-                      <span className="tool-output-label">Output</span>
-                    </div>
+                    <ToolSectionHeader
+                      label={context.t('components.toolCall.output', 'Output')}
+                      text={output}
+                      copyText={context.copyToClipboard}
+                    />
                     <pre
-                      className="m-0 whitespace-pre-wrap"
+                      className="tool-output-plain"
                       dangerouslySetInnerHTML={{
                         __html: highlighted(output, searchQuery),
                       }}

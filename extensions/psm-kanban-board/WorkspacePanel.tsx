@@ -146,18 +146,21 @@ export default function WorkspacePanel({
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-card border-r border-border/10">
+      <div className="flex h-full items-center justify-center">
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
   return (
-    <div className="h-full min-h-0 flex flex-col bg-card border-r border-border/10">
-      <div className="px-2 py-2 border-b border-border/10 relative">
+    <div className="flex h-full min-h-0 flex-col bg-transparent">
+      <div className="relative border-b border-border/65 px-2 py-2">
         <button
+          type="button"
           onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted motion-color text-xs font-medium"
+          className="flex h-8 w-full items-center gap-2 rounded-md border border-border/65 px-2 text-xs font-medium hover:bg-secondary/55"
+          aria-expanded={isWorkspaceOpen}
+          aria-haspopup="menu"
         >
           {activeWorkspace.id === '__default__' ? (
             <LayoutGrid className="h-3.5 w-3.5 text-muted-foreground" />
@@ -169,7 +172,7 @@ export default function WorkspacePanel({
         </button>
 
         {isWorkspaceOpen && (
-          <div className="absolute z-50 top-full left-2 right-2 mt-1 bg-popover border border-border rounded-md shadow-lg py-1 animate-in fade-in-0 zoom-in-95">
+          <div className="absolute left-2 right-2 top-full z-50 mt-1 rounded-md border border-border/75 bg-popover py-1 shadow-sm" role="menu">
             {workspaces.map((workspace) => (
               <div key={workspace.id} className={`flex items-center group px-1 ${workspace.id === activeWorkspaceId ? 'bg-primary/5' : ''}`}>
                 <button
@@ -250,7 +253,7 @@ export default function WorkspacePanel({
         </div>
       )}
 
-      <div className="px-2 py-1.5 border-b border-border/10">
+      <div className="border-b border-border/65 px-2 py-2">
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <CompositionInput
@@ -258,12 +261,12 @@ export default function WorkspacePanel({
             placeholder={t('common.searchProjectsPlaceholder')}
             value={searchQuery}
             onChange={setSearchQuery}
-            className="w-full pl-7 pr-2 py-1.5 bg-muted/30 border border-transparent focus:border-primary/30 rounded-md text-xs outline-none transition-colors"
+            className="h-8 w-full rounded-md border border-border/65 bg-background py-1.5 pl-7 pr-2 text-xs outline-none focus:border-ring/50 focus:ring-2 focus:ring-ring/15"
           />
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <button
           onClick={() => selectProject(null)}
           className={`w-full px-3 py-2 flex items-center gap-2 text-xs border-b border-border/5 ${

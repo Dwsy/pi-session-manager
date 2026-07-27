@@ -1,15 +1,21 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSessionView } from '@/contexts/SessionViewContext'
 import CodeBlock from '@/components/ui/CodeBlock'
+import ToolHeader from '@/components/tool-calls/ToolHeader'
+import ToolSectionHeader from '@/components/tool-calls/ToolSectionHeader'
 import { renderCodeHtml } from '@/utils/markdown'
 import { highlightSearchInHTML } from '@/utils/search'
 import { useClipboard } from '@/hooks/useClipboard'
+import { useSettings } from '@/hooks/useSettings'
+import { getToolStatusLabel, type ToolRenderStatus } from '@/plugins/tools-render/utils/status'
 
 interface BashExecutionProps {
   command: string
   output?: string
   exitCode?: number | null
   cancelled?: boolean
+  hasResult?: boolean
   entryId: string
   searchQuery?: string
 }
@@ -21,9 +27,12 @@ export default function BashExecution({
   output,
   exitCode,
   cancelled,
+  hasResult,
   entryId,
   searchQuery = '',
 }: BashExecutionProps) {
+  const { t } = useTranslation()
+  const { settings } = useSettings()
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const expanded = isToolExpanded(entryId)
   const [commandCopied, setCommandCopied] = useState(false)
@@ -36,78 +45,103 @@ export default function BashExecution({
       : highlighted
   }, [command, searchQuery])
 
-  const isError = cancelled || (exitCode !== undefined && exitCode !== null && exitCode !== 0)
-  const statusClass = isError ? 'error' : 'success'
+  const resultKnown = hasResult ?? (
+    output !== undefined || exitCode !== undefined || cancelled !== undefined
+  )
+  const isError = Boolean(
+    cancelled || (typeof exitCode === 'number' && exitCode !== 0),
+  )
+  const status: ToolRenderStatus = isError
+    ? 'error'
+    : resultKnown
+      ? 'success'
+      : 'pending'
+  const statusClass = status === 'success' && settings.appearance.disableToolSuccessStyle
+    ? ''
+    : status
+  const statusLabel = getToolStatusLabel(status, t)
 
   const handleCopyCommand = async () => {
-    try {
-      await copyText(command)
-      setCommandCopied(true)
-      setTimeout(() => setCommandCopied(false), 2000)
-    } catch (err) {
-      console.error('Failed to copy command:', err)
-    }
+    await copyText(command)
+    setCommandCopied(true)
+    window.setTimeout(() => setCommandCopied(false), 1600)
   }
 
   return (
-    <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
-      <div
-        className="tool-header tool-header-bash select-none"
-        onClick={() => toggleToolExpanded(entryId)}
+    <div className={`tool-execution ${statusClass}`.trim()} id={`entry-${entryId}`}>
+      <ToolHeader
+        className="tool-header-bash"
+        expandable={Boolean(command || output)}
+        expanded={expanded}
+        onToggle={() => toggleToolExpanded(entryId)}
+        ariaLabel={`Bash: ${statusLabel}`}
+        actions={
+          <button
+            type="button"
+            onClick={() => void handleCopyCommand()}
+            className="tool-copy-button bash-inline-copy-button"
+            aria-label={commandCopied ? 'Copied command' : 'Copy command'}
+          >
+            {commandCopied ? '✓' : '⧉'}
+          </button>
+        }
       >
-        <span className="tool-expand-indicator">
+        <span className="tool-expand-indicator" aria-hidden="true">
           {expanded ? '▾' : '▸'}
         </span>
-        <pre className="bash-command-inline">
+        <span className="bash-command-inline" title={command}>
           <span className="bash-command-prefix" aria-hidden="true">$ </span>
-          <code className="shiki language-bash" dangerouslySetInnerHTML={{ __html: highlightedCommand }} />
-        </pre>
-        {exitCode !== undefined && exitCode !== null && (
-          <span className="tool-meta" style={{ color: exitCode === 0 ? 'var(--success)' : 'var(--error)' }}>
-            exit {exitCode}
-          </span>
-        )}
-        {cancelled && (
-          <span className="tool-meta" style={{ color: 'var(--warning)' }}>
-            cancelled
-          </span>
-        )}
-        <button
-          onClick={(event) => {
-            event.stopPropagation()
-            void handleCopyCommand()
-          }}
-          className="tool-copy-button bash-inline-copy-button"
-          aria-label={commandCopied ? 'Copied!' : 'Copy command'}
-        >
-          {commandCopied ? (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          )}
-        </button>
-      </div>
+          <code
+            className="shiki language-bash"
+            dangerouslySetInnerHTML={{ __html: highlightedCommand }}
+          />
+        </span>
+        {exitCode !== undefined && exitCode !== null ? (
+          <span className="tool-detail">exit {exitCode}</span>
+        ) : null}
+        {cancelled ? <span className="tool-detail">cancelled</span> : null}
+        <span className={`tool-status tool-status-${status}`}>{statusLabel}</span>
+      </ToolHeader>
 
-      {output && (
+      {command && expanded ? (
+        <div className="tool-command-detail">
+          <ToolSectionHeader
+            label={t('components.toolCall.command', 'Command')}
+            text={command}
+            copyText={copyText}
+          />
+          <pre className="tool-command-expanded">
+            <code
+              className="shiki language-bash"
+              dangerouslySetInnerHTML={{ __html: highlightedCommand }}
+            />
+          </pre>
+        </div>
+      ) : null}
+
+      {output ? (
         <div className={`tool-output-wrapper collapsible ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
-            {expanded && (
-              <CodeBlock
-                code={output}
-                language="shell"
-                showLineNumbers={true}
-                scrollable
-                maxHeight={OUTPUT_MAX_HEIGHT}
-                searchQuery={searchQuery}
-              />
-            )}
+            {expanded ? (
+              <>
+                <ToolSectionHeader
+                  label={t('components.toolCall.output', 'Output')}
+                  text={output}
+                  copyText={copyText}
+                />
+                <CodeBlock
+                  code={output}
+                  language="shell"
+                  showLineNumbers
+                  scrollable
+                  maxHeight={OUTPUT_MAX_HEIGHT}
+                  searchQuery={searchQuery}
+                />
+              </>
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

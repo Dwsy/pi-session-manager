@@ -320,12 +320,12 @@ export default function HeatmapDayModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="absolute inset-0 bg-black/55 backdrop-blur-xl ui-enter-fade"
+        className="absolute inset-0 bg-black/55"
         onClick={onClose}
       />
 
-      <div className="relative w-full sm:w-[92vw] max-w-[1440px] h-[92vh] sm:h-[88vh] overflow-hidden rounded-xl border border-border/35 bg-background/95 shadow-[0_24px_64px_rgba(0,0,0,0.32)] ui-enter-fade ui-enter-zoom flex flex-col">
-        <div className="relative border-b border-border/20 px-4 py-3 sm:px-5 bg-card/25">
+      <div role="dialog" aria-modal="true" aria-label={formattedDate} className="relative flex h-[92vh] w-full max-w-[1440px] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl sm:h-[88vh] sm:w-[92vw]">
+        <div className="relative border-b border-border px-4 py-3 sm:px-5 bg-background">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[1.28rem] leading-[1.08] font-semibold tracking-tight text-foreground truncate sm:text-[1.5rem]">
@@ -339,7 +339,7 @@ export default function HeatmapDayModal({
                   label={t(activityConfig.label)}
                   value={`${point.level}/5`}
                 />
-                <span className="inline-flex items-center rounded-full border border-border/25 bg-muted/25 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                <span className="inline-flex items-center rounded-full border border-border bg-muted/25 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                   {hasDetailedStats
                     ? t('dashboard.heatmapModal.detailedMode', 'Detailed mode')
                     : t('dashboard.heatmapModal.lightweightMode', 'Lightweight mode')}
@@ -349,7 +349,7 @@ export default function HeatmapDayModal({
 
             <button
               onClick={onClose}
-              className="shrink-0 rounded-lg border border-border/20 bg-muted/15 p-2 text-muted-foreground hover:text-foreground hover:bg-muted/30 motion-surface motion-color focus-ring"
+              className="shrink-0 rounded-lg border border-border bg-muted/15 p-2 text-muted-foreground hover:text-foreground hover:bg-muted/30 focus-ring"
               aria-label={t('common.close')}
             >
               <X className="w-4.5 h-4.5" />
@@ -357,9 +357,9 @@ export default function HeatmapDayModal({
           </div>
         </div>
 
-        <div className="relative flex-1 min-h-0 p-2.5 sm:p-4 grid grid-rows-[auto_1fr] gap-3 bg-gradient-to-b from-muted/8 to-transparent">
+        <div className="relative flex-1 min-h-0 p-2.5 sm:p-4 grid grid-rows-[auto_1fr] gap-3 bg-background">
           {showDelayedLoading ? (
-            <div className="h-full rounded-xl border border-border/20 bg-muted/15 flex flex-col items-center justify-center gap-2">
+            <div className="h-full rounded-md border border-border bg-muted/15 flex flex-col items-center justify-center gap-2">
               <DelayedLoadingCenter className="flex items-center justify-center" />
               <div className="text-xs text-muted-foreground">{t('dashboard.loading', 'Loading dashboard...')}</div>
             </div>
@@ -403,7 +403,7 @@ export default function HeatmapDayModal({
               </div>
 
               <div className="min-h-0 grid grid-cols-1 xl:grid-cols-12 xl:grid-rows-[minmax(0,0.95fr)_minmax(0,1.05fr)] gap-3">
-                <section className="xl:col-span-4 rounded-xl border bg-card/55 border-border/20 p-3.5 min-h-0 overflow-hidden flex flex-col shadow-sm">
+                <section className="xl:col-span-4 rounded-md border bg-card/55 border-border p-3.5 min-h-0 overflow-hidden flex flex-col shadow-sm">
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                       <Zap className="w-4 h-4 text-muted-foreground" />
@@ -438,7 +438,7 @@ export default function HeatmapDayModal({
                   )}
                 </section>
 
-                <section className="xl:col-span-4 rounded-xl border bg-card/55 border-border/20 p-3.5 min-h-0 flex flex-col shadow-sm">
+                <section className="xl:col-span-4 rounded-md border bg-card/55 border-border p-3.5 min-h-0 flex flex-col shadow-sm">
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="min-w-0">
                       <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
@@ -558,7 +558,7 @@ export default function HeatmapDayModal({
                       </svg>
                     </div>
                     {hoveredTrendPoint && (
-                      <div className="pointer-events-none absolute right-2 top-2 rounded-md border border-border/25 bg-background/95 px-2 py-1 text-[10px] shadow-sm backdrop-blur tabular-nums">
+                      <div className="pointer-events-none absolute right-2 top-2 rounded-md border border-border bg-background px-2 py-1 text-[10px] shadow-sm tabular-nums">
                         <div className="font-medium text-foreground">{hoveredTrendPoint.label}</div>
                         <div className="text-muted-foreground">{formatCompactNumber(hoveredTrendPoint.item.total_tokens)} {t('dashboard.heatmapModal.tokenUnit', 'tokens')}</div>
                       </div>
@@ -570,7 +570,7 @@ export default function HeatmapDayModal({
                   </div>
                 </section>
 
-                <section className="xl:col-span-4 rounded-xl border bg-card/55 border-border/20 p-3 min-h-0 flex flex-col shadow-sm">
+                <section className="xl:col-span-4 rounded-md border bg-card/55 border-border p-3 min-h-0 flex flex-col shadow-sm">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                       <Clock className="w-4 h-4 text-muted-foreground" />
@@ -580,7 +580,7 @@ export default function HeatmapDayModal({
                       <button
                         type="button"
                         onClick={() => setSelectedHour(null)}
-                        className="inline-flex items-center rounded-full border border-border/30 bg-background/20 px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:border-border/50 motion-color focus-ring"
+                        className="inline-flex items-center rounded-full border border-border bg-background/20 px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:border-border/50 focus-ring"
                       >
                         {t('common.clear', 'Clear')} {selectedHour.toString().padStart(2, '0')}:00
                       </button>
@@ -610,7 +610,7 @@ export default function HeatmapDayModal({
                             <button
                               key={item.hour}
                               type="button"
-                              className={`h-full rounded-[3px] relative overflow-hidden motion-color focus-ring ${isSelected ? 'ring-1 ring-info/70' : 'hover:bg-background/30'}`}
+                              className={`h-full rounded-[3px] relative overflow-hidden focus-ring ${isSelected ? 'ring-1 ring-info/70' : 'hover:bg-background/30'}`}
                               aria-label={`${item.hour.toString().padStart(2, '0')}:00 · ${item.count} ${t('dashboard.heatmapModal.messageUnit', 'messages')}`}
                               style={{ backgroundColor: item.count === 0 ? 'rgba(148, 163, 184, 0.12)' : hexToRgba(barColor, 0.18) }}
                               title={`${item.hour.toString().padStart(2, '0')}:00 · ${item.count}`}
@@ -639,14 +639,14 @@ export default function HeatmapDayModal({
 
                 <section
                   ref={projectsRef}
-                  className={`xl:col-span-4 rounded-xl border bg-card/55 border-border/20 p-3.5 min-h-0 flex flex-col shadow-sm ${focusPanel === 'projects' ? 'ring-1 ring-primary/45' : ''}`}
+                  className={`xl:col-span-4 rounded-md border bg-card/55 border-border p-3.5 min-h-0 flex flex-col shadow-sm ${focusPanel === 'projects' ? 'ring-1 ring-primary/45' : ''}`}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                       <Folder className="w-4 h-4 text-muted-foreground" />
                       {t('dashboard.heatmapModal.projectShare', 'Projects')}
                     </h3>
-                    <span className="inline-flex items-center rounded-full border border-border/20 bg-background/25 px-2 py-0.5 text-[10px] text-muted-foreground tabular-nums">
+                    <span className="inline-flex items-center rounded-full border border-border bg-background/25 px-2 py-0.5 text-[10px] text-muted-foreground tabular-nums">
                       {hasProjects ? `${stats.project_breakdown.length}` : '--'}
                     </span>
                   </div>
@@ -665,7 +665,7 @@ export default function HeatmapDayModal({
                           <button
                             key={`${project.project_path}-${project.project_name}`}
                             type="button"
-                            className={`w-full text-left rounded-lg border px-2.5 py-2 ${canFilter ? 'border-border/15 bg-background/18 hover:bg-background/28 hover:border-border/30 motion-surface motion-color focus-ring' : 'border-transparent bg-transparent'}`}
+                            className={`w-full text-left rounded-lg border px-2.5 py-2 ${canFilter ? 'border-border/15 bg-background/18 hover:bg-background/28 hover:border-border focus-ring' : 'border-transparent bg-transparent'}`}
                             onClick={() => canFilter && onFilterProject?.(target)}
                             disabled={!canFilter}
                           >
@@ -700,7 +700,7 @@ export default function HeatmapDayModal({
 
                 <section
                   ref={sessionsRef}
-                  className={`xl:col-span-8 rounded-xl border bg-card/55 border-border/20 p-3.5 min-h-0 flex flex-col shadow-sm ${focusPanel === 'sessions' ? 'ring-1 ring-primary/45' : ''}`}
+                  className={`xl:col-span-8 rounded-md border bg-card/55 border-border p-3.5 min-h-0 flex flex-col shadow-sm ${focusPanel === 'sessions' ? 'ring-1 ring-primary/45' : ''}`}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
@@ -728,7 +728,7 @@ export default function HeatmapDayModal({
                             key={session.path}
                             type="button"
                             onClick={() => onOpenSession?.(session.path)}
-                            className={`group relative w-full rounded-lg border bg-background/18 px-2.5 py-2 text-left ${onOpenSession ? 'border-border/15 hover:border-border/30 hover:bg-background/28 motion-surface motion-color focus-ring' : 'border-border/12'}`}
+                            className={`group relative w-full rounded-lg border bg-background/18 px-2.5 py-2 text-left ${onOpenSession ? 'border-border/15 hover:border-border hover:bg-background/28 focus-ring' : 'border-border/12'}`}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div className="min-w-0 flex-1">
@@ -745,7 +745,7 @@ export default function HeatmapDayModal({
                                   <span>{formatCompactNumber(session.token_count)} {t('dashboard.heatmapModal.tokenUnit', 'tokens')}</span>
                                 </div>
                               </div>
-                              {onOpenSession && <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground motion-color" />}
+                              {onOpenSession && <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground" />}
                             </div>
                           </button>
                         )
@@ -782,7 +782,7 @@ function StatCard({ icon: Icon, label, value, color, emphasis, onClick, hint }: 
   return (
     <button
       type="button"
-      className={`group rounded-lg border border-border/15 px-3 py-2.5 text-left w-full ${interactive ? 'bg-card/60 hover:bg-card/80 motion-surface motion-color focus-ring' : 'bg-card/45 cursor-default'}`}
+      className={`group rounded-lg border border-border/15 px-3 py-2.5 text-left w-full ${interactive ? 'bg-card/60 hover:bg-card/80 focus-ring' : 'bg-card/45 cursor-default'}`}
       onClick={onClick}
       disabled={!interactive}
     >
@@ -796,7 +796,7 @@ function StatCard({ icon: Icon, label, value, color, emphasis, onClick, hint }: 
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] text-muted-foreground truncate">{label}</span>
             {interactive && (
-              <ChevronRight className="w-3 h-3 shrink-0 text-muted-foreground group-hover:text-foreground motion-color" />
+              <ChevronRight className="w-3 h-3 shrink-0 text-muted-foreground group-hover:text-foreground" />
             )}
           </div>
           <div className="mt-0.5 flex items-end justify-between gap-2">

@@ -51,20 +51,31 @@ html.tool-call-style-disabled {
 
 // Tool Header
 .tool-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 1px 12px;
-  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  display: grid;
   min-width: 0;
+  min-height: 34px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+}
+
+.tool-header--collapsed {
+  min-height: 32px;
+}
+
+.tool-header--expanded {
+  border-bottom: 1px solid rgb(var(--color-border) / 0.5);
 }
 
 .tool-header-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: inline-flex;
   min-width: 0;
-  flex-shrink: 0;
+  max-width: 12rem;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 5px;
 }
 
 .tool-header-meta .message-timestamp {
@@ -72,12 +83,17 @@ html.tool-call-style-disabled {
 }
 
 .tool-name {
-  font-weight: 600;
-  color: var(--toolTitle, var(--accent));
-  display: flex;
+  display: inline-flex;
+  min-width: 0;
+  max-width: 12rem;
+  flex: 0 1 auto;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  gap: 5px;
+  overflow: hidden;
+  color: var(--toolTitle, var(--text));
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tool-icon {
@@ -87,15 +103,17 @@ html.tool-call-style-disabled {
 }
 
 .tool-expand-indicator {
+  display: flex;
+  width: 14px;
+  flex: 0 0 14px;
+  align-items: center;
+  justify-content: center;
   color: rgb(var(--color-muted-foreground));
   font-size: 14px;
   line-height: 1;
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
+  opacity: 0.72;
   user-select: none;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .tool-header:hover .tool-expand-indicator {
@@ -107,7 +125,9 @@ html.tool-call-style-disabled {
 }
 
 .tool-path {
-  font-weight: 500;
+  min-width: 64px;
+  flex: 1 1 160px;
+  overflow: hidden;
   color: var(--toolTitle, var(--text));
   font-family: var(
     --font-family-mono,
@@ -119,14 +139,18 @@ html.tool-call-style-disabled {
     "DejaVu Sans Mono",
     monospace
   );
-  min-width: 0;
-  overflow: hidden;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 // Generic tool collapsed args preview (truncated JSON)
 .tool-generic-args-preview {
+  min-width: 80px;
+  flex: 1 1 180px;
+  overflow: hidden;
+  padding: 0;
+  color: rgb(var(--color-muted-foreground));
   font-family: var(
     --font-family-mono,
     ui-monospace,
@@ -138,16 +162,8 @@ html.tool-call-style-disabled {
     monospace
   );
   font-size: calc(var(--font-size-base, 16px) * 0.625);
-  color: var(--text);
-  // background: rgba(var(--accent-rgb), 0.06);
-  // border: 1px solid rgba(var(--accent-rgb), 0.1);
-  border-radius: 4px;
-  padding: 2px 8px;
-  min-width: 0;
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
   cursor: inherit;
 }
 
@@ -161,18 +177,31 @@ html.tool-call-style-disabled {
   margin-left: auto;
 }
 
+.tool-detail {
+  min-width: 0;
+  max-width: 10rem;
+  flex: 0 1 auto;
+  overflow: hidden;
+  color: rgb(var(--color-muted-foreground));
+  font-size: calc(var(--font-size-base, 16px) * 0.625);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 // Tool Toggle Button
 .tool-toggle-button {
-  padding: 4px 8px;
-  background: transparent;
-  color: rgb(var(--color-muted-foreground));
-  border: none;
-  border-radius: 4px;
-  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
   font-size: calc(var(--font-size-base, 16px) * 0.75);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    color var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .tool-toggle-button:hover {
@@ -180,9 +209,6 @@ html.tool-call-style-disabled {
   background: rgba(var(--accent-rgb), 0.05);
 }
 
-.tool-toggle-button:active {
-  transform: scale(0.98);
-}
 
 // Tool Command
 .tool-command {
@@ -294,36 +320,28 @@ html.tool-call-style-disabled {
   padding: 6px 0;
   font-size: calc(var(--font-size-base, 16px) * 0.625);
   border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-.tool-output-header:hover {
-  color: var(--text-secondary);
-}
-
-.tool-output-header:hover .tool-output-label {
-  color: var(--accent);
 }
 
 .tool-output-label {
   font-size: calc(var(--font-size-base, 16px) * 0.625);
   color: rgb(var(--color-muted-foreground));
   font-weight: 500;
-  transition: color 0.2s ease;
 }
 
 // Tool Copy Button
 .tool-copy-button {
-  padding: 4px;
-  background: transparent;
-  color: rgb(var(--color-muted-foreground));
-  border: none;
-  border-radius: 4px;
-  transition: all 0.2s ease;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    color var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .tool-copy-button:hover {
@@ -544,11 +562,11 @@ html.tool-call-style-disabled {
 // Expand Hint
 .expand-hint {
   padding: 8px 0;
-  text-align: left;
   color: rgb(var(--color-muted-foreground));
   font-size: 10px;
-  transition: all 0.2s ease;
   font-style: italic;
+  text-align: left;
+  transition: color var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .expand-hint:hover {
@@ -557,27 +575,22 @@ html.tool-call-style-disabled {
 
 // Bash Command Highlight
 .tool-header-bash {
-  gap: 8px;
-  align-items: flex-start;
+  align-items: center;
 }
 
-.tool-header-bash .tool-meta,
+.tool-header-bash .tool-detail,
+.tool-header-bash .tool-status,
 .tool-header-bash .bash-inline-copy-button {
   flex-shrink: 0;
 }
 
 .bash-command-inline {
+  min-width: 80px;
+  flex: 1 1 220px;
+  overflow: hidden;
   margin: 0;
-  padding: 4px 10px;
-  min-width: 0;
-  flex: 1;
-  overflow: visible;
-  text-overflow: clip;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  background: var(--bg-inset);
-  border-radius: 6px;
+  padding: 0;
+  background: transparent;
   font-family: var(
     --font-family-mono,
     ui-monospace,
@@ -589,8 +602,11 @@ html.tool-call-style-disabled {
     monospace
   );
   font-size: calc(var(--font-size-base, 16px) * 0.75);
-  line-height: 1.5;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
 
 .bash-command-prefix {
   user-select: none;
@@ -756,3 +772,224 @@ html.tool-call-style-disabled {
 }
 
 // Assistant fold group (per assistant message)
+
+
+.tool-status {
+  display: inline-flex;
+  min-width: 50px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-left: 2px;
+  padding-left: 5px;
+  color: rgb(var(--color-muted-foreground));
+  font-size: calc(var(--font-size-base, 16px) * 0.5625);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tool-status::before {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 5px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+  opacity: 0.85;
+}
+
+.tool-status-pending {
+  color: rgb(var(--color-warning));
+}
+
+.tool-status-error {
+  color: rgb(var(--color-destructive));
+}
+
+.tool-status-success {
+  color: rgb(var(--color-success));
+}
+
+
+@media (max-width: 640px) {
+  .tool-header {
+    gap: 3px;
+    padding-inline: 6px;
+  }
+
+  .tool-header-content {
+    gap: 4px;
+  }
+
+  .tool-detail {
+    display: none;
+  }
+
+  .tool-name,
+  .tool-header-meta {
+    max-width: 7rem;
+  }
+
+  .tool-status {
+    min-width: 0;
+    margin-left: 0;
+    padding-left: 3px;
+  }
+
+  .tool-path,
+  .bash-command-inline,
+  .tool-generic-args-preview {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .conversation-process-summary__action {
+    width: 46px;
+    flex-basis: 46px;
+  }
+
+  .conversation-process-summary__items {
+    gap: 7px;
+  }
+
+  .conversation-process-summary__review {
+    padding-inline: 8px;
+  }
+}
+
+
+.tool-output-plain {
+  margin: 0;
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  line-height: 1.5;
+}
+
+
+.tool-header-toggle {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 26px;
+  align-items: center;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.tool-header-content {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+button.tool-header-toggle {
+  cursor: pointer;
+}
+
+button.tool-header-toggle:focus-visible,
+.tool-header-actions button:focus-visible {
+  outline: 2px solid rgb(var(--color-ring) / 0.75);
+  outline-offset: 1px;
+}
+
+.tool-header-actions {
+  display: flex;
+  min-height: 26px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  border-left: 1px solid rgb(var(--color-border) / 0.62);
+  padding-left: 5px;
+}
+
+.tool-header-actions .tool-copy-button,
+.tool-header-actions > button {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  padding: 0;
+  border-radius: 5px;
+}
+
+.tool-command-detail {
+  border-top: 1px solid rgb(var(--color-border) / 0.5);
+  background: rgb(var(--color-surface) / 0.22);
+}
+
+.tool-command-expanded {
+  max-height: 180px;
+  overflow: auto;
+  margin: 0;
+  padding: 8px 10px;
+  background: transparent;
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tool-command-expanded code {
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  white-space: inherit;
+}
+
+.session-viewer .conversation-preview-process .tool-execution,
+.session-viewer .conversation-preview-process .tool-execution.pending,
+.session-viewer .conversation-preview-process .tool-execution.success,
+.session-viewer .conversation-preview-process .tool-execution.error {
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.session-viewer .conversation-preview-process .tool-header {
+  min-height: 31px;
+  padding: 2px 7px 2px 3px;
+}
+
+.session-viewer .conversation-preview-process .tool-header--expanded {
+  border-bottom: 1px solid rgb(var(--color-border) / 0.5);
+  background: rgb(var(--color-secondary) / 0.2);
+}
+
+.session-viewer .conversation-preview-process .tool-execution.error > .tool-header {
+  background: rgb(var(--color-destructive) / 0.035);
+}
+
+.session-viewer .conversation-preview-process .tool-header-actions {
+  min-height: 25px;
+  border-left-color: rgb(var(--color-border) / 0.45);
+}
+
+.session-viewer .conversation-preview-process .tool-header-actions .tool-copy-button,
+.session-viewer .conversation-preview-process .tool-header-actions > button {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
+}
+
+.session-viewer .conversation-preview-process .tool-output-wrapper,
+.session-viewer .conversation-preview-process .tool-diff-wrapper,
+.session-viewer .conversation-preview-process .tool-command-detail,
+.session-viewer .conversation-preview-process .tool-expand-content.expanded {
+  background: rgb(var(--color-surface) / 0.16);
+}

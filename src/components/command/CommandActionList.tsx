@@ -87,7 +87,7 @@ export default function CommandActionList({
         <div className="py-1">
           {groups.map(([pluginId, group]) => (
             <section key={pluginId} className="mb-1 last:mb-0">
-              <div className="sticky top-0 z-10 bg-background/95 px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75 backdrop-blur-sm">
+              <div className="sticky top-0 z-10 bg-background/95 px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">
                 {group.label}
               </div>
               <ul className="px-1">

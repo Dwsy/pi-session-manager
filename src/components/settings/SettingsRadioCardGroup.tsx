@@ -32,7 +32,7 @@ export default function SettingsRadioCardGroup<T extends string>({
   getSuffix,
   containerClassName = 'space-y-2',
   itemClassName = '',
-  activeClassName = 'border-info bg-info/10',
+  activeClassName = 'border-primary/40 bg-primary/10',
   inactiveClassName = 'border-border hover:border-border-hover',
   radioClassName = 'sr-only',
   labelClassName = 'text-sm font-medium text-foreground',
@@ -48,7 +48,7 @@ export default function SettingsRadioCardGroup<T extends string>({
         return (
           <label
             key={option}
-            className={`flex items-center gap-3 p-3 rounded-lg border motion-surface motion-color focus-within:ring-1 focus-within:ring-info/30 ${
+            className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 motion-color focus-within:ring-2 focus-within:ring-ring/30 ${
               active ? activeClassName : inactiveClassName
             } ${className}`}
           >

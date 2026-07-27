@@ -1,8 +1,14 @@
 /* @jsxRuntime classic */
 /* @jsx React.createElement */
 
-import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { PsmPluginI18nClient } from '../../../packages/runtime-sdk/src'
+import {
+  SessionPluginPanel,
+  SessionPluginPanelBody,
+  SessionPluginPanelHeader,
+  SessionPluginPanelState,
+  sessionPluginPanelIconButtonClass,
+} from '../../../src/components/session-viewer/SessionPluginPanel'
 
 import {
   formatInt,
@@ -49,8 +55,6 @@ interface CacheUsagePanelProps {
   onClose(): void
 }
 
-const MIN_PANEL_WIDTH = 320
-const MAX_PANEL_WIDTH = 620
 const CHART_HEIGHT = 170
 
 function toolbarButtonClass(open: boolean) {
@@ -386,7 +390,7 @@ function StatSection({
 
   return (
     <section className="border-b border-border/70 pb-3">
-      <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{title}</div>
+      <div className="mb-2 text-xs font-medium text-muted-foreground">{title}</div>
       <div className="space-y-2 text-xs">
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3"><span className="text-muted-foreground">{t('session.cacheUsage.stats.assistantMessages', 'Assistant turns')}</span>{renderValue(totals.assistantMessages)}</div>
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3"><span className="text-muted-foreground">{t('session.cacheUsage.stats.input', 'Input (uncached)')}</span>{renderValue(totals.input)}</div>
@@ -424,7 +428,7 @@ function CostSummary({ stats, locale, t }: { stats: CacheUsageStats; locale: str
 
   return (
     <section className="border-b border-border/70 pb-3">
-      <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{t('session.cacheUsage.cost.title', 'Cost analysis')}</div>
+      <div className="mb-2 text-xs font-medium text-muted-foreground">{t('session.cacheUsage.cost.title', 'Cost analysis')}</div>
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="border-l border-border/70 px-2.5 py-2">
           <div className="text-muted-foreground">{t('session.cacheUsage.cost.activeBranch', 'Branch cost')}</div>
@@ -457,7 +461,7 @@ function ModelStatsTable({ models, locale, t }: { models: CacheUsageModelStat[];
   return (
     <section className="border-b border-border/70 pb-3">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{t('session.cacheUsage.models.title', 'Model breakdown')}</div>
+        <div className="text-xs font-medium text-muted-foreground">{t('session.cacheUsage.models.title', 'Model breakdown')}</div>
         <div className="text-[11px] text-muted-foreground">{t('session.cacheUsage.models.count', '{{count}} models', { count: models.length })}</div>
       </div>
       <div className="space-y-2">
@@ -534,6 +538,7 @@ export function CacheUsageToolbarButton({ i18n, open, onToggle }: CacheUsageTool
       title={t('session.cacheUsage.title', 'Cache usage')}
       aria-label={t('session.cacheUsage.title', 'Cache usage')}
       aria-expanded={open}
+      aria-pressed={open}
     >
       <span className="font-medium">{t('session.cacheUsage.shortLabel', 'Cache')}</span>
     </button>
@@ -547,87 +552,60 @@ export function CacheUsagePanel({
   activeEntryId,
   open,
   width = 360,
-  onWidthChange,
   recentTurns,
   onClose,
 }: CacheUsagePanelProps) {
   const { t, language } = i18n
-  const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<CacheUsageStats | null>(null)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
+  const [reloadNonce, setReloadNonce] = useState(0)
   const [activeTab, setActiveTab] = useState<CacheUsageTab>('overview')
   const [trendView, setTrendView] = useState<CacheUsageTrendView>('per-turn')
-  const [isResizing, setIsResizing] = useState(false)
-  const resizeStartRef = useRef<{ x: number; width: number } | null>(null)
+  const loadedSessionPathRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!open) return
 
     let cancelled = false
-    setLoading(true)
+    const replacingSession = loadedSessionPathRef.current !== session.path
+    if (replacingSession) {
+      setStats(null)
+      setLastUpdatedAt(null)
+      setInitialLoading(true)
+    } else {
+      setRefreshing(true)
+    }
     setError(null)
 
     client.readEntries(session.path)
       .then((entries) => {
         if (cancelled) return
         setStats(collectCacheUsageStats(entries as any[], { activeEntryId }))
+        setLastUpdatedAt(new Date())
+        loadedSessionPathRef.current = session.path
       })
       .catch((nextError) => {
         if (cancelled) return
         setError(nextError instanceof Error ? nextError.message : String(nextError))
-        setStats(null)
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setInitialLoading(false)
+          setRefreshing(false)
+        }
       })
 
     return () => {
       cancelled = true
     }
-  }, [activeEntryId, client, open, session.path])
+  }, [activeEntryId, client, open, reloadNonce, session.path])
 
-  useEffect(() => {
-    if (!isResizing) return
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const start = resizeStartRef.current
-      if (!start) return
-      const delta = start.x - event.clientX
-      const nextWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, start.width + delta))
-      onWidthChange?.(nextWidth)
-    }
-
-    const handlePointerUp = () => {
-      setIsResizing(false)
-      resizeStartRef.current = null
-    }
-
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp, { once: true })
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-    }
-  }, [isResizing, onWidthChange])
-
-  const handleResizeStart = (event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    resizeStartRef.current = { x: event.clientX, width }
-    setIsResizing(true)
-  }
-
-  const handleRefresh = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const entries = await client.readEntries(session.path)
-      setStats(collectCacheUsageStats(entries as any[], { activeEntryId }))
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : String(nextError))
-      setStats(null)
-    } finally {
-      setLoading(false)
-    }
+  const handleRefresh = () => {
+    if (initialLoading || refreshing) return
+    setReloadNonce((value) => value + 1)
   }
 
   const chartBucketCount = Math.max(10, Math.min(28, Math.floor((width - 48) / 11)))
@@ -671,103 +649,108 @@ export function CacheUsagePanel({
     ? t('session.cacheUsage.activeBranchHint', 'Active branch follows the entry currently selected in the viewer.')
     : t('session.cacheUsage.branchHint', 'Latest branch is inferred from the newest message lineage in this session file.')
   const branchSpread = stats ? stats.activeBranchHitRate - stats.treeHitRate : 0
-  const latestHitRate = stats?.activeBranchHitRate ?? 0
-  const treeHitRate = stats?.treeHitRate ?? 0
-  const treeHitTone = metricTone(treeHitRate)
+  const latestHitRate = stats?.activeBranchHitRate
+  const treeHitRate = stats?.treeHitRate
+  const treeHitTone = metricTone(treeHitRate ?? 0)
   const spreadTone = metricTone(branchSpread)
   const latestPoint = stats?.messages[stats.messages.length - 1]?.hitRate ?? 0
   const minHit = stats?.messages.length ? Math.min(...stats.messages.map((message) => message.hitRate)) : 0
   const maxHit = stats?.messages.length ? Math.max(...stats.messages.map((message) => message.hitRate)) : 0
+  const pending = initialLoading || refreshing
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-background" data-no-window-drag>
-      <div
-        onPointerDown={handleResizeStart}
-        className={`absolute -left-[3px] top-0 h-full w-[6px] cursor-ew-resize ${isResizing ? 'bg-primary/30' : 'hover:bg-primary/15'}`}
-        role="separator"
-        aria-orientation="vertical"
-        aria-label={t('session.cacheUsage.title', 'Cache usage')}
+    <SessionPluginPanel label={t('session.cacheUsage.title', 'Cache usage')}>
+      <SessionPluginPanelHeader
+        title={t('session.cacheUsage.title', 'Cache usage')}
+        subtitle={session.name || session.path}
+        actions={
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={pending}
+            className={`${sessionPluginPanelIconButtonClass} disabled:cursor-not-allowed disabled:opacity-40`}
+            aria-label={t('session.cacheUsage.refresh', 'Refresh cache usage')}
+            title={t('session.cacheUsage.refresh', 'Refresh cache usage')}
+          >
+            ↻
+          </button>
+        }
+        onClose={onClose}
+        closeLabel={t('session.cacheUsage.close', 'Close cache usage panel')}
       />
 
-      <header className="border-b border-border/70 px-3 py-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
-              {t('session.cacheUsage.title', 'Cache usage')}
-            </div>
-            <div className="mt-1 truncate text-xs text-muted-foreground">{session.name || session.path}</div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={() => void handleRefresh()}
-              className={iconButtonClass()}
-              aria-label={t('session.cacheUsage.refresh', 'Refresh cache usage')}
-              title={t('session.cacheUsage.refresh', 'Refresh cache usage')}
-            >
-              ↻
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className={iconButtonClass()}
-              aria-label={t('session.cacheUsage.close', 'Close cache usage panel')}
-            >
-              ×
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 flex items-end justify-between gap-3">
+      <div className="border-b border-border/70 px-3 py-3">
+        <div className="flex items-end justify-between gap-3">
           <div>
             <div className="text-[11px] text-muted-foreground">{branchTitle}</div>
-            <div className="mt-0.5 text-3xl font-semibold tracking-tight text-foreground">{formatPercent(latestHitRate, language)}</div>
+            <div className="mt-0.5 text-3xl font-semibold tracking-tight text-foreground">{latestHitRate === undefined ? '—' : formatPercent(latestHitRate, language)}</div>
           </div>
           <div className={`border-l-2 px-3 py-1 text-right ${spreadTone}`}>
-            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{t('session.cacheUsage.spread', 'Spread')}</div>
-            <div className="mt-1 font-mono text-sm text-foreground">{branchSpread > 0 ? '+' : ''}{formatPercent(branchSpread, language)}</div>
+            <div className="text-xs font-medium text-muted-foreground">{t('session.cacheUsage.spread', 'Spread')}</div>
+            <div className="mt-1 font-mono text-sm text-foreground">{stats ? `${branchSpread > 0 ? '+' : ''}${formatPercent(branchSpread, language)}` : '—'}</div>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-border/60 pt-3 text-xs">
+        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border/60 pt-3 text-xs">
           <div className={`border-l-2 px-2 ${treeHitTone}`}>
             <div className="text-muted-foreground">{t('session.cacheUsage.wholeTree', 'Whole tree')}</div>
-            <div className="mt-0.5 font-mono text-foreground">{formatPercent(treeHitRate, language)}</div>
+            <div className="mt-0.5 font-mono text-foreground">{treeHitRate === undefined ? '—' : formatPercent(treeHitRate, language)}</div>
           </div>
           <div className="border-l-2 border-border px-2">
-            <div className="text-muted-foreground">{t('session.cacheUsage.cost.recorded', 'Recorded cost')}</div>
-            <div className="mt-0.5"><CostValue value={stats?.treeTotals.cost.total ?? 0} knownMessages={stats?.treeTotals.cost.knownMessages ?? 0} unknownMessages={stats?.treeTotals.cost.unknownMessages ?? 0} locale={language} t={t} /></div>
+            <div className="text-muted-foreground">{t('session.cacheUsage.stats.promptTotal', 'Prompt total')}</div>
+            <div className="mt-0.5 font-mono text-foreground">{stats ? formatInt(stats.activeBranchTotals.promptTotal, language) : '—'}</div>
+          </div>
+          <div className="border-l-2 border-primary/70 px-2">
+            <div className="text-muted-foreground">{t('session.cacheUsage.stats.cacheRead', 'Cache hit')}</div>
+            <div className="mt-0.5 font-mono text-foreground">{stats ? formatInt(stats.activeBranchTotals.cacheRead, language) : '—'}</div>
+          </div>
+          <div className="border-l-2 border-warning/80 px-2">
+            <div className="text-muted-foreground">{t('session.cacheUsage.stats.cacheWrite', 'Cache write')}</div>
+            <div className="mt-0.5 font-mono text-foreground">{stats ? formatInt(stats.activeBranchTotals.cacheWrite, language) : '—'}</div>
           </div>
         </div>
 
-        <div className="mt-3 flex items-center gap-2 text-[10px] text-muted-foreground">
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
           <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
           <span>{t('session.cacheUsage.formula', 'cacheRead / (input + cacheRead + cacheWrite)')}</span>
+          {lastUpdatedAt ? (
+            <span className="ml-auto">{t('session.cacheUsage.updated', 'Updated {{time}}', { time: formatTimestamp(lastUpdatedAt.toISOString(), language) })}</span>
+          ) : null}
         </div>
-      </header>
+      </div>
 
-      <nav className="flex shrink-0 items-center gap-2 border-b border-border/70 px-3" aria-label={t('session.cacheUsage.title', 'Cache usage')}>
-        <button type="button" onClick={() => setActiveTab('overview')} className={tabButtonClass(activeTab === 'overview')}>{t('session.cacheUsage.tabs.overview', 'Overview')}</button>
-        <button type="button" onClick={() => setActiveTab('trend')} className={tabButtonClass(activeTab === 'trend')}>{t('session.cacheUsage.tabs.trend', 'Trend')}</button>
-        <button type="button" onClick={() => setActiveTab('stats')} className={tabButtonClass(activeTab === 'stats')}>{t('session.cacheUsage.tabs.stats', 'Stats')}</button>
-        <button type="button" onClick={() => setActiveTab('recent')} className={tabButtonClass(activeTab === 'recent')}>{t('session.cacheUsage.tabs.recent', 'Recent')}</button>
+      <nav className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-border/70 px-3" aria-label={t('session.cacheUsage.title', 'Cache usage')}>
+        <button type="button" onClick={() => setActiveTab('overview')} aria-pressed={activeTab === 'overview'} className={tabButtonClass(activeTab === 'overview')}>{t('session.cacheUsage.tabs.overview', 'Overview')}</button>
+        <button type="button" onClick={() => setActiveTab('trend')} aria-pressed={activeTab === 'trend'} className={tabButtonClass(activeTab === 'trend')}>{t('session.cacheUsage.tabs.trend', 'Trend')}</button>
+        <button type="button" onClick={() => setActiveTab('stats')} aria-pressed={activeTab === 'stats'} className={tabButtonClass(activeTab === 'stats')}>{t('session.cacheUsage.tabs.stats', 'Stats')}</button>
+        <button type="button" onClick={() => setActiveTab('recent')} aria-pressed={activeTab === 'recent'} className={tabButtonClass(activeTab === 'recent')}>{t('session.cacheUsage.tabs.recent', 'Recent')}</button>
       </nav>
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        {loading ? (
-          <div className="px-3 py-4 text-sm text-muted-foreground">{t('session.cacheUsage.loading', 'Loading cache usage...')}</div>
-        ) : error ? (
-          <div className="m-3 border-l-2 border-destructive px-3 py-2 text-sm text-destructive">{error}</div>
+      {refreshing || (error && stats) ? (
+        <div className={`flex min-h-8 shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5 text-xs ${error ? 'border-destructive/30 bg-destructive/5 text-destructive' : 'border-border/70 bg-primary/5 text-muted-foreground'}`} role="status">
+          <span>{error ? t('session.cacheUsage.refreshFailed', 'Refresh failed: {{message}}', { message: error }) : t('session.cacheUsage.refreshing', 'Refreshing cache usage...')}</span>
+          {error ? <button type="button" onClick={handleRefresh} className="border border-current/30 px-2 py-1 text-[11px] hover:bg-background/40">{t('session.cacheUsage.retry', 'Retry')}</button> : null}
+        </div>
+      ) : null}
+
+      <SessionPluginPanelBody className="p-0" aria-busy={pending}>
+        {initialLoading ? (
+          <SessionPluginPanelState className="m-3" role="status">{t('session.cacheUsage.loading', 'Loading cache usage...')}</SessionPluginPanelState>
+        ) : error && !stats ? (
+          <SessionPluginPanelState tone="error" className="m-3" role="alert">
+            <p>{error}</p>
+            <button type="button" onClick={handleRefresh} className="mt-2 border border-current/30 px-2 py-1 text-xs hover:bg-destructive/5">{t('session.cacheUsage.retry', 'Retry')}</button>
+          </SessionPluginPanelState>
         ) : !stats || stats.assistantMessages === 0 ? (
-          <div className="m-3 border-l-2 border-border px-3 py-3 text-sm text-muted-foreground">
+          <SessionPluginPanelState className="m-3" role="status">
             <p>{t('session.cacheUsage.empty', 'No assistant usage metrics found in this session.')}</p>
             <p className="mt-2 text-xs text-muted-foreground/80">{branchHint}</p>
-          </div>
+          </SessionPluginPanelState>
         ) : activeTab === 'overview' ? (
           <div className="space-y-4 px-3 py-4">
             <section className="border-b border-border/70 pb-4">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{t('session.cacheUsage.overview.signals', 'Signals')}</div>
+                <div className="text-xs font-medium text-muted-foreground">{t('session.cacheUsage.overview.signals', 'Signals')}</div>
                 <div className="font-mono text-[11px] text-muted-foreground">{formatInt(stats.insights.length, language)}</div>
               </div>
               {stats.insights.length > 0 ? (
@@ -792,13 +775,13 @@ export function CacheUsagePanel({
           <div className="space-y-4 px-3 py-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{t('session.cacheUsage.tabs.trend', 'Trend')}</div>
+                <div className="text-xs font-medium text-muted-foreground">{t('session.cacheUsage.tabs.trend', 'Trend')}</div>
                 <div className="mt-1 text-xs text-muted-foreground">{t('session.cacheUsage.summary.assistantTurns', 'Assistant turns')}: {formatInt(stats.messages.length, language)}</div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <button type="button" onClick={() => setTrendView('per-turn')} className={tabButtonClass(trendView === 'per-turn')}>{t('session.cacheUsage.views.perTurn', 'Per-turn %')}</button>
-                <button type="button" onClick={() => setTrendView('cumulative-percent')} className={tabButtonClass(trendView === 'cumulative-percent')}>{t('session.cacheUsage.views.cumulativePercent', 'Cum %')}</button>
-                <button type="button" onClick={() => setTrendView('cumulative-total')} className={tabButtonClass(trendView === 'cumulative-total')}>{t('session.cacheUsage.views.cumulativeTotal', 'Cum total')}</button>
+                <button type="button" onClick={() => setTrendView('per-turn')} aria-pressed={trendView === 'per-turn'} className={tabButtonClass(trendView === 'per-turn')}>{t('session.cacheUsage.views.perTurn', 'Per-turn %')}</button>
+                <button type="button" onClick={() => setTrendView('cumulative-percent')} aria-pressed={trendView === 'cumulative-percent'} className={tabButtonClass(trendView === 'cumulative-percent')}>{t('session.cacheUsage.views.cumulativePercent', 'Cum %')}</button>
+                <button type="button" onClick={() => setTrendView('cumulative-total')} aria-pressed={trendView === 'cumulative-total'} className={tabButtonClass(trendView === 'cumulative-total')}>{t('session.cacheUsage.views.cumulativeTotal', 'Cum total')}</button>
               </div>
             </div>
 
@@ -839,7 +822,7 @@ export function CacheUsagePanel({
         ) : (
           <div className="px-3 py-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{t('session.cacheUsage.recentTurns', 'Recent {{count}} turns', { count: recentMessages.length })}</div>
+              <div className="text-xs font-medium text-muted-foreground">{t('session.cacheUsage.recentTurns', 'Recent {{count}} turns', { count: recentMessages.length })}</div>
               <div className="font-mono text-[11px] text-muted-foreground">{formatInt(recentMessages.length, language)}</div>
             </div>
             {recentMessages.length > 0 ? (
@@ -883,7 +866,7 @@ export function CacheUsagePanel({
             )}
           </div>
         )}
-      </div>
-    </div>
+      </SessionPluginPanelBody>
+    </SessionPluginPanel>
   )
 }

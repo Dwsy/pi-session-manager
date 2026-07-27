@@ -88,7 +88,13 @@ function TintinwebResultCard({
   const ok = isCompleted && !isError
 
   return (
-    <button className="subagent-result-card" onClick={onOpenDetails}>
+    <button
+      type="button"
+      className="subagent-result-card"
+      onClick={onOpenDetails}
+      aria-haspopup="dialog"
+      aria-label={`Open details for ${details.displayName}`}
+    >
       <div className="subagent-result-header">
         <span className={`subagent-status-dot ${ok ? 'success' : isError ? 'error' : 'warning'}`} />
         <span
@@ -163,7 +169,13 @@ function ResultCard({
   const ps = result.progressSummary
 
   return (
-    <button className="subagent-result-card" onClick={onClick}>
+    <button
+      type="button"
+      className="subagent-result-card"
+      onClick={onClick}
+      aria-haspopup="dialog"
+      aria-label={`Open details for ${result.agent}`}
+    >
       <div className="subagent-result-header">
         <span className={`subagent-status-dot ${ok ? 'success' : 'error'}`} />
         <span
@@ -245,7 +257,13 @@ function SubagentToolCall({
 
   if (toolState.kind === 'hazat-started') {
     return (
-      <div className="subagent-tool-call subagent-pending" id={entryId ? `entry-${entryId}` : undefined}>
+      <div
+        className="subagent-tool-call subagent-pending"
+        id={entryId ? `entry-${entryId}` : undefined}
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
         <div className="subagent-header">
           <div className="subagent-title">
             <Loader2 size={16} className="subagent-icon spinning" />
@@ -266,7 +284,13 @@ function SubagentToolCall({
     const modeLabel = toolState.details.mode === 'parallel' ? 'Parallel' : toolState.details.mode === 'chain' ? 'Chain' : 'Single'
 
     return (
-      <div className="subagent-tool-call subagent-pending" id={entryId ? `entry-${entryId}` : undefined}>
+      <div
+        className="subagent-tool-call subagent-pending"
+        id={entryId ? `entry-${entryId}` : undefined}
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
         <div className="subagent-header">
           <div className="subagent-title">
             <Loader2 size={16} className="subagent-icon spinning" />
@@ -358,6 +382,9 @@ function SubagentToolCall({
       <div
         className={`subagent-tool-call ${toolState.isPending ? 'subagent-pending' : ''}`}
         id={entryId ? `entry-${entryId}` : undefined}
+        role="status"
+        aria-live="polite"
+        aria-busy={toolState.isPending}
       >
         <div className="subagent-header">
           <div className="subagent-title">

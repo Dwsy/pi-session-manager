@@ -131,6 +131,8 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
   const [visibleCount, setVisibleCount] = useState(0)
   const [progressiveRendering, setProgressiveRendering] = useState(false)
   const backdropRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null)
   const depthRef = useRef(0)
   const closeTimerRef = useRef<number | null>(null)
   const progressiveTimerRef = useRef<number | null>(null)
@@ -155,6 +157,18 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
     modalDepth++
     depthRef.current = modalDepth
     return () => { modalDepth-- }
+  }, [])
+
+  useEffect(() => {
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    const frame = requestAnimationFrame(() => dialogRef.current?.focus())
+    return () => {
+      cancelAnimationFrame(frame)
+      previouslyFocusedRef.current?.focus()
+      previouslyFocusedRef.current = null
+    }
   }, [])
 
   // Lock body scroll
@@ -216,6 +230,10 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
       if (e.key === 'Escape') {
         e.stopImmediatePropagation()
         handleClose()
+        return
+      }
+      if (e.key === 'Tab') {
+        trapFocusWithinSubagentDialog(e, dialogRef.current)
         return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 't') {
@@ -355,10 +373,12 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
       style={{ zIndex: 1000 + depthRef.current }}
     >
       <div
+        ref={dialogRef}
         className="subagent-modal"
         role="dialog"
         aria-modal="true"
-        aria-label={t('components.subagent.modalTitle', 'Subagent Session Details')}
+        aria-labelledby="subagent-modal-title"
+        tabIndex={-1}
       >
         {/* Header */}
         <div className="subagent-modal-header">
@@ -368,7 +388,7 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
               : <AlertCircle size={18} className="subagent-icon error" />
             }
             <Bot size={18} />
-            <span className="subagent-modal-agent">{result.agent}</span>
+            <span id="subagent-modal-title" className="subagent-modal-agent">{result.agent}</span>
             {result.model && <span className="subagent-modal-model">{result.model}</span>}
           </div>
 
@@ -412,7 +432,13 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
             )}
           </div>
 
-          <button className="subagent-modal-close" onClick={handleClose} title={t('components.subagent.close')}>
+          <button
+            type="button"
+            className="subagent-modal-close"
+            onClick={handleClose}
+            aria-label={t('components.subagent.close')}
+            title={t('components.subagent.close')}
+          >
             <X size={18} />
           </button>
         </div>
@@ -425,16 +451,20 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
           </div>
           <div className="subagent-modal-toolbar-actions">
             <button
+              type="button"
               className={`subagent-toolbar-btn ${showThinking ? 'active' : ''}`}
               onClick={toggleThinking}
+              aria-pressed={showThinking}
               title={showThinking ? t('components.subagent.hideThinking') : t('components.subagent.showThinking')}
             >
               {showThinking ? <Eye size={14} /> : <EyeOff size={14} />}
               <span>{t('components.subagent.thinking')}</span>
             </button>
             <button
+              type="button"
               className={`subagent-toolbar-btn ${toolsExpanded ? 'active' : ''}`}
               onClick={toggleToolsExpanded}
+              aria-pressed={toolsExpanded}
               title={toolsExpanded ? t('components.subagent.collapseTools') : t('components.subagent.expandTools')}
             >
               <ChevronsUpDown size={14} />
@@ -446,7 +476,7 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
         {/* Content */}
         <div className="subagent-modal-content">
           {loading && (
-            <div className="subagent-modal-loading-block">
+            <div className="subagent-modal-loading-block" role="status" aria-live="polite">
               <div className="subagent-modal-loading">
                 <div className="subagent-spinner" />
                 {t('components.subagent.loadingSession', 'Loading subagent session…')}
@@ -460,14 +490,14 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
           )}
 
           {error && !loading && (
-            <div className="subagent-modal-error">
+            <div className="subagent-modal-error" role="alert">
               <AlertCircle size={16} />
               {error}
             </div>
           )}
 
           {!loading && !error && entries.length === 0 && (
-            <div className="subagent-modal-empty">
+            <div className="subagent-modal-empty" role="status">
               {t('components.subagent.noEntries', 'No entries found in subagent session.')}
             </div>
           )}
@@ -501,6 +531,7 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
                     <span style={{ width: `${progressRatio * 100}%` }} />
                   </div>
                   <button
+                    type="button"
                     className="subagent-render-progress-btn"
                     onClick={handleRenderAllNow}
                   >
@@ -515,6 +546,33 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
     </div>,
     document.body
   )
+}
+
+function trapFocusWithinSubagentDialog(
+  event: KeyboardEvent,
+  dialog: HTMLElement | null,
+): void {
+  if (!dialog) return
+  const focusable = Array.from(
+    dialog.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])',
+    ),
+  )
+  if (focusable.length === 0) {
+    event.preventDefault()
+    dialog.focus()
+    return
+  }
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  const active = document.activeElement
+  if (event.shiftKey && (active === first || !dialog.contains(active))) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault()
+    first.focus()
+  }
 }
 
 export default function SubagentModal(props: SubagentModalProps) {

@@ -12,25 +12,25 @@ export function ModelConfigFeedbackToast({
 }) {
   const palette = {
     success:
-      "border-green-500/35 bg-card/95 text-green-800 shadow-lg dark:text-green-200",
-    error: "border-red-500/35 bg-card/95 text-red-800 shadow-lg dark:text-red-200",
+      "border-success/30 bg-card text-success shadow-md",
+    error: "border-destructive/30 bg-card text-destructive shadow-md",
     warning:
-      "border-amber-500/35 bg-card/95 text-amber-900 shadow-lg dark:text-amber-100",
-    info: "border-blue-500/35 bg-card/95 text-blue-900 shadow-lg dark:text-blue-100",
+      "border-warning/30 bg-card text-warning shadow-md",
+    info: "border-info/30 bg-card text-info shadow-md",
   } as const;
 
   const icons = {
-    success: <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />,
-    error: <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-400" />,
+    success: <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />,
+    error: <AlertCircle className="h-3.5 w-3.5 shrink-0 text-destructive" />,
     warning: (
-      <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+      <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warning" />
     ),
-    info: <Info className="h-3.5 w-3.5 shrink-0 text-blue-600 dark:text-blue-400" />,
+    info: <Info className="h-3.5 w-3.5 shrink-0 text-info" />,
   };
 
   return (
     <div
-      className={`pointer-events-auto fixed right-3 top-[calc(env(safe-area-inset-top)+12px)] z-[90] w-[min(380px,calc(100vw-24px))] rounded-lg border px-3 py-2 text-xs backdrop-blur-md ${palette[tone]}`}
+      className={`pointer-events-auto fixed right-3 top-[calc(env(safe-area-inset-top)+12px)] z-[90] w-[min(380px,calc(100vw-24px))] rounded-md border px-3 py-2 text-xs ${palette[tone]}`}
       role="status"
     >
       <div className="flex items-start gap-2">

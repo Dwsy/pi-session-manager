@@ -317,7 +317,7 @@ export default function Dashboard({
       {/* Header */}
       <div className="flex items-center justify-between mb-4 gap-2">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg md:text-2xl font-bold text-gradient mb-0.5 truncate">
+          <h1 className="mb-0.5 truncate text-lg font-semibold text-foreground md:text-xl">
             {projectName ? (
               <>
                 {t("dashboard.title")} -{" "}
@@ -336,10 +336,10 @@ export default function Dashboard({
         <button
           onClick={loadStats}
           disabled={isRefreshing}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 md:gap-2 md:px-3 md:py-2 glass-card rounded-lg text-xs motion-surface motion-color motion-press focus-ring hover:scale-105 group flex-shrink-0"
+          className="flex h-8 flex-shrink-0 items-center gap-1.5 rounded border border-border/60 bg-card/45 px-2.5 text-xs text-muted-foreground motion-surface hover:bg-card/70 hover:text-foreground focus-ring md:gap-2 md:px-3"
         >
           <RefreshCw
-            className={`h-3.5 w-3.5 motion-transform ${isRefreshing ? "animate-spin" : "group-hover:rotate-180"}`}
+            className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
           />
           <span className="hidden md:inline">{t("common.refresh")}</span>
         </button>

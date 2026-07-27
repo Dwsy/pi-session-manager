@@ -15,14 +15,14 @@ export default function SettingsOptionButton({
   active,
   children,
   className = '',
-  activeClassName = 'border-transparent text-foreground settings-accent-bg-soft settings-accent-ring',
+  activeClassName = 'border-primary/40 bg-primary/10 text-foreground',
   inactiveClassName = 'border-border text-muted-foreground hover:border-border-hover',
   ...props
 }: SettingsOptionButtonProps) {
   return (
     <button
       type="button"
-      className={`rounded-lg border text-sm motion-surface motion-color motion-press focus-ring ${
+      className={`focus-ring rounded-md border text-sm motion-color ${
         active ? activeClassName : inactiveClassName
       } ${className}`}
       {...props}

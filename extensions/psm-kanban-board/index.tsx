@@ -7,6 +7,12 @@ import type {
 } from '@pi-session-manager/plugin-sdk'
 
 import type { AppPluginSurfaceData } from '@/components/app/AppPluginSurfaceData'
+import {
+  AppPluginSidebarBody,
+  AppPluginSidebarHeader,
+  AppPluginSidebarShell,
+  AppPluginSidebarState,
+} from '@/components/app/AppPluginSidebarShell'
 
 import { manifest } from './manifest'
 import WorkspacePanel from './WorkspacePanel'
@@ -98,13 +104,24 @@ function KanbanSidebarView({
 }: PsmAppSidebarViewRenderProps<KanbanSidebarData> & { workspaceStore: KanbanWorkspaceStore }) {
   if (!isKanbanSidebarData(data)) {
     return (
-      <div className="h-full flex items-center justify-center px-3 text-xs text-muted-foreground">
-        Kanban sidebar data unavailable
-      </div>
+      <AppPluginSidebarShell label="Kanban">
+        <AppPluginSidebarHeader title="Kanban" subtitle="Workspaces" />
+        <AppPluginSidebarState role="status">Kanban sidebar data unavailable</AppPluginSidebarState>
+      </AppPluginSidebarShell>
     )
   }
 
-  return <WorkspacePanel data={data} workspaceStore={workspaceStore} />
+  return (
+    <AppPluginSidebarShell label="Kanban">
+      <AppPluginSidebarHeader
+        title="Kanban"
+        subtitle="Workspaces and project filters"
+      />
+      <AppPluginSidebarBody className="overflow-hidden p-0">
+        <WorkspacePanel data={data} workspaceStore={workspaceStore} />
+      </AppPluginSidebarBody>
+    </AppPluginSidebarShell>
+  )
 }
 
 export default function activate(ctx: PsmPluginHostContext) {

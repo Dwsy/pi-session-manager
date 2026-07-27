@@ -7,11 +7,17 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { useSessionView } from '@/contexts/SessionViewContext'
 import { highlightSearchInHTML } from '@/utils/search'
 import CodeBlock from '@/components/ui/CodeBlock'
+import ToolHeader from '@/components/tool-calls/ToolHeader'
+import ToolSectionHeader from '@/components/tool-calls/ToolSectionHeader'
+import { useClipboard } from '@/hooks/useClipboard'
+import { useSettings } from '@/hooks/useSettings'
+import { getToolStatusLabel, type ToolRenderStatus } from '@/plugins/tools-render/utils/status'
 
 interface WriteExecutionProps {
   filePath: string
   content: string
   output?: string
+  hasResult?: boolean
   entryId: string
   searchQuery?: string
 }
@@ -22,14 +28,16 @@ export default function WriteExecution({
   filePath,
   content,
   output,
+  hasResult = true,
   entryId,
   searchQuery = '',
 }: WriteExecutionProps) {
   const { t } = useTranslation()
+  const { settings } = useSettings()
+  const { copyText } = useClipboard()
   const isMobile = useIsMobile()
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const expanded = isToolExpanded(entryId)
-
   const lang = getLanguageFromPath(filePath)
   const displayPath = isMobile ? shortenPath(filePath) : filePath
   const desktopPathStyle: CSSProperties | undefined = isMobile
@@ -43,67 +51,78 @@ export default function WriteExecution({
       }
   const lines = content.split('\n')
   const highlightedOutput = useMemo(() => {
-    if (!output) {
-      return ''
-    }
-
+    if (!output) return ''
     const escapedOutput = escapeHtml(output)
     return searchQuery
       ? highlightSearchInHTML(escapedOutput, searchQuery)
       : escapedOutput
   }, [output, searchQuery])
+  const status: ToolRenderStatus = hasResult ? 'success' : 'pending'
+  const statusClass = status === 'success' && settings.appearance.disableToolSuccessStyle
+    ? ''
+    : status
+  const statusLabel = getToolStatusLabel(status, t)
 
   return (
-    <div className="tool-execution success" id={`entry-${entryId}`}>
-      <div
-        className="tool-header select-none"
-        onClick={() => toggleToolExpanded(entryId)}
+    <div className={`tool-execution ${statusClass}`.trim()} id={`entry-${entryId}`}>
+      <ToolHeader
+        expandable={Boolean(content || output)}
+        expanded={expanded}
+        onToggle={() => toggleToolExpanded(entryId)}
+        ariaLabel={`Write: ${statusLabel}`}
       >
-        <span className="tool-expand-indicator">
+        <span className="tool-expand-indicator" aria-hidden="true">
           {expanded ? '▾' : '▸'}
         </span>
-        <div className="tool-header-meta">
-          <span className="tool-name">
-            <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Write
-          </span>
-        </div>
-        <span className="tool-path" style={desktopPathStyle}>{escapeHtml(displayPath)}</span>
-        <span className="tool-meta">({lines.length} {t('components.writeExecution.lines')})</span>
-      </div>
+        <span className="tool-header-meta"><span className="tool-name">Write</span></span>
+        <span className="tool-path" style={desktopPathStyle}>{displayPath}</span>
+        <span className="tool-detail">{lines.length} {t('components.writeExecution.lines')}</span>
+        <span className={`tool-status tool-status-${status}`}>{statusLabel}</span>
+      </ToolHeader>
 
-      {content && (
+      {content ? (
         <div className={`tool-output-wrapper collapsible ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
-            {expanded && (
+            {expanded ? (
               <div className="tool-output">
+                <ToolSectionHeader
+                  label={t('components.toolCall.content', 'Content')}
+                  text={content}
+                  copyText={copyText}
+                />
                 <CodeBlock
                   code={content}
                   language={lang}
-                  showLineNumbers={true}
+                  showLineNumbers
                   scrollable
                   maxHeight={OUTPUT_MAX_HEIGHT}
                   searchQuery={searchQuery}
                 />
               </div>
-            )}
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {output && (
+      {output ? (
         <div className={`tool-output-wrapper collapsible ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
-            {expanded && (
+            {expanded ? (
               <div className="tool-output">
-                <div dangerouslySetInnerHTML={{ __html: highlightedOutput }} />
+                <ToolSectionHeader
+                  label={t('components.toolCall.output', 'Output')}
+                  text={output}
+                  copyText={copyText}
+                />
+                <pre
+                  className="tool-output-plain"
+                  dangerouslySetInnerHTML={{ __html: highlightedOutput }}
+                />
               </div>
-            )}
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

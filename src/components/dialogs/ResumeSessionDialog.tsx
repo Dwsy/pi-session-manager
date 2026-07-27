@@ -74,16 +74,19 @@ export default function ResumeSessionDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
-        className={`bg-background border border-border rounded-xl p-6 shadow-2xl ${
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="resume-session-title"
+        className={`border border-border bg-background p-5 shadow-xl rounded-lg ${
           isMobile ? "w-[95vw] max-w-md" : "w-[32rem]"
         }`}
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Play className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">
+            <h3 id="resume-session-title" className="text-base font-semibold">
               {mode === "copy"
                 ? t(
                     "session.resumeDialog.copyTitle",
@@ -94,14 +97,14 @@ export default function ResumeSessionDialog({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label={t("common.close")}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="mb-4 rounded-lg border border-border/60 bg-secondary/30 px-3 py-2 text-sm">
+        <div className="mb-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
           <div className="font-medium truncate">
             {getSessionListDisplayName(session, t("session.list.untitled"))}
           </div>
@@ -128,10 +131,10 @@ export default function ResumeSessionDialog({
               type="button"
               onClick={() => handleSubmit(option.slug)}
               disabled={submitting}
-              className={`flex w-full items-start justify-between gap-3 rounded-lg border px-4 py-3 text-left motion-context ${
+              className={`flex w-full items-start justify-between gap-3 rounded-md border px-3 py-2.5 text-left focus-ring ${
                 target === option.slug
                   ? "border-primary/40 bg-primary/10"
-                  : "border-border/60 bg-secondary/20 hover:bg-secondary/50"
+                  : "border-border bg-background hover:bg-muted"
               }`}
             >
               <div className="min-w-0">
@@ -164,7 +167,7 @@ export default function ResumeSessionDialog({
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-2 text-sm rounded-lg border border-border/70 bg-secondary hover:bg-secondary-hover transition-colors"
+            className="focus-ring rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
           >
             {t("common.cancel")}
           </button>

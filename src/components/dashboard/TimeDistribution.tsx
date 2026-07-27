@@ -60,12 +60,11 @@ export default function TimeDistribution({
               <div
                 className={`h-full rounded motion-width ${
                   item.isPeak
-                    ? 'bg-gradient-to-r from-warning to-destructive'
-                    : 'bg-gradient-to-r from-info/60 to-info'
+                    ? 'bg-warning'
+                    : 'bg-info'
                 }`}
                 style={{
-                  width: `${Math.min((item.value / maxValue) * 100, 100)}%`,
-                  boxShadow: item.isPeak ? '0 0 8px rgba(255, 166, 87, 0.4)' : 'none'
+                  width: `${Math.min((item.value / maxValue) * 100, 100)}%`
                 }}
               />
             </div>
@@ -91,7 +90,7 @@ export default function TimeDistribution({
             <div className="w-6 text-right text-[10px] text-muted-foreground">{item.day}</div>
             <div className="flex-1 h-4 bg-background/60 rounded overflow-hidden inner-shadow">
               <div
-                className="h-full bg-gradient-to-r from-success/60 to-success rounded motion-width"
+                className="h-full bg-success rounded motion-width"
                 style={{ width: `${Math.min((item.value / maxValue) * 100, 100)}%` }}
               />
             </div>
@@ -128,7 +127,6 @@ export default function TimeDistribution({
   return (
     <DashboardCardShell
       className={`rounded-lg p-3 ${onClick ? 'cursor-pointer focus-within:ring-2 focus-within:ring-warning/30' : ''}`}
-      overlayClassName="bg-gradient-to-br from-warning/5 via-transparent to-transparent"
     >
       {onClick ? (
         <button type="button" onClick={onClick} className="w-full text-left">

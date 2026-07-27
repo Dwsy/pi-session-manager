@@ -10,6 +10,13 @@ import type {
 } from '@pi-session-manager/plugin-sdk'
 
 import type { AppPluginSurfaceData } from '@/components/app/AppPluginSurfaceData'
+import {
+  AppPluginSidebarBody,
+  AppPluginSidebarControls,
+  AppPluginSidebarHeader,
+  AppPluginSidebarShell,
+  AppPluginSidebarState,
+} from '@/components/app/AppPluginSidebarShell'
 import type { SessionInfo } from '@/types'
 
 const React = hostReact()
@@ -846,41 +853,48 @@ class WordCloudSidebar extends Component<PsmAppSidebarViewRenderProps<AppPluginS
     const projects = projectSummaries(sessions, projectSearch, projectSort)
 
     return (
-      <div className="flex h-full min-h-0 flex-col gap-2 p-2.5 select-none">
-        <div className="px-1 text-xs font-medium text-muted-foreground">Scope</div>
-        <button
-          type="button"
-          onClick={() => setActiveScope({ type: 'global' })}
-          className={`rounded-md border px-2.5 py-1.5 text-left text-sm ${scope.type === 'global' ? 'border-info/40 bg-info/8 text-foreground' : 'border-border/70 text-muted-foreground hover:bg-surface/50 hover:text-foreground'}`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span>Global</span>
-            <span className="font-mono text-xs text-muted-foreground">{sessions.length}</span>
-          </div>
-        </button>
+      <AppPluginSidebarShell label="Word Cloud Filters">
+        <AppPluginSidebarHeader
+          title="Word Cloud"
+          subtitle={scope.type === 'global' ? 'Global scope' : compactPath(scope.projectPath)}
+          meta={`${projects.length} projects`}
+        />
 
-        <div className="grid grid-cols-[minmax(0,1fr)_112px] gap-2">
-          <input
-            value={projectSearch}
-            onChange={(event) => this.setState({ projectSearch: event.currentTarget.value })}
-            placeholder="Search projects"
-            className="h-8 min-w-0 rounded-md border border-border/70 bg-background/60 px-2 text-xs text-foreground outline-none focus:border-info/50"
-          />
-          <select
-            value={projectSort}
-            onChange={(event) => this.setState({ projectSort: event.currentTarget.value as ProjectSortMode })}
-            className="h-8 rounded-md border border-border/70 bg-background/60 px-2 text-xs text-foreground outline-none focus:border-info/50"
+        <AppPluginSidebarControls className="space-y-2 select-none">
+          <button
+            type="button"
+            onClick={() => setActiveScope({ type: 'global' })}
+            aria-pressed={scope.type === 'global'}
+            className={`flex h-8 w-full items-center justify-between rounded-md border px-2.5 text-left text-xs ${scope.type === 'global' ? 'border-info/40 bg-info/8 text-foreground' : 'border-border/70 text-muted-foreground hover:bg-secondary/60 hover:text-foreground'}`}
           >
-            <option value="recent">Recent</option>
-            <option value="sessions">Sessions</option>
-            <option value="messages">Messages</option>
-            <option value="name">A-Z</option>
-          </select>
-        </div>
+            <span>Global</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{sessions.length}</span>
+          </button>
 
-        <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border/70 bg-surface/20">
+          <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2">
+            <input
+              value={projectSearch}
+              onChange={(event) => this.setState({ projectSearch: event.currentTarget.value })}
+              placeholder="Search projects"
+              className="h-8 min-w-0 rounded-md border border-border/70 bg-background px-2 text-xs text-foreground outline-none focus:border-ring/50 focus:ring-2 focus:ring-ring/15"
+            />
+            <select
+              value={projectSort}
+              onChange={(event) => this.setState({ projectSort: event.currentTarget.value as ProjectSortMode })}
+              className="h-8 rounded-md border border-border/70 bg-background px-2 text-xs text-foreground outline-none focus:border-ring/50"
+              aria-label="Sort projects"
+            >
+              <option value="recent">Recent</option>
+              <option value="sessions">Sessions</option>
+              <option value="messages">Messages</option>
+              <option value="name">A-Z</option>
+            </select>
+          </div>
+        </AppPluginSidebarControls>
+
+        <AppPluginSidebarBody>
           {projects.length === 0 ? (
-            <div className="p-4 text-center text-xs text-muted-foreground">No projects</div>
+            <AppPluginSidebarState role="status">No projects</AppPluginSidebarState>
           ) : projects.map((project) => {
             const selected = scope.type === 'project' && scope.projectPath === project.dir
             return (
@@ -888,24 +902,25 @@ class WordCloudSidebar extends Component<PsmAppSidebarViewRenderProps<AppPluginS
                 key={project.dir}
                 type="button"
                 onClick={() => setActiveScope({ type: 'project', projectPath: project.dir })}
-                className={`block w-full border-b border-border/10 px-3 py-2 text-left ${selected ? 'bg-info/10 text-foreground' : 'text-muted-foreground hover:bg-background hover:text-foreground'}`}
+                aria-pressed={selected}
+                className={`block w-full border-b border-border/50 px-3 py-2 text-left ${selected ? 'bg-info/8 text-foreground' : 'text-muted-foreground hover:bg-secondary/55 hover:text-foreground'}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{project.name}</div>
-                    <div className="mt-1 truncate font-mono text-xs opacity-80">{compactPath(project.dir)}</div>
+                    <div className="truncate text-xs font-medium">{project.name}</div>
+                    <div className="mt-0.5 truncate font-mono text-[10px] opacity-80">{compactPath(project.dir)}</div>
                   </div>
-                  <div className="shrink-0 text-right font-mono text-[11px] opacity-70">{relativeTime(project.lastModified)}</div>
+                  <div className="shrink-0 text-right font-mono text-[10px] opacity-70">{relativeTime(project.lastModified)}</div>
                 </div>
-                <div className="mt-2 flex gap-2 text-[11px] opacity-80">
-                  <span className="rounded bg-muted/40 px-1.5 py-0.5">{project.sessionCount} sessions</span>
-                  <span className="rounded bg-muted/40 px-1.5 py-0.5">{project.messageCount} messages</span>
+                <div className="mt-1.5 flex gap-3 text-[10px] opacity-80">
+                  <span>{project.sessionCount} sessions</span>
+                  <span>{project.messageCount} messages</span>
                 </div>
               </button>
             )
           })}
-        </div>
-      </div>
+        </AppPluginSidebarBody>
+      </AppPluginSidebarShell>
     )
   }
 }

@@ -205,7 +205,7 @@ export default function SessionSortSelect({
             closeMenu()
           }
         }}
-        className={`inline-flex items-center rounded-md border border-border/60 bg-secondary/40 text-muted-foreground outline-none transition-colors hover:border-border/80 hover:bg-secondary/70 hover:text-foreground focus:ring-1 focus:ring-border/70 ${showValueLabel ? 'gap-1.5' : 'justify-center'} ${showValueLabel ? (compact ? 'h-7 min-w-[98px] px-2 text-[11px]' : 'h-8 min-w-[112px] px-2.5 text-xs') : (compact ? 'h-7 w-7' : 'h-8 w-8')}`}
+        className={`inline-flex items-center rounded-md border border-border/70 bg-background text-muted-foreground outline-none transition-colors hover:border-border hover:bg-secondary/55 hover:text-foreground focus-visible:border-ring/50 focus-visible:ring-2 focus-visible:ring-ring/15 ${showValueLabel ? 'gap-1.5' : 'justify-center'} ${showValueLabel ? (compact ? 'h-7 min-w-[98px] px-2 text-[11px]' : 'h-8 min-w-[112px] px-2.5 text-xs') : (compact ? 'h-7 w-7' : 'h-8 w-8')}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t('session.sort.label', { defaultValue: 'Sort sessions' })}
@@ -224,7 +224,7 @@ export default function SessionSortSelect({
       <button
         type="button"
         onClick={handleToggleOrder}
-        className={`${compact ? 'h-7 w-7' : 'h-8 w-8'} inline-flex items-center justify-center rounded-md border border-border/60 bg-secondary/40 text-muted-foreground outline-none transition-colors hover:border-border/80 hover:bg-secondary/70 hover:text-foreground focus:ring-1 focus:ring-border/70`}
+        className={`${compact ? 'h-7 w-7' : 'h-8 w-8'} inline-flex items-center justify-center rounded-md border border-border/70 bg-background text-muted-foreground outline-none transition-colors hover:border-border hover:bg-secondary/55 hover:text-foreground focus-visible:border-ring/50 focus-visible:ring-2 focus-visible:ring-ring/15`}
         aria-label={directionActionLabel}
         title={directionActionLabel}
       >
@@ -282,9 +282,9 @@ export default function SessionSortSelect({
             transform: menuPosition.transform,
             transformOrigin: menuPosition.transformOrigin,
           }}
-          className="z-[70] w-[164px] max-w-[calc(100vw-16px)] rounded-lg border border-border/70 bg-popover p-1 shadow-xl"
+          className="session-sort-menu z-[70] w-[172px] max-w-[calc(100vw-16px)]"
         >
-          <div className="px-2 pb-1 pt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/75">
+          <div className="session-sort-menu__label">
             {t('session.sort.label', { defaultValue: 'Sort sessions' })}
           </div>
           {SORT_OPTIONS.map((option, index) => {
@@ -305,7 +305,7 @@ export default function SessionSortSelect({
                 }}
                 role="menuitemradio"
                 aria-checked={active}
-                className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-[11px] motion-color motion-press focus-ring ${active ? 'bg-secondary text-foreground' : highlighted ? 'bg-secondary/60 text-foreground' : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground'}`}
+                className={`session-sort-menu__item ${active ? 'session-sort-menu__item--active' : highlighted ? 'session-sort-menu__item--highlighted' : ''}`}
               >
                 <span>{t(option.labelKey, { defaultValue: option.fallback })}</span>
                 {active && <Check className="h-3.5 w-3.5 text-primary" />}

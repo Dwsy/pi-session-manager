@@ -65,7 +65,7 @@ export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendC
     if (active && payload && payload.length) {
       const data = payload[0].payload
       return (
-        <div className="bg-background border border-foreground/10 rounded-lg px-3 py-2 text-xs shadow-xl backdrop-blur-sm">
+        <div className="bg-background border border-foreground/10 rounded-lg px-3 py-2 text-xs shadow-xl">
           <div className="text-foreground font-medium mb-1">
             {data.displayDate}
           </div>
@@ -85,7 +85,6 @@ export default function TokenTrendChart({ stats, title, days = 30 }: TokenTrendC
   return (
     <DashboardCardShell
       className="rounded-lg p-3 !border-0"
-      overlayClassName="bg-gradient-to-br from-success/5 via-transparent to-info/5"
     >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">

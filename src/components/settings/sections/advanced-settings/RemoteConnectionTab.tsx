@@ -320,7 +320,7 @@ export default function RemoteConnectionTab() {
             <button
               onClick={handleApply}
               disabled={enabled && !serverUrl.trim()}
-              className="px-4 py-2 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color focus-ring shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {t("settings.advanced.remoteApply", "Apply & Reload")}
             </button>

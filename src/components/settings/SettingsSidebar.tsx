@@ -132,7 +132,7 @@ export default function SettingsSidebar({
   };
 
   return (
-    <div className="w-64 bg-background/95 border-r border-border/70 flex flex-col overflow-y-auto">
+    <div className="flex w-64 flex-col overflow-y-auto border-r border-border bg-background">
       <div className="px-5 py-4 flex-shrink-0">
         <h2 className="text-base font-semibold text-foreground tracking-tight">
           {t("settings.title", "Settings")}
@@ -141,7 +141,7 @@ export default function SettingsSidebar({
 
       <div className="px-3 pb-1 flex-shrink-0">
         <div
-          className="mb-2 grid gap-1 rounded-md bg-surface/60 p-1"
+          className="mb-2 grid overflow-hidden rounded-md border border-border"
           style={{
             gridTemplateColumns: `repeat(${Math.max(settingsAreas.length, 1)}, minmax(0, 1fr))`,
           }}
@@ -150,10 +150,11 @@ export default function SettingsSidebar({
             <button
               key={area.id}
               onClick={() => onAreaChange(area.id)}
-              className={`min-h-[28px] truncate rounded px-2 text-xs font-medium motion-color focus-ring ${
+              aria-pressed={activeArea === area.id}
+              className={`focus-ring min-h-[30px] truncate border-r border-border px-2 text-xs font-medium last:border-r-0 ${
                 activeArea === area.id
-                  ? "settings-accent-bg-strong"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               {t(area.labelKey, area.fallbackLabel)}
@@ -167,7 +168,7 @@ export default function SettingsSidebar({
             value={searchQuery}
             onChange={onSearchChange}
             placeholder={t("settings.searchPlaceholder", "Search settings...")}
-            className="w-full pl-8 pr-3 py-1 text-sm bg-surface/40 border border-border/50 rounded-md text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-transparent focus:settings-accent-ring transition-colors"
+            className="focus-ring w-full rounded-md border border-border bg-background py-1.5 pl-8 pr-8 text-sm text-foreground placeholder:text-muted-foreground"
           />
           {searchQuery && (
             <button
@@ -191,7 +192,7 @@ export default function SettingsSidebar({
               <button
                 key={result.item.id}
                 onClick={() => onNavigateToResult(result)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left motion-surface motion-color motion-press focus-ring hover:bg-surface/80 group"
+                className="group focus-ring flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left hover:bg-muted"
               >
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-foreground truncate">
@@ -211,7 +212,7 @@ export default function SettingsSidebar({
         {/* No search results */}
         {hasNoResults && (
           <div className="px-3 py-8 text-center">
-            <Search className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
+            <Search className="mx-auto mb-2 h-6 w-6 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground/60">
               {t("settings.searchEmpty", "No matching settings")}
             </p>
@@ -234,73 +235,60 @@ export default function SettingsSidebar({
                       children.some((child) => child.id === activeSection);
                     return (
                       <div key={item.id} className="space-y-0.5">
-                        <button
-                          onClick={() => onSectionChange(item.id)}
-                          className={`w-full flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm motion-surface motion-color focus-ring ${
-                            activeSection === item.id
-                              ? "settings-accent-bg-soft text-foreground"
-                              : isActive
-                                ? "text-foreground bg-surface/55"
-                                : "text-muted-foreground hover:text-foreground hover:bg-surface/60"
-                          }`}
-                        >
-                          <span
-                            className={
-                              activeSection === item.id || isActive
-                                ? "settings-accent-fg"
-                                : ""
-                            }
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => onSectionChange(item.id)}
+                            className={`focus-ring flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${
+                              activeSection === item.id
+                                ? "bg-primary/10 text-foreground"
+                                : isActive
+                                  ? "bg-muted/60 text-foreground"
+                                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                            }`}
                           >
-                            {item.icon}
-                          </span>
-                          <span className="flex-1 text-left">
-                            {t(item.labelKey, item.fallbackLabel)}
-                          </span>
+                            <span className={activeSection === item.id || isActive ? "text-primary" : ""}>
+                              {item.icon}
+                            </span>
+                            <span className="flex-1 truncate text-left">
+                              {t(item.labelKey, item.fallbackLabel)}
+                            </span>
+                          </button>
                           {hasChildren && (
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                toggleCollapsed(item.id);
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  toggleCollapsed(item.id);
-                                }
-                              }}
-                              className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-secondary hover:text-foreground"
+                            <button
+                              type="button"
+                              onClick={() => toggleCollapsed(item.id)}
+                              className="focus-ring flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                               aria-label={
                                 isExpanded
                                   ? t("common.collapse", "Collapse")
                                   : t("common.expand", "Expand")
                               }
+                              aria-expanded={isExpanded}
                             >
                               <ChevronRight
                                 className={`h-3.5 w-3.5 motion-transform ${
                                   isExpanded ? "rotate-90" : ""
                                 }`}
                               />
-                            </span>
+                            </button>
                           )}
-                        </button>
+                        </div>
                         {hasChildren && isExpanded && (
                           <div className="space-y-0.5 pl-6">
                             {children.map((child) => (
                               <button
                                 key={child.id}
                                 onClick={() => onSectionChange(child.id)}
-                                className={`w-full flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs motion-surface motion-color focus-ring ${
+                                className={`focus-ring flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs ${
                                   activeSection === child.id
-                                    ? "settings-accent-bg-soft text-foreground"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-surface/60"
+                                    ? "bg-primary/10 text-foreground"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 }`}
                               >
                                 <span
                                   className={
-                                    activeSection === child.id ? "settings-accent-fg" : ""
+                                    activeSection === child.id ? "text-primary" : ""
                                   }
                                 >
                                   {child.icon}

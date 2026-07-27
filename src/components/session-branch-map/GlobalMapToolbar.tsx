@@ -118,6 +118,7 @@ export function GlobalMapToolbar({
             key={scope.value}
             type="button"
             className={settings.scope === scope.value ? "is-active" : ""}
+            aria-pressed={settings.scope === scope.value}
             title={scope.description}
             onClick={() =>
               onSettingsChange({ ...settings, scope: scope.value })

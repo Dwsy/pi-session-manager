@@ -149,6 +149,7 @@ function AssistantMessage({
       {textBlocks.length > 0 && !previewMode && (
         <div className="flex justify-end mt-2">
           <button
+            type="button"
             onClick={handleCopy}
             className="tool-copy-button"
             aria-label={copied ? 'Copied' : 'Copy text'}

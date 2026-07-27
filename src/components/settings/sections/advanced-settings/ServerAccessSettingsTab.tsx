@@ -167,7 +167,7 @@ export default function ServerAccessSettingsTab({
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <button
                   onClick={onSaveServerSettings}
-                  className="px-4 py-2 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring shadow-sm"
+                  className="px-4 py-2 bg-info hover:bg-info/90 text-white text-sm font-medium rounded-lg motion-color focus-ring shadow-sm"
                 >
                   {t("settings.advanced.saveServer", "Save server settings")}
                 </button>

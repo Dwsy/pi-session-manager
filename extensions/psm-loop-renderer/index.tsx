@@ -1,4 +1,7 @@
 import { CheckCircle2, CircleStop, ListChecks, RotateCcw } from 'lucide-react'
+import ToolHeader from '@/components/tool-calls/ToolHeader'
+import ToolSectionHeader from '@/components/tool-calls/ToolSectionHeader'
+import { getToolExecutionClass, getToolRenderStatus, getToolStatusLabel } from '@/plugins/tools-render/utils/status'
 import type {
   PsmPluginHostContext,
   PsmPluginManifest,
@@ -40,14 +43,14 @@ function getResultDetails(data: PsmToolResolvedData): { active?: boolean; taskCo
 }
 
 function LoopToolRenderer({ resolvedData, context }: PsmToolRenderProps) {
-  const { name, args, output, isError, entryId } = resolvedData
-  const { isExpanded, toggleExpanded, disableSuccessStyle } = context
+  const { name, args, output, entryId } = resolvedData
+  const { isExpanded, toggleExpanded, disableSuccessStyle, t, copyToClipboard } = context
+  const status = getToolRenderStatus(resolvedData)
   const tasks = name === 'submit_loop_plan' ? asLoopTasks(args) : []
   const details = getResultDetails(resolvedData)
   const isSignal = name === 'signal_loop_success'
   const ended = isSignal && details.active === false
   const hasDetails = tasks.length > 0 || Boolean(output)
-  const statusClass = isError ? 'error' : disableSuccessStyle ? '' : 'success'
   const title = name === 'submit_loop_plan' ? 'Loop plan' : ended ? 'Loop ended' : 'Loop advanced'
   const summary = name === 'submit_loop_plan'
     ? `${tasks.length} task${tasks.length === 1 ? '' : 's'}`
@@ -55,19 +58,22 @@ function LoopToolRenderer({ resolvedData, context }: PsmToolRenderProps) {
   const Icon = name === 'submit_loop_plan' ? ListChecks : ended ? CircleStop : CheckCircle2
 
   return (
-    <div className={`tool-execution ${statusClass}`.trim()} id={`entry-${entryId}`}>
-      <div
-        className={`tool-header ${hasDetails ? 'select-none' : ''}`}
-        onClick={hasDetails ? toggleExpanded : undefined}
+    <div className={`tool-execution ${getToolExecutionClass(resolvedData, disableSuccessStyle)}`.trim()} id={`entry-${entryId}`}>
+      <ToolHeader
+        expandable={hasDetails}
+        expanded={isExpanded}
+        onToggle={toggleExpanded}
+        ariaLabel={`${title}: ${getToolStatusLabel(status, t)}`}
       >
         {hasDetails && <span className="tool-expand-indicator">{isExpanded ? '▾' : '▸'}</span>}
         <span className="tool-name inline-flex items-center gap-1.5">
           <Icon className="h-4 w-4" />
           {title}
         </span>
-        <span className="tool-meta">{summary}</span>
-        {details.currentTask !== undefined && <span className="tool-meta">task {details.currentTask}</span>}
-      </div>
+        <span className="tool-detail">{summary}</span>
+        {details.currentTask !== undefined && <span className="tool-detail">task {details.currentTask}</span>}
+        <span className={`tool-status tool-status-${status}`}>{getToolStatusLabel(status, t)}</span>
+      </ToolHeader>
 
       {hasDetails && (
         <div className={`tool-output-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
@@ -76,6 +82,11 @@ function LoopToolRenderer({ resolvedData, context }: PsmToolRenderProps) {
               <div className="space-y-3 p-3 text-sm">
                 {tasks.length > 0 && (
                   <div className="space-y-2">
+                    <ToolSectionHeader
+                      label={t('components.toolCall.plan', 'Plan')}
+                      text={JSON.stringify(tasks, null, 2)}
+                      copyText={copyToClipboard}
+                    />
                     {tasks.map((task, index) => (
                       <div key={`${index}-${task.description}`} className="rounded-md border border-border/60 bg-surface/35 p-2.5">
                         <div className="flex items-start gap-2 font-medium text-foreground">
@@ -96,9 +107,16 @@ function LoopToolRenderer({ resolvedData, context }: PsmToolRenderProps) {
                   </div>
                 )}
                 {output && (
-                  <div className="flex items-start gap-2 rounded-md border border-border/60 bg-background/35 p-2.5 text-muted-foreground">
-                    <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
-                    <span className="whitespace-pre-wrap">{output}</span>
+                  <div className="tool-output">
+                    <ToolSectionHeader
+                      label={t('components.toolCall.output', 'Output')}
+                      text={output}
+                      copyText={copyToClipboard}
+                    />
+                    <div className="flex min-w-0 items-start gap-2 rounded-md border border-border/60 bg-background/35 p-2.5 text-muted-foreground">
+                      <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                      <pre className="tool-output-plain min-w-0 flex-1">{output}</pre>
+                    </div>
                   </div>
                 )}
               </div>

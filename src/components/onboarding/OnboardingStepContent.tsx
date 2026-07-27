@@ -17,26 +17,22 @@ export default function OnboardingStepContent({
 
   return (
     <div className={animationClassName}>
-      <div className="flex items-center justify-center mb-6">
-        <div className="p-5 rounded-2xl bg-surface border border-border">
-          {step.icon}
+      <div className="mb-4 flex items-start gap-3">
+        <div className="mt-0.5 text-muted-foreground">{step.icon}</div>
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-foreground">
+            {t(step.titleKey)}
+          </h2>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+            {t(step.descriptionKey)}
+          </p>
         </div>
       </div>
 
-      <h2 className="text-xl font-bold text-foreground mb-3">
-        {t(step.titleKey)}
-      </h2>
-
-      <p className="text-sm text-muted-foreground leading-relaxed mb-4 max-w-sm mx-auto">
-        {t(step.descriptionKey)}
-      </p>
-
       {step.hintKey && (
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-surface border border-border rounded-lg">
-          <span className="text-xs text-info font-medium">
-            {t(step.hintKey)}
-          </span>
-        </div>
+        <p className="mb-4 border-l-2 border-primary/40 pl-3 text-xs text-muted-foreground">
+          {t(step.hintKey)}
+        </p>
       )}
 
       {children}

@@ -20,19 +20,21 @@ export default function ExportDialog({ session, onExport, onClose }: ExportDialo
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm motion-overlay-enter">
-      <div className={`bg-background border border-border rounded-xl p-6 shadow-2xl motion-overlay-surface-enter ${isMobile ? 'w-[95vw] max-w-md' : 'w-[28rem]'}`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="export-dialog-title" className={`rounded-md border border-border bg-background p-5 shadow-xl ${isMobile ? 'w-[95vw] max-w-md' : 'w-[28rem]'}`}>
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Download className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">
+            <h3 id="export-dialog-title" className="text-lg font-semibold">
               {t('export.dialog.title')}
             </h3>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary motion-color"
+            aria-label={t('common.close', 'Close')}
+            className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
@@ -47,10 +49,10 @@ export default function ExportDialog({ session, onExport, onClose }: ExportDialo
         <div className="space-y-2">
           <button
             onClick={() => handleExport('html')}
-            className={`w-full px-4 py-3 text-left rounded-lg motion-context flex items-start gap-3 group ${
+            className={`focus-ring group flex w-full items-start gap-3 rounded-md border px-3 py-2.5 text-left ${
               defaultFormat === 'html'
-                ? 'bg-primary/10 ring-1 ring-primary/30'
-                : 'bg-secondary hover:bg-secondary/80'
+                ? 'border-primary/40 bg-primary/10'
+                : 'bg-background hover:bg-muted/80'
             }`}
           >
             <FileText className={`h-5 w-5 mt-0.5 flex-shrink-0 ${defaultFormat === 'html' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
@@ -62,10 +64,10 @@ export default function ExportDialog({ session, onExport, onClose }: ExportDialo
 
           <button
             onClick={() => handleExport('md')}
-            className={`w-full px-4 py-3 text-left rounded-lg motion-context flex items-start gap-3 group ${
+            className={`focus-ring group flex w-full items-start gap-3 rounded-md border px-3 py-2.5 text-left ${
               defaultFormat === 'md'
-                ? 'bg-primary/10 ring-1 ring-primary/30'
-                : 'bg-secondary hover:bg-secondary/80'
+                ? 'border-primary/40 bg-primary/10'
+                : 'bg-background hover:bg-muted/80'
             }`}
           >
             <FileCode className={`h-5 w-5 mt-0.5 flex-shrink-0 ${defaultFormat === 'md' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
@@ -77,10 +79,10 @@ export default function ExportDialog({ session, onExport, onClose }: ExportDialo
 
           <button
             onClick={() => handleExport('json')}
-            className={`w-full px-4 py-3 text-left rounded-lg motion-context flex items-start gap-3 group ${
+            className={`focus-ring group flex w-full items-start gap-3 rounded-md border px-3 py-2.5 text-left ${
               defaultFormat === 'json'
-                ? 'bg-primary/10 ring-1 ring-primary/30'
-                : 'bg-secondary hover:bg-secondary/80'
+                ? 'border-primary/40 bg-primary/10'
+                : 'bg-background hover:bg-muted/80'
             }`}
           >
             <Database className={`h-5 w-5 mt-0.5 flex-shrink-0 ${defaultFormat === 'json' ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />

@@ -124,14 +124,12 @@
     .motion-continuity,
     .motion-layout,
     .motion-overlay-backdrop,
-    .motion-overlay-surface,
-    .glass-card-hover {
+    .motion-overlay-surface {
       transition-duration: 1ms !important;
       transition-delay: 0ms !important;
     }
 
-    .motion-press:active,
-    .glass-card-hover:hover {
+    .motion-press:active {
       transform: none !important;
     }
 
@@ -215,54 +213,6 @@
     color: rgb(var(--color-muted-foreground));
   }
 
-  // Glassmorphism
-  .glass {
-    background: rgba(var(--glass-rgb), 0.6);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(var(--highlight-rgb), 0.08);
-  }
-
-  .glass-card {
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(var(--highlight-rgb), 0.06);
-    box-shadow:
-      0 4px 24px rgba(var(--shadow-rgb), 0.2),
-      0 1px 2px rgba(var(--highlight-rgb), 0.03) inset;
-  }
-
-  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .glass,
-    .glass-card {
-      backdrop-filter: none;
-      -webkit-backdrop-filter: none;
-    }
-  }
-
-  @media (prefers-reduced-transparency: reduce) {
-    .glass,
-    .glass-card {
-      background: rgb(var(--color-card));
-      backdrop-filter: none !important;
-      -webkit-backdrop-filter: none !important;
-    }
-  }
-
-  .glass-card-hover {
-    transition-property: transform, box-shadow, border-color, background-color;
-    transition-duration: var(--motion-duration-base);
-    transition-timing-function: var(--motion-ease-standard);
-  }
-
-  .glass-card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow:
-      0 8px 32px rgba(var(--shadow-rgb), 0.3),
-      0 1px 2px rgba(var(--highlight-rgb), 0.05) inset,
-      0 0 0 1px rgba(var(--highlight-rgb), 0.08);
-  }
-
   // Glow Effects
   .glow-blue {
     box-shadow: 0 0 20px rgba(var(--info-rgb), 0.15);
@@ -278,18 +228,6 @@
 
   .glow-red {
     box-shadow: 0 0 20px rgba(var(--destructive-rgb), 0.15);
-  }
-
-  // Text Gradient
-  .text-gradient {
-    background: linear-gradient(
-      135deg,
-      rgb(var(--color-foreground)) 0%,
-      rgb(var(--color-muted-foreground)) 100%
-    );
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
   }
 
   // Inner Shadow

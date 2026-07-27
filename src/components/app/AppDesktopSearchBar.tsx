@@ -103,7 +103,7 @@ function AppDesktopSearchBar({
           <button
             type="button"
             onClick={onSelectModeTrigger}
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-secondary/40 text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-secondary/40 text-muted-foreground hover:text-foreground motion-color focus-ring"
             aria-label={t("session.list.selectMode", { defaultValue: "Select mode" })}
             title={t("session.list.selectMode", { defaultValue: "Select mode" })}
           >

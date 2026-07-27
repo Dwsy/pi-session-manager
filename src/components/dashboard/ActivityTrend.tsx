@@ -13,7 +13,6 @@ export default function ActivityTrend({
   stats,
   title = 'Activity Trend',
   days = 30,
-  type = 'area',
 }: ActivityTrendProps) {
   const trendData = stats.heatmap_data
     .filter(p => p.level > 0)
@@ -85,7 +84,7 @@ export default function ActivityTrend({
             <div className="w-12 text-right text-xs text-muted-foreground">{item.date}</div>
             <div className="flex-1 h-6 bg-background rounded-lg overflow-hidden">
               <div
-                className={`h-full rounded-lg motion-width ${type === 'area' ? 'bg-gradient-to-r from-info/50 to-info' : 'bg-info'}`}
+                className={`h-full rounded-lg motion-width bg-info`}
                 style={{ width: `${(item.value / maxValue) * 100}%` }}
               />
             </div>

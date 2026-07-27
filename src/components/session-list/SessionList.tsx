@@ -693,7 +693,7 @@ export default function SessionList({
   return (
     <div className="relative">
       {onDeleteSessions && isSelectionMode && (
-        <div className="sticky top-0 z-20 border-b border-border/40 bg-background/95 px-2 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="sticky top-0 z-20 border-b border-border/40 bg-background/95 px-2 py-1.5">
           <div className="flex items-center justify-between gap-2 rounded-md border border-primary/25 bg-primary/5 px-2 py-1.5">
             <div className="min-w-0">
               <div className="truncate text-[11px] font-medium text-foreground/90">
@@ -718,7 +718,7 @@ export default function SessionList({
                       : new Set(sessions.map((session) => session.id)),
                   )
                 }
-                className="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-foreground/5 hover:text-foreground motion-color motion-press focus-ring"
+                className="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-foreground/5 hover:text-foreground motion-color focus-ring"
               >
                 {allSessionsSelected
                   ? t("session.list.clearSelection", { defaultValue: "Clear" })
@@ -727,7 +727,7 @@ export default function SessionList({
               <button
                 type="button"
                 onClick={handleExitSelectionMode}
-                className="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-foreground/5 hover:text-foreground motion-color motion-press focus-ring"
+                className="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-foreground/5 hover:text-foreground motion-color focus-ring"
               >
                 {t("common.cancel")}
               </button>
@@ -737,7 +737,7 @@ export default function SessionList({
                 onClick={(event) => {
                   onDeleteSessions(selectedSessions, getDeleteRequestOptions(event));
                 }}
-                className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-1 text-[11px] text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 motion-color motion-press focus-ring"
+                className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-1 text-[11px] text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 motion-color focus-ring"
               >
                 <Trash2 className="h-3 w-3" />
                 <span>
@@ -855,8 +855,8 @@ export default function SessionList({
                         className={`relative px-3 py-2.5 motion-surface motion-color group rounded-lg overflow-clip border select-none cursor-pointer ${
                           isSelected
                             ? isSelectionMode
-                              ? "border-primary/60 bg-primary/10 shadow-[0_0_0_1px_rgba(59,130,246,0.22)] ring-1 ring-primary/30"
-                              : "border-primary/30 bg-surface/75 shadow-[0_0_0_1px_rgba(59,130,246,0.12)]"
+                              ? "border-primary/60 bg-primary/10 shadow-lg ring-1 ring-primary/30"
+                              : "border-primary/30 bg-surface/75 shadow-lg"
                             : isSelectionMode
                               ? "border-border/70 hover:bg-surface/70"
                               : "border-transparent hover:bg-surface/60"
@@ -875,7 +875,7 @@ export default function SessionList({
                                     event.shiftKey,
                                   );
                                 }}
-                                className={`mt-0.5 rounded-md p-1 motion-color motion-press focus-ring ${
+                                className={`mt-0.5 rounded-md p-1 motion-color focus-ring ${
                                   isSelected
                                     ? "bg-destructive/15 text-destructive"
                                     : "text-muted-foreground/70 hover:bg-foreground/5 hover:text-foreground"
@@ -1037,7 +1037,7 @@ export default function SessionList({
                                   );
                                   setTagPickerAnchor(rect);
                                 }}
-                                className="p-1 text-muted-foreground/60 hover:text-blue-400 rounded motion-color motion-press focus-ring"
+                                className="p-1 text-muted-foreground/60 hover:text-blue-400 rounded motion-color focus-ring"
                                 title={t("tags.assign")}
                               >
                                 <Tags className="h-3 w-3" />
@@ -1080,7 +1080,7 @@ export default function SessionList({
                                   e.stopPropagation();
                                   onConvertSession(session);
                                 }}
-                                className="p-1 text-muted-foreground/60 hover:text-primary rounded motion-color motion-press focus-ring"
+                                className="p-1 text-muted-foreground/60 hover:text-primary rounded motion-color focus-ring"
                                 title={t("session.convert.title")}
                               >
                                 <ArrowRightLeft className="h-3 w-3" />

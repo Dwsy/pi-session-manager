@@ -10,17 +10,17 @@ export function StatTile({
   icon?: ReactNode;
 }) {
   return (
-    <div className="group relative flex items-center gap-3.5 rounded-xl border border-border/60 bg-card/40 px-4 py-3 shadow-sm backdrop-blur-sm transition-all duration-200 hover:border-border hover:bg-card/60 hover:shadow">
+    <div className="relative flex items-center gap-3 rounded-md border border-border bg-card px-3 py-3">
       {icon && (
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-105">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground">
           {icon}
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="text-xs font-medium text-muted-foreground">
           {label}
         </div>
-        <div className="mt-0.5 text-xl font-bold tracking-tight text-foreground">
+        <div className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
           {value}
         </div>
       </div>

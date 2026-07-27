@@ -39,7 +39,7 @@ export function ToolsTab({
     >
       <div className="space-y-6">
         {/* Import Mode Selector Banner */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/40 p-5 shadow-sm backdrop-blur-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-md border border-border bg-card p-5">
           <div>
             <div className="text-sm font-bold text-foreground">
               {t(
@@ -80,11 +80,19 @@ export function ToolsTab({
           {/* Card 1: Import File */}
           <div
             onClick={() => !busy && onImportFromPath()}
-            className={`group relative flex items-start gap-4 rounded-xl border border-border/60 bg-card/40 p-5 cursor-pointer transition-all duration-200 hover:border-border hover:bg-card/70 hover:shadow-md ${
+            onKeyDown={(event) => {
+              if (!busy && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
+                onImportFromPath();
+              }
+            }}
+            role="button"
+            tabIndex={busy ? -1 : 0}
+            className={`focus-ring group relative flex items-start gap-4 rounded-md border border-border bg-card p-5 cursor-pointer hover:border-border hover:bg-muted ${
               busy === "import-file" ? "opacity-60 pointer-events-none" : ""
             }`}
           >
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary transition-transform duration-200 group-hover:scale-105 shadow-inner">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground">
               {busy === "import-file" ? (
                 <Loader2 className="h-6 w-6 animate-spin" />
               ) : (
@@ -92,7 +100,7 @@ export function ToolsTab({
               )}
             </div>
             <div>
-              <h4 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">
+              <h4 className="text-sm font-semibold text-foreground">
                 {t(
                   "settings.modelConfigCenter.actions.importFile",
                   "Import file",
@@ -110,13 +118,21 @@ export function ToolsTab({
           {/* Card 2: Import JSON Content */}
           <div
             onClick={() => !busy && onOpenImportContentModal()}
-            className="group relative flex items-start gap-4 rounded-xl border border-border/60 bg-card/40 p-5 cursor-pointer transition-all duration-200 hover:border-border hover:bg-card/70 hover:shadow-md"
+            onKeyDown={(event) => {
+              if (!busy && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
+                onOpenImportContentModal();
+              }
+            }}
+            role="button"
+            tabIndex={busy ? -1 : 0}
+            className="focus-ring group relative flex items-start gap-4 rounded-md border border-border bg-card p-5 cursor-pointer hover:border-border hover:bg-muted"
           >
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-blue-500 transition-transform duration-200 group-hover:scale-105 shadow-inner">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground">
               <Upload className="h-6 w-6" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-foreground group-hover:text-blue-500 transition-colors">
+              <h4 className="text-sm font-semibold text-foreground">
                 {t(
                   "settings.modelConfigCenter.actions.importContent",
                   "Import JSON content",
@@ -134,13 +150,21 @@ export function ToolsTab({
           {/* Card 3: Copy Current Draft */}
           <div
             onClick={() => !busy && void onCopyDraftJson()}
-            className="group relative flex items-start gap-4 rounded-xl border border-border/60 bg-card/40 p-5 cursor-pointer transition-all duration-200 hover:border-border hover:bg-card/70 hover:shadow-md"
+            onKeyDown={(event) => {
+              if (!busy && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
+                void onCopyDraftJson();
+              }
+            }}
+            role="button"
+            tabIndex={busy ? -1 : 0}
+            className="focus-ring group relative flex items-start gap-4 rounded-md border border-border bg-card p-5 cursor-pointer hover:border-border hover:bg-muted"
           >
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-500 transition-transform duration-200 group-hover:scale-105 shadow-inner">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground">
               <Copy className="h-6 w-6" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-foreground group-hover:text-amber-500 transition-colors">
+              <h4 className="text-sm font-semibold text-foreground">
                 {t(
                   "settings.modelConfigCenter.actions.copyDraft",
                   "Copy current draft",
@@ -158,13 +182,21 @@ export function ToolsTab({
           {/* Card 4: Export Saved File */}
           <div
             onClick={() => !busy && void onExportToPath()}
-            className="group relative flex items-start gap-4 rounded-xl border border-border/60 bg-card/40 p-5 cursor-pointer transition-all duration-200 hover:border-border hover:bg-card/70 hover:shadow-md"
+            onKeyDown={(event) => {
+              if (!busy && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
+                void onExportToPath();
+              }
+            }}
+            role="button"
+            tabIndex={busy ? -1 : 0}
+            className="focus-ring group relative flex items-start gap-4 rounded-md border border-border bg-card p-5 cursor-pointer hover:border-border hover:bg-muted"
           >
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500 transition-transform duration-200 group-hover:scale-105 shadow-inner">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground">
               <Download className="h-6 w-6" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-foreground group-hover:text-emerald-500 transition-colors">
+              <h4 className="text-sm font-semibold text-foreground">
                 {t(
                   "settings.modelConfigCenter.actions.exportSaved",
                   "Export saved file",

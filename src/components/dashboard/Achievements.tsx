@@ -148,7 +148,7 @@ export default function Achievements({ stats, title = 'Achievements' }: Achievem
         </div>
         <div className="h-2 bg-background rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-info via-success to-warning rounded-full motion-width"
+            className="h-full bg-primary rounded-full motion-width"
             style={{ width: `${progressPercent}%` }}
           />
         </div>

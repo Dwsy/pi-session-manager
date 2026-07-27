@@ -131,7 +131,7 @@ export default function ConfigVersionsTab() {
             </span>
             <button
               onClick={() => handlePreview(v.id)}
-              className={`rounded p-1 motion-surface motion-color motion-press focus-ring ${previewId === v.id ? "settings-accent-bg-soft settings-accent-fg" : "text-muted-foreground hover:bg-surface/80 hover:text-foreground"}`}
+              className={`rounded p-1 motion-surface motion-color focus-ring ${previewId === v.id ? "settings-accent-bg-soft settings-accent-fg" : "text-muted-foreground hover:bg-surface/80 hover:text-foreground"}`}
               title={t("settings.piConfig.preview", "Preview")}
             >
               <Eye className="h-3.5 w-3.5" />
@@ -139,7 +139,7 @@ export default function ConfigVersionsTab() {
             <button
               onClick={() => handleRestore(v.id)}
               disabled={restoring === v.id}
-              className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface/80 hover:text-warning motion-surface motion-color motion-press focus-ring disabled:opacity-50"
+              className="rounded p-1 text-muted-foreground transition-colors hover:bg-surface/80 hover:text-warning motion-surface motion-color focus-ring disabled:opacity-50"
               title={t("settings.piConfig.restore", "Restore")}
             >
               {restoring === v.id ? (

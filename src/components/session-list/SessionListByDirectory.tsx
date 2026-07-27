@@ -169,7 +169,7 @@ export default function SessionListByDirectory({
               >
                 <button
                   onClick={() => toggleDir(row.dir)}
-                  className="w-full px-3 py-2 flex items-center gap-2 hover:bg-surface motion-color motion-press focus-ring text-left bg-background"
+                  className="w-full px-3 py-2 flex items-center gap-2 hover:bg-surface motion-color focus-ring text-left bg-background"
                 >
                   {row.isExpanded ? (
                     <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -285,7 +285,7 @@ export default function SessionListByDirectory({
                           e.stopPropagation()
                           onDeleteSession(session)
                         }}
-                        className="p-1 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 rounded motion-color motion-surface motion-press focus-ring"
+                        className="p-1 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 rounded motion-color motion-surface focus-ring"
                         title={t('common.deleteSession')}
                       >
                         <Trash2 className="h-3.5 w-3.5" />

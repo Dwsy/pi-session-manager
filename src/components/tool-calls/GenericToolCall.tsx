@@ -1,6 +1,10 @@
 import { useMemo, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSessionView } from '@/contexts/SessionViewContext'
 import MarkdownContent from '@/components/ui/MarkdownContent'
+import ToolHeader from '@/components/tool-calls/ToolHeader'
+import ToolSectionHeader from '@/components/tool-calls/ToolSectionHeader'
+import { useClipboard } from '@/hooks/useClipboard'
 import { escapeHtml } from '@/utils/markdown'
 import { highlightSearchInHTML } from '@/utils/search'
 import {
@@ -14,6 +18,7 @@ interface GenericToolCallProps {
   arguments?: unknown
   output?: string
   isError?: boolean
+  hasResult?: boolean
   entryId: string
   searchQuery?: string
 }
@@ -84,13 +89,20 @@ export default function GenericToolCall({
   arguments: rawArgs,
   output,
   isError = false,
+  hasResult = true,
   entryId,
   searchQuery = '',
 }: GenericToolCallProps) {
+  const { t } = useTranslation()
+  const { copyText } = useClipboard()
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const expanded = isToolExpanded(entryId)
-
-  const statusClass = isError ? 'error' : 'success'
+  const status = isError ? 'error' : hasResult ? 'success' : 'pending'
+  const statusLabel = isError
+    ? t('components.toolCall.status.error', 'Failed')
+    : hasResult
+      ? t('components.toolCall.status.success', 'Done')
+      : t('components.toolCall.status.pending', 'Waiting for result')
 
   const args = normalizeToolArguments(rawArgs)
   const argsText = formatToolValue(args)
@@ -120,10 +132,12 @@ export default function GenericToolCall({
   }
 
   return (
-    <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
-      <div
-        className={`tool-header ${(hasArgs || hasOutput) ? 'cursor-pointer select-none' : ''}`}
-        onClick={(hasArgs || hasOutput) ? () => toggleToolExpanded(entryId) : undefined}
+    <div className={`tool-execution ${status}`} id={`entry-${entryId}`}>
+      <ToolHeader
+        expandable={hasArgs || hasOutput}
+        expanded={expanded}
+        onToggle={() => toggleToolExpanded(entryId)}
+        ariaLabel={`${name}: ${statusLabel}`}
       >
         {(hasArgs || hasOutput) && (
           <span className="tool-expand-indicator">
@@ -138,17 +152,20 @@ export default function GenericToolCall({
           {name}
         </span>
         {hasArgs && (
-          <span className="tool-generic-args-preview" title={escapeHtml(argsText)}>
+          <span className="tool-generic-args-preview" title={argsText}>
             {buildCollapsedArgs(args)}
           </span>
         )}
-      </div>
+        <span className={`tool-status tool-status-${status}`}>{statusLabel}</span>
+      </ToolHeader>
 
       {hasArgs && expanded && (
         <div className="tool-output-wrapper">
-          <div className="tool-output-header">
-            <span className="tool-output-label">Arguments</span>
-          </div>
+          <ToolSectionHeader
+            label={t('components.toolCall.arguments', 'Arguments')}
+            text={argsText}
+            copyText={copyText}
+          />
           <div
             className="tool-arguments"
             style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto', margin: 0 }}
@@ -187,14 +204,16 @@ export default function GenericToolCall({
 
       {hasOutput && expanded && (
         <div className="tool-output-wrapper">
-          <div className="tool-output-header">
-            <span className="tool-output-label">Output</span>
-          </div>
+          <ToolSectionHeader
+            label={t('components.toolCall.output', 'Output')}
+            text={output}
+            copyText={copyText}
+          />
           <div
             className="tool-output"
             style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}
           >
-            <pre className="whitespace-pre-wrap m-0" dangerouslySetInnerHTML={{ __html: highlightedOutput }} />
+            <pre className="tool-output-plain" dangerouslySetInnerHTML={{ __html: highlightedOutput }} />
           </div>
         </div>
       )}

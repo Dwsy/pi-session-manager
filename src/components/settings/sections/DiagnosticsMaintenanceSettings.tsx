@@ -133,13 +133,13 @@ export default function DiagnosticsMaintenanceSettings({
                 ),
               );
             }}
-            className="px-4 py-2 bg-info/10 text-info hover:bg-info/20 rounded-lg text-sm font-medium motion-color motion-press focus-ring"
+            className="px-4 py-2 bg-info/10 text-info hover:bg-info/20 rounded-lg text-sm font-medium motion-color focus-ring"
           >
             {t("settings.advanced.showOnboarding", "Show onboarding again")}
           </button>
           <button
             onClick={handleClearCache}
-            className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium motion-color motion-press focus-ring"
+            className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium motion-color focus-ring"
           >
             {t("settings.advanced.clearCache", "Clear cache")}
           </button>

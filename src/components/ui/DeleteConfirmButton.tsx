@@ -72,14 +72,14 @@ export default function DeleteConfirmButton({
       <div className={`inline-flex items-center gap-1 ${className}`}>
         <button
           onClick={handleClick}
-          className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-1 text-[10px] text-white hover:bg-red-700 motion-color motion-press focus-ring"
+          className="inline-flex items-center gap-1 rounded bg-red-600 px-2 py-1 text-[10px] text-white hover:bg-red-700 motion-color focus-ring"
           title={t('app.confirm.deleteIrreversible', { defaultValue: 'This action cannot be undone' })}
         >
           <span>{t('common.confirm', { defaultValue: 'Confirm?' })}</span>
         </button>
         <button
           onClick={handleCancel}
-          className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-secondary motion-color motion-press focus-ring"
+          className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-secondary motion-color focus-ring"
           title={t('common.cancel')}
         >
           <X className={cancelIconSize} />
@@ -91,7 +91,7 @@ export default function DeleteConfirmButton({
   return (
     <button
       onClick={handleClick}
-      className="p-1 text-muted-foreground/60 hover:text-red-500 rounded motion-color motion-press focus-ring"
+      className="p-1 text-muted-foreground/60 hover:text-red-500 rounded motion-color focus-ring"
       title={t('common.deleteSession')}
     >
       <Trash2 className={iconSize} />

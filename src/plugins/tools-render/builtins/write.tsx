@@ -5,6 +5,9 @@ import { defaultResolveData } from '@/plugins/tools-render/utils/resolveData'
 import { escapeHtml, getLanguageFromPath, renderCodeHtml } from '@/utils/markdown'
 import { shortenPath } from '@/utils/format'
 import CodeBlock from '@/components/ui/CodeBlock'
+import ToolHeader from '@/components/tool-calls/ToolHeader'
+import ToolSectionHeader from '@/components/tool-calls/ToolSectionHeader'
+import { getToolExecutionClass, getToolRenderStatus, getToolStatusLabel } from '@/plugins/tools-render/utils/status'
 
 /** Maximum height for tool output in pixels */
 const OUTPUT_MAX_HEIGHT = 300
@@ -19,7 +22,8 @@ function WriteExecution({
   context,
 }: ToolRenderProps) {
   const { args, output, entryId } = resolvedData
-  const { isExpanded, toggleExpanded, isMobile, disableSuccessStyle } = context
+  const { isExpanded, toggleExpanded, isMobile, disableSuccessStyle, t, copyToClipboard } = context
+  const status = getToolRenderStatus(resolvedData)
 
   const filePath = args.file_path || args.path || ''
   const content = args.content || ''
@@ -40,31 +44,39 @@ function WriteExecution({
   const lines = content.split('\n')
 
   return (
-    <div className={`tool-execution ${disableSuccessStyle ? '' : 'success'}`.trim()} id={`entry-${entryId}`}>
-      <div
-        className="tool-header select-none"
-        onClick={toggleExpanded}
+    <div className={`tool-execution ${getToolExecutionClass(resolvedData, disableSuccessStyle)}`.trim()} id={`entry-${entryId}`}>
+      <ToolHeader
+        expandable={Boolean(content || output)}
+        expanded={isExpanded}
+        onToggle={toggleExpanded}
+        ariaLabel={`Write: ${getToolStatusLabel(status, t)}`}
       >
         <span className="tool-expand-indicator">
           {isExpanded ? '▾' : '▸'}
         </span>
-        <div className="tool-header-meta">
+        <span className="tool-header-meta">
           <span className="tool-name">
             <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
             Write
           </span>
-        </div>
-        <span className="tool-path" style={desktopPathStyle}>{escapeHtml(displayPath)}</span>
-        <span className="tool-meta">({lines.length} lines)</span>
-      </div>
+        </span>
+        <span className="tool-path" style={desktopPathStyle}>{displayPath}</span>
+        <span className="tool-detail">{lines.length} lines</span>
+        <span className={`tool-status tool-status-${status}`}>{getToolStatusLabel(status, t)}</span>
+      </ToolHeader>
 
       {content && (
         <div className={`tool-output-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
             {isExpanded && (
               <div className="tool-output">
+                <ToolSectionHeader
+                  label={t('components.toolCall.content', 'Content')}
+                  text={content}
+                  copyText={copyToClipboard}
+                />
                 <CodeBlock
                   code={content}
                   language={lang}
@@ -84,7 +96,12 @@ function WriteExecution({
           <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
             {isExpanded && (
               <div className="tool-output">
-                <div dangerouslySetInnerHTML={{ __html: escapeHtml(output) }} />
+                <ToolSectionHeader
+                  label={t('components.toolCall.output', 'Output')}
+                  text={output}
+                  copyText={copyToClipboard}
+                />
+                <pre className="tool-output-plain">{output}</pre>
               </div>
             )}
           </div>

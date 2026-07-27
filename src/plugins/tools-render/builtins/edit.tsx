@@ -10,6 +10,9 @@ import { escapeHtml } from '@/utils/markdown'
 import { shortenPath } from '@/utils/format'
 import { getPathBasename } from '@/utils/path'
 import { highlightSearchInHTML } from '@/utils/search'
+import ToolHeader from '@/components/tool-calls/ToolHeader'
+import ToolSectionHeader from '@/components/tool-calls/ToolSectionHeader'
+import { getToolExecutionClass, getToolRenderStatus, getToolStatusLabel } from '@/plugins/tools-render/utils/status'
 
 // Register custom diff viewer themes (light/dark) with transparent background
 let themesRegistered = false
@@ -44,7 +47,8 @@ function EditExecution({
 }: ToolRenderProps) {
   const { t } = useTranslation()
   const { args, diff, output, isError, entryId } = resolvedData
-  const { isExpanded, toggleExpanded, theme, isMobile, disableSuccessStyle } = context
+  const { isExpanded, toggleExpanded, theme, isMobile, disableSuccessStyle, copyToClipboard } = context
+  const status = getToolRenderStatus(resolvedData)
 
   const filePath = args.file_path || args.path || ''
   const isDark = theme === 'dark'
@@ -185,35 +189,42 @@ function EditExecution({
 
   const shouldShowOutput = Boolean(isError && output)
   const hasContent = Boolean(diff || shouldShowOutput)
-  const statusClass = isError ? 'error' : disableSuccessStyle ? '' : 'success'
 
   return (
-    <div className={`tool-execution ${statusClass}`} id={`entry-${entryId}`}>
-      <div
-        className={`tool-header ${hasContent ? 'select-none' : ''}`}
-        onClick={hasContent ? toggleExpanded : undefined}
+    <div className={`tool-execution ${getToolExecutionClass(resolvedData, disableSuccessStyle)}`} id={`entry-${entryId}`}>
+      <ToolHeader
+        expandable={hasContent}
+        expanded={isExpanded}
+        onToggle={toggleExpanded}
+        ariaLabel={`Edit: ${getToolStatusLabel(status, t)}`}
       >
         {hasContent && (
           <span className="tool-expand-indicator">
             {isExpanded ? '▾' : '▸'}
           </span>
         )}
-        <div className="tool-header-meta">
+        <span className="tool-header-meta">
           <span className="tool-name">
             <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
             Edit
           </span>
-        </div>
-        <span className="tool-path" style={desktopPathStyle}>{escapeHtml(displayPath)}</span>
-      </div>
+        </span>
+        <span className="tool-path" style={desktopPathStyle}>{displayPath}</span>
+        <span className={`tool-status tool-status-${status}`}>{getToolStatusLabel(status, t)}</span>
+      </ToolHeader>
 
       {diff && (
         <div className={`tool-diff-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
             {isExpanded && (
               <div>
+                <ToolSectionHeader
+                  label={t('components.toolCall.diff', 'Diff')}
+                  text={diff}
+                  copyText={copyToClipboard}
+                />
                 {renderDiff()}
               </div>
             )}
@@ -226,15 +237,23 @@ function EditExecution({
           <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
             {isExpanded && (
               <div className="tool-output">
-                <div dangerouslySetInnerHTML={{ __html: highlightedOutput }} />
+                <ToolSectionHeader
+                  label={t('components.toolCall.output', 'Output')}
+                  text={output}
+                  copyText={copyToClipboard}
+                />
+                <pre
+                  className="tool-output-plain"
+                  dangerouslySetInnerHTML={{ __html: highlightedOutput }}
+                />
               </div>
             )}
           </div>
         </div>
       )}
 
-      {!hasContent && (
-        <div className="tool-output" style={{ color: 'var(--muted)', fontStyle: 'italic' }}>
+      {!hasContent && resolvedData.result && (
+        <div className="tool-output tool-output-empty">
           {t('components.editExecution.noChanges', 'No changes')}
         </div>
       )}

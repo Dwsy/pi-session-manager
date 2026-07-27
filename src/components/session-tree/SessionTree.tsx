@@ -225,6 +225,22 @@ const SessionTree = memo(
     }, [activeLeafUid, model]);
 
     useEffect(() => {
+      if (visibleEntryUids.length === 0) {
+        setFocusedUid(null);
+        return;
+      }
+      if (focusedUid && visibleEntryUids.includes(focusedUid)) return;
+      const fallback =
+        (selectedUid && visibleEntryUids.includes(selectedUid) ? selectedUid : null) ??
+        (activeLeafUid && visibleEntryUids.includes(activeLeafUid) ? activeLeafUid : null) ??
+        visibleEntryUids[0];
+      setFocusedUid(fallback ?? null);
+      if (!selectedUid || !visibleEntryUids.includes(selectedUid)) {
+        setSelectedUid(fallback ?? null);
+      }
+    }, [activeLeafUid, focusedUid, selectedUid, visibleEntryUids]);
+
+    useEffect(() => {
       if (!focusedUid) return;
       const index = items.findIndex(
         (item) => item.kind === "entry" && item.node.uid === focusedUid,
@@ -422,13 +438,15 @@ const SessionTree = memo(
         />
 
         {pluginViews.length > 0 ? (
-          <div className="tree-toolbar tree-toolbar-views">
+          <div className="tree-plugin-views" role="toolbar" aria-label="Plugin views">
             {pluginViews.map((view) => (
               <button
                 key={view.id}
                 type="button"
-                className="filter-btn"
+                className="tree-plugin-view-button"
+                aria-haspopup="dialog"
                 onClick={() => setActivePluginViewId(view.id)}
+                title={view.title}
               >
                 {view.title}
               </button>
@@ -447,6 +465,7 @@ const SessionTree = memo(
                 key={item.value}
                 type="button"
                 className={treeFilter === item.value ? "is-active" : ""}
+                aria-pressed={treeFilter === item.value}
                 onClick={() => {
                   setTreeFilter(item.value);
                   setCollapsed(new Set());
@@ -535,7 +554,7 @@ const SessionTree = memo(
             })}
           </div>
           {items.length === 0 ? (
-            <div className="tree-empty">No matching entries</div>
+            <div className="tree-empty">{t("components.branchMap.noMatchingEntries", "No matching entries")}</div>
           ) : null}
         </div>
 
@@ -577,33 +596,37 @@ const SessionTree = memo(
         {activePluginView && typeof document !== "undefined"
           ? createPortal(
               <div
-                className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 p-4 backdrop-blur-md"
-                role="dialog"
-                aria-modal="true"
+                className="session-tree-plugin-dialog-backdrop"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) setActivePluginViewId(null);
+                }}
               >
-                <div
-                  className="flex h-[100dvh] w-[100vw] min-w-[320px] flex-col overflow-hidden rounded-none border border-border/70 bg-surface-dark/90 shadow-2xl sm:h-[80vh] sm:w-[80vw] sm:rounded-xl"
+                <section
+                  className="session-tree-plugin-dialog"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="session-tree-plugin-dialog-title"
                   data-no-window-drag
                 >
-                  <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/70 bg-background/20 px-3">
+                  <header className="session-tree-plugin-dialog-header">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-foreground">
+                      <h2 id="session-tree-plugin-dialog-title" className="session-tree-plugin-dialog-title">
                         {activePluginView.title}
-                      </div>
-                      <div className="truncate text-[11px] text-muted-foreground">
+                      </h2>
+                      <div className="session-tree-plugin-dialog-subtitle">
                         {entries.length} JSONL entries
                       </div>
                     </div>
                     <button
                       type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/70 bg-background/35 text-muted-foreground hover:bg-background/55 hover:text-foreground"
+                      className="session-tree-plugin-dialog-close"
                       onClick={() => setActivePluginViewId(null)}
                       aria-label="Close"
                     >
                       ×
                     </button>
-                  </div>
-                  <div className="min-h-0 flex-1 overflow-hidden bg-background/10">
+                  </header>
+                  <div className="session-tree-plugin-dialog-body">
                     <PluginContributionBoundary
                       pluginId={activePluginView.pluginId}
                       contributionId={activePluginView.id}
@@ -633,7 +656,7 @@ const SessionTree = memo(
                       />
                     </PluginContributionBoundary>
                   </div>
-                </div>
+                </section>
               </div>,
               document.body,
             )

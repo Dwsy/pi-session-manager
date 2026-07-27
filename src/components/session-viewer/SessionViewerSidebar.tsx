@@ -3,9 +3,11 @@ import {
   useMemo,
   useState,
   type CSSProperties,
+  type KeyboardEventHandler,
   type MouseEventHandler,
   type RefObject,
 } from "react";
+import { X } from "lucide-react";
 
 import SessionTree, { type SessionTreeRef } from "@/components/session-tree/SessionTree";
 import { getRuntimeSessionLabels } from "@/runtime-data/sessionSource";
@@ -24,6 +26,8 @@ export interface SessionViewerSidebarProps {
   isMobile: boolean;
   placement?: "overlay" | "embedded";
   sidebarWidth: number;
+  sidebarMinWidth: number;
+  sidebarMaxWidth: number;
   isResizing: boolean;
   entries: SessionEntry[];
   sessionPath: string;
@@ -33,6 +37,7 @@ export interface SessionViewerSidebarProps {
   onCloseSidebar: () => void;
   onNodeClick: (leafId: string, targetId: string) => void;
   onResizeMouseDown: MouseEventHandler<HTMLDivElement>;
+  onResizeKeyDown: KeyboardEventHandler<HTMLDivElement>;
   treeRef: RefObject<SessionTreeRef>;
   sidebarRef: RefObject<HTMLElement>;
   resizeHandleRef: RefObject<HTMLDivElement>;
@@ -46,6 +51,8 @@ export default function SessionViewerSidebar({
   isMobile,
   placement = "overlay",
   sidebarWidth,
+  sidebarMinWidth,
+  sidebarMaxWidth,
   isResizing,
   entries,
   sessionPath,
@@ -55,6 +62,7 @@ export default function SessionViewerSidebar({
   onCloseSidebar,
   onNodeClick,
   onResizeMouseDown,
+  onResizeKeyDown,
   treeRef,
   sidebarRef,
   resizeHandleRef,
@@ -110,8 +118,6 @@ export default function SessionViewerSidebar({
     top: 0,
     bottom: 0,
     zIndex: 70,
-    boxShadow: "8px 0 24px rgba(0, 0, 0, 0.22)",
-    borderRight: "1px solid rgba(var(--color-border), 0.85)",
   };
 
   const desktopSidebarStyle: CSSProperties = isEmbedded
@@ -127,45 +133,37 @@ export default function SessionViewerSidebar({
         <button
           type="button"
           onClick={onCloseSidebar}
-          className="fixed inset-0 z-[60] bg-black/18"
+          className="session-sidebar-backdrop"
           aria-label={hideSidebarTitle}
         />
       )}
       <aside
         ref={sidebarRef}
-        className={`session-sidebar ${open ? "session-sidebar--open" : "session-sidebar--closed"} ${isMobile ? "safe-area-top" : isEmbedded ? "session-sidebar--embedded" : "absolute left-0 top-0 bottom-0 z-20 shadow-xl"}`}
+        className={`session-sidebar ${open ? "session-sidebar--open" : "session-sidebar--closed"} ${isMobile ? "safe-area-top session-sidebar--mobile" : isEmbedded ? "session-sidebar--embedded" : "session-sidebar--overlay"}`}
         style={isMobile ? mobileSidebarStyle : desktopSidebarStyle}
         aria-hidden={!open}
+        aria-labelledby="session-sidebar-title"
       >
-        {isMobile ? (
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/95 backdrop-blur-sm flex-shrink-0">
-            <h2 className="text-sm font-semibold text-foreground">
+        <header className="session-sidebar-header">
+          <div className="session-sidebar-heading">
+            <h2 id="session-sidebar-title" className="session-sidebar-title">
               {outlineTitle}
             </h2>
-            <button
-              type="button"
-              onClick={onCloseSidebar}
-              className="h-9 w-9 inline-flex items-center justify-center border border-border/70 bg-background text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
-              title={hideSidebarTitle}
-              aria-label={hideSidebarTitle}
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+            <div className="session-sidebar-subtitle">
+              {entries.length} entries{pluginViews.length > 0 ? ` · ${pluginViews.length} views` : ""}
+            </div>
           </div>
-        ) : null}
-        <div className="flex-1 min-h-0">
+          <button
+            type="button"
+            onClick={onCloseSidebar}
+            className="session-sidebar-close"
+            title={hideSidebarTitle}
+            aria-label={hideSidebarTitle}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+        <div className="session-sidebar-body">
           <SessionTree
             ref={treeRef}
             entries={entries}
@@ -184,7 +182,15 @@ export default function SessionViewerSidebar({
           ref={resizeHandleRef}
           className={`sidebar-resize-handle ${isEmbedded ? "sidebar-resize-handle--embedded" : "absolute z-30"} ${isResizing ? "resizing" : ""}`}
           style={isEmbedded ? undefined : { left: `${sidebarWidth}px` }}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={`${outlineTitle} width`}
+          aria-valuemin={sidebarMinWidth}
+          aria-valuemax={sidebarMaxWidth}
+          aria-valuenow={Math.round(sidebarWidth)}
+          tabIndex={0}
           onMouseDown={onResizeMouseDown}
+          onKeyDown={onResizeKeyDown}
         >
           <div className="sidebar-resize-handle-inner" />
         </div>

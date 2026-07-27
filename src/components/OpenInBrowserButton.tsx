@@ -69,7 +69,7 @@ export default function OpenInBrowserButton({
       onClick={handleOpenInBrowser}
       disabled={loading}
       className={`
-        rounded-md motion-surface motion-color motion-press focus-ring
+        rounded-md motion-surface motion-color focus-ring
         disabled:opacity-50 disabled:cursor-not-allowed
         ${sizeClasses[size]}
         ${variantClasses[variant]}

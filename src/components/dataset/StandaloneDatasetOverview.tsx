@@ -4,7 +4,6 @@ import {
   Database,
   FolderOpen,
   MessageSquare,
-  Sparkles,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -88,14 +87,14 @@ export default function StandaloneDatasetOverview({
     return (
       <div className="h-full overflow-y-auto p-3 md:p-4">
         <div className="mx-auto max-w-7xl">
-          <div className="rounded-3xl border border-border/70 bg-gradient-to-br from-background via-background to-secondary/30 p-4 md:p-5">
+          <div className="border-b border-border pb-4 md:pb-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
-                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-xs text-muted-foreground">
+                <div className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <Database className="h-3.5 w-3.5" />
                   {t("settings.session.standaloneDataset.badge", "Dataset")}
                 </div>
-                <h1 className="mt-3 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+                <h1 className="mt-2 text-xl font-semibold tracking-tight text-foreground md:text-2xl">
                   {datasetName}
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
@@ -110,10 +109,9 @@ export default function StandaloneDatasetOverview({
               </div>
               <button
                 onClick={onManageDatasets}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-info/40 bg-info/10 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-info/15"
+                className="focus-ring inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
               >
-                <Sparkles className="h-4 w-4" />
-                {t(
+                  {t(
                   "settings.session.standaloneDataset.manageAction",
                   "Manage datasets",
                 )}
@@ -124,7 +122,7 @@ export default function StandaloneDatasetOverview({
               {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={index}
-                  className="rounded-2xl border border-border/60 bg-background/70 p-4"
+                  className="rounded-md border border-border bg-card p-4"
                 >
                   <Skeleton className="h-4 w-24" />
                   <Skeleton className="mt-3 h-8 w-16" />
@@ -134,14 +132,14 @@ export default function StandaloneDatasetOverview({
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-12">
-            <section className="min-w-0 rounded-3xl border border-border/70 bg-background/80 p-5 xl:col-span-8">
+            <section className="min-w-0 rounded-lg border border-border bg-card p-4 xl:col-span-8">
               <Skeleton className="h-5 w-36" />
               <Skeleton className="mt-2 h-3 w-64 max-w-full" />
               <div className="mt-4 space-y-2">
                 {Array.from({ length: 6 }).map((_, index) => (
                   <div
                     key={index}
-                    className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3"
+                    className="rounded-md border border-border bg-background px-3 py-2.5"
                   >
                     <Skeleton className="h-4 w-2/3" />
                     <Skeleton className="mt-2 h-3 w-1/2" />
@@ -151,13 +149,13 @@ export default function StandaloneDatasetOverview({
             </section>
 
             <section className="min-w-0 space-y-3 xl:col-span-4">
-              <div className="min-w-0 rounded-3xl border border-border/70 bg-background/80 p-5">
+              <div className="min-w-0 rounded-lg border border-border bg-card p-4">
                 <Skeleton className="h-5 w-28" />
                 <div className="mt-4 space-y-2">
                   {Array.from({ length: 4 }).map((_, index) => (
                     <div
                       key={index}
-                      className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3"
+                      className="rounded-md border border-border bg-background px-3 py-2.5"
                     >
                       <Skeleton className="h-4 w-1/2" />
                       <Skeleton className="mt-2 h-3 w-2/3" />
@@ -179,14 +177,14 @@ export default function StandaloneDatasetOverview({
   return (
     <div className="h-full overflow-y-auto p-3 md:p-4">
       <div className="mx-auto max-w-7xl">
-        <div className="rounded-3xl border border-border/70 bg-gradient-to-br from-background via-background to-secondary/30 p-4 md:p-5">
+        <div className="border-b border-border pb-4 md:pb-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-xs text-muted-foreground">
+              <div className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Database className="h-3.5 w-3.5" />
                 {t("settings.session.standaloneDataset.badge", "Dataset")}
               </div>
-              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+              <h1 className="mt-2 text-xl font-semibold tracking-tight text-foreground md:text-2xl">
                 {datasetName}
               </h1>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
@@ -201,9 +199,8 @@ export default function StandaloneDatasetOverview({
             </div>
             <button
               onClick={onManageDatasets}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-info/40 bg-info/10 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-info/15"
+              className="focus-ring inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
             >
-              <Sparkles className="h-4 w-4" />
               {t(
                 "settings.session.standaloneDataset.manageAction",
                 "Manage datasets",
@@ -212,7 +209,7 @@ export default function StandaloneDatasetOverview({
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+            <div className="rounded-md border border-border bg-card p-4">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Database className="h-3.5 w-3.5" />
                 {t("settings.session.standaloneDataset.totalSessions", "Sessions")}
@@ -221,7 +218,7 @@ export default function StandaloneDatasetOverview({
                 {sessions.length}
               </div>
             </div>
-            <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+            <div className="rounded-md border border-border bg-card p-4">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <MessageSquare className="h-3.5 w-3.5" />
                 {t("settings.session.standaloneDataset.totalMessages", "Messages")}
@@ -230,7 +227,7 @@ export default function StandaloneDatasetOverview({
                 {totalMessages}
               </div>
             </div>
-            <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+            <div className="rounded-md border border-border bg-card p-4">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <FolderOpen className="h-3.5 w-3.5" />
                 {t("settings.session.standaloneDataset.totalProjects", "Projects")}
@@ -239,7 +236,7 @@ export default function StandaloneDatasetOverview({
                 {projectCount}
               </div>
             </div>
-            <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+            <div className="rounded-md border border-border bg-card p-4">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <CalendarClock className="h-3.5 w-3.5" />
                 {t(
@@ -264,7 +261,7 @@ export default function StandaloneDatasetOverview({
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-12">
-          <section className="min-w-0 rounded-3xl border border-border/70 bg-background/80 p-5 xl:col-span-8">
+          <section className="min-w-0 rounded-lg border border-border bg-card p-4 xl:col-span-8">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-foreground">
@@ -288,7 +285,7 @@ export default function StandaloneDatasetOverview({
                   <button
                     key={session.path}
                     onClick={() => onSessionSelect?.(session)}
-                    className="flex w-full items-start justify-between gap-3 rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-left transition-colors hover:border-border hover:bg-secondary/40"
+                    className="flex w-full items-start justify-between gap-3 rounded-md border border-border bg-background px-3 py-2.5 text-left hover:border-border hover:bg-secondary/40"
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium text-foreground">
@@ -314,7 +311,7 @@ export default function StandaloneDatasetOverview({
                   </button>
                 ))
               ) : (
-                <div className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+                <div className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
                   {t(
                     "settings.session.standaloneDataset.emptySessions",
                     "No sessions available in the current dataset.",
@@ -325,7 +322,7 @@ export default function StandaloneDatasetOverview({
           </section>
 
           <section className="min-w-0 space-y-3 xl:col-span-4">
-            <div className="min-w-0 rounded-3xl border border-border/70 bg-background/80 p-5">
+            <div className="min-w-0 rounded-lg border border-border bg-card p-4">
               <h2 className="text-base font-semibold text-foreground">
                 {t(
                   "settings.session.standaloneDataset.topProjectsTitle",
@@ -338,7 +335,7 @@ export default function StandaloneDatasetOverview({
                     <button
                       key={project.path}
                       onClick={() => onProjectSelect?.(project.path)}
-                      className="flex w-full items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/70 px-4 py-3 text-left transition-colors hover:border-border hover:bg-secondary/40"
+                      className="flex w-full items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2.5 text-left hover:border-border hover:bg-secondary/40"
                     >
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium text-foreground">
@@ -377,7 +374,7 @@ export default function StandaloneDatasetOverview({
               </div>
             </div>
 
-            <div className="min-w-0 rounded-3xl border border-border/70 bg-background/80 p-5">
+            <div className="min-w-0 rounded-lg border border-border bg-card p-4">
               <h2 className="text-base font-semibold text-foreground">
                 {t(
                   "settings.session.standaloneDataset.tipsTitle",
@@ -385,13 +382,13 @@ export default function StandaloneDatasetOverview({
                 )}
               </h2>
               <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
+                <div className="rounded-md border border-border bg-background px-3 py-2.5">
                   {t(
                     "settings.session.standaloneDataset.tipCapabilities",
                     "Standalone dataset mode keeps browsing, search, tags, and favorites, while removing terminal resume, delete, rename, and backend-dependent analytics.",
                   )}
                 </div>
-                <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
+                <div className="rounded-md border border-border bg-background px-3 py-2.5">
                   {t(
                     "settings.session.standaloneDataset.tipSwitching",
                     "After switching datasets, search, tags, favorites, and session lists all move to the current dataset scope.",

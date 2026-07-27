@@ -41,7 +41,7 @@ export default function MessageDistribution({ stats, title = 'Message Distributi
             <span className="text-[10px] text-muted-foreground">User</span>
           </div>
           <div className="flex items-end justify-between">
-            <span className="text-lg font-bold text-gradient">{stats.user_messages.toLocaleString()}</span>
+            <span className="text-lg font-semibold tabular-nums text-foreground">{stats.user_messages.toLocaleString()}</span>
             <span className="text-[10px] text-info">{userPercent.toFixed(0)}%</span>
           </div>
         </div>
@@ -54,7 +54,7 @@ export default function MessageDistribution({ stats, title = 'Message Distributi
             <span className="text-[10px] text-muted-foreground">Assistant</span>
           </div>
           <div className="flex items-end justify-between">
-            <span className="text-lg font-bold text-gradient">{stats.assistant_messages.toLocaleString()}</span>
+            <span className="text-lg font-semibold tabular-nums text-foreground">{stats.assistant_messages.toLocaleString()}</span>
             <span className="text-[10px] text-success">{assistantPercent.toFixed(0)}%</span>
           </div>
         </div>
@@ -72,7 +72,6 @@ export default function MessageDistribution({ stats, title = 'Message Distributi
   return (
     <DashboardCardShell
       className={`rounded-lg p-3 ${onClick ? 'cursor-pointer focus-within:ring-2 focus-within:ring-info/30' : ''}`}
-      overlayClassName="bg-gradient-to-br from-info/5 via-transparent to-success/5"
     >
       {onClick ? (
         <button type="button" onClick={onClick} className="w-full text-left">

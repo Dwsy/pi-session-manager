@@ -304,7 +304,7 @@ export default function SessionViewerToolbar({
         </div>
 
         {isMobile && (
-          <div className="mt-2 rounded-2xl border border-border/60 bg-background/90 p-1.5 shadow-sm">
+          <div className="mt-2 rounded-lg border border-border/60 bg-background/90 p-1.5 shadow-sm">
             <div className="grid grid-cols-5 gap-1">
               <button
                 onClick={onToggleSidebar}
@@ -386,11 +386,11 @@ export default function SessionViewerToolbar({
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
           <button
             onClick={closeMobileMenu}
-            className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+            className="absolute inset-0 bg-black/60"
             aria-label={t("common.close")}
             type="button"
           />
-          <div className="absolute inset-x-0 bottom-0 rounded-t-[20px] border border-border/70 bg-popover/95 shadow-[0_-18px_48px_rgba(0,0,0,0.28)] p-2 pb-[max(0.875rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-4 duration-200 backdrop-blur-md">
+          <div className="absolute inset-x-0 bottom-0 rounded-t-[20px] border border-border/70 bg-popover/95 shadow-lg p-2 pb-[max(0.875rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-4 duration-200">
             <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border" />
             <div className="px-1 pb-2 text-xs font-medium text-muted-foreground">
               {t("session.toolbar.moreActions", "More actions")}

@@ -275,7 +275,7 @@ function PickerDialog({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[95] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/60 p-4"
       role="dialog"
       aria-modal="true"
       onKeyDown={(event) => {
@@ -286,8 +286,8 @@ function PickerDialog({
         }
       }}
     >
-      <div className="w-[min(720px,calc(100vw-32px))] max-h-[80vh] rounded-2xl border border-border/70 bg-popover shadow-2xl overflow-hidden">
-        <div className="border-b border-border/70 px-5 py-4">
+      <div className="max-h-[80vh] w-[min(720px,calc(100vw-32px))] overflow-hidden rounded-lg border border-border bg-popover shadow-xl">
+        <div className="border-b border-border px-5 py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="text-lg font-semibold text-foreground">{title}</div>
@@ -302,7 +302,7 @@ function PickerDialog({
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="mt-4 flex items-center gap-3 rounded-[10px] border border-border/70 bg-surface px-4 py-3">
+          <div className="mt-4 flex items-center gap-3 rounded-[10px] border border-border bg-surface px-4 py-3">
             <Search className="h-4 w-4 text-foreground/50" />
             <input
               autoFocus
@@ -705,7 +705,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
               <button
                 type="button"
                 onClick={() => setUiFontPickerOpen(true)}
-                className="w-full rounded-[10px] border border-border/70 bg-background/35 px-4 py-3 text-left hover:border-border-hover motion-color"
+                className="w-full rounded-[10px] border border-border bg-background/35 px-4 py-3 text-left hover:border-border-hover motion-color"
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
@@ -762,7 +762,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
               <button
                 type="button"
                 onClick={() => setThemePickerOpen(true)}
-                className="w-full rounded-[10px] border border-border/70 bg-background/35 px-4 py-3 text-left hover:border-border-hover motion-color"
+                className="w-full rounded-[10px] border border-border bg-background/35 px-4 py-3 text-left hover:border-border-hover motion-color"
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0">
@@ -796,7 +796,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
                 <button
                   type="button"
                   onClick={() => setFontPickerOpen(true)}
-                  className="w-full rounded-[10px] border border-border/70 bg-background/35 px-4 py-3 text-left hover:border-border-hover motion-color"
+                  className="w-full rounded-[10px] border border-border bg-background/35 px-4 py-3 text-left hover:border-border-hover motion-color"
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
@@ -827,7 +827,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
             </SettingsField>
           </div>
 
-          <div className="rounded-[10px] border border-border/70 bg-background/35 p-3.5">
+          <div className="rounded-[10px] border border-border bg-background/35 p-3.5">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div className="settings-section-label">
                 {t('settings.appearance.preview', 'Preview')}
@@ -1066,7 +1066,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
                   className={`w-full rounded-[10px] border px-4 py-3 text-left motion-color ${
                     isSelected
                       ? SELECTED_CARD
-                      : 'border-border/70 bg-background/35 hover:border-border-hover hover:bg-surface/70'
+                      : 'border-border bg-background/35 hover:border-border-hover hover:bg-surface/70'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-4">
@@ -1098,7 +1098,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
               )
             })}
             {filteredThemes.length === 0 && (
-              <div className="rounded-[10px] border border-dashed border-border/70 px-4 py-8 text-center text-sm text-foreground/55">
+              <div className="rounded-[10px] border border-dashed border-border px-4 py-8 text-center text-sm text-foreground/55">
                 {t('settings.searchEmpty', 'No matching settings')}
               </div>
             )}
@@ -1117,7 +1117,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         >
           <div className="space-y-3">
             {uiFontsLoading && (
-              <div className="flex items-center justify-center py-3 text-sm text-foreground/55 gap-2 border border-dashed border-border/70 rounded-[10px] bg-background/20">
+              <div className="flex items-center justify-center py-3 text-sm text-foreground/55 gap-2 border border-dashed border-border rounded-[10px] bg-background/20">
                 <Loader2 className="h-4 w-4 animate-spin settings-accent-fg" />
                 <span>{t('settings.appearance.detecting', 'Detecting system fonts...')}</span>
               </div>
@@ -1135,7 +1135,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
                   className={`w-full rounded-[10px] border px-4 py-3 text-left motion-color ${
                     isSelected
                       ? SELECTED_CARD
-                      : 'border-border/70 bg-background/35 hover:border-border-hover hover:bg-surface/70'
+                      : 'border-border bg-background/35 hover:border-border-hover hover:bg-surface/70'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-4">
@@ -1165,7 +1165,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
               )
             })}
             {filteredUiFonts.length === 0 && (
-              <div className="rounded-[10px] border border-dashed border-border/70 px-4 py-8 text-center text-sm text-foreground/55">
+              <div className="rounded-[10px] border border-dashed border-border px-4 py-8 text-center text-sm text-foreground/55">
                 {t('settings.searchEmpty', 'No matching settings')}
               </div>
             )}
@@ -1184,7 +1184,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         >
           <div className="space-y-3">
             {monoFontsLoading && (
-              <div className="flex items-center justify-center py-3 text-sm text-foreground/55 gap-2 border border-dashed border-border/70 rounded-[10px] bg-background/20">
+              <div className="flex items-center justify-center py-3 text-sm text-foreground/55 gap-2 border border-dashed border-border rounded-[10px] bg-background/20">
                 <Loader2 className="h-4 w-4 animate-spin settings-accent-fg" />
                 <span>{t('settings.appearance.detecting', 'Detecting system fonts...')}</span>
               </div>
@@ -1202,7 +1202,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
                   className={`w-full rounded-[10px] border px-4 py-3 text-left motion-color ${
                     isSelected
                       ? SELECTED_CARD
-                      : 'border-border/70 bg-background/35 hover:border-border-hover hover:bg-surface/70'
+                      : 'border-border bg-background/35 hover:border-border-hover hover:bg-surface/70'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-4">
@@ -1232,7 +1232,7 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
               )
             })}
             {filteredMonoFonts.length === 0 && (
-              <div className="rounded-[10px] border border-dashed border-border/70 px-4 py-8 text-center text-sm text-foreground/55">
+              <div className="rounded-[10px] border border-dashed border-border px-4 py-8 text-center text-sm text-foreground/55">
                 {t('settings.searchEmpty', 'No matching settings')}
               </div>
             )}

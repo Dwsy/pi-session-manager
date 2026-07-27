@@ -49,7 +49,6 @@ export default function ProjectsChart({ stats, sessions, title, limit = 8, onPro
   return (
     <DashboardCardShell
       className="rounded-lg p-3"
-      overlayClassName="bg-gradient-to-br from-info/5 via-transparent to-transparent"
     >
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">

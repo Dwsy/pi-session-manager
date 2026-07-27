@@ -39,7 +39,7 @@ export default function ConvertSessionResultDialog({
     if (normalized.includes('pi')) {
       return 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-200'
     }
-    return 'border-border/60 bg-secondary/30 text-foreground'
+    return 'border-border bg-muted/30 text-foreground'
   }
 
   const handleCopy = async () => {
@@ -49,9 +49,12 @@ export default function ConvertSessionResultDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
-        className={`bg-background border border-border rounded-xl p-6 shadow-2xl ${
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="convert-session-result-title"
+        className={`rounded-md border border-border bg-background p-5 shadow-xl ${
           isMobile ? 'w-[95vw] max-w-md' : 'w-[34rem]'
         }`}
       >
@@ -62,7 +65,7 @@ export default function ConvertSessionResultDialog({
             ) : (
               <FileOutput className="h-5 w-5 text-primary" />
             )}
-            <h3 className="text-lg font-semibold">
+            <h3 id="convert-session-result-title" className="text-lg font-semibold">
               {result.dry_run
                 ? t('session.convert.previewTitle')
                 : t('session.convert.successTitle')}
@@ -70,7 +73,7 @@ export default function ConvertSessionResultDialog({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label={t('common.close')}
           >
             <X className="h-4 w-4" />
@@ -85,7 +88,7 @@ export default function ConvertSessionResultDialog({
           <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${providerTone(result.target_provider)}`}>
             {result.target_provider}
           </span>
-          <span className="inline-flex items-center rounded-full border border-border/60 bg-secondary/30 px-2.5 py-1 text-xs text-muted-foreground">
+          <span className="inline-flex items-center rounded-full border border-border bg-muted/30 px-2.5 py-1 text-xs text-muted-foreground">
             {result.dry_run
               ? t('session.convert.previewBadge')
               : t('session.convert.writtenBadge')}
@@ -93,7 +96,7 @@ export default function ConvertSessionResultDialog({
         </div>
 
         <div className="space-y-3">
-          <div className="rounded-lg border border-border/60 bg-secondary/20 p-3 text-sm">
+          <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
             <div className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2">
               <span className="text-muted-foreground">{t('session.convert.source')}</span>
               <span>{result.source_provider}</span>
@@ -106,17 +109,17 @@ export default function ConvertSessionResultDialog({
             </div>
           </div>
 
-          <div className="rounded-lg border border-border/60 bg-background/40 p-3">
+          <div className="rounded-md border border-border bg-background/40 p-3">
             <div className="mb-2 text-sm font-medium">
               {t('session.convert.resumeCommand')}
             </div>
-            <pre className="whitespace-pre-wrap break-all rounded-md bg-secondary/40 px-3 py-2 text-xs text-foreground">
+            <pre className="whitespace-pre-wrap break-all rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
               {result.resume_command}
             </pre>
           </div>
 
           {result.warnings.length > 0 && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
               <div className="font-medium mb-1">{t('common.warning')}</div>
               <ul className="space-y-1 text-xs">
                 {result.warnings.map((warning, index) => (
@@ -132,7 +135,7 @@ export default function ConvertSessionResultDialog({
             <button
               type="button"
               onClick={() => onOpenTargetPath(writtenPath)}
-              className="px-3 py-2 text-sm rounded-lg border border-border/70 bg-secondary hover:bg-secondary-hover transition-colors inline-flex items-center gap-2"
+              className="px-3 py-2 text-sm rounded-md border border-border bg-background hover:bg-muted inline-flex items-center gap-2"
             >
               <ExternalLink className="h-4 w-4" />
               {t('session.convert.openTarget')}
@@ -142,7 +145,7 @@ export default function ConvertSessionResultDialog({
             <button
               type="button"
               onClick={() => onRunResumeCommand(result.resume_command)}
-              className="px-3 py-2 text-sm rounded-lg border border-primary/40 bg-primary/10 hover:bg-primary/15 transition-colors inline-flex items-center gap-2"
+              className="px-3 py-2 text-sm rounded-md border border-primary/40 bg-primary/10 hover:bg-primary/15 inline-flex items-center gap-2"
             >
               <FileOutput className="h-4 w-4" />
               {t('session.convert.runResume')}
@@ -151,7 +154,7 @@ export default function ConvertSessionResultDialog({
           <button
             type="button"
             onClick={handleCopy}
-            className="px-3 py-2 text-sm rounded-lg border border-border/70 bg-secondary hover:bg-secondary-hover transition-colors inline-flex items-center gap-2"
+            className="px-3 py-2 text-sm rounded-md border border-border bg-background hover:bg-muted inline-flex items-center gap-2"
           >
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copied
@@ -161,14 +164,14 @@ export default function ConvertSessionResultDialog({
           <button
             type="button"
             onClick={onConvertAgain}
-            className="px-3 py-2 text-sm rounded-lg border border-border/70 bg-secondary hover:bg-secondary-hover transition-colors"
+            className="px-3 py-2 text-sm rounded-md border border-border bg-background hover:bg-muted"
           >
             {t('session.convert.convertAgain')}
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-2 text-sm rounded-lg border border-border/70 bg-secondary hover:bg-secondary-hover transition-colors"
+            className="px-3 py-2 text-sm rounded-md border border-border bg-background hover:bg-muted"
           >
             {t('common.done')}
           </button>

@@ -369,7 +369,7 @@ export default function LabelFilter({
       <button
         key={tag.id}
         onClick={() => handleToggle(tag.id)}
-        className="flex w-full select-none items-center gap-2.5 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+        className="flex w-full select-none items-center gap-2.5 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring"
         style={{
           paddingLeft: `${8 + depth * 14}px`,
           width: "calc(100% - 8px)",
@@ -411,10 +411,13 @@ export default function LabelFilter({
           clickPointRef.current = { x: event.clientX, y: event.clientY };
           setOpen(true);
         }}
-        className={`inline-flex items-center gap-1.5 h-7 px-2 rounded-[6px] text-[12px] select-none motion-color motion-press focus-ring ${
+        aria-label={t("tags.filter.filterChats")}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={`inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px] select-none motion-color focus-ring ${
           activeCount > 0
             ? "bg-foreground/[0.08] text-foreground"
-            : "text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted"
         }`}
       >
         <ListFilter className="h-3 w-3" />
@@ -439,10 +442,10 @@ export default function LabelFilter({
               opacity: menuReady ? 1 : 0,
               pointerEvents: menuReady ? "auto" : "none",
             }}
-            className="z-[70] flex w-[280px] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-[8px] border border-border/50 bg-popover text-popover-foreground shadow-lg transition-opacity duration-75"
+            className="z-[70] flex w-[280px] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-lg transition-opacity duration-75"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
               <span className="text-[13px] font-medium">
                 {t("tags.filter.filterChats")}
               </span>
@@ -456,7 +459,7 @@ export default function LabelFilter({
                     setFilter("");
                     setSubmenu(null);
                   }}
-                  className="text-[11px] text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
+                  className="text-[11px] text-muted-foreground hover:text-foreground motion-color focus-ring"
                 >
                   {t("tags.filter.clearFilter")}
                 </button>
@@ -464,7 +467,7 @@ export default function LabelFilter({
             </div>
 
             {/* Search */}
-            <div className="border-b border-border/50 px-3 py-2 flex items-center gap-2">
+            <div className="border-b border-border px-3 py-2 flex items-center gap-2">
               <Search className="h-3 w-3 text-muted-foreground/50 shrink-0" />
               <CompositionInput
                 ref={inputRef}
@@ -485,7 +488,7 @@ export default function LabelFilter({
                   {onSourceFilterChange && sourceOptions.length > 0 && (
                     <button
                       onClick={() => setSubmenu("sources")}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-muted motion-color focus-ring"
                     >
                       <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                       <span className="flex-1 text-left">{t("tags.filter.sources", "Sources")}</span>
@@ -499,7 +502,7 @@ export default function LabelFilter({
                   {onModelFilterChange && modelOptions.length > 0 && (
                     <button
                       onClick={() => setSubmenu("models")}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-muted motion-color focus-ring"
                     >
                       <Bot className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                       <span className="flex-1 text-left">{t("tags.filter.models", "Models")}</span>
@@ -513,7 +516,7 @@ export default function LabelFilter({
                   {onDateRangeChange && (
                     <button
                       onClick={() => setSubmenu("dates")}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-muted motion-color focus-ring"
                     >
                       <Calendar className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                       <span className="flex-1 text-left">{t("tags.filter.dateRange", "Date Range")}</span>
@@ -527,7 +530,7 @@ export default function LabelFilter({
                   {onSortByChange && (
                     <button
                       onClick={() => setSubmenu("sort")}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-muted motion-color focus-ring"
                     >
                       <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                       <span className="flex-1 text-left">{t("session.sort.label", "Sort")}</span>
@@ -546,7 +549,7 @@ export default function LabelFilter({
                   {filteredStatuses.length > 0 && (
                     <button
                       onClick={() => setSubmenu("statuses")}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-muted motion-color focus-ring"
                     >
                       <CircleDot className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                       <span className="flex-1 text-left">{t("tags.filter.statuses")}</span>
@@ -561,7 +564,7 @@ export default function LabelFilter({
                   {/* Labels */}
                   <button
                     onClick={() => setSubmenu("labels")}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-muted motion-color focus-ring"
                   >
                     <Tags className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
                     <span className="flex-1 text-left">{t("tags.filter.labels")}</span>
@@ -578,7 +581,7 @@ export default function LabelFilter({
                 <>
                   <button
                     onClick={() => setSubmenu(null)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] motion-color motion-press focus-ring border-b border-border/50"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground hover:bg-muted motion-color focus-ring border-b border-border"
                   >
                     <ArrowLeft className="h-3.5 w-3.5" />
                     <span>{t("tags.filter.back", "Back")}</span>
@@ -598,7 +601,7 @@ export default function LabelFilter({
                                   onSourceFilterChange([...new Set([...selectedSourceSlugs, source.slug])]);
                                 }
                               }}
-                              className="flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                              className="flex w-full items-center gap-2 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring"
                               style={{ width: "calc(100% - 8px)" }}
                             >
                               <AgentColorIcon
@@ -618,7 +621,7 @@ export default function LabelFilter({
                       <>
                         <button
                           onClick={() => onModelFilterChange("")}
-                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                          className={`flex w-full items-center gap-2 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring ${
                             !selectedModel ? "text-foreground" : "text-muted-foreground"
                           }`}
                           style={{ width: "calc(100% - 8px)" }}
@@ -630,7 +633,7 @@ export default function LabelFilter({
                           <button
                             key={model}
                             onClick={() => onModelFilterChange(model)}
-                            className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                            className={`flex w-full items-center gap-2 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring ${
                               selectedModel === model ? "text-foreground" : "text-muted-foreground"
                             }`}
                             style={{ width: "calc(100% - 8px)" }}
@@ -645,7 +648,7 @@ export default function LabelFilter({
                       <>
                         <button
                           onClick={() => { onDateRangeChange(null); setSubmenu(null); }}
-                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                          className={`flex w-full items-center gap-2 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring ${
                             !dateRange ? "text-foreground" : "text-muted-foreground"
                           }`}
                           style={{ width: "calc(100% - 8px)" }}
@@ -661,7 +664,7 @@ export default function LabelFilter({
                             onDateRangeChange({ start, end: now });
                             setSubmenu(null);
                           }}
-                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                          className={`flex w-full items-center gap-2 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring ${
                             dateRange && isToday(dateRange) ? "text-foreground" : "text-muted-foreground"
                           }`}
                           style={{ width: "calc(100% - 8px)" }}
@@ -677,7 +680,7 @@ export default function LabelFilter({
                             onDateRangeChange({ start, end: now });
                             setSubmenu(null);
                           }}
-                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                          className={`flex w-full items-center gap-2 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring ${
                             dateRange && isLast24h(dateRange) ? "text-foreground" : "text-muted-foreground"
                           }`}
                           style={{ width: "calc(100% - 8px)" }}
@@ -693,7 +696,7 @@ export default function LabelFilter({
                             onDateRangeChange({ start, end: now });
                             setSubmenu(null);
                           }}
-                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                          className={`flex w-full items-center gap-2 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring ${
                             dateRange && isLast2Days(dateRange) ? "text-foreground" : "text-muted-foreground"
                           }`}
                           style={{ width: "calc(100% - 8px)" }}
@@ -709,7 +712,7 @@ export default function LabelFilter({
                             onDateRangeChange({ start, end: now });
                             setSubmenu(null);
                           }}
-                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                          className={`flex w-full items-center gap-2 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring ${
                             dateRange && isLast7Days(dateRange) ? "text-foreground" : "text-muted-foreground"
                           }`}
                           style={{ width: "calc(100% - 8px)" }}
@@ -725,7 +728,7 @@ export default function LabelFilter({
                             onDateRangeChange({ start, end: now });
                             setSubmenu(null);
                           }}
-                          className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                          className={`flex w-full items-center gap-2 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring ${
                             dateRange && isLast30Days(dateRange) ? "text-foreground" : "text-muted-foreground"
                           }`}
                           style={{ width: "calc(100% - 8px)" }}
@@ -748,7 +751,7 @@ export default function LabelFilter({
                                 onSortByChange(option.value);
                               }
                             }}
-                            className={`flex w-full items-center gap-2 rounded-[6px] mx-1 px-2 py-1.5 text-[13px] hover:bg-foreground/[0.05] motion-color motion-press focus-ring ${
+                            className={`flex w-full items-center gap-2 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring ${
                               sortBy === option.value ? "text-foreground" : "text-muted-foreground"
                             }`}
                             style={{ width: "calc(100% - 8px)" }}
@@ -819,7 +822,7 @@ export default function LabelFilter({
                                 <button
                                   type="submit"
                                   disabled={!newName.trim()}
-                                  className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-30 motion-color motion-press focus-ring"
+                                  className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-30 motion-color focus-ring"
                                 >
                                   {t("tags.add")}
                                 </button>
@@ -830,7 +833,7 @@ export default function LabelFilter({
                                   setCreating(true);
                                   setTimeout(() => createInputRef.current?.focus(), 0);
                                 }}
-                                className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-[6px] text-[12px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] motion-color motion-press focus-ring"
+                                className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-md text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted motion-color focus-ring"
                               >
                                 <Plus className="h-3 w-3" />
                                 {t("tags.createNew")}

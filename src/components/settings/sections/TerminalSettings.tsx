@@ -343,7 +343,7 @@ export default function TerminalSettings({
                       onClick={() =>
                         onUpdate("terminal", "defaultShell", shell.path)
                       }
-                      className={`px-4 py-2 rounded-lg border text-sm motion-surface motion-color motion-press focus-ring ${
+                      className={`px-4 py-2 rounded-lg border text-sm motion-surface motion-color focus-ring ${
                         settings.terminal.defaultShell === shell.path
                           ? "border-info bg-info/10 text-foreground"
                           : "border-border text-muted-foreground hover:border-border-hover hover:text-foreground"
@@ -407,7 +407,7 @@ export default function TerminalSettings({
                   onClick={() =>
                     onUpdate("terminal", "defaultTerminal", term.id)
                   }
-                  className={`relative p-3 rounded-lg border text-left motion-surface motion-color motion-press focus-ring ${
+                  className={`relative p-3 rounded-lg border text-left motion-surface motion-color focus-ring ${
                     settings.terminal.defaultTerminal === term.id
                       ? "border-info bg-info/10"
                       : "border-border hover:border-border-hover"
@@ -594,7 +594,7 @@ export default function TerminalSettings({
                         onClick={() =>
                           handleCopyExample(example.command, example.key)
                         }
-                        className="p-1 rounded hover:bg-secondary motion-color motion-press focus-ring"
+                        className="p-1 rounded hover:bg-secondary motion-color focus-ring"
                         title="Copy"
                       >
                         {copiedExample === example.key ? (

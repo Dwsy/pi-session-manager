@@ -611,6 +611,25 @@ export function GlobalMapCanvas({
     if (target) onActivateNode(targetNode(target).uid);
   }
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLCanvasElement>): void {
+    if (mode !== "atlas" || !onViewChange) return;
+    const panStep = 0.08 / Math.max(view.zoom, 0.1);
+    if (event.key === "ArrowLeft")
+      onViewChange(clampView({ ...view, centerX: view.centerX - panStep }, layout));
+    else if (event.key === "ArrowRight")
+      onViewChange(clampView({ ...view, centerX: view.centerX + panStep }, layout));
+    else if (event.key === "ArrowUp")
+      onViewChange(clampView({ ...view, centerY: view.centerY - panStep }, layout));
+    else if (event.key === "ArrowDown")
+      onViewChange(clampView({ ...view, centerY: view.centerY + panStep }, layout));
+    else if (event.key === "+" || event.key === "=")
+      onViewChange(clampView({ ...view, zoom: view.zoom * 1.2 }, layout));
+    else if (event.key === "-" || event.key === "_")
+      onViewChange(clampView({ ...view, zoom: view.zoom / 1.2 }, layout));
+    else return;
+    event.preventDefault();
+  }
+
   return (
     <div
       ref={stageRef}
@@ -629,7 +648,10 @@ export function GlobalMapCanvas({
         }}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
+        onKeyDown={handleKeyDown}
+        tabIndex={mode === "atlas" ? 0 : -1}
         aria-label="Pi branch segment map"
+        aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight + -"
       />
       {hover ? (
         <MapTooltip
@@ -804,6 +826,7 @@ function MapTooltip({
             arguments={toolPresentation.arguments}
             output={toolPresentation.output}
             isError={toolPresentation.isError}
+            hasResult={toolPresentation.hasResult}
             entryId={node.uid}
           />
         </Suspense>
@@ -907,6 +930,7 @@ function resolveToolPresentation(
   arguments: Record<string, unknown>;
   output: string;
   isError: boolean;
+  hasResult: boolean;
 } | null {
   const message = node.entry.message;
   if (!message) return null;
@@ -920,6 +944,7 @@ function resolveToolPresentation(
       arguments: call?.arguments || {},
       output: body,
       isError: Boolean(message.isError),
+      hasResult: true,
     };
   }
 
@@ -938,6 +963,7 @@ function resolveToolPresentation(
     arguments: toolCall.arguments || {},
     output: result ? nodePrimaryText(result) : "",
     isError: Boolean(result?.entry.message?.isError),
+    hasResult: Boolean(result),
   };
 }
 

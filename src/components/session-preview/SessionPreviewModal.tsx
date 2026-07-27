@@ -93,7 +93,7 @@ export default function SessionPreviewModal({
           <KbdTooltip shortcut="Cmd+R">
             <button
               onClick={() => session && onResumeSession(session)}
-              className="p-1.5 rounded border border-border/70 bg-secondary hover:bg-secondary-hover transition-colors no-drag"
+              className="focus-ring no-drag rounded-md border border-border p-1.5 hover:bg-muted"
               title={t("session.resume", "Resume")}
               aria-label={t("session.resume", "Resume")}
             >
@@ -104,7 +104,7 @@ export default function SessionPreviewModal({
         <div className="h-4 w-px bg-border/60 mx-0.5" />
         <button
           onClick={handleMinimize}
-          className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors no-drag"
+          className="focus-ring no-drag rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           title={t("session.preview.minimize", "Minimize")}
           aria-label={t("session.preview.minimize", "Minimize")}
         >
@@ -112,7 +112,7 @@ export default function SessionPreviewModal({
         </button>
         <button
           onClick={handleMaximize}
-          className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors no-drag"
+          className="focus-ring no-drag rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           title={t("session.preview.maximize", "Maximize")}
           aria-label={t("session.preview.maximize", "Maximize")}
         >
@@ -120,7 +120,7 @@ export default function SessionPreviewModal({
         </button>
         <button
           onClick={handleClose}
-          className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors no-drag"
+          className="focus-ring no-drag rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           title={t("session.preview.close", "Close")}
           aria-label={t("session.preview.close", "Close")}
         >
@@ -211,15 +211,15 @@ export default function SessionPreviewModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-0"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 sm:p-0"
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="session-preview-title"
+      aria-label={t("session.preview.title", "Session preview")}
     >
       <div
         ref={modalRef}
-        className="bg-surface rounded-lg shadow-2xl flex flex-col overflow-hidden border border-border w-full h-full sm:w-[90vw] sm:h-[90vh] sm:max-w-[90vw] sm:max-h-[90vh]"
+        className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl sm:h-[90vh] sm:max-h-[90vh] sm:w-[90vw] sm:max-w-[90vw]"
       >
         <div className="flex-1 overflow-hidden bg-background">
           <SessionViewer

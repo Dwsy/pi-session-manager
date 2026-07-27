@@ -54,7 +54,7 @@ export function HistoryTab({
       )}
     >
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/40 p-4 shadow-sm backdrop-blur-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-border bg-card p-4">
           <SettingsTabs
             items={[
               {
@@ -81,7 +81,7 @@ export function HistoryTab({
             type="button"
             onClick={() => void onCreateBackup()}
             disabled={busy === "backup"}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all duration-150 active:scale-95 focus-ring disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-ring disabled:opacity-60"
           >
             {busy === "backup" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -101,10 +101,10 @@ export function HistoryTab({
               backups.map((backup) => (
                 <div
                   key={backup.id}
-                  className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/40 p-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:border-border hover:bg-card/70 hover:shadow"
+                  className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-md border border-border bg-card p-4 hover:border-border hover:bg-muted"
                 >
                   <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary shadow-inner">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
                       <History className="h-5 w-5" />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -120,7 +120,7 @@ export function HistoryTab({
                         </span>
                       </div>
                       {backup.note && (
-                        <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-foreground/80 bg-surface/80 px-2.5 py-1 rounded-lg border border-border/40 w-fit">
+                        <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-foreground/80 bg-surface/80 px-2.5 py-1 rounded-lg border border-border w-fit">
                           <FileText className="h-3.5 w-3.5 text-primary" />
                           <span>{backup.note}</span>
                         </div>
@@ -133,7 +133,7 @@ export function HistoryTab({
                       type="button"
                       onClick={() => onRestoreBackup(backup.id)}
                       disabled={busy === `restore-${backup.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/60 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-150 active:scale-95 focus-ring disabled:opacity-60"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/60 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary focus-ring disabled:opacity-60"
                       title={t(
                         "settings.modelConfigCenter.actions.restore",
                         "Resume",
@@ -155,7 +155,7 @@ export function HistoryTab({
                       type="button"
                       onClick={() => onDeleteBackup(backup.id)}
                       disabled={busy === `delete-${backup.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-red-500/15 hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/30 transition-all duration-150 active:scale-95 focus-ring disabled:opacity-60"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-red-500/15 hover:text-red-600 dark:hover:text-red-400 hover:border-red-500/30 focus-ring disabled:opacity-60"
                       title={t(
                         "settings.modelConfigCenter.actions.delete",
                         "Delete",
@@ -171,8 +171,8 @@ export function HistoryTab({
                 </div>
               ))
             ) : (
-              <div className="rounded-xl border border-dashed border-border/60 p-12 text-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary mx-auto mb-3 shadow-inner">
+              <div className="rounded-md border border-dashed border-border p-12 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-primary/10 text-primary mx-auto mb-3">
                   <History className="h-7 w-7" />
                 </div>
                 <div className="text-sm font-semibold text-foreground">
@@ -190,10 +190,10 @@ export function HistoryTab({
             versions.map((version) => (
               <div
                 key={version.id}
-                className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/40 p-4 shadow-sm backdrop-blur-sm transition-all duration-200 hover:border-border hover:bg-card/70 hover:shadow"
+                className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-md border border-border bg-card p-4 hover:border-border hover:bg-muted"
               >
                 <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent shadow-inner">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-accent/15 text-accent">
                     <GitCommit className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -219,7 +219,7 @@ export function HistoryTab({
                     type="button"
                     onClick={() => onRestoreVersion(version.id)}
                     disabled={busy === `version-${version.id}`}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/60 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-150 active:scale-95 focus-ring disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/60 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary focus-ring disabled:opacity-60"
                   >
                     {busy === `version-${version.id}` ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -237,8 +237,8 @@ export function HistoryTab({
               </div>
             ))
           ) : (
-            <div className="rounded-xl border border-dashed border-border/60 p-12 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10 text-accent mx-auto mb-3 shadow-inner">
+            <div className="rounded-md border border-dashed border-border p-12 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-accent/10 text-accent mx-auto mb-3">
                 <GitCommit className="h-7 w-7" />
               </div>
               <div className="text-sm font-semibold text-foreground">

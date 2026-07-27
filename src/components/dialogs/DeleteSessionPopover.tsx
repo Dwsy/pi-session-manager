@@ -180,7 +180,7 @@ export default function DeleteSessionPopover({
       ref={popoverRef}
       data-delete-session-dialog="true"
       className={[
-        'fixed z-[10000] rounded-lg border border-border/70 bg-card shadow-2xl',
+        'fixed z-[10000] rounded-md border border-border bg-popover shadow-lg',
         isMobile ? 'inset-x-4 top-1/2 w-auto -translate-y-1/2' : 'w-[280px]',
       ].join(' ')}
       style={isMobile ? undefined : {
@@ -215,7 +215,7 @@ export default function DeleteSessionPopover({
           type="button"
           onClick={onCancel}
           disabled={isDeleting}
-          className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+          className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
           aria-label={t('common.close')}
         >
           <X className="h-3.5 w-3.5" />
@@ -262,7 +262,7 @@ export default function DeleteSessionPopover({
           type="button"
           onClick={onCancel}
           disabled={isDeleting}
-          className="rounded px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
           {t('common.cancel')}
         </button>

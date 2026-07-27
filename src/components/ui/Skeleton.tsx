@@ -162,7 +162,7 @@ export function FavoritesSkeleton({ count = 6 }: FavoritesSkeletonProps) {
 
 export function StatCardSkeleton() {
   return (
-    <div className="glass-card rounded-lg p-3 relative overflow-hidden">
+    <div className="relative overflow-hidden rounded-lg border border-border bg-card p-3">
       <div className="relative z-10">
         <div className="flex items-start justify-between mb-2">
           <Skeleton className="h-9 w-9 rounded-lg" />
@@ -188,7 +188,7 @@ export function DashboardStatsSkeleton() {
 
 export function ChartCardSkeleton({ height = 120 }: { height?: number }) {
   return (
-    <div className="glass-card rounded-lg p-3 relative overflow-hidden">
+    <div className="relative overflow-hidden rounded-lg border border-border bg-card p-3">
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5">
@@ -205,7 +205,7 @@ export function ChartCardSkeleton({ height = 120 }: { height?: number }) {
 
 export function RecentSessionsSkeleton({ count = 5 }: { count?: number }) {
   return (
-    <div className="glass-card rounded-lg p-3 relative overflow-hidden">
+    <div className="relative overflow-hidden rounded-lg border border-border bg-card p-3">
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
@@ -216,7 +216,7 @@ export function RecentSessionsSkeleton({ count = 5 }: { count?: number }) {
         </div>
         <div className="space-y-1.5">
           {Array.from({ length: count }).map((_, index) => (
-            <div key={index} className="flex items-center gap-2 p-2 bg-background/60 rounded-lg border border-foreground/5">
+            <div key={index} className="flex items-center gap-2 border-b border-border/40 p-2 last:border-b-0">
               <Skeleton className="h-5 w-5 rounded flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <Skeleton className="h-3 w-full mb-1" style={{ maxWidth: '70%' }} />
@@ -240,7 +240,7 @@ export function RecentSessionsSkeleton({ count = 5 }: { count?: number }) {
 
 export function HeatmapSkeleton() {
   return (
-    <div className="glass-card rounded-lg p-3 relative overflow-hidden">
+    <div className="relative overflow-hidden rounded-lg border border-border bg-card p-3">
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5">
@@ -256,7 +256,7 @@ export function HeatmapSkeleton() {
                 <Skeleton
                   key={colIndex}
                   className="w-3 h-3 rounded-[2px]"
-                  style={{ opacity: 0.3 + Math.random() * 0.4 }}
+                  style={{ opacity: 0.35 + ((rowIndex * 7 + colIndex * 3) % 5) * 0.1 }}
                 />
               ))}
             </div>
@@ -269,7 +269,7 @@ export function HeatmapSkeleton() {
 
 export function ListChartSkeleton({ items = 5 }: { items?: number }) {
   return (
-    <div className="glass-card rounded-lg p-3 relative overflow-hidden">
+    <div className="relative overflow-hidden rounded-lg border border-border bg-card p-3">
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5">
@@ -281,7 +281,7 @@ export function ListChartSkeleton({ items = 5 }: { items?: number }) {
           {Array.from({ length: items }).map((_, index) => (
             <div key={index} className="flex items-center gap-2">
               <Skeleton className="h-3 w-3 rounded-sm" />
-              <Skeleton className="h-3 flex-1" style={{ maxWidth: `${40 + Math.random() * 40}%` }} />
+              <Skeleton className="h-3 flex-1" style={{ maxWidth: `${45 + (index % 4) * 10}%` }} />
               <Skeleton className="h-3 w-8" />
             </div>
           ))}

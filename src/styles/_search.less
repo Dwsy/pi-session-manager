@@ -96,10 +96,10 @@
 
 // Session Tree Search
 .session-tree-search {
-  padding: 14px 12px 12px 12px;
-  border-bottom: 1px solid rgba(var(--accent-rgb), 0.1);
-  background: var(--bg-subtle);
   flex-shrink: 0;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgb(var(--color-border) / 0.65);
+  background: rgb(var(--color-background));
 }
 
 .session-tree-search-content {
@@ -124,21 +124,24 @@
 
 .session-tree-search .search-input {
   width: 100%;
-  padding: 6px 10px 6px 28px;
-  font-size: calc(var(--font-size-base, 16px) * 0.75);
-  font-family: inherit;
-  background: var(--bg-inset);
-  color: var(--text-secondary);
-  border: none;
+  height: 30px;
+  padding: 5px 28px;
+  border: 1px solid rgb(var(--color-border) / 0.72);
   border-radius: 6px;
-  transition: all 0.2s ease;
+  background: transparent;
+  color: rgb(var(--color-foreground));
+  font-family: inherit;
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-ease-standard),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .session-tree-search .search-input:focus {
   outline: none;
-  border-color: rgba(var(--accent-rgb), 0.5);
-  background: var(--bg-inset-hover);
-  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.1);
+  border-color: rgb(var(--color-ring) / 0.62);
+  background: rgb(var(--color-background));
+  box-shadow: 0 0 0 2px rgb(var(--color-ring) / 0.14);
 }
 
 .session-tree-search .search-input::placeholder {
@@ -148,15 +151,17 @@
 .search-input-wrapper .clear-button {
   position: absolute;
   right: 6px;
-  padding: 2px;
-  background: transparent;
-  color: rgb(var(--color-muted-foreground));
-  border: none;
-  border-radius: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  padding: 2px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
+  transition:
+    color var(--motion-duration-fast) var(--motion-ease-standard),
+    background-color var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .search-input-wrapper .clear-button:hover {
@@ -183,17 +188,19 @@
 }
 
 .search-navigation .nav-button {
-  padding: 6px;
-  min-width: 32px;
-  min-height: 32px;
-  background: transparent;
-  color: rgb(var(--color-muted-foreground));
-  border: none;
-  border-radius: 4px;
-  transition: all 0.2s ease;
   display: flex;
+  min-width: 28px;
+  min-height: 28px;
   align-items: center;
   justify-content: center;
+  padding: 5px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
+  transition:
+    color var(--motion-duration-fast) var(--motion-ease-standard),
+    background-color var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .search-navigation .nav-button:hover:not(:disabled) {

@@ -65,14 +65,14 @@ export default function DeleteConfirmMenuItem({
           <div className="flex items-center gap-1">
             <button
               onClick={handleClick}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded bg-red-600 px-2 py-1.5 text-[10px] text-white hover:bg-red-700 motion-color motion-press focus-ring"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded bg-red-600 px-2 py-1.5 text-[10px] text-white hover:bg-red-700 motion-color focus-ring"
             >
               <Trash2 className="h-3 w-3" />
               <span>{t('common.confirm', { defaultValue: 'Confirm?' })}</span>
             </button>
             <button
               onClick={handleCancel}
-              className="rounded p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary motion-color motion-press focus-ring"
+              className="rounded p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary motion-color focus-ring"
               title={t('common.cancel')}
             >
               <X className="h-3 w-3" />
@@ -88,7 +88,7 @@ export default function DeleteConfirmMenuItem({
       <div className="border-t border-border/50 my-1" />
       <button
         onClick={handleClick}
-        className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-red-500/10 motion-color motion-press focus-ring"
+        className="flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-red-500/10 motion-color focus-ring"
       >
         <Trash2 className="h-3.5 w-3.5 text-red-500" />
         <span className="text-xs text-red-500">{label || t('tags.contextMenu.delete')}</span>

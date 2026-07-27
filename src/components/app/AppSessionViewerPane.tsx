@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, cloneElement, isValidElement } from "react";
-import type { ComponentProps, PointerEvent as ReactPointerEvent } from "react";
+import type { ComponentProps, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { PanelRightOpen, Terminal as TerminalIcon, Pin } from "lucide-react";
 
@@ -156,6 +156,22 @@ function AppSessionViewerPane({
 
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp, { once: true });
+  }, [setPanelWidth]);
+
+  const handleRightPanelResizeKeyDown = useCallback((
+    event: ReactKeyboardEvent<HTMLDivElement>,
+    panelId: string,
+    width: number,
+  ) => {
+    const step = event.shiftKey ? 32 : 16;
+    let nextWidth = width;
+    if (event.key === "ArrowLeft") nextWidth = width + step;
+    else if (event.key === "ArrowRight") nextWidth = width - step;
+    else if (event.key === "Home") nextWidth = RIGHT_PANEL_MIN_WIDTH;
+    else if (event.key === "End") nextWidth = RIGHT_PANEL_MAX_WIDTH;
+    else return;
+    event.preventDefault();
+    setPanelWidth(panelId, nextWidth);
   }, [setPanelWidth]);
 
   const toggleRightFeaturePanel = useCallback(() => {
@@ -506,9 +522,14 @@ function AppSessionViewerPane({
         className="psm-session-right-panel__resize-handle"
         data-no-window-drag
         onPointerDown={(event) => handleRightPanelResizePointerDown(event, RIGHT_FEATURE_PANEL_WIDTH_KEY, rightFeaturePanelWidth)}
+        onKeyDown={(event) => handleRightPanelResizeKeyDown(event, RIGHT_FEATURE_PANEL_WIDTH_KEY, rightFeaturePanelWidth)}
+        tabIndex={0}
         role="separator"
         aria-orientation="vertical"
         aria-label={t("session.toolbar.resizeRightPanel", "Resize right panel")}
+        aria-valuemin={RIGHT_PANEL_MIN_WIDTH}
+        aria-valuemax={RIGHT_PANEL_MAX_WIDTH}
+        aria-valuenow={Math.round(rightFeaturePanelWidth)}
       />
       <div className="psm-session-right-feature-panel__grid">
         {rightFeatureItems.map((item) => (
@@ -553,7 +574,7 @@ function AppSessionViewerPane({
         ))}
       </div>
     </aside>
-  ) : null), [activePanelId, handleRightPanelResizePointerDown, pinRightPanel, pinToToolbarLabel, rightFeatureItems, rightFeaturePanelWidth, rightFeaturePickerOpen, t]);
+  ) : null), [activePanelId, handleRightPanelResizeKeyDown, handleRightPanelResizePointerDown, pinRightPanel, pinToToolbarLabel, rightFeatureItems, rightFeaturePanelWidth, rightFeaturePickerOpen, t]);
 
   const bottomFeatureTray = useMemo(() => (bottomFeatureTrayOpen && bottomFeatureItems.length > 1 ? (
     <div className="psm-session-bottom-features" data-no-window-drag>
@@ -587,17 +608,23 @@ function AppSessionViewerPane({
       style={{ width: panelWidths[renderedPanel.id] ?? 380 }}
       data-no-window-drag
       aria-hidden={!activePanel}
+      aria-label={renderedPanel.title}
     >
       <div
         className="psm-session-right-panel__resize-handle"
         data-no-window-drag
         onPointerDown={(event) => handleRightPanelResizePointerDown(event, renderedPanel.id, panelWidths[renderedPanel.id] ?? 380)}
+        onKeyDown={(event) => handleRightPanelResizeKeyDown(event, renderedPanel.id, panelWidths[renderedPanel.id] ?? 380)}
+        tabIndex={0}
         role="separator"
         aria-orientation="vertical"
         aria-label={t("session.toolbar.resizeRightPanel", "Resize right panel")}
+        aria-valuemin={RIGHT_PANEL_MIN_WIDTH}
+        aria-valuemax={RIGHT_PANEL_MAX_WIDTH}
+        aria-valuenow={Math.round(panelWidths[renderedPanel.id] ?? 380)}
       />
       {rightPanels.length > 1 && (
-        <div className="relative z-10 flex items-center gap-1 border-b border-border/70 bg-background/20 px-2 py-2" data-no-window-drag>
+        <div className="psm-session-right-panel__tabs" role="tablist" aria-label={t("session.toolbar.rightPanelButtons", "Right panel buttons")} data-no-window-drag>
           {rightPanels.map((panel) => {
             const active = panel.id === renderedPanel.id;
             return (
@@ -606,12 +633,9 @@ function AppSessionViewerPane({
                 type="button"
                 onClick={() => setActivePanelId(panel.id)}
                 data-no-window-drag
-                className={[
-                  "inline-flex h-7 items-center rounded-md border px-2.5 text-[11px] font-medium transition-colors",
-                  active
-                    ? "border-primary/30 bg-primary/12 text-foreground"
-                    : "border-transparent bg-transparent text-muted-foreground hover:border-border/60 hover:bg-background/25 hover:text-foreground",
-                ].join(" ")}
+                role="tab"
+                aria-selected={active}
+                className={`psm-session-right-panel__tab ${active ? "psm-session-right-panel__tab--active" : ""}`}
               >
                 {panel.title}
               </button>
@@ -619,7 +643,7 @@ function AppSessionViewerPane({
           })}
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-hidden" data-no-window-drag>
+      <div className="psm-session-right-panel__content" data-no-window-drag>
         <PluginContributionBoundary pluginId={renderedPanel.pluginId} contributionId={renderedPanel.id} title={renderedPanel.title}>
           <PluginContributionSlot render={() => renderedPanel.render({
             session,
@@ -637,6 +661,7 @@ function AppSessionViewerPane({
     activeEntryId,
     activePanel,
     closePanel,
+    handleRightPanelResizeKeyDown,
     handleRightPanelResizePointerDown,
     panelWidths,
     renderedPanel,

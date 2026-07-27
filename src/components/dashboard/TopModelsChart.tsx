@@ -59,7 +59,6 @@ export default function TopModelsChart({
   return (
     <DashboardCardShell
       className="rounded-lg p-3"
-      overlayClassName="bg-gradient-to-br from-purple/5 via-transparent to-transparent"
     >
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
@@ -88,7 +87,7 @@ export default function TopModelsChart({
               <button
                 type="button"
                 key={name}
-                className={`w-full flex items-center justify-between p-2 bg-background/60 rounded-lg border border-foreground/5 ${clickable ? 'hover:bg-background/90 hover:border-purple/25 motion-surface motion-color motion-press focus-ring' : 'cursor-default'}`}
+                className={`w-full flex items-center justify-between p-2 bg-background/60 rounded-lg border border-foreground/5 ${clickable ? 'hover:bg-background/90 hover:border-purple/25 motion-surface motion-color focus-ring' : 'cursor-default'}`}
                 title={getFullModelName(name)}
                 onClick={() => onModelClick?.(name)}
                 disabled={!clickable}

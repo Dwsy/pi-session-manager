@@ -1793,7 +1793,7 @@ function App() {
             <img
               src="/icon-128.png"
               alt="Pi Session Manager"
-              className="relative w-16 h-16 rounded-2xl shadow-lg"
+              className="relative w-16 h-16 rounded-lg shadow-lg"
             />
             <div className="absolute -right-1 -bottom-1">
               <Loader2 className="w-5 h-5 animate-spin text-accent" aria-hidden="true" />

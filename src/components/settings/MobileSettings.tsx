@@ -184,7 +184,7 @@ export default function MobileSettings({
           }}
           onTransitionEnd={!showDetail ? handleTransitionEnd : undefined}
         >
-          <div className="flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur-sm flex-shrink-0 safe-area-top">
+          <div className="safe-area-top flex flex-shrink-0 items-center justify-between border-b border-border bg-background px-4 py-3">
             <div>
               <h2 className="text-lg font-semibold text-foreground">
                 {t("settings.title", "Settings")}
@@ -195,7 +195,7 @@ export default function MobileSettings({
             </div>
             <button
               onClick={onClose}
-              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg motion-color motion-press focus-ring"
+              className="focus-ring flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <X className="h-5 w-5" />
             </button>
@@ -203,7 +203,7 @@ export default function MobileSettings({
 
           <div className="px-4 pt-2 pb-1 flex-shrink-0">
             <div
-              className="mb-2 grid gap-1 rounded-lg bg-surface p-1"
+              className="mb-2 grid overflow-hidden rounded-md border border-border"
               style={{
                 gridTemplateColumns: `repeat(${Math.max(settingsAreas.length, 1)}, minmax(0, 1fr))`,
               }}
@@ -212,10 +212,10 @@ export default function MobileSettings({
                 <button
                   key={area.id}
                   onClick={() => handleAreaClick(area.id)}
-                  className={`min-h-[36px] truncate rounded-md px-2 text-xs font-medium motion-color motion-press focus-ring ${
+                  className={`focus-ring min-h-[36px] truncate border-r border-border px-2 text-xs font-medium last:border-r-0 ${
                     activeArea === area.id
-                      ? "bg-info text-white"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   {t(area.labelKey, area.fallbackLabel)}
@@ -229,7 +229,7 @@ export default function MobileSettings({
                 value={mobileSearchQuery}
                 onChange={setMobileSearchQuery}
                 placeholder={t("settings.searchPlaceholder", "Search settings...")}
-                className="w-full pl-8 pr-3 py-2 text-sm bg-surface/60 border border-border/60 rounded-lg text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-info/50 focus:ring-1 focus:ring-info/20 transition-colors"
+                className="focus-ring w-full rounded-md border border-border bg-background py-2 pl-8 pr-8 text-sm text-foreground placeholder:text-muted-foreground"
               />
               {mobileSearchQuery && (
                 <button
@@ -254,7 +254,7 @@ export default function MobileSettings({
                     <button
                       key={result.item.id}
                       onClick={() => handleMobileResultClick(result)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left motion-color focus-ring hover:bg-surface/80"
+                      className="focus-ring flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left hover:bg-muted"
                     >
                       <div className="flex-1 min-w-0">
                         <div className="text-sm text-foreground truncate">
@@ -273,7 +273,7 @@ export default function MobileSettings({
               {/* No mobile search results */}
               {mobileTrimmedQuery && mobileSearchResults.length === 0 && (
                 <div className="px-3 py-8 text-center">
-                  <Search className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
+                  <Search className="mx-auto mb-2 h-6 w-6 text-muted-foreground/50" />
                   <p className="text-sm text-muted-foreground/60">
                     {t("settings.searchEmpty", "No matching settings")}
                   </p>
@@ -294,7 +294,7 @@ export default function MobileSettings({
                     <div className="px-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                       {t(group.labelKey, group.fallbackLabel)}
                     </div>
-                    <div className="overflow-hidden rounded-xl border border-border/60 bg-background/45">
+                    <div className="overflow-hidden rounded-md border border-border bg-background">
                       {items.map((item, index) => {
                         if (!item) return null;
                         const isActive = activeSection === item.id;
@@ -312,13 +312,13 @@ export default function MobileSettings({
                                 : ""
                             } ${
                               isActive
-                                ? "bg-info/10 text-foreground"
-                                : "text-foreground hover:bg-surface"
+                                ? "bg-primary/10 text-foreground"
+                                : "text-foreground hover:bg-muted"
                             }`}
                           >
                             <span
                               className={
-                                isActive ? "text-info" : "text-muted-foreground"
+                                isActive ? "text-primary" : "text-muted-foreground"
                               }
                             >
                               {item.icon}
@@ -326,11 +326,6 @@ export default function MobileSettings({
                             <span className="flex-1 text-left">
                               {t(item.labelKey, item.fallbackLabel)}
                             </span>
-                            {isActive && (
-                              <span className="rounded-full bg-info/15 px-2 py-0.5 text-[10px] font-medium text-info">
-                                {t("common.current", "Current")}
-                              </span>
-                            )}
                             {!isPluginChild && <ChevronRight className="h-4 w-4 text-muted-foreground/50" />}
                           </button>
                         );
@@ -341,14 +336,14 @@ export default function MobileSettings({
               })}
             </div>
 
-            <div className="border-t border-border bg-background/95 px-4 py-4 backdrop-blur-sm safe-area-bottom">
+            <div className="safe-area-bottom border-t border-border bg-background px-4 py-4">
               <div
                 className={`grid gap-3 ${canOpenConfigFolder ? "grid-cols-2" : "grid-cols-1"}`}
               >
                 {canOpenConfigFolder && (
                   <button
                     onClick={onOpenConfigFolder}
-                    className="flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border motion-color motion-surface motion-press focus-ring"
+                    className="focus-ring flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-border px-4 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
                     <FolderOpen className="h-4 w-4" />
                     {t("settings.openConfigFolder", "Open Config Folder")}
@@ -356,7 +351,7 @@ export default function MobileSettings({
                 )}
                 <button
                   onClick={onReset}
-                  className="flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg border border-border motion-color motion-surface motion-press focus-ring"
+                  className="focus-ring flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-border px-4 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                   <RefreshCw className="h-4 w-4" />
                   {t("settings.reset", "Reset Settings")}
@@ -376,10 +371,10 @@ export default function MobileSettings({
           }}
           onTransitionEnd={showDetail ? handleTransitionEnd : undefined}
         >
-          <div className="flex items-center gap-2 border-b border-border bg-background/95 px-4 py-3 backdrop-blur-sm flex-shrink-0 safe-area-top">
+          <div className="safe-area-top flex flex-shrink-0 items-center gap-2 border-b border-border bg-background px-4 py-3">
             <button
               onClick={handleBack}
-              className="p-2 -ml-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg motion-color motion-press focus-ring"
+              className="focus-ring -ml-2 flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -391,16 +386,10 @@ export default function MobileSettings({
                     ?.fallbackLabel || "",
                 )}
               </h3>
-              <p className="truncate text-[11px] text-muted-foreground">
-                {t(
-                  "settings.mobile.sectionDetail",
-                  "Tap back to switch section",
-                )}
-              </p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg motion-color motion-press focus-ring"
+              className="focus-ring flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <X className="h-5 w-5" />
             </button>
@@ -409,7 +398,7 @@ export default function MobileSettings({
           <div className="flex-1 overflow-y-auto px-3 py-3 overscroll-contain sm:px-4 sm:py-4">
             {loading ? (
               <div className="flex items-center justify-center h-40">
-                <Loader2 className="h-8 w-8 animate-spin text-info" />
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
             ) : (
               <div className="mx-auto w-full max-w-3xl space-y-5">
@@ -419,17 +408,17 @@ export default function MobileSettings({
           </div>
 
           {activeSaveMode === "app-settings" ? (
-            <div className="grid grid-cols-2 gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm flex-shrink-0 safe-area-bottom">
+            <div className="safe-area-bottom grid flex-shrink-0 grid-cols-2 gap-3 border-t border-border bg-background px-4 py-3">
               <button
                 onClick={handleBack}
-                className="min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg motion-color motion-surface motion-press focus-ring flex items-center justify-center"
+                className="focus-ring flex min-h-[44px] items-center justify-center rounded-md border border-border px-4 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 {t("common.cancel", "Cancel")}
               </button>
               <button
                 onClick={onSave}
                 disabled={saving}
-                className="flex items-center justify-center gap-2 min-h-[44px] px-4 bg-info hover:bg-info/80 text-white text-sm font-medium rounded-lg motion-color motion-press focus-ring disabled:opacity-50"
+                className="focus-ring flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
                 {saving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -442,7 +431,7 @@ export default function MobileSettings({
               </button>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm flex-shrink-0 safe-area-bottom">
+            <div className="safe-area-bottom flex flex-shrink-0 items-center justify-between gap-3 border-t border-border bg-background px-4 py-3">
               <span className="min-w-0 text-xs text-muted-foreground">
                 {activeSaveMode === "inline"
                   ? t(
@@ -453,7 +442,7 @@ export default function MobileSettings({
               </span>
               <button
                 onClick={handleBack}
-                className="min-h-[44px] px-4 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg motion-color motion-surface motion-press focus-ring flex items-center justify-center"
+                className="focus-ring flex min-h-[44px] items-center justify-center rounded-md border border-border px-4 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 {t("common.back", "Back")}
               </button>

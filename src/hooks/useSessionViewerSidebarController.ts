@@ -27,7 +27,14 @@ export function useSessionViewerSidebarController({
   setScrollTargetId,
 }: UseSessionViewerSidebarControllerOptions) {
   const [showSidebar, setShowSidebar] = useState(false);
-  const { sidebarWidth, isResizing, handleMouseDown } = useResizableSidebar({
+  const {
+    sidebarWidth,
+    isResizing,
+    minWidth: sidebarMinWidth,
+    maxWidth: sidebarMaxWidth,
+    handleMouseDown,
+    handleKeyDown,
+  } = useResizableSidebar({
     storageKey: SIDEBAR_WIDTH_KEY,
     defaultWidth: SIDEBAR_DEFAULT_WIDTH,
     minWidth: SIDEBAR_MIN_WIDTH,
@@ -69,8 +76,11 @@ export function useSessionViewerSidebarController({
     showSidebar,
     setShowSidebar,
     sidebarWidth,
+    sidebarMinWidth,
+    sidebarMaxWidth,
     isResizing,
     handleMouseDown,
+    handleKeyDown,
     sidebarRef,
     resizeHandleRef,
     treeRef,

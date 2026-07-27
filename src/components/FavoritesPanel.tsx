@@ -1,6 +1,6 @@
-import { Star, FolderOpen, Trash2 } from 'lucide-react'
+import { FolderOpen, Star, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { SessionInfo, FavoriteItem } from '@/types'
+import type { FavoriteItem, SessionInfo } from '@/types'
 import { SessionBadge } from './session-viewer/SessionBadge'
 import { FavoritesSkeleton } from './ui/Skeleton'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
@@ -18,6 +18,7 @@ interface FavoritesPanelProps {
   getBadgeType?: (sessionId: string) => 'new' | 'updated' | null
   loading?: boolean
   liveSessionIds?: Set<string>
+  compact?: boolean
 }
 
 export default function FavoritesPanel({
@@ -30,79 +31,72 @@ export default function FavoritesPanel({
   getBadgeType,
   loading = false,
   liveSessionIds,
+  compact = false,
 }: FavoritesPanelProps) {
   const { t } = useTranslation()
   const { getSessionSetting } = useSettings()
-  const showAgentIconInBadge =
-    getSessionSetting('showAgentIconInSessionBadge') !== false
-
-  const favoriteSessions = favorites.filter(f => f.type === 'session')
-  const favoriteProjects = favorites.filter(f => f.type === 'project')
-
+  const showAgentIconInBadge = getSessionSetting('showAgentIconInSessionBadge') !== false
+  const favoriteSessions = favorites.filter((favorite) => favorite.type === 'session')
+  const favoriteProjects = favorites.filter((favorite) => favorite.type === 'project')
   const showDelayedLoading = useDelayedLoading(loading)
 
-  if (showDelayedLoading) {
-    return <FavoritesSkeleton />
-  }
-
-  if (loading) {
-    return <div className="flex-1 min-h-[120px]" aria-hidden="true" />
-  }
+  if (showDelayedLoading) return <FavoritesSkeleton />
+  if (loading) return <div className="min-h-[120px] flex-1" aria-hidden="true" />
 
   if (favorites.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground px-4">
-        <Star className="h-12 w-12 mb-3 opacity-30" />
-        <p className="text-sm text-center">{t('favorites.empty')}</p>
+      <div className="flex min-h-[160px] flex-col items-center justify-center px-4 text-muted-foreground">
+        <Star className="mb-3 h-10 w-10 opacity-25" />
+        <p className="text-center text-xs">{t('favorites.empty')}</p>
       </div>
     )
   }
 
+  const sectionTitleClass = 'px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground'
+  const removeButtonClass = 'inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 group-hover:opacity-100'
+
   return (
-    <div className="flex flex-col">
-      {favoriteProjects.length > 0 && (
-        <div className="mb-4">
-          <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+    <div className={`favorites-panel flex flex-col ${compact ? 'text-xs' : ''}`}>
+      {favoriteProjects.length > 0 ? (
+        <section className={compact ? 'mb-1' : 'mb-4'} aria-labelledby="favorite-projects-heading">
+          <h3 id="favorite-projects-heading" className={sectionTitleClass}>
             {t('favorites.projects')} ({favoriteProjects.length})
-          </div>
-          {favoriteProjects.map(favorite => {
-            const projectSessions = sessions.filter(s => pathsEqual(s.cwd, favorite.path))
+          </h3>
+          {favoriteProjects.map((favorite) => {
+            const projectSessions = sessions.filter((session) => pathsEqual(session.cwd, favorite.path))
             return (
-              <div
-                key={favorite.id}
-                onClick={() => onSelectProject?.(favorite.path)}
-                className="group px-3 py-2 hover:bg-secondary border-b border-border/50"
-              >
-                <div className="flex items-center gap-2">
-                  <FolderOpen className="h-4 w-4 text-blue-400 flex-shrink-0" />
-                  <span className="text-sm flex-1 truncate">{favorite.name}</span>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    {projectSessions.length}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onRemoveFavorite(favorite)
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 motion-opacity motion-color motion-press focus-ring flex-shrink-0"
-                    title={t('favorites.remove')}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+              <div key={favorite.id} className="group flex items-center border-b border-border/50 hover:bg-secondary/55">
+                <button
+                  type="button"
+                  onClick={() => onSelectProject?.(favorite.path)}
+                  className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
+                >
+                  <FolderOpen className="h-4 w-4 flex-shrink-0 text-info" />
+                  <span className={`${compact ? 'text-xs' : 'text-sm'} min-w-0 flex-1 truncate`}>{favorite.name}</span>
+                  <span className="flex-shrink-0 text-[10px] text-muted-foreground">{projectSessions.length}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRemoveFavorite(favorite)}
+                  className={removeButtonClass}
+                  title={t('favorites.remove')}
+                  aria-label={`${t('favorites.remove')}: ${favorite.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </div>
             )
           })}
-        </div>
-      )}
+        </section>
+      ) : null}
 
-      {favoriteSessions.length > 0 && (
-        <div>
-          <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+      {favoriteSessions.length > 0 ? (
+        <section aria-labelledby="favorite-sessions-heading">
+          <h3 id="favorite-sessions-heading" className={sectionTitleClass}>
             {t('favorites.sessions')} ({favoriteSessions.length})
-          </div>
-          {favoriteSessions.map(favorite => {
-            const session = sessions.find(s => s.id === favorite.id)
+          </h3>
+          {favoriteSessions.map((favorite) => {
+            const session = sessions.find((item) => item.id === favorite.id)
             if (!session) return null
 
             const badgeType = getBadgeType?.(session.id)
@@ -114,51 +108,42 @@ export default function FavoritesPanel({
             return (
               <div
                 key={favorite.id}
-                onClick={() => onSelectSession(session)}
-                className={`group px-3 py-2 border-b border-border/50 ${
-                  isSelected ? 'bg-info/10' : 'hover:bg-secondary'
-                }`}
+                className={`group flex items-start border-b border-border/50 ${isSelected ? 'bg-info/8' : 'hover:bg-secondary/55'}`}
               >
-                <div className="flex items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {isLive && (
-                        <span
-                          className="h-2 w-2 rounded-full bg-green-500 animate-pulse flex-shrink-0"
-                          title="Live"
-                        />
-                      )}
-                      <span className="text-sm truncate">{session.name || t('common.untitled')}</span>
-                      {sourceTag && (
-                        <SessionBadge
-                          label={sourceTag}
-                          tone="source"
-                          sourceSlug={sourceSlug || undefined}
-                          showIcon={showAgentIconInBadge}
-                        />
-                      )}
-                      {badgeType && <SessionBadge type={badgeType} />}
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate mt-0.5">
-                      {getPathBasename(session.cwd)}
-                    </div>
+                <button
+                  type="button"
+                  onClick={() => onSelectSession(session)}
+                  className="min-w-0 flex-1 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    {isLive ? <span className="h-2 w-2 flex-shrink-0 rounded-full bg-success" title="Live" /> : null}
+                    <span className={`${compact ? 'text-xs' : 'text-sm'} min-w-0 truncate`}>{session.name || t('common.untitled')}</span>
+                    {sourceTag ? (
+                      <SessionBadge
+                        label={sourceTag}
+                        tone="source"
+                        sourceSlug={sourceSlug || undefined}
+                        showIcon={showAgentIconInBadge}
+                      />
+                    ) : null}
+                    {badgeType ? <SessionBadge type={badgeType} /> : null}
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onRemoveFavorite(favorite)
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 motion-opacity motion-color motion-press focus-ring flex-shrink-0"
-                    title={t('favorites.remove')}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                  <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{getPathBasename(session.cwd)}</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRemoveFavorite(favorite)}
+                  className={`${removeButtonClass} mt-1.5`}
+                  title={t('favorites.remove')}
+                  aria-label={`${t('favorites.remove')}: ${session.name || t('common.untitled')}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </div>
             )
           })}
-        </div>
-      )}
+        </section>
+      ) : null}
     </div>
   )
 }

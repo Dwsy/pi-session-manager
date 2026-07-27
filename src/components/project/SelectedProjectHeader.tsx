@@ -22,7 +22,7 @@ function SelectedProjectHeader({
     <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/30 flex-shrink-0 sticky top-0 z-10">
       <button
         onClick={onBack}
-        className="p-1 rounded motion-color motion-press focus-ring flex-shrink-0 hover:bg-accent"
+        className="p-1 rounded motion-color focus-ring flex-shrink-0 hover:bg-accent"
         aria-label={backLabel}
         title={backLabel}
       >

@@ -238,7 +238,7 @@ export function CatalogBrowserModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color motion-press focus-ring"
+            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground motion-color focus-ring"
           >
             {t("settings.modelConfigCenter.actions.cancel", "Cancel")}
           </button>
@@ -246,7 +246,7 @@ export function CatalogBrowserModal({
             type="button"
             onClick={handleConfirm}
             disabled={selectedCount === 0}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all motion-press focus-ring disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all focus-ring disabled:opacity-50"
           >
             <Library className="h-4 w-4" />
             {t(

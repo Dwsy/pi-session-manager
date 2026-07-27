@@ -185,7 +185,7 @@ export default function HeatmapTooltip({
           onMouseLeave={handleTooltipLeave}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="relative rounded-xl border border-white/20 bg-background/88 backdrop-blur-xl shadow-[0_16px_40px_rgba(0,0,0,0.2)] px-3.5 py-3 min-w-[240px] max-w-[300px]">
+          <div className="relative rounded-md border border-border bg-popover shadow-lg px-3.5 py-3 min-w-[240px] max-w-[300px]">
             <div className="text-sm font-semibold text-foreground mb-2">{formattedDate}</div>
 
             <div className="mb-3">
@@ -195,7 +195,7 @@ export default function HeatmapTooltip({
               </div>
               <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full"
+                  className="h-full rounded-full bg-success"
                   style={{ width: `${(point.level / 5) * 100}%` }}
                 />
               </div>
@@ -221,7 +221,7 @@ export default function HeatmapTooltip({
             {point.top_project && (
               <button
                 type="button"
-                className="mt-3 pt-2.5 border-t border-border/15 w-full text-left hover:text-primary motion-color focus-ring"
+                className="mt-3 pt-2.5 border-t border-border/15 w-full text-left hover:text-primary focus-ring"
                 onClick={handleFilterProject}
               >
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -237,7 +237,7 @@ export default function HeatmapTooltip({
             <div className="mt-3 pt-2.5 border-t border-border/15 flex items-center justify-end gap-2">
               <button
                 type="button"
-                className="text-xs px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 motion-color motion-press focus-ring inline-flex items-center gap-1"
+                className="text-xs px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 focus-ring inline-flex items-center gap-1"
                 onClick={handleViewDetails}
               >
                 <ExternalLink className="w-3 h-3" />

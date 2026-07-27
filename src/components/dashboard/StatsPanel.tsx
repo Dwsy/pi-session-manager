@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { invoke } from '@/transport'
 import { useTranslation } from 'react-i18next'
-import { X, BarChart3, Calendar, Folder, Clock, Zap, RefreshCw, Download, Settings, Award } from 'lucide-react'
+import { X, BarChart3, Calendar, Folder, Clock, Zap, RefreshCw, Award } from 'lucide-react'
 import type { SessionInfo, SessionStats } from '@/types'
 import StatCard from './StatCard'
 import ActivityHeatmap from './ActivityHeatmap'
@@ -91,23 +91,30 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
 
   if (!stats || !stats.heatmap_data) {
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-background border border-border rounded-xl p-8">
-          <div className="text-center text-muted-foreground">{t('stats.panel.noData')}</div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div role="dialog" aria-modal="true" aria-label={t('stats.panel.title')} className="w-full max-w-sm rounded-lg border border-border bg-background p-5 shadow-xl">
+          <p className="text-sm text-muted-foreground">{t('stats.panel.noData')}</p>
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="focus-ring rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted"
+            >
+              {t('common.close', 'Close')}
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-background border border-border rounded-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div role="dialog" aria-modal="true" aria-label={t('stats.panel.title')} className="flex max-h-[90vh] w-full max-w-7xl flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-dark">
+        <div className="flex items-center justify-between border-b border-border bg-background px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-info/10 rounded-xl">
-              <BarChart3 className="h-5 w-5 text-info" />
-            </div>
+            <BarChart3 className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
             <div>
               <h2 className="text-lg font-semibold text-foreground">{t('stats.panel.title')}</h2>
               <p className="text-xs text-muted-foreground">{t('stats.panel.subtitle')}</p>
@@ -116,20 +123,16 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={loadStats}
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg motion-surface motion-color motion-press focus-ring"
+              className="focus-ring inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               title={t('stats.panel.tooltips.refresh')}
             >
               <RefreshCw className="h-4 w-4" />
             </button>
-            <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg motion-surface motion-color motion-press focus-ring" title={t('stats.panel.tooltips.export')}>
-              <Download className="h-4 w-4" />
-            </button>
-            <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg motion-surface motion-color motion-press focus-ring" title={t('stats.panel.tooltips.settings')}>
-              <Settings className="h-4 w-4" />
-            </button>
+
+
             <button
               onClick={onClose}
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg motion-surface motion-color motion-press focus-ring"
+              className="focus-ring inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               title={t('stats.panel.tooltips.close')}
             >
               <X className="h-5 w-5" />
@@ -138,17 +141,18 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 px-6 py-2 border-b border-border bg-background overflow-x-auto">
+        <div className="flex items-center overflow-x-auto border-b border-border bg-background px-5">
           {TABS.map(tab => {
             const Icon = tab.icon
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium motion-surface motion-color motion-press focus-ring whitespace-nowrap ${
+                aria-pressed={activeTab === tab.id}
+                className={`focus-ring flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium ${
                   activeTab === tab.id
-                    ? 'text-info bg-info/10'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 <Icon className="h-4 w-4" />
@@ -159,7 +163,7 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-5">
           {activeTab === 'overview' && <OverviewTab stats={stats} sessions={sessions} />}
           {activeTab === 'activity' && <ActivityTab stats={stats} />}
           {activeTab === 'projects' && <ProjectsTab stats={stats} />}

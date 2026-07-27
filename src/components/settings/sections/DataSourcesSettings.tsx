@@ -113,7 +113,7 @@ export default function DataSourcesSettings({
                     nextDirs.splice(index, 1);
                     setExtraDirs(nextDirs);
                   }}
-                  className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg motion-color motion-press focus-ring"
+                  className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg motion-color focus-ring"
                   title={t("settings.advanced.removeSessionDir", "Remove")}
                 >
                   <X className="h-4 w-4" />
@@ -123,7 +123,7 @@ export default function DataSourcesSettings({
 
             <button
               onClick={() => setExtraDirs([...extraDirs, ""])}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-info hover:bg-info/10 rounded-lg motion-color motion-press focus-ring"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-info hover:bg-info/10 rounded-lg motion-color focus-ring"
             >
               <Plus className="h-4 w-4" />
               {t("settings.advanced.addSessionDir", "Add path")}

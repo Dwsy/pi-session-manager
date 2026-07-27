@@ -82,7 +82,7 @@ export const PiAgentMessages: React.FC<PiAgentMessagesProps> = ({
 
               {/* Content */}
               <div className={`flex-1 max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}>
-                <div className={`rounded-2xl px-4 py-2.5 ${
+                <div className={`rounded-lg px-4 py-2.5 ${
                   isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'
                 }`}>
                   <div className="text-sm whitespace-pre-wrap">

@@ -77,11 +77,6 @@
 .subagent-result-card:hover {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
-  transform: translateY(-1px);
-}
-
-.subagent-result-card:active {
-  transform: translateY(0);
 }
 
 .subagent-result-header {
@@ -120,7 +115,6 @@
 }
 
 .subagent-result-card:hover .subagent-chevron {
-  transform: translateX(2px);
   color: var(--accent);
 }
 
@@ -495,6 +489,7 @@
   max-height: 300px;
   overflow-y: auto;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-family: var(--font-family-mono, ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace);
 }
 
@@ -564,4 +559,16 @@
   .subagent-render-progress-bar > span {
     transition: none !important;
   }
+}
+
+
+.subagent-result-card:focus-visible,
+.subagent-modal:focus-visible,
+.subagent-modal button:focus-visible {
+  outline: 2px solid rgb(var(--color-ring) / 0.75);
+  outline-offset: -2px;
+}
+
+.subagent-modal:focus-visible {
+  outline: none;
 }

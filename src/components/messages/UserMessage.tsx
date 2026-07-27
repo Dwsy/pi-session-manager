@@ -47,8 +47,14 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
     }
   }, [copyText, text])
 
+  const hasDisplayContent = text.trim().length > 0 || images.length > 0
+  const expandButtonRef = useRef<HTMLButtonElement>(null)
+
   const handleOpenModal = useCallback(() => setIsModalOpen(true), [])
-  const handleCloseModal = useCallback(() => setIsModalOpen(false), [])
+  const handleCloseModal = useCallback(() => {
+    setIsModalOpen(false)
+    requestAnimationFrame(() => expandButtonRef.current?.focus())
+  }, [])
 
   const bodyRef = useRef<HTMLDivElement>(null)
   const [isTruncated, setIsTruncated] = useState(false)
@@ -66,28 +72,26 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
 
   return (
     <>
-      <div className={`user-message ${className}`} id={`entry-${id}`}>
+      <article
+        className={`user-message ${className}`}
+        id={`entry-${id}`}
+        aria-label={t('components.userMessage.you')}
+      >
         <div className="user-message-header">
           <div className="user-message-meta">
             <span className="user-message-role">{t('components.userMessage.you')}</span>
-            {timestamp && <span className="message-timestamp">{formatDate(timestamp)}</span>}
           </div>
           <div className="flex items-center gap-1">
             {text.trim() && (
               <>
                 <button
+                  type="button"
                   onClick={e => {
                     e.stopPropagation()
                     setShowRaw(!showRaw)
                   }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      setShowRaw(!showRaw)
-                    }
-                  }}
                   className={`tool-copy-button user-message-copy-button ${showRaw ? 'active' : ''}`}
+                  aria-pressed={showRaw}
                   aria-label={
                     showRaw
                       ? t('components.userMessage.viewRendered') || 'View Rendered'
@@ -102,16 +106,10 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
                   {showRaw ? <Eye className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
                 </button>
                 <button
+                  type="button"
                   onClick={e => {
                     e.stopPropagation()
                     void handleCopy()
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      void handleCopy()
-                    }
                   }}
                   className="tool-copy-button user-message-copy-button"
                   aria-label={
@@ -125,28 +123,26 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
                 </button>
               </>
             )}
-            <button
-              onClick={e => {
-                e.stopPropagation()
-                handleOpenModal()
-              }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
+            {hasDisplayContent && (
+              <button
+                ref={expandButtonRef}
+                type="button"
+                onClick={e => {
                   e.stopPropagation()
                   handleOpenModal()
-                }
-              }}
-              className="tool-copy-button user-message-copy-button"
-              aria-label={t('components.userMessage.expand') || 'Expand message'}
-              title={t('components.userMessage.expand') || 'Expand message'}
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
+                }}
+                className="tool-copy-button user-message-copy-button"
+                aria-haspopup="dialog"
+                aria-label={t('components.userMessage.expand') || 'Expand message'}
+                title={t('components.userMessage.expand') || 'Expand message'}
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
-        <div onClick={handleOpenModal} className="cursor-pointer">
+        <div className="user-message-content">
           {images.length > 0 && (
             <div className="message-images">
               {images.map((img, idx) => (
@@ -154,10 +150,17 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
                   key={idx}
                   src={`data:${img.mimeType};base64,${img.data}`}
                   className="message-image"
-                  alt={t('components.userMessage.imageAlt')}
+                  alt={`${t('components.userMessage.imageAlt')} ${idx + 1}`}
+                  loading="lazy"
                 />
               ))}
             </div>
+          )}
+
+          {!hasDisplayContent && (
+            <p className="user-message-empty">
+              {t('components.userMessage.empty', 'Empty message')}
+            </p>
           )}
 
           {text.trim() && (
@@ -173,7 +176,7 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
             </div>
           )}
         </div>
-      </div>
+      </article>
 
       {isModalOpen && (
         <UserMessageModal
@@ -284,6 +287,7 @@ function UserMessageModal({ text, images, timestamp, searchQuery, initialShowRaw
                   type="button"
                   onClick={() => setShowRaw(!showRaw)}
                   className={`user-message-modal-close-btn ${showRaw ? 'active' : ''}`}
+                  aria-pressed={showRaw}
                   aria-label={
                     showRaw
                       ? t('components.userMessage.viewRendered') || 'View Rendered'
@@ -332,7 +336,8 @@ function UserMessageModal({ text, images, timestamp, searchQuery, initialShowRaw
                   key={idx}
                   src={`data:${img.mimeType};base64,${img.data}`}
                   className="message-image max-h-72 rounded-lg border border-border/60"
-                  alt={t('components.userMessage.imageAlt')}
+                  alt={`${t('components.userMessage.imageAlt')} ${idx + 1}`}
+                  loading="lazy"
                 />
               ))}
             </div>

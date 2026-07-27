@@ -109,7 +109,7 @@ function AuthGate({ children }: AuthGateProps) {
         <div className="w-full max-w-sm">
           {/* Logo / Icon */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-14 h-14 rounded-2xl bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center mb-4">
+            <div className="mb-4 flex h-10 w-10 items-center justify-center text-zinc-400">
               <Shield className="w-7 h-7 text-zinc-300" />
             </div>
             <h1 className="text-lg font-semibold text-zinc-100">
@@ -123,7 +123,7 @@ function AuthGate({ children }: AuthGateProps) {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
+              <label className="text-sm font-medium text-zinc-300">
                 {t("auth.tokenLabel", "API Token")}
               </label>
               <div className="relative">
@@ -138,10 +138,9 @@ function AuthGate({ children }: AuthGateProps) {
                   autoFocus
                   autoComplete="off"
                   className={`
-                    w-full px-3.5 py-2.5 pr-10 rounded-lg text-sm
+                    w-full px-3.5 py-2.5 pr-10 rounded-md text-sm
                     bg-zinc-900 text-zinc-100 placeholder-zinc-600
-                    border motion-color outline-none
-                    focus:ring-1 focus:ring-blue-500/40
+                    border outline-none focus-ring
                     ${
                       error
                         ? "border-red-500/60 focus:border-red-500"
@@ -152,8 +151,10 @@ function AuthGate({ children }: AuthGateProps) {
                 <button
                   type="button"
                   onClick={() => setShowToken(!showToken)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 motion-color motion-press focus-ring"
-                  tabIndex={-1}
+                  aria-label={showToken
+                    ? t("auth.hideToken", "Hide token")
+                    : t("auth.showToken", "Show token")}
+                  className="focus-ring absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
                 >
                   {showToken ? (
                     <EyeOff className="w-4 h-4" />
@@ -169,9 +170,7 @@ function AuthGate({ children }: AuthGateProps) {
               type="submit"
               disabled={loading || !tokenInput.trim()}
               className="
-                w-full py-2.5 rounded-lg text-sm font-medium
-                bg-blue-600 hover:bg-blue-500 active:bg-blue-700
-                text-white motion-color motion-press focus-ring
+                w-full rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-ring
                 disabled:opacity-40 disabled:cursor-not-allowed
                 flex items-center justify-center gap-2
               "

@@ -1,4 +1,7 @@
 import { Check, CheckCircle2, CircleOff, HelpCircle, MessageSquareText } from 'lucide-react'
+import ToolHeader from '@/components/tool-calls/ToolHeader'
+import ToolSectionHeader from '@/components/tool-calls/ToolSectionHeader'
+import { getToolExecutionClass, getToolRenderStatus, getToolStatusLabel } from '@/plugins/tools-render/utils/status'
 import type {
   PsmPluginHostContext,
   PsmPluginManifest,
@@ -112,29 +115,42 @@ function answerLabel(answer: ReturnType<typeof asAnswers>[number] | undefined): 
 }
 
 function AskUserQuestionRenderer({ resolvedData, context }: PsmToolRenderProps) {
-  const { args, output, isError, entryId } = resolvedData
-  const { isExpanded, toggleExpanded, disableSuccessStyle } = context
+  const { args, output, entryId } = resolvedData
+  const { isExpanded, toggleExpanded, disableSuccessStyle, t, copyToClipboard } = context
   const questions = asQuestions(args)
   const result = getResult(resolvedData)
   const answers = asAnswers(result)
   const cancelled = result.cancelled === true
   const error = typeof result.error === 'string' ? result.error : undefined
-  const statusClass = isError || error ? 'error' : disableSuccessStyle ? '' : 'success'
+  const statusData = { ...resolvedData, isError: resolvedData.isError || Boolean(error) }
+  const status = getToolRenderStatus(statusData)
   const title = cancelled ? 'Questionnaire declined' : 'User questions'
   const summary = questions.length === 1 ? '1 question' : `${questions.length} questions`
-  const Icon = cancelled ? CircleOff : error ? HelpCircle : CheckCircle2
+  const Icon = cancelled
+    ? CircleOff
+    : error
+      ? HelpCircle
+      : status === 'pending'
+        ? MessageSquareText
+        : CheckCircle2
 
   return (
-    <div className={`tool-execution ${statusClass}`.trim()} id={`entry-${entryId}`}>
-      <div className="tool-header select-none" onClick={toggleExpanded}>
+    <div className={`tool-execution ${getToolExecutionClass(statusData, disableSuccessStyle)}`.trim()} id={`entry-${entryId}`}>
+      <ToolHeader
+        expandable={questions.length > 0 || Boolean(output)}
+        expanded={isExpanded}
+        onToggle={toggleExpanded}
+        ariaLabel={`${title}: ${getToolStatusLabel(status, t)}`}
+      >
         <span className="tool-expand-indicator">{isExpanded ? '▾' : '▸'}</span>
         <span className="tool-name inline-flex items-center gap-1.5">
           <Icon className="h-4 w-4" />
           {title}
         </span>
-        <span className="tool-meta">{summary}</span>
-        {error && <span className="tool-meta text-destructive">{error}</span>}
-      </div>
+        <span className="tool-detail">{summary}</span>
+        {error && <span className="tool-detail text-destructive">{error}</span>}
+        <span className={`tool-status tool-status-${status}`}>{getToolStatusLabel(status, t)}</span>
+      </ToolHeader>
 
       <div className={`tool-output-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
         <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
@@ -282,7 +298,7 @@ function AskUserQuestionRenderer({ resolvedData, context }: PsmToolRenderProps) 
                       {answer?.preview && (
                         <div className="mt-2 border-t border-border/10 pt-2">
                           <span className="text-[10px] font-bold uppercase tracking-wider block text-muted-foreground/75 mb-1">Code Preview</span>
-                          <pre className="whitespace-pre-wrap rounded border border-border/20 bg-background/50 p-2 font-mono text-[11px] leading-relaxed text-foreground/90">
+                          <pre className="tool-output-plain rounded border border-border/20 bg-background/50 p-2 text-[11px] text-foreground/90">
                             {answer.preview}
                           </pre>
                         </div>
@@ -292,9 +308,13 @@ function AskUserQuestionRenderer({ resolvedData, context }: PsmToolRenderProps) 
                 )
               })}
               {output && (
-                <div className="rounded-md border border-border/60 bg-background/35 p-2.5 text-xs text-muted-foreground">
-                  <div className="mb-1 font-medium text-foreground">Tool output</div>
-                  <div className="whitespace-pre-wrap">{output}</div>
+                <div className="tool-output">
+                  <ToolSectionHeader
+                    label={t('components.toolCall.output', 'Output')}
+                    text={output}
+                    copyText={copyToClipboard}
+                  />
+                  <pre className="tool-output-plain">{output}</pre>
                 </div>
               )}
             </div>

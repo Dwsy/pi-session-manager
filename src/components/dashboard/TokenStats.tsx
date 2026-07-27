@@ -34,7 +34,6 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
   return (
     <DashboardCardShell
       className="rounded-xl p-5"
-      overlayClassName="bg-gradient-to-br from-warning/5 via-transparent to-destructive/5"
     >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-medium flex items-center gap-2 text-foreground">
@@ -79,12 +78,11 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
               <div className="w-24 text-xs text-muted-foreground">Input</div>
               <div className="flex-1 h-2.5 bg-background/80 rounded-full overflow-hidden inner-shadow">
                 <div
-                  className="h-full bg-gradient-to-r from-info to-[#6bb8ff] rounded-full motion-width"
+                  className="h-full bg-info rounded-full motion-width"
                   style={{
                     width: stats.total_tokens > 0
                       ? `${(token_details.total_input / stats.total_tokens) * 100}%`
                       : '0%',
-                    boxShadow: '0 0 10px rgba(86, 156, 214, 0.3)'
                   }}
                 />
               </div>
@@ -99,12 +97,11 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
               <div className="w-24 text-xs text-muted-foreground">Output</div>
               <div className="flex-1 h-2.5 bg-background/80 rounded-full overflow-hidden inner-shadow">
                 <div
-                  className="h-full bg-gradient-to-r from-success to-[#a3ff9e] rounded-full motion-width"
+                  className="h-full bg-success rounded-full motion-width"
                   style={{
                     width: stats.total_tokens > 0
                       ? `${(token_details.total_output / stats.total_tokens) * 100}%`
                       : '0%',
-                    boxShadow: '0 0 10px rgba(126, 231, 135, 0.3)'
                   }}
                 />
               </div>
@@ -119,12 +116,11 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
               <div className="w-24 text-xs text-muted-foreground">Cache</div>
               <div className="flex-1 h-2.5 bg-background/80 rounded-full overflow-hidden inner-shadow">
                 <div
-                  className="h-full bg-gradient-to-r from-warning to-[#ffc48c] rounded-full motion-width"
+                  className="h-full bg-warning rounded-full motion-width"
                   style={{
                     width: stats.total_tokens > 0
                       ? `${((token_details.total_cache_read / stats.total_tokens) * 100)}%`
                       : '0%',
-                    boxShadow: '0 0 10px rgba(255, 166, 87, 0.3)'
                   }}
                 />
               </div>
@@ -161,10 +157,9 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
                     <div className="flex items-center gap-2">
                       <div className="w-20 h-1.5 bg-surface-dark/80 rounded-full overflow-hidden inner-shadow">
                         <div
-                          className="h-full bg-gradient-to-r from-purple to-[#d4a8f0] rounded-full"
+                          className="h-full bg-purple rounded-full"
                           style={{
-                            width: `${percent}%`,
-                            boxShadow: '0 0 6px rgba(199, 146, 234, 0.3)'
+                            width: `${percent}%`
                           }}
                         />
                       </div>
@@ -216,10 +211,9 @@ export default function TokenStats({ stats, title = 'Token Usage' }: TokenStatsP
                       <div className="flex items-center gap-2">
                         <div className="w-20 h-1.5 bg-surface-dark/80 rounded-full overflow-hidden inner-shadow">
                           <div
-                            className="h-full bg-gradient-to-r from-[#f97316] to-[#fb923c] rounded-full"
+                            className="h-full bg-warning rounded-full"
                             style={{
-                              width: `${percent}%`,
-                              boxShadow: '0 0 6px rgba(249, 115, 22, 0.3)'
+                              width: `${percent}%`
                             }}
                           />
                         </div>

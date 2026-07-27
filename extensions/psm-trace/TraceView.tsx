@@ -29,6 +29,7 @@ import {
 
 import {
   loadSessionEntries,
+  type TraceLoadProgress,
   type TraceSessionReference,
 } from "./sessionEntries";
 
@@ -78,19 +79,32 @@ export default function TraceView({
 }: TraceViewProps) {
   const [model, setModel] = useState<SessionModel | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadProgress, setLoadProgress] = useState<TraceLoadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
   const [mode, setMode] = useState<TimelineMode>("conversation");
   const [scopeSegmentUid, setScopeSegmentUid] = useState<string | null>(null);
   const [selectedUid, setSelectedUid] = useState("");
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(480);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const loadedSessionPathRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    const replacingSession = loadedSessionPathRef.current !== session.path;
+    if (replacingSession) {
+      setModel(null);
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+    setLoadProgress(null);
     setError(null);
-    void loadSessionEntries(client, session.path)
+    void loadSessionEntries(client, session.path, (progress) => {
+      if (!cancelled) setLoadProgress(progress);
+    })
       .then((entries) => {
         if (cancelled) return;
         setModel(
@@ -98,6 +112,7 @@ export default function TraceView({
             sessionName: session.name || session.path,
           }),
         );
+        loadedSessionPathRef.current = session.path;
       })
       .catch((loadError) => {
         if (!cancelled) {
@@ -107,12 +122,15 @@ export default function TraceView({
         }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [activeEntryId, client, session.name, session.path]);
+  }, [activeEntryId, client, reloadNonce, session.name, session.path]);
 
   const activeLeafUid = model
     ? ((activeEntryId ? model.firstById.get(activeEntryId)?.uid : undefined) ??
@@ -196,13 +214,20 @@ export default function TraceView({
   );
 
   if (loading) {
-    return <TimelineState title="Building active path…" onClose={onClose} />;
+    return (
+      <TimelineState
+        title="Building active path…"
+        detail={formatLoadProgress(loadProgress)}
+        onClose={onClose}
+      />
+    );
   }
-  if (error) {
+  if (error && !model) {
     return (
       <TimelineState
         title="Unable to load path timeline"
         detail={error}
+        onRetry={() => setReloadNonce((value) => value + 1)}
         onClose={onClose}
       />
     );
@@ -226,6 +251,9 @@ export default function TraceView({
       onScrollTopChange={setScrollTop}
       onSelectNode={setSelectedUid}
       onActivateNode={activateNode}
+      refreshing={refreshing}
+      refreshError={error}
+      onRetry={() => setReloadNonce((value) => value + 1)}
       onStepEnding={stepEnding}
       onClose={onClose}
     />
@@ -246,6 +274,9 @@ function PathTimeline({
   onScrollTopChange,
   onSelectNode,
   onActivateNode,
+  refreshing,
+  refreshError,
+  onRetry,
   onStepEnding,
   onClose,
 }: {
@@ -262,6 +293,9 @@ function PathTimeline({
   onScrollTopChange: (top: number) => void;
   onSelectNode: (uid: string) => void;
   onActivateNode: (uid: string) => void;
+  refreshing: boolean;
+  refreshError: string | null;
+  onRetry: () => void;
   onStepEnding: (direction: -1 | 1) => void;
   onClose: () => void;
 }) {
@@ -296,6 +330,11 @@ function PathTimeline({
   useEffect(() => {
     onScopeChange(null);
   }, [activeLeafUid, onScopeChange]);
+
+  useEffect(() => {
+    if (nodes.length === 0 || nodes.some((node) => node.uid === selectedUid)) return;
+    onSelectNode(nodes[nodes.length - 1].uid);
+  }, [nodes, onSelectNode, selectedUid]);
 
   useEffect(() => {
     const index = nodes.findIndex((node) => node.uid === selectedUid);
@@ -336,6 +375,7 @@ function PathTimeline({
             <button
               type="button"
               onClick={() => onStepEnding(-1)}
+              disabled={model.terminalSegments.length < 2}
               aria-label="Previous ending"
             >
               <ChevronLeft size={15} />
@@ -343,6 +383,7 @@ function PathTimeline({
             <button
               type="button"
               onClick={() => onStepEnding(1)}
+              disabled={model.terminalSegments.length < 2}
               aria-label="Next ending"
             >
               <ChevronRight size={15} />
@@ -371,6 +412,7 @@ function PathTimeline({
               ]
                 .filter(Boolean)
                 .join(" ")}
+              aria-pressed={scopeSegmentUid === segment.uid}
               onClick={() => {
                 onScopeChange(
                   scopeSegmentUid === segment.uid ? null : segment.uid,
@@ -413,6 +455,7 @@ function PathTimeline({
               key={item.value}
               type="button"
               className={mode === item.value ? "is-active" : ""}
+              aria-pressed={mode === item.value}
               title={item.description}
               onClick={() => onModeChange(item.value)}
             >
@@ -422,6 +465,18 @@ function PathTimeline({
           <span>{formatNumber(nodes.length)} records</span>
         </div>
       </header>
+
+      {refreshing || refreshError ? (
+        <div
+          className={`trace-refresh-state ${refreshError ? "is-error" : ""}`}
+          role="status"
+        >
+          <span>{refreshError ? `Refresh failed: ${refreshError}` : "Refreshing active path…"}</span>
+          {refreshError ? (
+            <button type="button" onClick={onRetry}>Retry</button>
+          ) : null}
+        </div>
+      ) : null}
 
       {mode === "context" && metrics.compactions > 0 ? (
         <div className="context-notice">
@@ -536,6 +591,7 @@ function TraceInspector({
           arguments={tool.arguments}
           output={tool.output}
           isError={tool.isError}
+          hasResult={tool.hasResult}
           entryId={`trace:${node.uid}`}
         />
       ) : (
@@ -554,6 +610,7 @@ function traceToolPresentation(
   arguments: Record<string, unknown>;
   output: string;
   isError: boolean;
+  hasResult: boolean;
 } | null {
   const message = node.entry.message;
   if (!message) return null;
@@ -566,6 +623,7 @@ function traceToolPresentation(
       arguments: call?.arguments || {},
       output: body,
       isError: Boolean(message.isError),
+      hasResult: true,
     };
   }
   if (message.role !== "assistant" || !Array.isArray(message.content)) {
@@ -583,6 +641,7 @@ function traceToolPresentation(
     arguments: call.arguments || {},
     output: result ? nodePrimaryText(result) : "",
     isError: Boolean(result?.entry.message?.isError),
+    hasResult: Boolean(result),
   };
 }
 
@@ -623,8 +682,20 @@ function TimelineRow({
         .filter(Boolean)
         .join(" ")}
       style={{ transform: `translateY(${index * ROW_HEIGHT}px)` }}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
       onClick={onSelect}
       onDoubleClick={onActivate}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          onActivate();
+        } else if (event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
     >
       <div className="path-sequence-column">
         <span>#{formatNumber(node.sequence)}</span>
@@ -687,21 +758,40 @@ function Metric({
 function TimelineState({
   title,
   detail,
+  onRetry,
   onClose,
 }: {
   title: string;
   detail?: string;
+  onRetry?: () => void;
   onClose: () => void;
 }) {
   return (
     <div className="path-timeline-state" role="status">
-      <button type="button" onClick={onClose} aria-label="Close path timeline">
+      <button
+        type="button"
+        className="path-timeline-state-close"
+        onClick={onClose}
+        aria-label="Close path timeline"
+      >
         <X size={15} />
       </button>
       <strong>{title}</strong>
       {detail ? <p>{detail}</p> : null}
+      {onRetry ? (
+        <button type="button" className="path-timeline-state-retry" onClick={onRetry}>
+          Retry
+        </button>
+      ) : null}
     </div>
   );
+}
+
+function formatLoadProgress(progress: TraceLoadProgress | null): string | undefined {
+  if (!progress) return undefined;
+  if (!progress.totalBytes) return `${formatNumber(progress.loadedBytes)} bytes read`;
+  const percent = Math.min(100, Math.round((progress.loadedBytes / progress.totalBytes) * 100));
+  return `${percent}% · ${formatNumber(progress.loadedBytes)} / ${formatNumber(progress.totalBytes)} bytes`;
 }
 
 function roleLabel(node: SessionNode): string {

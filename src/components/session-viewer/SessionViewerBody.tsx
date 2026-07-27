@@ -1,5 +1,6 @@
 import type {
   Dispatch,
+  KeyboardEventHandler,
   MouseEventHandler,
   MutableRefObject,
   PointerEvent as ReactPointerEvent,
@@ -32,6 +33,8 @@ import { getPathBasename, stripJsonlExt } from "@/utils/path";
 export interface SessionViewerBodySidebarProps {
   showSidebar: boolean;
   sidebarWidth: number;
+  sidebarMinWidth: number;
+  sidebarMaxWidth: number;
   isResizing: boolean;
   activeEntryId: string | null;
   hasMoreHistory?: boolean;
@@ -39,6 +42,7 @@ export interface SessionViewerBodySidebarProps {
   onCloseSidebar: () => void;
   onNodeClick: (leafId: string, targetId: string) => void;
   onResizeMouseDown: MouseEventHandler<HTMLDivElement>;
+  onResizeKeyDown: KeyboardEventHandler<HTMLDivElement>;
   treeRef: RefObject<SessionTreeRef>;
   sidebarRef: RefObject<HTMLElement>;
   resizeHandleRef: RefObject<HTMLDivElement>;
@@ -143,6 +147,8 @@ export default function SessionViewerBody({
       isMobile={isMobile}
       placement={isMobile ? "overlay" : "embedded"}
       sidebarWidth={sidebar.sidebarWidth}
+      sidebarMinWidth={sidebar.sidebarMinWidth}
+      sidebarMaxWidth={sidebar.sidebarMaxWidth}
       isResizing={sidebar.isResizing}
       entries={entries}
       sessionPath={session.path}
@@ -152,6 +158,7 @@ export default function SessionViewerBody({
       onCloseSidebar={sidebar.onCloseSidebar}
       onNodeClick={sidebar.onNodeClick}
       onResizeMouseDown={sidebar.onResizeMouseDown}
+      onResizeKeyDown={sidebar.onResizeKeyDown}
       treeRef={sidebar.treeRef}
       sidebarRef={sidebar.sidebarRef}
       resizeHandleRef={sidebar.resizeHandleRef}

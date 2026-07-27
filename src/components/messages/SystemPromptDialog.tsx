@@ -78,39 +78,41 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-surface-dark rounded-lg shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-border">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="system-prompt-title" className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl">
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <div className="flex items-center gap-1">
+          <div className="flex overflow-hidden rounded-md border border-border">
             <button
               onClick={() => setActiveTab('prompt')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium motion-surface motion-color motion-press focus-ring ${
+              aria-pressed={activeTab === 'prompt'}
+              className={`focus-ring flex items-center gap-2 border-r border-border px-3 py-2 text-sm font-medium last:border-r-0 ${
                 activeTab === 'prompt'
-                  ? 'bg-surface text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-surface/50'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
               <Terminal className="w-4 h-4" />
-              {t('common.systemPrompt.systemPrompt', 'System Prompt')}
+              <span id="system-prompt-title">{t('common.systemPrompt.systemPrompt', 'System Prompt')}</span>
             </button>
             <button
               onClick={() => setActiveTab('tools')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium motion-surface motion-color motion-press focus-ring ${
+              aria-pressed={activeTab === 'tools'}
+              className={`focus-ring flex items-center gap-2 border-r border-border px-3 py-2 text-sm font-medium last:border-r-0 ${
                 activeTab === 'tools'
-                  ? 'bg-surface text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-surface/50'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
               <Wrench className="w-4 h-4" />
               {t('common.systemPrompt.toolsUsed', 'Tools Used')}
-              <span className="text-xs bg-surface-dark text-muted-foreground px-2 py-0.5 rounded-full">
+              <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                 {toolUsages.length}
               </span>
             </button>
           </div>
           <button
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground motion-color motion-press focus-ring p-1"
+            className="focus-ring rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label={t('common.close', 'Close')}
           >
             <X className="w-5 h-5" />
@@ -123,7 +125,7 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
               <div className="text-muted-foreground">{t('common.loading', 'Loading...')}</div>
             </div>
           ) : activeTab === 'prompt' ? (
-            <div className="bg-surface rounded-lg p-4">
+            <div className="rounded-md border border-border bg-background p-4">
               {systemPrompt ? (
                 <MarkdownContent content={systemPrompt} className="text-sm" />
               ) : (
@@ -143,10 +145,10 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
                   {toolUsages.map((tool) => (
                     <div
                       key={tool.name}
-                      className="bg-surface rounded-lg border border-border-hover p-3 flex items-center justify-between"
+                      className="flex items-center justify-between border-b border-border p-3 last:border-b-0"
                     >
                       <span className="font-medium text-foreground">{tool.name}</span>
-                      <span className="text-xs bg-surface-dark text-muted-foreground px-2 py-1 rounded-full">
+                      <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                         {tool.count} {t('common.systemPrompt.calls', 'calls')}
                       </span>
                     </div>

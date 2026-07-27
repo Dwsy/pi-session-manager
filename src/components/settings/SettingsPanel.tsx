@@ -435,20 +435,23 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   return (
     <div
-      className={`settings-modal-no-press fixed inset-0 z-50 flex items-center justify-center motion-overlay-backdrop ${
-        heavyOverlay ? "bg-black/50 backdrop-blur-sm" : "bg-background/60"
+      className={`settings-modal-no-press fixed inset-0 z-50 flex items-center justify-center ${
+        heavyOverlay ? "bg-black/60" : "bg-background/60"
       } ${visible ? "opacity-100" : "opacity-0"}`}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("settings.title", "Settings")}
         className={`${
           isMobile
             ? "w-full h-full rounded-none"
             : heavyOverlay
-              ? "w-[95vw] h-[95vh] rounded-xl shadow-2xl"
+              ? "h-[95vh] w-[95vw] rounded-lg shadow-xl"
               : "w-[96vw] h-[94vh] rounded-[10px]"
-        } bg-surface-dark border border-border/70 flex ${
+        } border border-border bg-background flex ${
           isMobile ? "flex-col" : ""
-        } overflow-hidden motion-overlay-surface ${
+        } overflow-hidden ${
           visible ? "opacity-100" : "opacity-0"
         }`}
       >

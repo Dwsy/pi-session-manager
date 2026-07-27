@@ -12,9 +12,15 @@ export interface TraceSessionReference extends PsmSessionReference {
   modified?: string;
 }
 
+export interface TraceLoadProgress {
+  loadedBytes: number;
+  totalBytes: number | null;
+}
+
 export async function loadSessionEntries(
   client: PsmCapabilityClient,
   sessionPath: string,
+  onProgress?: (progress: TraceLoadProgress) => void,
 ): Promise<SessionEntry[]> {
   let offset = 0;
   let content = "";
@@ -25,6 +31,10 @@ export async function loadSessionEntries(
       maxBytes: READ_CHUNK_BYTES,
     });
     content += chunk.content;
+    onProgress?.({
+      loadedBytes: Math.max(content.length, chunk.next_offset),
+      totalBytes: chunk.file_size > 0 ? chunk.file_size : null,
+    });
     if (!chunk.has_more) break;
     if (chunk.next_offset <= offset) {
       throw new Error("Session chunk reader did not advance");

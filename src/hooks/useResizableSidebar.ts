@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { MouseEventHandler } from "react";
+import type { KeyboardEventHandler, MouseEventHandler } from "react";
 
 export interface UseResizableSidebarOptions {
   storageKey: string;
@@ -11,7 +11,10 @@ export interface UseResizableSidebarOptions {
 export interface UseResizableSidebarResult {
   sidebarWidth: number;
   isResizing: boolean;
+  minWidth: number;
+  maxWidth: number;
   handleMouseDown: MouseEventHandler<HTMLElement>;
+  handleKeyDown: KeyboardEventHandler<HTMLElement>;
 }
 
 function clampWidth(width: number, minWidth: number, maxWidth: number): number {
@@ -78,12 +81,39 @@ export function useResizableSidebar(
     }
   }, [minWidth, maxWidth]);
 
+  const persistWidth = useCallback((width: number) => {
+    try {
+      localStorage.setItem(storageKey, String(width));
+    } catch {
+      // Ignore storage write errors and keep UI responsive.
+    }
+  }, [storageKey]);
+
+  const updateWidth = useCallback((width: number, persist = false) => {
+    const nextWidth = clampWidth(width, minWidth, maxWidth);
+    sidebarWidthRef.current = nextWidth;
+    setSidebarWidth(nextWidth);
+    if (persist) persistWidth(nextWidth);
+  }, [maxWidth, minWidth, persistWidth]);
+
   const handleMouseDown = useCallback<MouseEventHandler<HTMLElement>>((event) => {
     event.preventDefault();
     setIsResizing(true);
     startXRef.current = event.clientX;
     startWidthRef.current = sidebarWidthRef.current;
   }, []);
+
+  const handleKeyDown = useCallback<KeyboardEventHandler<HTMLElement>>((event) => {
+    const step = event.shiftKey ? 32 : 16;
+    let nextWidth: number | null = null;
+    if (event.key === "ArrowLeft") nextWidth = sidebarWidthRef.current - step;
+    else if (event.key === "ArrowRight") nextWidth = sidebarWidthRef.current + step;
+    else if (event.key === "Home") nextWidth = minWidth;
+    else if (event.key === "End") nextWidth = maxWidth;
+    if (nextWidth === null) return;
+    event.preventDefault();
+    updateWidth(nextWidth, true);
+  }, [maxWidth, minWidth, updateWidth]);
 
   useEffect(() => {
     if (!isResizing) {
@@ -98,18 +128,13 @@ export function useResizableSidebar(
         maxWidth,
       );
 
-      setSidebarWidth(nextWidth);
-      sidebarWidthRef.current = nextWidth;
+      updateWidth(nextWidth);
     };
 
     const handleMouseUp = () => {
       setIsResizing(false);
 
-      try {
-        localStorage.setItem(storageKey, String(sidebarWidthRef.current));
-      } catch {
-        // Ignore storage write errors and keep UI responsive.
-      }
+      persistWidth(sidebarWidthRef.current);
     };
 
     document.addEventListener("mousemove", handleMouseMove);
@@ -119,11 +144,14 @@ export function useResizableSidebar(
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isResizing, maxWidth, minWidth, storageKey]);
+  }, [isResizing, maxWidth, minWidth, persistWidth, updateWidth]);
 
   return {
     sidebarWidth,
     isResizing,
+    minWidth,
+    maxWidth,
     handleMouseDown,
+    handleKeyDown,
   };
 }

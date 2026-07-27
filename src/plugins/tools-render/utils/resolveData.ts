@@ -20,9 +20,13 @@ export function defaultResolveData(
   const result = toolCallId ? toolResultByCallId.get(toolCallId) : undefined
   const toolResultContent = (result?.message?.content?.[0] || null) as any | null
 
-  const isError = result?.message?.isError ||
-    toolResultContent?.isError ||
-    false
+  const resultExitCode = result?.message?.exitCode
+  const isError = Boolean(
+    result?.message?.isError ||
+    result?.message?.cancelled ||
+    (typeof resultExitCode === 'number' && resultExitCode !== 0) ||
+    toolResultContent?.isError
+  )
 
   const output = getRenderableToolOutput(result)
 

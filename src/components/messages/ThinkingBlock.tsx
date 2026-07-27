@@ -1,5 +1,5 @@
+import { Brain, ChevronDown, ChevronRight } from 'lucide-react'
 import { memo, useEffect, useState } from 'react'
-import { Brain } from 'lucide-react'
 import MarkdownContent from '@/components/ui/MarkdownContent'
 
 interface ThinkingBlockProps {
@@ -16,20 +16,27 @@ function ThinkingBlock({ content, searchQuery = '', collapsed = false }: Thinkin
   }, [collapsed])
 
   return (
-    <div
-      className={`thinking-block ${expanded ? 'expanded' : ''}`}
-      onClick={() => setExpanded(!expanded)}
-      style={{ cursor: 'pointer' }}
-    >
-      <div className="thinking-text">
-        <MarkdownContent content={content} searchQuery={searchQuery} />
-      </div>
-      {!expanded && (
-        <div className="thinking-collapsed">
-          <Brain className="h-3.5 w-3.5" />
-          <span>Thinking ...</span>
+    <div className={`thinking-block ${expanded ? 'expanded' : ''}`}>
+      <button
+        type="button"
+        className="thinking-toggle"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+      >
+        {expanded ? (
+          <ChevronDown className="thinking-toggle-chevron" aria-hidden="true" />
+        ) : (
+          <ChevronRight className="thinking-toggle-chevron" aria-hidden="true" />
+        )}
+        <Brain className="thinking-toggle-icon" aria-hidden="true" />
+        <span className="thinking-toggle-label">Thinking</span>
+        <span className="thinking-toggle-hint">{expanded ? 'Hide' : 'Show reasoning'}</span>
+      </button>
+      {expanded ? (
+        <div className="thinking-text">
+          <MarkdownContent content={content} searchQuery={searchQuery} />
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

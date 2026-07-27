@@ -185,16 +185,16 @@ export default function ThemeStudioModal({
   const builtInBase46List = getBuiltInBase46Themes()
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="flex h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="theme-studio-title" className="flex h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-md border border-border bg-background shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border bg-surface px-6 py-4">
+        <div className="flex items-center justify-between border-b border-border bg-background px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/20 text-accent">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-accent/20 text-accent">
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-foreground">Theme Studio</h2>
+              <h2 id="theme-studio-title" className="text-lg font-semibold text-foreground">Theme Studio</h2>
               <p className="text-xs text-muted-foreground">Customise palette variables or generate JSON with AI</p>
             </div>
           </div>
@@ -230,7 +230,7 @@ export default function ThemeStudioModal({
 
             <button
               onClick={handleCancel}
-              className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-dark hover:text-foreground"
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-surface-dark hover:text-foreground"
             >
               <X className="h-5 w-5" />
             </button>
@@ -282,7 +282,7 @@ export default function ThemeStudioModal({
                           return (
                             <div
                               key={key}
-                              className="flex items-center justify-between rounded-lg border border-border/60 bg-background/50 p-2.5"
+                              className="flex items-center justify-between rounded-md border border-border/60 bg-background/50 p-2.5"
                             >
                               <span className="text-xs font-medium text-foreground">{name}</span>
                               <div className="flex items-center gap-2">
@@ -309,7 +309,7 @@ export default function ThemeStudioModal({
               ) : (
                 <div className="flex h-full flex-col space-y-4">
                   {/* AI Generator Helper */}
-                  <div className="rounded-lg border border-accent/30 bg-accent/10 p-4">
+                  <div className="rounded-md border border-accent/30 bg-accent/10 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
                         <h4 className="flex items-center gap-1.5 text-xs font-semibold text-accent">
@@ -347,7 +347,7 @@ export default function ThemeStudioModal({
                       value={jsonText}
                       onChange={(e) => handleJsonTextChange(e.target.value)}
                       placeholder="Paste JSON theme object here..."
-                      className="flex-1 font-mono text-xs rounded-lg border border-border bg-background p-3 text-foreground focus:border-accent focus:outline-none"
+                      className="flex-1 font-mono text-xs rounded-md border border-border bg-background p-3 text-foreground focus:border-accent focus:outline-none"
                     />
                     {!jsonValidation.valid && (
                       <p className="text-xs font-mono text-destructive">{jsonValidation.error}</p>
@@ -381,13 +381,13 @@ export default function ThemeStudioModal({
               {/* Chat Dialog Simulation */}
               <div className="space-y-3 pt-2">
                 {/* User Message */}
-                <div className="ml-auto max-w-[80%] rounded-lg bg-surface-dark p-3 text-xs text-foreground">
+                <div className="ml-auto max-w-[80%] rounded-md bg-surface-dark p-3 text-xs text-foreground">
                   <p className="font-medium text-accent">User</p>
                   <p className="mt-1">Can you create a custom theme for me?</p>
                 </div>
 
                 {/* Assistant Message */}
-                <div className="mr-auto max-w-[90%] space-y-2 rounded-lg border border-border bg-card p-3 text-xs text-foreground">
+                <div className="mr-auto max-w-[90%] space-y-2 rounded-md border border-border bg-card p-3 text-xs text-foreground">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-purple">Assistant Agent</span>
                     <span className="text-[10px] text-muted-foreground">16:35</span>
@@ -428,7 +428,7 @@ export default function ThemeStudioModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between border-t border-border bg-surface px-6 py-4">
+        <div className="flex items-center justify-between border-t border-border bg-background px-5 py-4">
           <div className="flex items-center gap-3">
             <label className="text-xs font-medium text-foreground">Save as Theme Name:</label>
             <input
@@ -444,14 +444,14 @@ export default function ThemeStudioModal({
           <div className="flex items-center gap-3">
             <button
               onClick={handleCancel}
-              className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-foreground hover:bg-surface-dark"
+              className="rounded-md border border-border px-4 py-2 text-xs font-medium text-foreground hover:bg-surface-dark"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
               {isSaving ? 'Saving...' : 'Save & Apply Theme'}

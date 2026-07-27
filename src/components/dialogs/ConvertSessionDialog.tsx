@@ -108,29 +108,32 @@ export default function ConvertSessionDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
-        className={`bg-background border border-border rounded-xl p-6 shadow-2xl ${
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="convert-session-title"
+        className={`rounded-md border border-border bg-background p-5 shadow-xl ${
           isMobile ? 'w-[95vw] max-w-md' : 'w-[32rem]'
         }`}
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">
+            <h3 id="convert-session-title" className="text-lg font-semibold">
               {t('session.convert.title')}
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label={t('common.close')}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="mb-4 rounded-lg border border-border/60 bg-secondary/30 px-3 py-2 text-sm">
+        <div className="mb-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
           <div className="font-medium truncate">
             {getSessionListDisplayName(session, t('session.list.untitled'))}
           </div>
@@ -145,10 +148,10 @@ export default function ConvertSessionDialog({
               key={option.slug}
               type="button"
               onClick={() => setTarget(option.slug)}
-              className={`w-full rounded-lg border px-4 py-3 text-left motion-context ${
+              className={`focus-ring w-full rounded-md border px-3 py-2.5 text-left ${
                 target === option.slug
                   ? 'border-primary/40 bg-primary/10'
-                  : 'border-border/60 bg-secondary/20 hover:bg-secondary/50'
+                  : 'border-border bg-muted/30 hover:bg-muted/50'
               }`}
             >
               <div className="font-medium">{t(`session.convert.targets.${option.slug}`)}</div>
@@ -159,7 +162,7 @@ export default function ConvertSessionDialog({
           ))}
         </div>
 
-        <div className="mt-4 space-y-3 rounded-lg border border-border/60 bg-secondary/20 p-3">
+        <div className="mt-4 space-y-3 rounded-md border border-border bg-muted/30 p-3">
           <label className="flex items-center gap-3 text-sm">
             <input
               type="checkbox"
@@ -190,7 +193,7 @@ export default function ConvertSessionDialog({
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-2 text-sm rounded-lg border border-border/70 bg-secondary hover:bg-secondary-hover transition-colors"
+            className="px-3 py-2 text-sm rounded-md border border-border bg-background hover:bg-muted"
           >
             {t('common.cancel')}
           </button>
@@ -198,7 +201,7 @@ export default function ConvertSessionDialog({
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="px-3 py-2 text-sm rounded-lg border border-primary/40 bg-primary/10 hover:bg-primary/15 text-foreground transition-colors inline-flex items-center gap-2 disabled:opacity-60"
+            className="px-3 py-2 text-sm rounded-md border border-primary/40 bg-primary/10 hover:bg-primary/15 text-foreground inline-flex items-center gap-2 disabled:opacity-60"
           >
             <FileOutput className="h-4 w-4" />
             {submitting

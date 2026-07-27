@@ -10,6 +10,10 @@ import { useTheme } from '@/hooks/useAppearance'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useSessionView } from '@/contexts/SessionViewContext'
 import { useSettings } from '@/hooks/useSettings'
+import { useClipboard } from '@/hooks/useClipboard'
+import ToolHeader from '@/components/tool-calls/ToolHeader'
+import ToolSectionHeader from '@/components/tool-calls/ToolSectionHeader'
+import { getToolStatusLabel, type ToolRenderStatus } from '@/plugins/tools-render/utils/status'
 import { highlightSearchInHTML } from '@/utils/search'
 
 // Custom themes: inherit pierre themes but override editor.background to match tool card bg
@@ -39,6 +43,7 @@ interface EditExecutionProps {
   diff?: string
   output?: string
   isError?: boolean
+  hasResult?: boolean
   entryId: string
   searchQuery?: string
 }
@@ -50,6 +55,7 @@ export default function EditExecution({
   diff,
   output,
   isError = false,
+  hasResult = true,
   entryId,
   searchQuery = '',
 }: EditExecutionProps) {
@@ -59,6 +65,7 @@ export default function EditExecution({
   const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   const { isToolExpanded, toggleToolExpanded } = useSessionView()
   const { settings } = useSettings()
+  const { copyText } = useClipboard()
   const disableSuccessStyle = settings.appearance.disableToolSuccessStyle
   const expanded = isToolExpanded(entryId)
   const displayPath = isMobile ? shortenPath(filePath) : filePath
@@ -274,35 +281,44 @@ export default function EditExecution({
   const outputText = output ?? ''
   const shouldShowOutput = Boolean(isError && outputText)
   const hasContent = Boolean(diff || shouldShowOutput)
-  const statusClass = isError ? 'error' : !disableSuccessStyle ? 'success' : ''
+  const status: ToolRenderStatus = isError
+    ? 'error'
+    : hasResult
+      ? 'success'
+      : 'pending'
+  const statusClass = status === 'success' && disableSuccessStyle ? '' : status
+  const statusLabel = getToolStatusLabel(status, t)
 
   return (
     <div className={`tool-execution ${statusClass}`.trim()} id={`entry-${entryId}`}>
-      <div
-        className={`tool-header ${hasContent ? 'cursor-pointer select-none' : ''}`}
-        onClick={hasContent ? () => toggleToolExpanded(entryId) : undefined}
+      <ToolHeader
+        expandable={hasContent}
+        expanded={expanded}
+        onToggle={() => toggleToolExpanded(entryId)}
+        ariaLabel={`Edit: ${statusLabel}`}
       >
         {hasContent && (
-          <span className="tool-expand-indicator">
+          <span className="tool-expand-indicator" aria-hidden="true">
             {expanded ? '▾' : '▸'}
           </span>
         )}
-        <div className="tool-header-meta">
-          <span className="tool-name">
-            <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-            </svg>
-            Edit
-          </span>
-        </div>
-        <span className="tool-path" style={desktopPathStyle}>{escapeHtml(displayPath)}</span>
-      </div>
+        <span className="tool-header-meta">
+          <span className="tool-name">Edit</span>
+        </span>
+        <span className="tool-path" style={desktopPathStyle}>{displayPath}</span>
+        <span className={`tool-status tool-status-${status}`}>{statusLabel}</span>
+      </ToolHeader>
 
       {diff && (
         <div className={`tool-diff-wrapper collapsible ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             {expanded && (
               <div style={{ maxHeight: OUTPUT_MAX_HEIGHT, overflowY: 'auto' }}>
+                <ToolSectionHeader
+                  label={t('components.toolCall.diff', 'Diff')}
+                  text={diff}
+                  copyText={copyText}
+                />
                 {renderDiff()}
               </div>
             )}
@@ -315,15 +331,23 @@ export default function EditExecution({
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             {expanded && (
               <div className="tool-output">
-                <div dangerouslySetInnerHTML={{ __html: highlightedOutput }} />
+                <ToolSectionHeader
+                  label={t('components.toolCall.output', 'Output')}
+                  text={outputText}
+                  copyText={copyText}
+                />
+                <pre
+                  className="tool-output-plain"
+                  dangerouslySetInnerHTML={{ __html: highlightedOutput }}
+                />
               </div>
             )}
           </div>
         </div>
       )}
 
-      {!hasContent && (
-        <div className="tool-output" style={{ color: 'var(--muted)', fontStyle: 'italic' }}>
+      {!hasContent && hasResult && (
+        <div className="tool-output tool-output-empty">
           {t('components.editExecution.noChanges')}
         </div>
       )}
