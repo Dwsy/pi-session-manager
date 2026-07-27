@@ -43,13 +43,15 @@ Pi Session Manager 将这些会话视为持久、可检查的工程资产。它�
 
 ## 界面预览
 
-| 首页 | 会话页 |
-|------|--------|
-| ![首页](website/public/screenshots/home.png) | ![会话页](website/public/screenshots/session-page.png) |
+## UI Preview
 
-| 会话树 | 看板 |
-|--------|------|
-| ![会话树](website/public/screenshots/session-tree.png) | ![看板](website/public/screenshots/kanban.png) |
+| Home | Session Page |
+|------|--------------|
+| ![Home](https://github.com/user-attachments/assets/d28aefb4-beed-4228-ac55-4d11164bc2f1) | ![Session Page](https://github.com/user-attachments/assets/b4b645a8-c58e-4568-b0e7-567f4e34ba7a) |
+
+| Session Tree | Kanban |
+|--------------|--------|
+| ![Session Tree](https://github.com/user-attachments/assets/fd026277-2de2-4e41-ac27-37a68d8c8322) | ![Kanban](https://github.com/user-attachments/assets/fc7d3adc-ab0d-475a-827c-9acb8ca4498e) |
 
 ## 核心能力
 
