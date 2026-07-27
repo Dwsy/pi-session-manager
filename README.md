@@ -23,17 +23,15 @@
 
 ## UI Preview
 
+## UI Preview
+
 | Home | Session Page |
-|------|-------------|
-| ![Home](<img width="1401" height="901" alt="image" src="https://github.com/user-attachments/assets/d28aefb4-beed-4228-ac55-4d11164bc2f1" />
-) | ![Session Page](<img width="1399" height="901" alt="image" src="https://github.com/user-attachments/assets/b4b645a8-c58e-4568-b0e7-567f4e34ba7a" />
-) |
+|------|--------------|
+| ![Home](https://github.com/user-attachments/assets/d28aefb4-beed-4228-ac55-4d11164bc2f1) | ![Session Page](https://github.com/user-attachments/assets/b4b645a8-c58e-4568-b0e7-567f4e34ba7a) |
 
 | Session Tree | Kanban |
-|-------------|--------|
-| ![Session Tree](<img width="1400" height="901" alt="image" src="https://github.com/user-attachments/assets/fd026277-2de2-4e41-ac27-37a68d8c8322" />
-) | ![Kanban](<img width="1399" height="901" alt="image" src="https://github.com/user-attachments/assets/fc7d3adc-ab0d-475a-827c-9acb8ca4498e" />
-) |
+|--------------|--------|
+| ![Session Tree](https://github.com/user-attachments/assets/fd026277-2de2-4e41-ac27-37a68d8c8322) | ![Kanban](https://github.com/user-attachments/assets/fc7d3adc-ab0d-475a-827c-9acb8ca4498e) |
 
 
 ## Install
