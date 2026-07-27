@@ -42,10 +42,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install Rust stable
+      - name: Install Rust 1.97.0
         run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+          rustup toolchain install 1.97.0 --profile minimal
+          rustup default 1.97.0
           rustup target add ${{ matrix.target }}
           rustup show
           echo "$(rustc --print sysroot)/bin" >> $GITHUB_PATH
@@ -129,10 +129,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Install Rust stable
+      - name: Install Rust 1.97.0
         run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+          rustup toolchain install 1.97.0 --profile minimal
+          rustup default 1.97.0
           rustup target add ${{ matrix.target }}
           rustup show
           echo "$(rustc --print sysroot)/bin" >> $GITHUB_PATH
