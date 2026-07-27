@@ -273,9 +273,9 @@ describe("buildConversationPreviewTurns", () => {
     );
 
     fireEvent.click(screen.getByText("Show"));
-    const toolHeader = container.querySelector(".tool-header-bash");
-    expect(toolHeader).toBeTruthy();
-    fireEvent.click(toolHeader!);
+    const toolToggle = container.querySelector(".tool-header-bash .tool-header-toggle");
+    expect(toolToggle).toBeTruthy();
+    fireEvent.click(toolToggle!);
 
     expect(document.body.textContent).toContain("tests passed");
   });

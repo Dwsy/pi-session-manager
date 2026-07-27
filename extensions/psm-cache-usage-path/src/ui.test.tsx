@@ -65,12 +65,12 @@ async function renderPanel(open = true): Promise<{ container: HTMLDivElement; ro
 }
 
 describe('CacheUsagePanel', () => {
-  it('uses the overview as the default panel and the main background token', async () => {
+  it('uses the overview as the default shared session panel', async () => {
     const { container, root } = await renderPanel()
 
     expect(container.textContent).toContain('Overview')
     expect(container.textContent).toContain('Signals')
-    expect(container.querySelector('[data-no-window-drag]')?.className).toContain('bg-background')
+    expect(container.querySelector('[data-no-window-drag]')?.className).toContain('psm-session-plugin-panel')
 
     await act(async () => root.unmount())
   })

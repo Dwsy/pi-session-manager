@@ -113,7 +113,7 @@ describe("SessionTree", () => {
 
     const flowDialog = screen.getByRole("dialog");
     expect(flowDialog).not.toBeNull();
-    expect(flowDialog.parentElement).toBe(document.body);
+    expect(flowDialog.closest('.session-tree-plugin-dialog-backdrop')?.parentElement).toBe(document.body);
     expect(screen.getByTestId("plugin-flow-view").textContent).toContain(
       "3 entries · no-tools",
     );

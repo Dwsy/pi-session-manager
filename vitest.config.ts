@@ -24,6 +24,12 @@ export default defineConfig({
     },
   },
   test: {
+    server: {
+      deps: {
+        // This package ships extensionless ESM directory imports that Node cannot resolve.
+        inline: ['@lobehub/ui', '@lobehub/fluent-emoji'],
+      },
+    },
     // Polyfills run for every test file; the setup file is defensive (guards
     // each polyfill with a typeof check) so node-environment tests are unaffected.
     setupFiles: ['./vitest.setup.ts'],
