@@ -436,16 +436,14 @@ export function CatalogBrowserModal({
                       pendingRemove
                         ? "border-red-500/25 bg-red-500/5"
                         : checked
-                          ? exists
-                            ? "border-primary/20 bg-primary/5"
-                            : "border-primary/30 bg-primary/10"
+                          ? "settings-accent-bg-soft settings-accent-ring border-transparent"
                           : "border-transparent hover:bg-accent/10"
                     }`}
                   >
                     <span
                       className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
                         checked
-                          ? "border-primary bg-primary text-primary-foreground"
+                          ? "settings-accent-bg-soft settings-accent-ring settings-accent-fg border-transparent"
                           : pendingRemove
                             ? "border-red-500/50 bg-background"
                             : "border-border/70 bg-background"

@@ -263,6 +263,14 @@ export const settings = {
   appBehavior: {
     title: "App behavior",
     description: "Control window behavior and everyday app-level defaults.",
+    recapTitle: "Dashboard recaps",
+    recapDescription: "A local midyear and year-end recap built only from existing session statistics.",
+    recapAuto: "Automatic seasonal recap",
+    recapAutoDescription: "Show once from June 15 through July 31, and once from December 15 through January 31. Closing it counts as shown for that cycle.",
+    recapManual: "Open a recap now",
+    recapManualDescription: "Manual views never mark an automatic cycle as shown. Statistics stay on this device.",
+    openMidyearRecap: "Midyear recap",
+    openYearendRecap: "Year-end recap",
   },
   dataSources: {
     localTitle: "Local session directories",

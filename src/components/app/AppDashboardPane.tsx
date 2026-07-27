@@ -38,6 +38,16 @@ function AppDashboardPane({
   sessions,
   onSessionSelect,
   onProjectSelect,
+  onPreviewExportSession,
+  onOpenPreviewRenameDialog,
+  onPreviewRenameSession,
+  onPreviewForkSession,
+  onPreviewConvertSession,
+  onPreviewResumeSession,
+  terminal,
+  piPath,
+  customCommand,
+  resumeCommand,
   projectName,
   loading,
   liveSessionIds,
@@ -48,6 +58,16 @@ function AppDashboardPane({
         sessions={sessions}
         onSessionSelect={onSessionSelect}
         onProjectSelect={onProjectSelect}
+        onPreviewExportSession={onPreviewExportSession}
+        onOpenPreviewRenameDialog={onOpenPreviewRenameDialog}
+        onPreviewRenameSession={onPreviewRenameSession}
+        onPreviewForkSession={onPreviewForkSession}
+        onPreviewConvertSession={onPreviewConvertSession}
+        onPreviewResumeSession={onPreviewResumeSession}
+        terminal={terminal}
+        piPath={piPath}
+        customCommand={customCommand}
+        resumeCommand={resumeCommand}
         projectName={projectName}
         loading={loading}
         liveSessionIds={liveSessionIds}

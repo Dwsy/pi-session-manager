@@ -15,7 +15,7 @@ export default function SettingsOptionButton({
   active,
   children,
   className = '',
-  activeClassName = 'border-primary/40 bg-primary/10 text-foreground',
+  activeClassName = 'settings-accent-bg-soft settings-accent-ring settings-accent-fg border-transparent font-medium',
   inactiveClassName = 'border-border text-muted-foreground hover:border-border-hover',
   ...props
 }: SettingsOptionButtonProps) {

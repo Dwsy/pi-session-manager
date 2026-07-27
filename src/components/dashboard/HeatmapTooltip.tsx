@@ -166,7 +166,12 @@ export default function HeatmapTooltip({
       className="block w-full"
       onMouseEnter={openTooltip}
       onMouseLeave={handleAnchorLeave}
-      onClick={closeImmediately}
+      onPointerDownCapture={(event) => {
+        if (!tooltipRef.current?.contains(event.target as Node)) closeImmediately()
+      }}
+      onKeyDownCapture={(event) => {
+        if ((event.key === 'Enter' || event.key === ' ') && !tooltipRef.current?.contains(event.target as Node)) closeImmediately()
+      }}
     >
       {children}
 
@@ -183,7 +188,6 @@ export default function HeatmapTooltip({
           }}
           onMouseEnter={cancelClose}
           onMouseLeave={handleTooltipLeave}
-          onClick={(e) => e.stopPropagation()}
         >
           <div className="relative rounded-md border border-border bg-popover shadow-lg px-3.5 py-3 min-w-[240px] max-w-[300px]">
             <div className="text-sm font-semibold text-foreground mb-2">{formattedDate}</div>

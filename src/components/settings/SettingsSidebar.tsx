@@ -153,7 +153,7 @@ export default function SettingsSidebar({
               aria-pressed={activeArea === area.id}
               className={`focus-ring min-h-[30px] truncate border-r border-border px-2 text-xs font-medium last:border-r-0 ${
                 activeArea === area.id
-                  ? "bg-primary text-primary-foreground"
+                  ? "settings-accent-bg-soft settings-accent-ring settings-accent-fg font-semibold"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
@@ -241,13 +241,13 @@ export default function SettingsSidebar({
                             onClick={() => onSectionChange(item.id)}
                             className={`focus-ring flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm ${
                               activeSection === item.id
-                                ? "bg-primary/10 text-foreground"
+                                ? "settings-accent-bg-soft settings-accent-ring text-foreground font-medium"
                                 : isActive
                                   ? "bg-muted/60 text-foreground"
                                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
                             }`}
                           >
-                            <span className={activeSection === item.id || isActive ? "text-primary" : ""}>
+                            <span className={activeSection === item.id || isActive ? "settings-accent-fg" : ""}>
                               {item.icon}
                             </span>
                             <span className="flex-1 truncate text-left">
@@ -282,13 +282,13 @@ export default function SettingsSidebar({
                                 onClick={() => onSectionChange(child.id)}
                                 className={`focus-ring flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs ${
                                   activeSection === child.id
-                                    ? "bg-primary/10 text-foreground"
+                                    ? "settings-accent-bg-soft settings-accent-ring text-foreground font-medium"
                                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                                 }`}
                               >
                                 <span
                                   className={
-                                    activeSection === child.id ? "text-primary" : ""
+                                    activeSection === child.id ? "settings-accent-fg" : ""
                                   }
                                 >
                                   {child.icon}

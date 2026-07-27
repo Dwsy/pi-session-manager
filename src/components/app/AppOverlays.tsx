@@ -9,6 +9,7 @@ import RenameDialog from "@/components/dialogs/RenameDialog";
 import ForkDialog from "@/components/dialogs/ForkDialog";
 import Onboarding from "@/components/Onboarding";
 import PsmPluginPermissionRequestDialog from "@/components/plugins/PsmPluginPermissionRequestDialog";
+import DashboardRecapController from "@/components/dashboard/DashboardRecapController";
 import type { SearchContext } from "@/plugins/types";
 import type {
   SessionConvertResult,
@@ -38,6 +39,7 @@ export interface AppOverlaysProps {
   showSettings: boolean;
   showOnboarding: boolean;
   selectedSession: SessionInfo | null;
+  sessions: SessionInfo[];
   commandContext: SearchContext;
   onExportSession: (format: ExportFormat) => Promise<void> | void;
   onConvertSession: (
@@ -74,6 +76,7 @@ function AppOverlays({
   showSettings,
   showOnboarding,
   selectedSession,
+  sessions,
   commandContext,
   onExportSession,
   onConvertSession,
@@ -150,6 +153,7 @@ function AppOverlays({
         <CommandPalette context={commandContext} />
       </Suspense>
       {showOnboarding && <Onboarding onComplete={onCompleteOnboarding} />}
+      <DashboardRecapController sessions={sessions} />
       <PsmPluginPermissionRequestDialog />
     </>
   );

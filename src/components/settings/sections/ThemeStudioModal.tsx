@@ -244,10 +244,11 @@ export default function ThemeStudioModal({
             {/* Tabs */}
             <div className="flex border-b border-border bg-surface-dark/50 px-4 pt-2">
               <button
+                type="button"
                 onClick={() => setActiveTab('palette')}
                 className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-medium transition-colors ${
                   activeTab === 'palette'
-                    ? 'border-accent text-accent'
+                    ? 'settings-accent-border settings-accent-fg font-semibold'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -255,10 +256,11 @@ export default function ThemeStudioModal({
                 Palette Editor
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab('ai')}
                 className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-medium transition-colors ${
                   activeTab === 'ai'
-                    ? 'border-accent text-accent'
+                    ? 'settings-accent-border settings-accent-fg font-semibold'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >

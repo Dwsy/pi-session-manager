@@ -32,7 +32,7 @@ export default function SettingsRadioCardGroup<T extends string>({
   getSuffix,
   containerClassName = 'space-y-2',
   itemClassName = '',
-  activeClassName = 'border-primary/40 bg-primary/10',
+  activeClassName = 'settings-accent-bg-soft settings-accent-ring border-transparent',
   inactiveClassName = 'border-border hover:border-border-hover',
   radioClassName = 'sr-only',
   labelClassName = 'text-sm font-medium text-foreground',

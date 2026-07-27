@@ -26,6 +26,30 @@ import TimeDistribution from "./TimeDistribution";
 import DashboardInsightModal from "./DashboardInsightModal";
 import type { DashboardInsightMode } from "./DashboardInsightModal";
 import TokenTrendChart from "./TokenTrendChart";
+import DashboardPulse from "./DashboardPulse";
+import DashboardTimeFilter from "./DashboardTimeFilter";
+import DashboardRangeDetail from "./DashboardRangeDetail";
+import { deriveDashboardInsights } from "./dashboardInsights";
+import {
+  buildDashboardHeatmapData,
+  createDefaultDashboardTimeSelection,
+  dashboardCombinedCost,
+  dashboardCombinedTokens,
+  dashboardPercentChange,
+  dashboardSelectionEquals,
+  emptyDashboardStats,
+  filterDashboardSessionsByBounds,
+  filterDashboardSessionsByProject,
+  filterDashboardSessionsByWindow,
+  formatDashboardTimeRange,
+  getDashboardDateBounds,
+  getDashboardTimeAnchor,
+  getDashboardTimeOptions,
+  getNaturalMonthWindow,
+  getNaturalWeekWindow,
+  normalizeDashboardTimeSelection,
+  type DashboardPeriodComparisonData,
+} from "./dashboardTimeRange";
 import SessionPreviewModal from "@/components/session-preview/SessionPreviewModal";
 import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { DashboardSkeleton } from "@/components/ui/Skeleton";
@@ -64,6 +88,18 @@ function getProjectName(path: string): string {
   return getPathBasename(path);
 }
 
+function formatTokensForPulse(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return value.toLocaleString();
+}
+
+function formatCostForPulse(value: number): string {
+  if (value < 0.01) return `$${value.toFixed(4)}`;
+  if (value < 1) return `$${value.toFixed(3)}`;
+  return `$${value.toFixed(2)}`;
+}
+
 export default function Dashboard({
   sessions,
   onSessionSelect,
@@ -82,8 +118,14 @@ export default function Dashboard({
   loading: parentLoading = false,
   liveSessionIds,
 }: DashboardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [stats, setStats] = useState<SessionStats | null>(null);
+  const [weekComparison, setWeekComparison] = useState<DashboardPeriodComparisonData | null>(null);
+  const [monthComparison, setMonthComparison] = useState<DashboardPeriodComparisonData | null>(null);
+  const [timeSelection, setTimeSelection] = useState(createDefaultDashboardTimeSelection);
+  const [reloadNonce, setReloadNonce] = useState(0);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDay, setSelectedDay] = useState<HeatmapPoint | null>(null);
   const [dayStats, setDayStats] = useState<DayStats | undefined>(undefined);
@@ -92,79 +134,132 @@ export default function Dashboard({
     DashboardInsightMode | null
   >(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [previewSession, setPreviewSession] = useState<SessionInfo | null>(null);
-  const isLoadingRef = useRef(false);
-  const hasLoadedOnce = useRef(false);
-  const warmRetryDone = useRef(false);
-  const prevProjectRef = useRef(projectName);
+  const statsRequestRef = useRef(0);
+  const loadedScopeKeyRef = useRef<string | null>(null);
+  const currentScopeKeyRef = useRef("");
+  const warmRetryKeysRef = useRef(new Set<string>());
+
+  const projectScopedSessions = useMemo(
+    () => filterDashboardSessionsByProject(sessions, projectName),
+    [projectName, sessions],
+  );
+  const effectiveTimeSelection = useMemo(
+    () => normalizeDashboardTimeSelection(projectScopedSessions, timeSelection),
+    [projectScopedSessions, timeSelection],
+  );
+  const timeOptions = useMemo(
+    () => getDashboardTimeOptions(projectScopedSessions, effectiveTimeSelection),
+    [effectiveTimeSelection, projectScopedSessions],
+  );
+  const dashboardBounds = useMemo(
+    () => getDashboardDateBounds(effectiveTimeSelection),
+    [effectiveTimeSelection],
+  );
+  const visibleSessions = useMemo(
+    () => filterDashboardSessionsByBounds(projectScopedSessions, dashboardBounds),
+    [dashboardBounds, projectScopedSessions],
+  );
+  const periodAnchor = useMemo(
+    () => getDashboardTimeAnchor(dashboardBounds),
+    [dashboardBounds],
+  );
+  const weekWindow = useMemo(() => getNaturalWeekWindow(periodAnchor), [periodAnchor]);
+  const monthWindow = useMemo(() => getNaturalMonthWindow(periodAnchor), [periodAnchor]);
+  const periodSessionGroups = useMemo(() => ({
+    weekCurrent: filterDashboardSessionsByWindow(projectScopedSessions, weekWindow.currentStart, weekWindow.currentEnd),
+    weekPrevious: filterDashboardSessionsByWindow(projectScopedSessions, weekWindow.previousStart, weekWindow.previousEnd),
+    monthCurrent: filterDashboardSessionsByWindow(projectScopedSessions, monthWindow.currentStart, monthWindow.currentEnd),
+    monthPrevious: filterDashboardSessionsByWindow(projectScopedSessions, monthWindow.previousStart, monthWindow.previousEnd),
+  }), [monthWindow, projectScopedSessions, weekWindow]);
   const statsKey = useMemo(() => {
-    const first = sessions[0];
-    const last = sessions[sessions.length - 1];
+    const first = visibleSessions[0];
+    const last = visibleSessions[visibleSessions.length - 1];
     return [
       projectName ?? "all",
-      sessions.length,
+      effectiveTimeSelection.granularity,
+      effectiveTimeSelection.year,
+      effectiveTimeSelection.month,
+      effectiveTimeSelection.day,
+      visibleSessions.length,
       first?.path ?? "",
       first?.modified ?? "",
       last?.path ?? "",
       last?.modified ?? "",
     ].join("|");
-  }, [projectName, sessions]);
+  }, [effectiveTimeSelection, projectName, visibleSessions]);
+  currentScopeKeyRef.current = statsKey;
 
-  // Reload stats when sessions or project changes
+  useEffect(() => {
+    if (dashboardSelectionEquals(timeSelection, effectiveTimeSelection)) return;
+    setTimeSelection(effectiveTimeSelection);
+  }, [effectiveTimeSelection, timeSelection]);
+
   useEffect(() => {
     if (parentLoading) return;
+    const requestId = ++statsRequestRef.current;
+    const scopeChanged = loadedScopeKeyRef.current !== statsKey;
 
-    // Reset on project switch and show skeleton UI
-    if (prevProjectRef.current !== projectName) {
-      prevProjectRef.current = projectName;
-      hasLoadedOnce.current = false;
-      warmRetryDone.current = false;
-      setStats(null);
-    }
+    // Preserve the last complete snapshot while a new project/time scope loads.
+    // Clearing here unmounts the entire dashboard and causes a visible flash.
+    setStatsError(null);
 
-    if (sessions.length === 0) {
+    if (visibleSessions.length === 0) {
+      loadedScopeKeyRef.current = statsKey;
       setStats(null);
-      hasLoadedOnce.current = false;
-      warmRetryDone.current = false;
+      setWeekComparison(null);
+      setMonthComparison(null);
+      setIsStatsLoading(false);
+      setIsRefreshing(false);
       return;
     }
-    loadStats();
-  }, [statsKey, parentLoading]);
 
-  const loadStats = async () => {
-    if (isLoadingRef.current) return;
-    isLoadingRef.current = true;
-    // Show refresh indicator only on subsequent updates; do not replace entire UI
-    if (hasLoadedOnce.current) {
-      setIsRefreshing(true);
-    }
+    setIsStatsLoading(true);
+    if (!scopeChanged || reloadNonce > 0) setIsRefreshing(true);
 
-    try {
-      const result = await getRuntimeStats(sessions);
-      setStats(result);
-      hasLoadedOnce.current = true;
+    const getStatsOrEmpty = (target: SessionInfo[]) =>
+      target.length ? getRuntimeStats(target) : Promise.resolve(emptyDashboardStats());
 
-      // Cold start: backend uses header-only parse for bootstrap so stats come back
-      // with zero tokens. A background task warms the cache; retry once after a delay.
-      if (
-        !warmRetryDone.current &&
-        result.total_tokens === 0 &&
-        sessions.length > 0
-      ) {
-        warmRetryDone.current = true;
-        setTimeout(() => {
-          isLoadingRef.current = false;
-          void loadStats();
-        }, 3000);
-        return;
-      }
-    } catch (error) {
-      console.error("Failed to load stats:", error);
-    } finally {
-      isLoadingRef.current = false;
-      setIsRefreshing(false);
-    }
-  };
+    Promise.all([
+      getRuntimeStats(visibleSessions),
+      getStatsOrEmpty(periodSessionGroups.weekCurrent),
+      getStatsOrEmpty(periodSessionGroups.weekPrevious),
+      getStatsOrEmpty(periodSessionGroups.monthCurrent),
+      getStatsOrEmpty(periodSessionGroups.monthPrevious),
+    ])
+      .then(([main, weekCurrent, weekPrevious, monthCurrent, monthPrevious]) => {
+        if (requestId !== statsRequestRef.current || currentScopeKeyRef.current !== statsKey) return;
+        setStats({
+          ...main,
+          heatmap_data: buildDashboardHeatmapData(visibleSessions, main, dashboardBounds),
+        });
+        setWeekComparison({ current: weekCurrent, previous: weekPrevious, window: weekWindow });
+        setMonthComparison({ current: monthCurrent, previous: monthPrevious, window: monthWindow });
+        loadedScopeKeyRef.current = statsKey;
+
+        if (main.total_tokens === 0 && !warmRetryKeysRef.current.has(statsKey)) {
+          warmRetryKeysRef.current.add(statsKey);
+          window.setTimeout(() => {
+            if (currentScopeKeyRef.current === statsKey) setReloadNonce((value) => value + 1);
+          }, 3000);
+        }
+      })
+      .catch((error) => {
+        if (requestId !== statsRequestRef.current) return;
+        console.error("Failed to load dashboard stats:", error);
+        setStatsError(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        if (requestId !== statsRequestRef.current) return;
+        setIsStatsLoading(false);
+        setIsRefreshing(false);
+      });
+
+    return () => {
+      if (requestId === statsRequestRef.current) statsRequestRef.current += 1;
+    };
+  }, [dashboardBounds, monthWindow, parentLoading, periodSessionGroups, reloadNonce, statsKey, visibleSessions, weekWindow]);
 
   const handleDayClick = async (point: HeatmapPoint) => {
     setSelectedDay(point);
@@ -172,7 +267,7 @@ export default function Dashboard({
     setDayStats(undefined);
 
     try {
-      const result = await getRuntimeDayStats(point.date, sessions);
+      const result = await getRuntimeDayStats(point.date, visibleSessions);
       setDayStats(result);
     } catch {
       // Fallback: use the data from the heatmap point
@@ -194,7 +289,7 @@ export default function Dashboard({
       return projectPathOrName;
     }
 
-    const matchedSession = sessions.find((session) => {
+    const matchedSession = visibleSessions.find((session) => {
       const nameFromPath = getPathBasename(session.cwd);
       return nameFromPath === projectPathOrName;
     });
@@ -220,12 +315,12 @@ export default function Dashboard({
   };
 
   const handleOpenSessionFromModal = (sessionPath: string) => {
-    const targetSession = sessions.find(
+    const targetSession = visibleSessions.find(
       (session) => pathsEqual(session.path, sessionPath),
     );
     if (targetSession) {
-      setPreviewSession(targetSession);
       handleCloseModal();
+      setPreviewSession(targetSession);
     }
   };
 
@@ -238,6 +333,7 @@ export default function Dashboard({
   const closeInsightModal = () => {
     setInsightModalMode(null);
     setSelectedModel(null);
+    setSelectedProject(null);
   };
 
   const openTokenCostInsight = () => {
@@ -262,14 +358,41 @@ export default function Dashboard({
 
   const openModelProjectsInsight = (model: string) => {
     setSelectedModel(model);
+    setSelectedProject(null);
     setInsightModalMode("model_projects");
   };
 
+  const openProjectSessionsInsight = (projectPath: string) => {
+    setSelectedProject(projectPath);
+    setSelectedModel(null);
+    setInsightModalMode("project_sessions");
+  };
+
+  const handleFilterProjectFromInsight = (projectPath: string) => {
+    if (!onProjectSelect) return;
+    const resolvedPath = resolveProjectPath(projectPath) || projectPath;
+    closeInsightModal();
+    onProjectSelect(resolvedPath);
+  };
+
+  const handlePreviewSessionFromInsight = (session: SessionInfo) => {
+    closeInsightModal();
+    setPreviewSession(session);
+  };
+
   const isInitialStatsLoading =
-    !hasLoadedOnce.current &&
     stats === null &&
-    (parentLoading || sessions.length > 0);
+    visibleSessions.length > 0 &&
+    (parentLoading || isStatsLoading);
   const showDelayedDashboardSkeleton = useDelayedLoading(isInitialStatsLoading);
+  const isScopeTransition =
+    stats !== null &&
+    loadedScopeKeyRef.current !== statsKey &&
+    isStatsLoading;
+  const showScopeTransition = useDelayedLoading(isScopeTransition);
+  const scopeLoadFailed = Boolean(
+    statsError && loadedScopeKeyRef.current !== statsKey,
+  );
 
   if (showDelayedDashboardSkeleton) {
     return <DashboardSkeleton />;
@@ -279,38 +402,52 @@ export default function Dashboard({
     return <div className="flex-1 min-h-0" aria-hidden="true" />;
   }
 
-  // Do not show loading state; display empty or actual data directly
-  const displayStats: SessionStats = stats || {
-    total_sessions: 0,
-    total_messages: 0,
-    user_messages: 0,
-    assistant_messages: 0,
-    total_tokens: 0,
-    sessions_by_project: {},
-    sessions_by_model: {},
-    model_usage_by_project: {},
-    messages_by_date: {},
-    messages_by_hour: {},
-    messages_by_day_of_week: {},
-    average_messages_per_session: 0,
-    heatmap_data: [],
-    time_distribution: [],
-    token_details: {
-      total_input: 0,
-      total_output: 0,
-      total_cache_read: 0,
-      total_cache_write: 0,
-      total_cost: 0,
-      tokens_by_model: {},
-    },
-    subagent_summary: {
-      total_cost: 0,
-      total_runs: 0,
-      total_tokens: 0,
-      runs_by_agent: {},
-      runs_by_model: {},
-    },
-  };
+  const displayStats: SessionStats = stats || emptyDashboardStats();
+  const dashboardInsights = deriveDashboardInsights(displayStats, visibleSessions, periodAnchor);
+  const weekSessionChange = weekComparison
+    ? dashboardPercentChange(weekComparison.current.total_sessions, weekComparison.previous.total_sessions)
+    : null;
+  const weekMessageChange = weekComparison
+    ? dashboardPercentChange(weekComparison.current.total_messages, weekComparison.previous.total_messages)
+    : null;
+  const weekTokenChange = weekComparison
+    ? dashboardPercentChange(dashboardCombinedTokens(weekComparison.current), dashboardCombinedTokens(weekComparison.previous))
+    : null;
+  const weekCostChange = weekComparison
+    ? dashboardPercentChange(dashboardCombinedCost(weekComparison.current), dashboardCombinedCost(weekComparison.previous))
+    : null;
+  const monthSessionChange = monthComparison
+    ? dashboardPercentChange(monthComparison.current.total_sessions, monthComparison.previous.total_sessions)
+    : null;
+  const monthMessageChange = monthComparison
+    ? dashboardPercentChange(monthComparison.current.total_messages, monthComparison.previous.total_messages)
+    : null;
+  const monthTokenChange = monthComparison
+    ? dashboardPercentChange(dashboardCombinedTokens(monthComparison.current), dashboardCombinedTokens(monthComparison.previous))
+    : null;
+  const monthCostChange = monthComparison
+    ? dashboardPercentChange(dashboardCombinedCost(monthComparison.current), dashboardCombinedCost(monthComparison.previous))
+    : null;
+  const comparisonChanges = effectiveTimeSelection.granularity === "week"
+    ? { sessions: weekSessionChange, messages: weekMessageChange, tokens: weekTokenChange, cost: weekCostChange }
+    : effectiveTimeSelection.granularity === "month"
+      ? { sessions: monthSessionChange, messages: monthMessageChange, tokens: monthTokenChange, cost: monthCostChange }
+      : null;
+  const formatChange = (value: number | null) =>
+    value === null ? t("dashboard.insight.newActivity", "new") : `${value > 0 ? "+" : ""}${Math.round(value)}%`;
+  const activeDaysInScope = displayStats.heatmap_data.filter((point) => point.level > 0).length;
+  const pulsePrimary = effectiveTimeSelection.granularity === "day"
+    ? {
+        label: t("dashboard.pulse.selectedDay", "Selected day"),
+        value: displayStats.total_messages.toLocaleString(),
+        detail: t("dashboard.pulse.selectedDayDetail", "{{count}} sessions in this day", { count: displayStats.total_sessions }),
+      }
+    : {
+        label: t("dashboard.pulse.rangeActivity", "Range activity"),
+        value: activeDaysInScope.toLocaleString(),
+        detail: t("dashboard.pulse.activeDaysDetail", "active days in the selected range"),
+      };
+  const rangeLabel = formatDashboardTimeRange(effectiveTimeSelection, i18n.language);
 
   return (
     <div className="h-full overflow-y-auto p-3 md:p-4">
@@ -334,8 +471,9 @@ export default function Dashboard({
           </p>
         </div>
         <button
-          onClick={loadStats}
-          disabled={isRefreshing}
+          type="button"
+          onClick={() => setReloadNonce((value) => value + 1)}
+          disabled={isRefreshing || visibleSessions.length === 0}
           className="flex h-8 flex-shrink-0 items-center gap-1.5 rounded border border-border/60 bg-card/45 px-2.5 text-xs text-muted-foreground motion-surface hover:bg-card/70 hover:text-foreground focus-ring md:gap-2 md:px-3"
         >
           <RefreshCw
@@ -345,6 +483,58 @@ export default function Dashboard({
         </button>
       </div>
 
+      <div className="mb-4">
+        <DashboardTimeFilter
+          selection={effectiveTimeSelection}
+          options={timeOptions}
+          rangeLabel={rangeLabel}
+          resultCount={visibleSessions.length}
+          totalCount={projectScopedSessions.length}
+          onChange={setTimeSelection}
+        />
+      </div>
+
+      {visibleSessions.length === 0 ? (
+        <div className="grid min-h-72 place-items-center rounded border border-dashed border-border bg-muted/10 px-6 text-center">
+          <div>
+            <Clock className="mx-auto h-5 w-5 text-muted-foreground" aria-hidden="true" />
+            <div className="mt-2 text-sm font-medium text-foreground">
+              {t("dashboard.timeFilter.emptyTitle", "No sessions in this time range")}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t("dashboard.timeFilter.emptyDescription", "Choose another year, month, or day. The dashboard will not fall back to all data.")}
+            </p>
+          </div>
+        </div>
+      ) : scopeLoadFailed ? (
+        <div className="grid min-h-72 place-items-center rounded border border-destructive/35 bg-destructive/5 px-6 text-center" role="alert">
+          <div className="max-w-md">
+            <Activity className="mx-auto h-5 w-5 text-destructive" aria-hidden="true" />
+            <div className="mt-2 text-sm font-medium text-foreground">
+              {t("dashboard.loadError.title", "Dashboard statistics could not be loaded")}
+            </div>
+            <p className="mt-1 break-words text-xs text-muted-foreground">{statsError}</p>
+            <button
+              type="button"
+              onClick={() => setReloadNonce((value) => value + 1)}
+              className="focus-ring mt-3 h-8 rounded border border-border bg-background px-3 text-xs text-foreground hover:bg-muted/30"
+            >
+              {t("dashboard.loadError.retry", "Retry")}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="relative" aria-busy={isScopeTransition}>
+          {isScopeTransition ? (
+            <div className={`absolute inset-0 z-20 cursor-wait ${showScopeTransition ? "bg-background/35 backdrop-blur-[1px]" : "bg-transparent"}`}>
+              {showScopeTransition ? (
+                <div className="sticky top-2 mx-auto flex w-fit items-center gap-2 rounded border border-border bg-background/95 px-3 py-2 text-xs text-muted-foreground shadow-lg" role="status" aria-live="polite">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  {t("dashboard.timeFilter.updating", "Updating selected range…")}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
       {/* Stats Grid - Compact - 5 cards */}
       {(() => {
         const subagentCost = displayStats.subagent_summary?.total_cost ?? 0;
@@ -377,22 +567,25 @@ export default function Dashboard({
               icon={BarChart3}
               label={t("components.displayStats.cards.sessions")}
               value={displayStats.total_sessions}
-              color="#569cd6"
+              tone="info"
+              hint={t("dashboard.kpi.scopeSessionsHint", "{{count}} sessions · {{days}} active days in the selected range", { count: displayStats.total_sessions, days: activeDaysInScope })}
               onClick={openSessionOverviewInsight}
             />
             <StatCard
               icon={Activity}
               label={t("components.displayStats.cards.messages")}
               value={displayStats.total_messages}
-              color="#7ee787"
+              tone="success"
+              hint={t("dashboard.kpi.messageHint", "{{ratio}}× assistant messages per user message", { ratio: dashboardInsights.assistantUserRatio.toFixed(1) })}
               onClick={openMessageMixInsight}
             />
             <StatCard
               icon={Clock}
               label={t("components.displayStats.cards.avgPerSession")}
               value={displayStats.average_messages_per_session.toFixed(1)}
-              color="#ffa657"
-              onClick={openActivityRhythmInsight}
+              tone="warning"
+              hint={t("dashboard.kpi.depthHint", "median {{median}} · p90 {{p90}} messages", { median: Math.round(dashboardInsights.medianMessagesPerSession), p90: dashboardInsights.p90MessagesPerSession })}
+              onClick={openSessionOverviewInsight}
             />
             <StatCard
               icon={Zap}
@@ -404,7 +597,8 @@ export default function Dashboard({
                     ? `${(combinedTokens / 1000).toFixed(1)}k`
                     : combinedTokens
               }
-              color="#c792ea"
+              tone="purple"
+              hint={t("dashboard.kpi.scopeTokenHint", "{{tokens}} tokens in the selected range", { tokens: combinedTokens.toLocaleString() })}
               onClick={openTokenCostInsight}
             />
             <div className="col-span-2 md:col-span-1">
@@ -412,7 +606,8 @@ export default function Dashboard({
                 icon={DollarSign}
                 label={t("components.displayStats.cards.totalCost")}
                 value={costValue}
-                color="#ff6b6b"
+                tone="destructive"
+                hint={t("dashboard.kpi.scopeCostHint", "{{cost}} in the selected range", { cost: formatCost(combinedCost) })}
                 onClick={openTokenCostInsight}
               />
             </div>
@@ -420,18 +615,60 @@ export default function Dashboard({
         );
       })()}
 
+      <div className="mb-3">
+        <DashboardPulse
+          insights={dashboardInsights}
+          primary={pulsePrimary}
+          comparison={comparisonChanges ? {
+            periodLabel: effectiveTimeSelection.granularity === "week"
+              ? t("dashboard.pulse.weekSummary", "This week compared with the previous week")
+              : t("dashboard.pulse.monthSummary", "This month compared with the previous month"),
+            previousLabel: effectiveTimeSelection.granularity === "week"
+              ? t("dashboard.period.previousWeek", "Previous week")
+              : t("dashboard.period.previousMonth", "Previous month"),
+            metrics: [
+              { key: "sessions", label: t("dashboard.period.sessions", "Sessions"), value: displayStats.total_sessions.toLocaleString(), previous: (effectiveTimeSelection.granularity === "week" ? weekComparison?.previous.total_sessions : monthComparison?.previous.total_sessions)?.toLocaleString() || "0", change: formatChange(comparisonChanges.sessions), onClick: openSessionOverviewInsight },
+              { key: "messages", label: t("dashboard.period.messages", "Messages"), value: displayStats.total_messages.toLocaleString(), previous: (effectiveTimeSelection.granularity === "week" ? weekComparison?.previous.total_messages : monthComparison?.previous.total_messages)?.toLocaleString() || "0", change: formatChange(comparisonChanges.messages), onClick: openMessageMixInsight },
+              { key: "tokens", label: t("dashboard.period.tokens", "Tokens"), value: formatTokensForPulse(dashboardCombinedTokens(displayStats)), previous: formatTokensForPulse(dashboardCombinedTokens((effectiveTimeSelection.granularity === "week" ? weekComparison?.previous : monthComparison?.previous) ?? emptyDashboardStats())), change: formatChange(comparisonChanges.tokens), onClick: openTokenCostInsight },
+              { key: "cost", label: t("dashboard.period.cost", "Cost"), value: formatCostForPulse(dashboardCombinedCost(displayStats)), previous: formatCostForPulse(dashboardCombinedCost((effectiveTimeSelection.granularity === "week" ? weekComparison?.previous : monthComparison?.previous) ?? emptyDashboardStats())), change: formatChange(comparisonChanges.cost), onClick: openTokenCostInsight },
+            ],
+          } : null}
+          onOpenSessions={openSessionOverviewInsight}
+          onOpenActivity={openActivityRhythmInsight}
+        />
+      </div>
+
+      <div className="mb-3">
+        <DashboardRangeDetail
+          granularity={effectiveTimeSelection.granularity}
+          stats={displayStats}
+          rangeStart={dashboardBounds.start}
+          rangeEnd={dashboardBounds.end}
+        />
+      </div>
+
+
       {/* Main Grid - Dense Layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
         {/* Left Column - 8 cols */}
         <div className="md:col-span-8 space-y-3">
           {/* Token Trend Chart - Full Width */}
-          <TokenTrendChart stats={displayStats} days={30} />
+          <TokenTrendChart
+            stats={displayStats}
+            days={30}
+            rangeStart={dashboardBounds.start}
+            rangeEnd={dashboardBounds.end}
+            rangeLabel={rangeLabel}
+            granularity={effectiveTimeSelection.granularity}
+          />
 
           {/* Message Distribution + Heatmap */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <MessageDistribution
               stats={displayStats}
               onClick={openMessageMixInsight}
+              granularity={effectiveTimeSelection.granularity}
+              rangeLabel={rangeLabel}
             />
             <ActivityHeatmap
               data={displayStats.heatmap_data}
@@ -439,14 +676,17 @@ export default function Dashboard({
               showLabels={false}
               onDayClick={handleDayClick}
               onProjectFilter={handleFilterProjectFromHeatmap}
+              rangeStart={dashboardBounds.start}
+              rangeEnd={dashboardBounds.end}
+              granularity={effectiveTimeSelection.granularity}
             />
           </div>
 
           {/* Recent Sessions */}
           <RecentSessions
-            sessions={sessions}
+            sessions={visibleSessions}
             limit={8}
-            onSessionSelect={onSessionSelect}
+            onSessionSelect={setPreviewSession}
             liveSessionIds={liveSessionIds}
           />
         </div>
@@ -463,9 +703,10 @@ export default function Dashboard({
           {/* Projects */}
           <ProjectsChart
             stats={displayStats}
-            sessions={sessions}
+            sessions={visibleSessions}
             limit={5}
             onProjectSelect={onProjectSelect}
+            onProjectInspect={openProjectSessionsInsight}
           />
 
           {/* Time Distribution */}
@@ -528,11 +769,21 @@ export default function Dashboard({
           open={Boolean(insightModalMode)}
           mode={insightModalMode}
           stats={displayStats}
-          sessions={sessions}
+          sessions={visibleSessions}
           liveSessionIds={liveSessionIds}
           selectedModel={selectedModel}
+          selectedProject={selectedProject}
+          onProjectSelect={handleFilterProjectFromInsight}
+          onInspectProject={(projectPath) => {
+            setSelectedProject(resolveProjectPath(projectPath) || projectPath);
+            setSelectedModel(null);
+            setInsightModalMode("project_sessions");
+          }}
+          onPreviewSession={handlePreviewSessionFromInsight}
           onClose={closeInsightModal}
         />
+      )}
+        </div>
       )}
     </div>
   );

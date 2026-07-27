@@ -186,21 +186,30 @@
   // Native-feel settings: follow system accent (macOS controlAccentColor /
   // Windows accent), no hardcoded brand blue. Falls back to --color-info
   // on engines that do not resolve `AccentColor`.
+  .theme-accent-fg,
   .settings-accent-fg {
     color: var(--accent, rgb(var(--color-info)));
   }
 
+  .theme-accent-bg-soft,
   .settings-accent-bg-soft {
     background-color: color-mix(in srgb, var(--accent, rgb(var(--color-info))) 16%, transparent);
   }
 
+  .theme-accent-bg-strong,
   .settings-accent-bg-strong {
     background-color: var(--accent, rgb(var(--color-info)));
     color: rgb(var(--color-primary-foreground, 255 255 255));
   }
 
+  .theme-accent-ring,
   .settings-accent-ring {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent, rgb(var(--color-info))) 55%, transparent);
+  }
+
+  .theme-accent-border,
+  .settings-accent-border {
+    border-color: color-mix(in srgb, var(--accent, rgb(var(--color-info))) 72%, transparent);
   }
 
   // Native-feel section label: replaces uppercase + 0.12em tracking heading

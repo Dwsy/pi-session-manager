@@ -303,6 +303,7 @@ export default function MobileSettings({
                         return (
                           <button
                             key={item.id}
+                            type="button"
                             onClick={() => handleSectionClick(item.id)}
                             className={`w-full flex items-center gap-3 text-left motion-color focus-ring ${
                               isPluginChild ? "px-7 py-2 text-xs" : "px-3 py-2.5 text-sm"
@@ -312,13 +313,13 @@ export default function MobileSettings({
                                 : ""
                             } ${
                               isActive
-                                ? "bg-primary/10 text-foreground"
+                                ? "settings-accent-bg-soft settings-accent-ring text-foreground font-medium"
                                 : "text-foreground hover:bg-muted"
                             }`}
                           >
                             <span
                               className={
-                                isActive ? "text-primary" : "text-muted-foreground"
+                                isActive ? "settings-accent-fg" : "text-muted-foreground"
                               }
                             >
                               {item.icon}

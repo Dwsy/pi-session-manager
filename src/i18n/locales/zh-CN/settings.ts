@@ -258,6 +258,14 @@ export const settings = {
   appBehavior: {
     title: "应用行为",
     description: "控制窗口行为和日常应用级默认值。",
+    recapTitle: "仪表板周期回顾",
+    recapDescription: "仅使用现有会话统计，在本地生成年中与年度回顾。",
+    recapAuto: "自动显示周期回顾",
+    recapAutoDescription: "每年 6 月 15 日至 7 月 31 日显示一次年中回顾；12 月 15 日至次年 1 月 31 日显示一次年度回顾。关闭即视为该周期已展示。",
+    recapManual: "立即打开回顾",
+    recapManualDescription: "手动查看不会把自动周期标记为已展示，统计数据始终保留在本机。",
+    openMidyearRecap: "年中回顾",
+    openYearendRecap: "年度回顾",
   },
   dataSources: {
     localTitle: "本地会话目录",

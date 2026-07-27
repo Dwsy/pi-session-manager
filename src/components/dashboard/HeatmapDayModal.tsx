@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, parseISO } from 'date-fns'
 import {
-  X,
   MessageSquare,
   Terminal,
   Zap,
@@ -17,6 +15,7 @@ import type { HeatmapPoint, DayStats } from '@/types'
 import { getPathBasename } from '@/utils/path'
 import { DelayedLoadingCenter } from '@/components/ui/DelayedLoading'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
+import DashboardDialog from './DashboardDialog'
 
 interface HeatmapDayModalProps {
   point: HeatmapPoint
@@ -29,12 +28,12 @@ interface HeatmapDayModalProps {
 }
 
 const ACTIVITY_CONFIG = [
-  { label: 'dashboard.activityLevels.none', color: '#1a1b26' },
-  { label: 'dashboard.activityLevels.low', color: '#0d4436' },
-  { label: 'dashboard.activityLevels.low', color: '#1b6e54' },
-  { label: 'dashboard.activityLevels.medium', color: '#2e9973' },
-  { label: 'dashboard.activityLevels.high', color: '#46c492' },
-  { label: 'dashboard.activityLevels.veryHigh', color: '#6eebb1' },
+  { label: 'dashboard.activityLevels.none', color: 'rgb(var(--color-muted-foreground))' },
+  { label: 'dashboard.activityLevels.low', color: 'rgb(var(--color-info))' },
+  { label: 'dashboard.activityLevels.low', color: 'rgb(var(--color-info))' },
+  { label: 'dashboard.activityLevels.medium', color: 'rgb(var(--color-warning))' },
+  { label: 'dashboard.activityLevels.high', color: 'rgb(var(--color-success))' },
+  { label: 'dashboard.activityLevels.veryHigh', color: 'rgb(var(--color-success))' },
 ]
 
 const TOKEN_TREND_CHART = {
@@ -52,18 +51,6 @@ function formatCompactNumber(value: number): string {
   return value.toString()
 }
 
-function hexToRgba(hex: string, alpha: number): string {
-  const sanitized = hex.replace('#', '')
-  const normalized = sanitized.length === 3
-    ? sanitized.split('').map((ch) => ch + ch).join('')
-    : sanitized
-  const int = Number.parseInt(normalized, 16)
-  const r = (int >> 16) & 255
-  const g = (int >> 8) & 255
-  const b = int & 255
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
-}
-
 function intensity(value: number, max: number): number {
   if (max <= 0 || value <= 0) return 0
   const scaled = Math.log10(value + 1) / Math.log10(max + 1)
@@ -71,17 +58,17 @@ function intensity(value: number, max: number): number {
 }
 
 function withAlpha(color: string, alpha: number): string {
-  if (color.startsWith('#')) return hexToRgba(color, alpha)
+  const variable = color.match(/^rgb\(var\((--[^)]+)\)\)$/)
+  if (variable) return `rgb(var(${variable[1]}) / ${alpha})`
   if (color.startsWith('hsl(')) return color.replace(')', ` / ${alpha})`)
   return color
 }
 
 function metricColor(scale: number): string {
-  const clamped = Math.max(0, Math.min(1, scale))
-  const hue = 215 - clamped * 95
-  const saturation = 52
-  const lightness = 48
-  return `hsl(${hue} ${saturation}% ${lightness}%)`
+  if (scale >= 0.67) return 'rgb(var(--color-success))'
+  if (scale >= 0.34) return 'rgb(var(--color-warning))'
+  if (scale > 0) return 'rgb(var(--color-info))'
+  return 'rgb(var(--color-muted-foreground))'
 }
 
 type FocusPanel = 'projects' | 'sessions' | null
@@ -105,29 +92,11 @@ export default function HeatmapDayModal({
   const projectsRef = useRef<HTMLDivElement>(null)
   const sessionsRef = useRef<HTMLDivElement>(null)
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') onClose()
-  }, [onClose])
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
-
   useEffect(() => {
     setSelectedHour(null)
     setFocusPanel(null)
     setHoveredTrendDate(null)
   }, [point.date])
-
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-
-    return () => {
-      document.body.style.overflow = originalOverflow
-    }
-  }, [])
 
   const formattedDate = new Intl.DateTimeFormat(i18n.language || undefined, {
     weekday: 'long',
@@ -242,9 +211,9 @@ export default function HeatmapDayModal({
   const tokenDetails = stats.token_details
   const cacheTokens = tokenDetails.total_cache_read + tokenDetails.total_cache_write
   const tokenBreakdownItems = [
-    { label: t('dashboard.heatmapModal.inputTokens', 'Input'), value: tokenDetails.total_input, color: 'rgb(59 130 246 / 0.92)' },
-    { label: t('dashboard.heatmapModal.outputTokens', 'Output'), value: tokenDetails.total_output, color: 'rgb(20 184 166 / 0.92)' },
-    { label: t('dashboard.heatmapModal.cacheTokens', 'Cache'), value: cacheTokens, color: 'rgb(139 92 246 / 0.88)' },
+    { label: t('dashboard.heatmapModal.inputTokens', 'Input'), value: tokenDetails.total_input, color: 'rgb(var(--color-info))' },
+    { label: t('dashboard.heatmapModal.outputTokens', 'Output'), value: tokenDetails.total_output, color: 'rgb(var(--color-success))' },
+    { label: t('dashboard.heatmapModal.cacheTokens', 'Cache'), value: cacheTokens, color: 'rgb(var(--color-purple))' },
   ]
   const tokenBreakdownTotal = Math.max(tokenBreakdownItems.reduce((sum, item) => sum + item.value, 0), 1)
   const formatCost = (cost: number) => cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(2)}`
@@ -314,50 +283,28 @@ export default function HeatmapDayModal({
     sessionsRef.current?.scrollIntoView({ block: 'nearest' })
   }
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-3 md:p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        className="absolute inset-0 bg-black/55"
-        onClick={onClose}
-      />
-
-      <div role="dialog" aria-modal="true" aria-label={formattedDate} className="relative flex h-[92vh] w-full max-w-[1440px] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl sm:h-[88vh] sm:w-[92vw]">
-        <div className="relative border-b border-border px-4 py-3 sm:px-5 bg-background">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[1.28rem] leading-[1.08] font-semibold tracking-tight text-foreground truncate sm:text-[1.5rem]">
-                {formattedDate}
-              </div>
-
-              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="min-w-0 max-w-full truncate">{daySummary}</span>
-                <Badge
-                  tone={activityConfig.color}
-                  label={t(activityConfig.label)}
-                  value={`${point.level}/5`}
-                />
-                <span className="inline-flex items-center rounded-full border border-border bg-muted/25 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  {hasDetailedStats
-                    ? t('dashboard.heatmapModal.detailedMode', 'Detailed mode')
-                    : t('dashboard.heatmapModal.lightweightMode', 'Lightweight mode')}
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={onClose}
-              className="shrink-0 rounded-lg border border-border bg-muted/15 p-2 text-muted-foreground hover:text-foreground hover:bg-muted/30 focus-ring"
-              aria-label={t('common.close')}
-            >
-              <X className="w-4.5 h-4.5" />
-            </button>
-          </div>
+  return (
+    <DashboardDialog
+      open
+      onClose={onClose}
+      title={formattedDate}
+      ariaLabel={formattedDate}
+      subtitle={(
+        <div className="flex flex-wrap items-center gap-2">
+          <span>{daySummary}</span>
+          <Badge tone={activityConfig.color} label={t(activityConfig.label)} value={`${point.level}/5`} />
+          <span className="inline-flex items-center rounded border border-border bg-muted/20 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            {hasDetailedStats
+              ? t('dashboard.heatmapModal.detailedMode', 'Detailed mode')
+              : t('dashboard.heatmapModal.lightweightMode', 'Lightweight mode')}
+          </span>
         </div>
-
-        <div className="relative flex-1 min-h-0 p-2.5 sm:p-4 grid grid-rows-[auto_1fr] gap-3 bg-background">
+      )}
+      eyebrow={t('dashboard.heatmapModal.activityDetail', 'Activity detail')}
+      className="h-[92vh] max-w-[1440px] sm:h-[88vh] sm:w-[92vw]"
+      bodyClassName="!overflow-hidden !p-0"
+    >
+        <div className="relative grid h-full min-h-0 grid-rows-[auto_1fr] gap-3 bg-background p-2.5 sm:p-4">
           {showDelayedLoading ? (
             <div className="h-full rounded-md border border-border bg-muted/15 flex flex-col items-center justify-center gap-2">
               <DelayedLoadingCenter className="flex items-center justify-center" />
@@ -372,7 +319,7 @@ export default function HeatmapDayModal({
                   icon={Terminal}
                   label={t('dashboard.stats.sessions')}
                   value={formatCompactNumber(stats.session_count)}
-                  color="#569cd6"
+                  tone="info"
                   emphasis={sessionsScale}
                   onClick={hasSessions ? () => jumpToPanel('sessions') : undefined}
                   hint={hasSessions ? t('dashboard.heatmapModal.viewSessions', 'View sessions') : undefined}
@@ -381,21 +328,21 @@ export default function HeatmapDayModal({
                   icon={MessageSquare}
                   label={t('dashboard.stats.messages')}
                   value={formatCompactNumber(stats.total_messages)}
-                  color="#7ee787"
+                  tone="success"
                   emphasis={messagesScale}
                 />
                 <StatCard
                   icon={Zap}
                   label={t('dashboard.stats.tokens')}
                   value={formatCompactNumber(stats.total_tokens)}
-                  color="#c792ea"
+                  tone="purple"
                   emphasis={tokensScale}
                 />
                 <StatCard
                   icon={Folder}
                   label={t('dashboard.stats.projects')}
                   value={formatCompactNumber(stats.project_count)}
-                  color="#ffa657"
+                  tone="warning"
                   emphasis={projectsScale}
                   onClick={hasProjects ? () => jumpToPanel('projects') : undefined}
                   hint={hasProjects ? t('dashboard.heatmapModal.viewProjects', 'View projects') : undefined}
@@ -500,8 +447,8 @@ export default function HeatmapDayModal({
                       <svg className="h-full w-full overflow-visible" viewBox="0 0 100 54" preserveAspectRatio="none" role="img" aria-label={t('dashboard.heatmapModal.tokenTrend', 'Token trend')}>
                       <defs>
                         <linearGradient id="token-trend-fill" x1="0" x2="0" y1="0" y2="1">
-                          <stop offset="0%" stopColor="rgb(20 184 166 / 0.16)" />
-                          <stop offset="100%" stopColor="rgb(20 184 166 / 0.01)" />
+                          <stop offset="0%" stopColor="rgb(var(--color-success) / 0.16)" />
+                          <stop offset="100%" stopColor="rgb(var(--color-success) / 0.01)" />
                         </linearGradient>
                       </defs>
                       {[TOKEN_TREND_CHART.top, averageTrendY, TOKEN_TREND_CHART.bottom].map((y, index) => (
@@ -511,7 +458,7 @@ export default function HeatmapDayModal({
                           x2={TOKEN_TREND_CHART.right}
                           y1={y}
                           y2={y}
-                          stroke={index === 1 ? 'rgb(20 184 166 / 0.24)' : 'rgb(var(--color-muted-foreground) / 0.11)'}
+                          stroke={index === 1 ? 'rgb(var(--color-success) / 0.24)' : 'rgb(var(--color-muted-foreground) / 0.11)'}
                           strokeDasharray={index === 1 ? '3 3' : undefined}
                           strokeWidth="1"
                           vectorEffect="non-scaling-stroke"
@@ -523,7 +470,7 @@ export default function HeatmapDayModal({
                       <polyline
                         points={tokenTrendLine}
                         fill="none"
-                        stroke="rgb(20 184 166 / 0.92)"
+                        stroke="rgb(var(--color-success) / 0.92)"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -612,7 +559,7 @@ export default function HeatmapDayModal({
                               type="button"
                               className={`h-full rounded-[3px] relative overflow-hidden focus-ring ${isSelected ? 'ring-1 ring-info/70' : 'hover:bg-background/30'}`}
                               aria-label={`${item.hour.toString().padStart(2, '0')}:00 · ${item.count} ${t('dashboard.heatmapModal.messageUnit', 'messages')}`}
-                              style={{ backgroundColor: item.count === 0 ? 'rgba(148, 163, 184, 0.12)' : hexToRgba(barColor, 0.18) }}
+                              style={{ backgroundColor: item.count === 0 ? 'rgb(var(--color-muted-foreground) / 0.12)' : withAlpha(barColor, 0.18) }}
                               title={`${item.hour.toString().padStart(2, '0')}:00 · ${item.count}`}
                               onClick={() => setSelectedHour((current) => (current === item.hour ? null : item.hour))}
                             >
@@ -620,7 +567,7 @@ export default function HeatmapDayModal({
                                 className="absolute bottom-0 left-0 right-0"
                                 style={{
                                   height: `${heightPercent}%`,
-                                  backgroundColor: isSelected ? '#569cd6' : barColor,
+                                  backgroundColor: isSelected ? 'rgb(var(--color-info))' : barColor,
                                 }}
                               />
                             </button>
@@ -760,9 +707,7 @@ export default function HeatmapDayModal({
             </>
           )}
         </div>
-      </div>
-    </div>,
-    document.body,
+    </DashboardDialog>
   )
 }
 
@@ -770,15 +715,22 @@ interface StatCardProps {
   icon: React.ComponentType<{ className?: string }>
   label: string
   value: string
-  color: string
+  tone: 'info' | 'success' | 'warning' | 'purple'
   emphasis: number
   onClick?: () => void
   hint?: string
 }
 
-function StatCard({ icon: Icon, label, value, color, emphasis, onClick, hint }: StatCardProps) {
+function StatCard({ icon: Icon, label, value, tone, emphasis, onClick, hint }: StatCardProps) {
   const interactive = Boolean(onClick)
-  const tone = metricColor(emphasis)
+  const accent = metricColor(emphasis)
+  const toneClass = tone === 'success'
+    ? 'bg-success/10 text-success'
+    : tone === 'warning'
+      ? 'bg-warning/10 text-warning'
+      : tone === 'purple'
+        ? 'bg-purple/10 text-purple'
+        : 'bg-info/10 text-info'
   return (
     <button
       type="button"
@@ -787,10 +739,8 @@ function StatCard({ icon: Icon, label, value, color, emphasis, onClick, hint }: 
       disabled={!interactive}
     >
       <div className="flex items-center gap-2">
-        <div className="p-1 rounded-md" style={{ backgroundColor: hexToRgba(color, 0.12) }}>
-          <span style={{ color }}>
-            <Icon className="w-3.5 h-3.5" />
-          </span>
+        <div className={`rounded p-1 ${toneClass}`}>
+          <Icon className="h-3.5 w-3.5" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
@@ -806,7 +756,7 @@ function StatCard({ icon: Icon, label, value, color, emphasis, onClick, hint }: 
         </div>
       </div>
       <div className="mt-1.5 h-[2px] rounded-full bg-muted/55 overflow-hidden">
-        <div className="h-full rounded-full motion-width" style={{ width: `${Math.max(8, emphasis * 100)}%`, backgroundColor: withAlpha(tone, 0.72) }} />
+        <div className="h-full rounded-full motion-width" style={{ width: `${Math.max(8, emphasis * 100)}%`, backgroundColor: withAlpha(accent, 0.72) }} />
       </div>
     </button>
   )

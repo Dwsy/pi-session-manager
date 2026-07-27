@@ -122,6 +122,7 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
           </div>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={loadStats}
               className="focus-ring inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               title={t('stats.panel.tooltips.refresh')}
@@ -131,6 +132,7 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
 
 
             <button
+              type="button"
               onClick={onClose}
               className="focus-ring inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               title={t('stats.panel.tooltips.close')}
@@ -147,11 +149,12 @@ export default function StatsPanel({ sessions, onClose }: StatsPanelProps) {
             return (
               <button
                 key={tab.id}
+                type="button"
                 onClick={() => setActiveTab(tab.id)}
                 aria-pressed={activeTab === tab.id}
                 className={`focus-ring flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium ${
                   activeTab === tab.id
-                    ? 'border-primary text-foreground'
+                    ? 'theme-accent-border theme-accent-fg bg-background font-semibold'
                     : 'border-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >

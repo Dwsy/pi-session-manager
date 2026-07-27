@@ -1480,11 +1480,16 @@ function App() {
     />
   );
 
+  const dashboardSessions = selectedProject
+    ? sessions.filter((session) => pathsEqual(session.cwd, selectedProject))
+    : sessions;
+
   const renderDashboard = () => (
     <AppDashboardPane
       fallback={<LoadingSpinner />}
       DashboardComponent={Dashboard}
-      sessions={sessions}
+      sessions={dashboardSessions}
+      projectName={selectedProject || undefined}
       onSessionSelect={handleSelectSession}
       onProjectSelect={handleDatasetOverviewProjectSelect}
       loading={loading}
@@ -1561,6 +1566,7 @@ function App() {
       showSettings={showSettings}
       showOnboarding={showOnboarding}
       selectedSession={selectedSession}
+      sessions={sessions}
       commandContext={commandContext}
       onExportSession={onExportSession}
       onConvertSession={onConvertSession}

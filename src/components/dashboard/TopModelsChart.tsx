@@ -1,4 +1,4 @@
-import { Cpu } from 'lucide-react'
+import { Coins, Cpu, Database, DollarSign } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import DashboardCardShell from './DashboardCardShell'
 import type { SessionStats } from '@/types'
@@ -10,123 +10,78 @@ interface TopModelsChartProps {
   onModelClick?: (model: string) => void
 }
 
-const MODEL_COLORS = [
-  '#569cd6', '#7ee787', '#ffa657', '#ff6b6b', '#c792ea',
-  '#82aaff', '#89ddff', '#f78c6c', '#ffcb6b', '#c3e88d',
-]
+function compact(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`
+  return value.toLocaleString()
+}
 
-export default function TopModelsChart({
-  stats,
-  title = 'Most Used AI Models',
-  limit = 8,
-  onModelClick,
-}: TopModelsChartProps) {
+function money(value: number): string {
+  if (value === 0) return '$0.00'
+  if (value < 0.01) return `$${value.toFixed(4)}`
+  return `$${value.toFixed(value < 1 ? 3 : 2)}`
+}
+
+export default function TopModelsChart({ stats, title, limit = 8, onModelClick }: TopModelsChartProps) {
   const { t } = useTranslation()
-  const topModels = Object.entries(stats.sessions_by_model)
-    .sort((a, b) => {
-      if (b[1] !== a[1]) {
-        return b[1] - a[1]
-      }
-      return a[0].localeCompare(b[0])
+  const displayTitle = title || t('dashboard.topModels.tokenUsageTitle', 'Model token usage')
+  const allModels = Object.entries(stats.token_details.tokens_by_model)
+    .map(([name, usage]) => {
+      const cache = usage.cache_read + usage.cache_write
+      const tokens = usage.input + usage.output + cache
+      return { name, usage, cache, tokens, sessions: stats.sessions_by_model[name] || 0 }
     })
-    .slice(0, limit)
-
-  const formatModelName = (name: string) => {
-    return name
-      .replace(/^anthropic\//, '')
-      .replace(/^openai\//, '')
-      .replace(/^google\//, '')
-      .replace(/^claude-3-/, 'claude-')
-      .replace(/^gpt-4-/, 'gpt-4-')
-      .replace(/-latest$/, '')
-  }
-
-  const getFullModelName = (name: string) => {
-    const providers: Record<string, string> = {
-      anthropic: 'Anthropic',
-      openai: 'OpenAI',
-      google: 'Google',
-    }
-
-    for (const [prefix, provider] of Object.entries(providers)) {
-      if (name.startsWith(`${prefix}/`)) {
-        return `${provider} - ${name.replace(`${prefix}/`, '')}`
-      }
-    }
-    return name
-  }
+    .filter((item) => item.tokens > 0 || item.usage.cost > 0)
+    .sort((left, right) => right.tokens - left.tokens || right.usage.cost - left.usage.cost || left.name.localeCompare(right.name))
+  const totalMeasured = allModels.reduce((sum, item) => sum + item.tokens, 0)
+  const models = allModels.slice(0, limit)
 
   return (
-    <DashboardCardShell
-      className="rounded-lg p-3"
-    >
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xs font-medium flex items-center gap-1.5 text-foreground">
-          <div className="p-1 rounded bg-purple/10">
-            <Cpu className="h-3 w-3 text-purple" />
-          </div>
-          {title}
-        </h3>
-        <div className="text-[10px] text-muted-foreground bg-background/60 px-2 py-0.5 rounded">
-          {Object.keys(stats.sessions_by_model).length} models
+    <DashboardCardShell className="p-3">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-foreground">
+            <span className="flex h-5 w-5 items-center justify-center rounded bg-purple/10 text-purple"><Cpu className="h-3 w-3" aria-hidden="true" /></span>
+            <span className="truncate">{displayTitle}</span>
+          </h3>
+          <p className="mt-1 text-[9px] text-muted-foreground">{t('dashboard.topModels.tokenUsageHint', 'Ranked by input, output, and cache tokens')}</p>
         </div>
+        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{compact(stats.total_tokens)} T</span>
       </div>
 
-      <div className="text-[9px] text-muted-foreground mb-2 px-1">
-        Sessions count by AI model
-      </div>
-
-      {topModels.length > 0 ? (
+      {models.length ? (
         <div className="space-y-1.5">
-          {topModels.map(([name, count], index) => {
-            const percent = stats.total_sessions > 0 ? (count / stats.total_sessions) * 100 : 0
-            const color = MODEL_COLORS[index % MODEL_COLORS.length]
-            const clickable = Boolean(onModelClick)
-
+          {models.map((item, index) => {
+            const share = totalMeasured > 0 ? item.tokens / totalMeasured : 0
+            const cacheShare = item.tokens > 0 ? item.cache / item.tokens : 0
             return (
               <button
                 type="button"
-                key={name}
-                className={`w-full flex items-center justify-between p-2 bg-background/60 rounded-lg border border-foreground/5 ${clickable ? 'hover:bg-background/90 hover:border-purple/25 motion-surface motion-color focus-ring' : 'cursor-default'}`}
-                title={getFullModelName(name)}
-                onClick={() => onModelClick?.(name)}
-                disabled={!clickable}
+                key={item.name}
+                onClick={() => onModelClick?.(item.name)}
+                disabled={!onModelClick}
+                className={`w-full rounded border border-border/55 bg-background/40 p-2 text-left ${onModelClick ? 'focus-ring hover:border-border hover:bg-muted/25' : 'cursor-default'}`}
+                title={item.name}
               >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <div
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{
-                      backgroundColor: color,
-                      boxShadow: `0 0 6px ${color}50`,
-                    }}
-                  />
-                  <span className="text-xs truncate text-foreground/90" title={getFullModelName(name)}>
-                    {formatModelName(name)}
+                <div className="flex items-start gap-2">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-purple/10 text-[9px] font-semibold tabular-nums text-purple">{index + 1}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-medium text-foreground">{item.name}</span>
+                    <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1"><Coins className="h-2.5 w-2.5" aria-hidden="true" />{compact(item.tokens)} · {Math.round(share * 100)}%</span>
+                      <span>{item.sessions} {t('dashboard.topModels.sessionsShort', 'sessions')}</span>
+                      <span className="inline-flex items-center gap-1"><DollarSign className="h-2.5 w-2.5" aria-hidden="true" />{money(item.usage.cost)}</span>
+                      <span className="inline-flex items-center gap-1"><Database className="h-2.5 w-2.5" aria-hidden="true" />{Math.round(cacheShare * 100)}% {t('dashboard.topModels.cacheShort', 'cache')}</span>
+                    </span>
                   </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-16 h-1.5 bg-surface-dark/80 rounded-full overflow-hidden inner-shadow">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${percent}%`,
-                        backgroundColor: color,
-                      }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-muted-foreground w-10 text-right">
-                    {count} <span className="text-[8px]">({percent.toFixed(0)}%)</span>
-                  </span>
+                  <strong className="shrink-0 text-sm tabular-nums text-foreground">{compact(item.tokens)}</strong>
                 </div>
               </button>
             )
           })}
         </div>
       ) : (
-        <div className="text-center py-4 text-muted-foreground">
-          <Cpu className="h-6 w-6 mx-auto mb-1 opacity-50" />
-          <p className="text-xs">{t('components.dashboard.noModelData')}</p>
-        </div>
+        <div className="py-6 text-center text-xs text-muted-foreground">{t('dashboard.topModels.noTokenUsage', 'No measured model token usage')}</div>
       )}
     </DashboardCardShell>
   )

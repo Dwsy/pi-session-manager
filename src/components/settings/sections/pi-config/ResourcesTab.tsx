@@ -480,7 +480,7 @@ function FilterChip({
       onClick={onClick}
       className={`inline-flex h-6 items-center gap-1 rounded-md border px-1.5 text-[11px] font-medium focus-ring ${
         active
-          ? "border-primary/40 bg-primary/10 text-primary"
+          ? "settings-accent-bg-soft settings-accent-ring settings-accent-fg border-transparent font-semibold"
           : "border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent/10"
       }`}
     >
