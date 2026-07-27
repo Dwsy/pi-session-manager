@@ -387,10 +387,10 @@
 .session-context-menu {
   overflow: hidden;
   border: 1px solid rgb(var(--color-border) / 0.78);
-  border-radius: 7px;
+  border-radius: 6px;
   background: rgb(var(--color-popover));
   color: rgb(var(--color-popover-foreground));
-  box-shadow: 0 10px 28px rgb(0 0 0 / 0.24);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
 }
 
 .session-sort-menu {
@@ -399,11 +399,12 @@
 
 .session-sort-menu__label,
 .session-context-menu__label {
-  padding: 4px 7px 5px;
+  padding: 4px 8px;
   color: rgb(var(--color-muted-foreground));
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
   text-transform: uppercase;
 }
 
@@ -431,9 +432,10 @@
 }
 
 .session-context-menu__item {
-  min-height: 30px;
-  padding: 5px 9px;
+  min-height: 28px;
+  padding: 4px 8px;
   font-size: 12px;
+  line-height: 1.25;
 }
 
 .session-sort-menu__item:hover,
@@ -446,32 +448,61 @@
   outline: none;
 }
 
+.session-context-menu__item:focus-visible {
+  box-shadow: inset 0 0 0 1px rgb(var(--color-ring) / 0.32);
+}
+
 .session-sort-menu__item--active {
   background: rgb(var(--color-secondary) / 0.58);
   color: rgb(var(--color-foreground));
 }
 
 .session-context-menu {
-  width: 224px;
+  width: 220px;
   padding: 4px;
 }
 
 .session-context-menu__tags {
-  max-height: 150px;
+  max-height: 140px;
   overflow-y: auto;
 }
 
 .session-context-menu__separator {
   height: 1px;
-  margin: 4px 2px;
-  background: rgb(var(--color-border) / 0.7);
+  margin: 3px 4px;
+  background: rgb(var(--color-border) / 0.64);
 }
 
 .session-context-menu__icon {
-  width: 15px;
-  height: 15px;
-  flex: 0 0 15px;
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  align-items: center;
+  justify-content: center;
   color: rgb(var(--color-muted-foreground));
+}
+
+.session-context-menu__icon > svg,
+.session-context-menu__plugin-actions svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  stroke-width: 1.8;
+}
+
+.session-context-menu__tag-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+}
+
+.session-context-menu__check {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
 }
 
 .session-context-menu__text {
@@ -497,19 +528,19 @@
 .session-context-menu__confirm {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px;
+  gap: 5px;
+  padding: 3px;
 }
 
 .session-context-menu__confirm-button {
   display: inline-flex;
-  min-height: 30px;
+  min-height: 28px;
   flex: 1;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   border: 1px solid rgb(var(--color-destructive) / 0.55);
-  border-radius: 5px;
+  border-radius: 4px;
   background: rgb(var(--color-destructive));
   color: rgb(var(--color-destructive-foreground));
   font-size: 11px;
@@ -517,12 +548,12 @@
 
 .session-context-menu__cancel-button {
   display: inline-flex;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   align-items: center;
   justify-content: center;
   border: 1px solid rgb(var(--color-border) / 0.72);
-  border-radius: 5px;
+  border-radius: 4px;
   background: transparent;
   color: rgb(var(--color-muted-foreground));
 }
@@ -537,16 +568,17 @@
 .session-context-menu__plugin-actions > button {
   display: flex;
   width: 100%;
-  min-height: 30px;
+  min-height: 28px;
   min-width: 0;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   border: 0;
   border-radius: 5px;
   background: transparent;
-  padding: 5px 9px;
+  padding: 4px 8px;
   color: rgb(var(--color-muted-foreground));
   font-size: 12px;
+  line-height: 1.25;
   text-align: left;
 }
 

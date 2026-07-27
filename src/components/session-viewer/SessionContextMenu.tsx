@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Children, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -17,7 +17,7 @@ import type { Tag } from '@/types'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
 
 const CONFIRM_TIMEOUT_MS = 3000
-const MENU_WIDTH = 224
+const MENU_WIDTH = 220
 const MENU_ESTIMATED_HEIGHT = 420
 const VIEWPORT_GUTTER = 8
 
@@ -130,6 +130,15 @@ export default function SessionContextMenu({
     onClose()
   }, [onClose])
 
+  const hasLaunchActions = Boolean(
+    onOpenTerminal || onOpenBrowser || onConvert || onToggleFavorite,
+  )
+  const hasPluginActions = Children.count(pluginActions) > 0
+  const hasSessionActions = Boolean(onCopyResume || onFork || onRename)
+  const hasContentBeforeDelete = Boolean(
+    tags.length > 0 || hasLaunchActions || hasPluginActions || hasSessionActions,
+  )
+
   const handleDeleteClick = useCallback(() => {
     if (!isDeleteConfirming) {
       setIsDeleteConfirming(true)
@@ -212,17 +221,19 @@ export default function SessionContextMenu({
                   onClick={() => onToggleTag(tag.id, assigned)}
                 >
                   <span
-                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${isHex ? '' : getColorClass(tag.color)}`}
+                    className={`session-context-menu__tag-dot ${isHex ? '' : getColorClass(tag.color)}`}
                     style={getColorStyle(tag.color)}
                     aria-hidden="true"
                   />
                   <span className="session-context-menu__text">{tag.name}</span>
-                  {assigned ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
+                  {assigned ? <Check className="session-context-menu__check text-primary" /> : null}
                 </button>
               )
             })}
           </div>
-          <div className="session-context-menu__separator" role="separator" />
+          {hasLaunchActions || hasPluginActions || hasSessionActions ? (
+            <div className="session-context-menu__separator" role="separator" />
+          ) : null}
         </>
       ) : null}
 
@@ -255,7 +266,17 @@ export default function SessionContextMenu({
         />
       ) : null}
 
-      {pluginActions ? <div className="session-context-menu__plugin-actions" role="presentation">{pluginActions}</div> : null}
+      {hasLaunchActions && (hasPluginActions || hasSessionActions) ? (
+        <div className="session-context-menu__separator" role="separator" />
+      ) : null}
+
+      {hasPluginActions ? (
+        <div className="session-context-menu__plugin-actions" role="presentation">{pluginActions}</div>
+      ) : null}
+
+      {hasPluginActions && hasSessionActions ? (
+        <div className="session-context-menu__separator" role="separator" />
+      ) : null}
 
       {onCopyResume ? (
         <MenuAction
@@ -281,7 +302,9 @@ export default function SessionContextMenu({
 
       {onDelete || onDeleteDirect ? (
         <>
-          <div className="session-context-menu__separator" role="separator" />
+          {hasContentBeforeDelete ? (
+            <div className="session-context-menu__separator" role="separator" />
+          ) : null}
           {isDeleteConfirming ? (
             <div className="session-context-menu__confirm" role="group" aria-label={t('tags.contextMenu.delete')}>
               <button
