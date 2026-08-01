@@ -236,6 +236,7 @@ fn extract_frontmatter_field(content: &str, field: &str) -> Option<String> {
 }
 
 fn scan_skills_dir(dir: &Path, base_dir: &Path, scope: &str, settings_list: &[String], discovery: &str, allow_root_markdown: bool) -> Vec<ResourceInfo> {
+    #[allow(clippy::too_many_arguments)]
     fn visit(current: &Path, root: &Path, base_dir: &Path, scope: &str, settings_list: &[String], discovery: &str, allow_root_markdown: bool, results: &mut Vec<ResourceInfo>) {
         let skill_file = current.join("SKILL.md");
         if skill_file.is_file() {
