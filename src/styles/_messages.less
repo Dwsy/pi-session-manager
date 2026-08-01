@@ -31,6 +31,16 @@
 .user-message-content {
   min-width: 0;
   user-select: text;
+  cursor: zoom-in;
+}
+
+.user-message-content :is(a, button, input, textarea, select, [contenteditable]):not([contenteditable="false"]) {
+  cursor: auto;
+}
+
+.user-message-content a,
+.user-message-content button {
+  cursor: pointer;
 }
 
 .user-message-meta {
@@ -108,9 +118,9 @@
   inset: 0;
   z-index: 1000;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
   background-color: rgba(0, 0, 0, 0.6);
 }
 
@@ -118,14 +128,14 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: min(85vh, 900px);
-  max-width: 896px;
+  height: 100%;
+  max-width: none;
   overflow: hidden;
-  border: 1px solid rgb(var(--color-border));
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
   background: rgb(var(--color-background));
   color: rgb(var(--color-foreground));
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.32);
+  box-shadow: none;
 }
 
 .user-message-modal-header {
@@ -207,6 +217,16 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 16px;
+  cursor: zoom-out;
+
+  :is(a, button, input, textarea, select, [contenteditable]):not([contenteditable="false"]) {
+    cursor: auto;
+  }
+
+  a,
+  button {
+    cursor: pointer;
+  }
 
   // Custom scrollbar
   &::-webkit-scrollbar {

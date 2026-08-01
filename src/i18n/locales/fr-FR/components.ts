@@ -65,6 +65,14 @@ export const components = {
   userMessage: {
     you: 'Vous',
     imageAlt: 'Image du message',
+    copied: 'Copié',
+    copyText: 'Copier le texte',
+    expand: 'Agrandir le message',
+    fullMessage: 'Message complet',
+    close: 'Fermer',
+    viewRaw: 'Afficher le texte brut',
+    viewRendered: 'Afficher le rendu',
+    empty: 'Message vide',
   },
   sessionHeader: {
     createdAt: 'Créé le',

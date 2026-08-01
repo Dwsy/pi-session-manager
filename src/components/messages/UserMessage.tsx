@@ -4,8 +4,32 @@ import MarkdownContent from '@/components/ui/MarkdownContent'
 import { formatDate } from '@/utils/format'
 import { Copy, Check, Maximize2, X, FileText, Eye } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import { memo, useMemo, useState, useRef, useCallback, useEffect } from 'react'
+import {
+  memo,
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 import { useClipboard } from '@/hooks/useClipboard'
+
+const MESSAGE_FULLSCREEN_INTERACTIVE_SELECTOR =
+  'button, a, input, textarea, select, option, [contenteditable]:not([contenteditable="false"]), [role="button"]'
+
+export function shouldIgnoreMessageFullscreenClick(
+  event: ReactMouseEvent<HTMLElement>,
+): boolean {
+  if (event.defaultPrevented) return true
+
+  const target = event.target
+  if (!(target instanceof Element)) return true
+  if (target.closest(MESSAGE_FULLSCREEN_INTERACTIVE_SELECTOR)) return true
+
+  const selection = window.getSelection?.()
+  return Boolean(selection && !selection.isCollapsed && selection.toString().trim())
+}
 
 interface UserMessageProps {
   id: string
@@ -142,7 +166,12 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
           </div>
         </div>
 
-        <div className="user-message-content">
+        <div
+          className="user-message-content"
+          onClick={(event) => {
+            if (!shouldIgnoreMessageFullscreenClick(event)) handleOpenModal()
+          }}
+        >
           {images.length > 0 && (
             <div className="message-images">
               {images.map((img, idx) => (
@@ -328,7 +357,12 @@ function UserMessageModal({ text, images, timestamp, searchQuery, initialShowRaw
             </button>
           </div>
         </div>
-        <div className="user-message-modal-body">
+        <div
+          className="user-message-modal-body"
+          onClick={(event) => {
+            if (!shouldIgnoreMessageFullscreenClick(event)) onClose()
+          }}
+        >
           {images.length > 0 && (
             <div className="message-images mb-4 flex flex-wrap gap-3">
               {images.map((img, idx) => (

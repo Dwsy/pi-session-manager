@@ -65,6 +65,14 @@ export const components = {
   userMessage: {
     you: 'あなた',
     imageAlt: 'メッセージ画像',
+    copied: 'コピーしました',
+    copyText: 'テキストをコピー',
+    expand: 'メッセージを拡大',
+    fullMessage: 'メッセージ全文',
+    close: '閉じる',
+    viewRaw: '原文を表示',
+    viewRendered: 'レンダリング表示',
+    empty: '空のメッセージ',
   },
   sessionHeader: {
     createdAt: '作成日時',
