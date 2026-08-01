@@ -117,13 +117,13 @@ export default function PiResourcesSettings() {
 
   const selectedLabel = projectCwd
     ? getPathBasename(projectCwd)
-    : t("settings.piResources.userOnly", "User only (~/.pi/agent)");
+    : t("settings.piResources.userOnly", "User resources");
 
   const selectedSublabel = projectCwd
     ? projectCwd
     : t(
         "settings.piResources.userOnlyHint",
-        "Only scan ~/.pi/agent resources",
+        "Scan ~/.pi/agent, ~/.agents/skills and user packages",
       );
 
   return (
@@ -140,7 +140,7 @@ export default function PiResourcesSettings() {
           <p className="text-[10px] text-muted-foreground">
             {t(
               "settings.piResources.projectScopeHelp",
-              "User resources always load. Choose a project cwd to also scan .pi/ in that project.",
+              "User .pi, .agents and package resources always load. Choose a project cwd to discover trusted project .pi resources, ancestor .agents skills and project packages.",
             )}
           </p>
         </div>
@@ -207,10 +207,10 @@ export default function PiResourcesSettings() {
             >
               <ProjectOption
                 active={!projectCwd}
-                title={t("settings.piResources.userOnly", "User only (~/.pi/agent)")}
+                title={t("settings.piResources.userOnly", "User resources")}
                 subtitle={t(
                   "settings.piResources.userOnlyHint",
-                  "Only scan ~/.pi/agent resources",
+                  "Scan ~/.pi/agent, ~/.agents/skills and user packages",
                 )}
                 onClick={() => handleCwdChange(null)}
               />

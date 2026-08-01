@@ -409,11 +409,15 @@ export interface PiSettings {
 
 // --- Pi Config TUI types (aligned with pi source) ---
 
+export type ResourceOverrideState = "inherit" | "enabled" | "disabled";
+export type ResourceDiscovery = "pi" | "agents" | "package";
+
 export interface ResourceMetadata {
   source: string;
   scope: "user" | "project";
   origin: "package" | "top-level";
-  /** Absolute package root for package resources. */
+  discovery: ResourceDiscovery;
+  /** Absolute root used to resolve the relative resource path. */
   baseDir?: string;
 }
 
@@ -424,8 +428,17 @@ export interface ResourceInfo {
   path: string;
   description: string;
   enabled: boolean;
+  state: ResourceOverrideState;
   resourceType: ResourceType;
   metadata: ResourceMetadata;
+}
+
+export interface ProjectResourceTrust {
+  cwd: string;
+  required: boolean;
+  trusted: boolean;
+  decision: boolean | null;
+  inheritedFrom?: string;
 }
 
 export interface PiSettingsFull {

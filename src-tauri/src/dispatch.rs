@@ -520,6 +520,17 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let result = crate::scan_all_resources_internal(cwd).await?;
             Ok(to_val(result, "serialize result")?)
         }
+        "get_project_resource_trust" => {
+            let cwd = extract(payload, "cwd")?;
+            let result = crate::get_project_resource_trust_internal(cwd).await?;
+            Ok(to_val(result, "serialize result")?)
+        }
+        "set_project_resource_trust" => {
+            let cwd = extract(payload, "cwd")?;
+            let trusted = payload.get("trusted").and_then(|value| value.as_bool()).unwrap_or(false);
+            let result = crate::set_project_resource_trust_internal(cwd, trusted).await?;
+            Ok(to_val(result, "serialize result")?)
+        }
         "load_pi_settings_full" => {
             let result = crate::load_pi_settings_full_internal().await?;
             Ok(to_val(result, "serialize result")?)
@@ -528,6 +539,17 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             let key = extract(payload, "key")?;
             let value = payload.get("value").cloned().unwrap_or(Value::Null);
             crate::save_pi_setting_internal(key, value).await?;
+            Ok(Value::Null)
+        }
+        "set_resource_state" => {
+            let resource_type = extract(payload, "resource_type")?;
+            let path = extract(payload, "path")?;
+            let state = extract(payload, "state")?;
+            let scope = extract(payload, "scope").unwrap_or_else(|_| "user".to_string());
+            let cwd = extract_optional_string(payload, "cwd");
+            let origin = extract_optional_string(payload, "origin");
+            let source = extract_optional_string(payload, "source");
+            crate::set_resource_state_internal(resource_type, path, state, scope, cwd, origin, source).await?;
             Ok(Value::Null)
         }
         "toggle_resource" => {
@@ -1271,7 +1293,7 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
             }
         }
         "list_available_terminals" => {
-            let terminals = crate::domain::terminal::utils::scan_available_terminals();
+            let terminals = tokio::task::spawn_blocking(crate::domain::terminal::utils::scan_available_terminals).await.map_err(|error| format!("Terminal scan task failed: {error}"))?;
             Ok(serde_json::json!(terminals))
         }
         "toggle_devtools" => Err("toggle_devtools is not supported via WebSocket".to_string()),

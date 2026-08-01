@@ -17,6 +17,7 @@ mod plugin_records;
 #[cfg(feature = "gui")]
 mod plugin_windows;
 mod psm_plugins;
+mod resource_trust;
 pub mod search;
 mod session;
 // session_file is pub(super) to restrict direct access from outside commands/.
@@ -54,6 +55,7 @@ pub use plugin_records::*;
 #[cfg(feature = "gui")]
 pub use plugin_windows::*;
 pub use psm_plugins::*;
+pub use resource_trust::*;
 pub use search::*;
 pub use session::*;
 pub use session_file::*;

@@ -169,8 +169,8 @@ pub async fn open_session_in_terminal(path: String, cwd: String, terminal: Optio
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub fn list_available_terminals() -> Vec<String> {
-    crate::domain::terminal::utils::scan_available_terminals().into_iter().map(String::from).collect()
+pub async fn list_available_terminals() -> Vec<String> {
+    tokio::task::spawn_blocking(|| crate::domain::terminal::utils::scan_available_terminals().into_iter().map(String::from).collect()).await.unwrap_or_default()
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]

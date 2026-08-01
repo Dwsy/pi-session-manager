@@ -505,91 +505,123 @@ pub async fn save_pi_setting(key: String, value: Value) -> Result<(), String> {
     save_pi_setting_internal(key, value).await
 }
 
-pub async fn toggle_resource_internal(resource_type: String, path: String, enabled: bool, scope: String, cwd: Option<String>, origin: Option<String>, source: Option<String>) -> Result<(), String> {
+fn validate_resource_state(state: &str) -> Result<(), String> {
+    match state {
+        "inherit" | "enabled" | "disabled" => Ok(()),
+        _ => Err(format!("Invalid resource state: {state}")),
+    }
+}
+
+fn exact_resource_override(entry: &str, path: &str) -> bool {
+    let Some(prefix) = entry.chars().next() else {
+        return false;
+    };
+    matches!(prefix, '+' | '-' | '!') && entry[1..] == *path
+}
+
+fn update_resource_entries(entries: &[Value], path: &str, state: &str) -> Result<Vec<String>, String> {
+    validate_resource_state(state)?;
+    let mut updated: Vec<String> = entries.iter().filter_map(|value| value.as_str().map(String::from)).filter(|entry| !exact_resource_override(entry, path)).collect();
+    match state {
+        "enabled" => updated.push(format!("+{path}")),
+        "disabled" => updated.push(format!("-{path}")),
+        "inherit" => {}
+        _ => unreachable!("validated resource state"),
+    }
+    Ok(updated)
+}
+
+pub async fn set_resource_state_internal(resource_type: String, path: String, state: String, scope: String, cwd: Option<String>, origin: Option<String>, source: Option<String>) -> Result<(), String> {
+    validate_resource_state(&state)?;
+    if scope == "project" {
+        let project_cwd = cwd.as_deref().filter(|value| !value.trim().is_empty()).ok_or_else(|| "Project cwd is required for project resource changes".to_string())?;
+        if !super::resource_trust::is_project_trusted(Path::new(project_cwd))? {
+            return Err("Project is not trusted; refusing to write project resource settings".to_string());
+        }
+    }
+
     let settings_path = settings_path_for_scope(&scope, cwd.as_deref())?;
     let mut json = read_settings_json(&settings_path)?;
-
-    let is_package = origin.as_deref() == Some("package") || source.as_ref().is_some_and(|s| !s.is_empty() && s != "auto" && s != "local");
+    let is_package = origin.as_deref() == Some("package") || source.as_ref().is_some_and(|value| !value.is_empty() && value != "auto" && value != "local");
 
     if is_package {
-        let package_source = source.as_deref().map(str::trim).filter(|s| !s.is_empty()).ok_or_else(|| "Missing package source for package resource toggle".to_string())?;
-        toggle_package_resource_filter(&mut json, package_source, &resource_type, &path, enabled)?;
+        let package_source = source.as_deref().map(str::trim).filter(|value| !value.is_empty()).ok_or_else(|| "Missing package source for package resource state".to_string())?;
+        set_package_resource_filter(&mut json, package_source, &resource_type, &path, &state)?;
     } else {
-        let arr = json.get(&resource_type).and_then(|v| v.as_array()).cloned().unwrap_or_default();
-
-        let mut new_arr: Vec<String> = arr
-            .iter()
-            .filter_map(|v| v.as_str().map(String::from))
-            .filter(|entry| {
-                let clean = entry.trim_start_matches('+').trim_start_matches('-').trim_start_matches('!');
-                clean != path
-            })
-            .collect();
-
-        if enabled {
-            new_arr.push(format!("+{path}"));
+        let entries = json.get(&resource_type).and_then(Value::as_array).cloned().unwrap_or_default();
+        let updated = update_resource_entries(&entries, &path, &state)?;
+        if updated.is_empty() {
+            json.as_object_mut().ok_or_else(|| "Invalid settings root".to_string())?.remove(&resource_type);
         } else {
-            new_arr.push(format!("-{path}"));
+            json[&resource_type] = serde_json::json!(updated);
         }
-
-        json[&resource_type] = serde_json::json!(new_arr);
     }
 
     write_settings_json(&settings_path, &json, true)
 }
 
-fn toggle_package_resource_filter(json: &mut Value, package_source: &str, resource_type: &str, path: &str, enabled: bool) -> Result<(), String> {
-    let packages = json.get_mut("packages").and_then(|v| v.as_array_mut()).ok_or_else(|| "No packages array in settings.json".to_string())?;
+fn set_package_resource_filter(json: &mut Value, package_source: &str, resource_type: &str, path: &str, state: &str) -> Result<(), String> {
+    let packages = json.get_mut("packages").and_then(Value::as_array_mut).ok_or_else(|| "No packages array in settings.json".to_string())?;
+    let pkg = packages
+        .iter_mut()
+        .find(|package| {
+            let source = if let Some(value) = package.as_str() { value.trim_start_matches(['+', '-']) } else { package.get("source").and_then(Value::as_str).unwrap_or("").trim_start_matches(['+', '-']) };
+            source == package_source
+        })
+        .ok_or_else(|| format!("Package not found in settings: {package_source}"))?;
 
-    let target = packages.iter_mut().find(|pkg| {
-        let source = if let Some(s) = pkg.as_str() { s.trim_start_matches(['+', '-']) } else { pkg.get("source").and_then(|v| v.as_str()).unwrap_or("").trim_start_matches(['+', '-']) };
-        source == package_source
-    });
-
-    let pkg = target.ok_or_else(|| format!("Package not found in settings: {package_source}"))?;
-
-    // Promote string package entry to object form.
+    if pkg.is_string() && state == "inherit" {
+        return Ok(());
+    }
     if pkg.is_string() {
         *pkg = serde_json::json!({ "source": package_source });
     }
 
     let obj = pkg.as_object_mut().ok_or_else(|| "Invalid package entry".to_string())?;
     obj.entry("source").or_insert_with(|| serde_json::json!(package_source));
-
-    let arr = obj.get(resource_type).and_then(|v| v.as_array()).cloned().unwrap_or_default();
-    let mut new_arr: Vec<String> = arr
-        .iter()
-        .filter_map(|v| v.as_str().map(String::from))
-        .filter(|entry| {
-            let clean = entry.trim_start_matches('+').trim_start_matches('-').trim_start_matches('!');
-            clean != path
-        })
-        .collect();
-
-    if enabled {
-        new_arr.push(format!("+{path}"));
-    } else {
-        new_arr.push(format!("-{path}"));
-    }
-
-    if new_arr.is_empty() {
+    let entries = obj.get(resource_type).and_then(Value::as_array).cloned().unwrap_or_default();
+    let updated = update_resource_entries(&entries, path, state)?;
+    if updated.is_empty() {
         obj.remove(resource_type);
     } else {
-        obj.insert(resource_type.to_string(), serde_json::json!(new_arr));
+        obj.insert(resource_type.to_string(), serde_json::json!(updated));
     }
 
-    // Collapse empty filter object back to string source.
-    let has_filters = ["extensions", "skills", "prompts", "themes"].iter().any(|k| obj.get(*k).is_some());
-    if !has_filters {
+    let collapse_to_source = obj.len() == 1 && obj.contains_key("source");
+    if collapse_to_source {
         *pkg = serde_json::json!(package_source);
     }
-
     Ok(())
+}
+
+pub async fn toggle_resource_internal(resource_type: String, path: String, enabled: bool, scope: String, cwd: Option<String>, origin: Option<String>, source: Option<String>) -> Result<(), String> {
+    set_resource_state_internal(resource_type, path, if enabled { "enabled" } else { "disabled" }.to_string(), scope, cwd, origin, source).await
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn set_resource_state(resource_type: String, path: String, state: String, scope: String, cwd: Option<String>, origin: Option<String>, source: Option<String>) -> Result<(), String> {
+    set_resource_state_internal(resource_type, path, state, scope, cwd, origin, source).await
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn toggle_resource(resource_type: String, path: String, enabled: bool, scope: String, cwd: Option<String>, origin: Option<String>, source: Option<String>) -> Result<(), String> {
     toggle_resource_internal(resource_type, path, enabled, scope, cwd, origin, source).await
+}
+
+#[cfg(test)]
+mod resource_state_tests {
+    use super::*;
+
+    #[test]
+    fn exact_state_changes_preserve_plain_and_broad_patterns() {
+        let entries = vec![serde_json::json!("custom/skill.md"), serde_json::json!("!skills/**"), serde_json::json!("-skills/demo/SKILL.md")];
+
+        let inherited = update_resource_entries(&entries, "skills/demo/SKILL.md", "inherit").unwrap();
+        assert_eq!(inherited, vec!["custom/skill.md", "!skills/**"]);
+
+        let enabled = update_resource_entries(&entries, "skills/demo/SKILL.md", "enabled").unwrap();
+        assert_eq!(enabled.last().map(String::as_str), Some("+skills/demo/SKILL.md"));
+    }
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]

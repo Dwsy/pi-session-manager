@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -136,7 +137,9 @@ pub struct ResourceMetadata {
     pub source: String,
     pub scope: String,
     pub origin: String,
-    /// Absolute package root for package resources; None for top-level.
+    /// Discovery channel: `pi`, `agents`, or `package`.
+    pub discovery: String,
+    /// Absolute root used to resolve the relative resource path.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_dir: Option<String>,
 }
@@ -148,6 +151,8 @@ pub struct ResourceInfo {
     pub path: String,
     pub description: String,
     pub enabled: bool,
+    /// Exact setting override: `inherit`, `enabled`, or `disabled`.
+    pub state: String,
     pub resource_type: String,
     pub metadata: ResourceMetadata,
 }
@@ -169,20 +174,28 @@ fn extract_settings_array(json: &serde_json::Value, key: &str) -> Vec<String> {
     json.get(key).and_then(|v| v.as_array()).map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()).unwrap_or_default()
 }
 
-fn is_resource_enabled(settings_list: &[String], relative_path: &str) -> bool {
-    for entry in settings_list {
-        let (prefix, path) = if let Some(rest) = entry.strip_prefix('-') {
-            ('-', rest)
-        } else if let Some(rest) = entry.strip_prefix('+') {
-            ('+', rest)
-        } else {
-            (' ', entry.as_str())
-        };
-        if path == relative_path {
-            return prefix != '-';
-        }
+fn resource_override_state(settings_list: &[String], relative_path: &str) -> String {
+    let rel = to_posix_rel(relative_path);
+    if settings_list.iter().filter_map(|entry| entry.strip_prefix('-')).any(|pattern| exact_pattern_matches(pattern, &rel)) {
+        return "disabled".to_string();
     }
-    true
+    if settings_list.iter().filter_map(|entry| entry.strip_prefix('+')).any(|pattern| exact_pattern_matches(pattern, &rel)) {
+        return "enabled".to_string();
+    }
+    "inherit".to_string()
+}
+
+fn is_resource_enabled(settings_list: &[String], relative_path: &str) -> bool {
+    let overrides: Vec<String> = settings_list.iter().filter(|entry| entry.starts_with('+') || entry.starts_with('-') || entry.starts_with('!')).cloned().collect();
+    overrides.is_empty() || package_resource_enabled(Some(&overrides), relative_path)
+}
+
+fn resource_metadata(scope: &str, discovery: &str, base_dir: &Path) -> ResourceMetadata {
+    ResourceMetadata { source: "auto".to_string(), scope: scope.to_string(), origin: "top-level".to_string(), discovery: discovery.to_string(), base_dir: Some(base_dir.to_string_lossy().to_string()) }
+}
+
+fn relative_resource_path(path: &Path, base_dir: &Path) -> Option<String> {
+    path.strip_prefix(base_dir).ok().map(|relative| to_posix_rel(&relative.to_string_lossy()))
 }
 
 fn extract_frontmatter_field(content: &str, field: &str) -> Option<String> {
@@ -222,136 +235,239 @@ fn extract_frontmatter_field(content: &str, field: &str) -> Option<String> {
     }
 }
 
-fn scan_skills_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec<ResourceInfo> {
-    let mut results = Vec::new();
-    let entries = match fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return results,
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_dir() {
-            continue;
+fn scan_skills_dir(dir: &Path, base_dir: &Path, scope: &str, settings_list: &[String], discovery: &str, allow_root_markdown: bool) -> Vec<ResourceInfo> {
+    fn visit(current: &Path, root: &Path, base_dir: &Path, scope: &str, settings_list: &[String], discovery: &str, allow_root_markdown: bool, results: &mut Vec<ResourceInfo>) {
+        let skill_file = current.join("SKILL.md");
+        if skill_file.is_file() {
+            if let Some(relative) = relative_resource_path(&skill_file, base_dir) {
+                let name = current.file_name().and_then(|value| value.to_str()).unwrap_or("SKILL").to_string();
+                let description = fs::read_to_string(&skill_file).ok().and_then(|content| extract_frontmatter_field(&content, "description")).unwrap_or_default();
+                results.push(ResourceInfo { name, path: relative.clone(), description, enabled: is_resource_enabled(settings_list, &relative), state: resource_override_state(settings_list, &relative), resource_type: "skills".to_string(), metadata: resource_metadata(scope, discovery, base_dir) });
+            }
+            return;
         }
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-        if name.starts_with('.') {
-            continue;
+
+        let entries = match fs::read_dir(current) {
+            Ok(entries) => entries,
+            Err(_) => return,
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') || name == "node_modules" {
+                continue;
+            }
+            if path.is_dir() {
+                visit(&path, root, base_dir, scope, settings_list, discovery, allow_root_markdown, results);
+            } else if allow_root_markdown && current == root && path.extension().is_some_and(|extension| extension == "md") {
+                if let Some(relative) = relative_resource_path(&path, base_dir) {
+                    let description = fs::read_to_string(&path).ok().and_then(|content| extract_frontmatter_field(&content, "description")).unwrap_or_default();
+                    results.push(ResourceInfo {
+                        name: path.file_stem().and_then(|value| value.to_str()).unwrap_or(&name).to_string(),
+                        path: relative.clone(),
+                        description,
+                        enabled: is_resource_enabled(settings_list, &relative),
+                        state: resource_override_state(settings_list, &relative),
+                        resource_type: "skills".to_string(),
+                        metadata: resource_metadata(scope, discovery, base_dir),
+                    });
+                }
+            }
         }
-        let skill_md = path.join("SKILL.md");
-        let description = if skill_md.exists() { fs::read_to_string(&skill_md).ok().and_then(|c| extract_frontmatter_field(&c, "description")).unwrap_or_default() } else { String::new() };
-        let relative = format!("skills/{name}/SKILL.md");
-        let enabled = is_resource_enabled(settings_list, &relative);
-        results.push(ResourceInfo { name, path: relative, description, enabled, resource_type: "skills".to_string(), metadata: ResourceMetadata { source: "auto".to_string(), scope: scope.to_string(), origin: "top-level".to_string(), base_dir: None } });
     }
-    results.sort_by(|a, b| a.name.cmp(&b.name));
+
+    let mut results = Vec::new();
+    visit(dir, dir, base_dir, scope, settings_list, discovery, allow_root_markdown, &mut results);
+    results.sort_by(|left, right| left.name.cmp(&right.name));
     results
 }
 
-fn scan_extensions_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec<ResourceInfo> {
-    let mut results = Vec::new();
-    let entries = match fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return results,
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-        if file_name.starts_with('.') || file_name == "README.md" || file_name == "CHANGELOG.md" {
-            continue;
+fn resolve_extension_entries(dir: &Path) -> Vec<PathBuf> {
+    let package_json = dir.join("package.json");
+    if let Ok(content) = fs::read_to_string(package_json) {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+            let entries: Vec<PathBuf> = json.get("pi").and_then(|value| value.get("extensions")).and_then(serde_json::Value::as_array).into_iter().flatten().filter_map(serde_json::Value::as_str).map(|relative| dir.join(relative)).filter(|path| path.exists()).collect();
+            if !entries.is_empty() {
+                return entries;
+            }
         }
-        let is_ext_file = path.is_file() && (file_name.ends_with(".ts") || file_name.ends_with(".js"));
-        let is_ext_dir = path.is_dir() && (path.join("index.ts").exists() || path.join("index.js").exists());
-        if !is_ext_file && !is_ext_dir {
-            continue;
-        }
-        let relative = format!("extensions/{file_name}");
-        let enabled = is_resource_enabled(settings_list, &relative);
-        results.push(ResourceInfo { name: file_name, path: relative, description: String::new(), enabled, resource_type: "extensions".to_string(), metadata: ResourceMetadata { source: "auto".to_string(), scope: scope.to_string(), origin: "top-level".to_string(), base_dir: None } });
     }
-    results.sort_by(|a, b| a.name.cmp(&b.name));
+    for entry in ["index.ts", "index.js"] {
+        let path = dir.join(entry);
+        if path.is_file() {
+            return vec![path];
+        }
+    }
+    Vec::new()
+}
+
+fn scan_extensions_dir(dir: &Path, base_dir: &Path, scope: &str, settings_list: &[String], discovery: &str) -> Vec<ResourceInfo> {
+    let mut files = resolve_extension_entries(dir);
+    if files.is_empty() {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let file_name = entry.file_name().to_string_lossy().to_string();
+                if file_name.starts_with('.') || file_name == "README.md" || file_name == "CHANGELOG.md" {
+                    continue;
+                }
+                if path.is_file() && (file_name.ends_with(".ts") || file_name.ends_with(".js")) {
+                    files.push(path);
+                } else if path.is_dir() {
+                    files.extend(resolve_extension_entries(&path));
+                }
+            }
+        }
+    }
+
+    let mut results = Vec::new();
+    for path in files {
+        let Some(relative) = relative_resource_path(&path, base_dir) else {
+            continue;
+        };
+        results.push(ResourceInfo {
+            name: display_name_for_resource("extensions", &relative),
+            path: relative.clone(),
+            description: String::new(),
+            enabled: is_resource_enabled(settings_list, &relative),
+            state: resource_override_state(settings_list, &relative),
+            resource_type: "extensions".to_string(),
+            metadata: resource_metadata(scope, discovery, base_dir),
+        });
+    }
+    results.sort_by(|left, right| left.name.cmp(&right.name));
     results
 }
 
-fn scan_prompts_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec<ResourceInfo> {
+fn scan_prompts_dir(dir: &Path, base_dir: &Path, scope: &str, settings_list: &[String], discovery: &str) -> Vec<ResourceInfo> {
     let mut results = Vec::new();
-    let entries = match fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return results,
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            if !path.is_file() || file_name.starts_with('.') || !file_name.ends_with(".md") {
+                continue;
+            }
+            let Some(relative) = relative_resource_path(&path, base_dir) else {
+                continue;
+            };
+            let description = fs::read_to_string(&path).ok().and_then(|content| content.lines().next().map(|line| line.trim().trim_start_matches("# ").to_string())).unwrap_or_default();
+            results.push(ResourceInfo {
+                name: file_name.trim_end_matches(".md").to_string(),
+                path: relative.clone(),
+                description,
+                enabled: is_resource_enabled(settings_list, &relative),
+                state: resource_override_state(settings_list, &relative),
+                resource_type: "prompts".to_string(),
+                metadata: resource_metadata(scope, discovery, base_dir),
+            });
         }
-        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-        if !file_name.ends_with(".md") || file_name.starts_with('.') {
-            continue;
-        }
-        let name = file_name.trim_end_matches(".md").to_string();
-        let description = fs::read_to_string(&path).ok().and_then(|c| c.lines().next().map(|s| s.trim().trim_start_matches("# ").to_string())).unwrap_or_default();
-        let relative = format!("prompts/{file_name}");
-        let enabled = is_resource_enabled(settings_list, &relative);
-        results.push(ResourceInfo { name, path: relative, description, enabled, resource_type: "prompts".to_string(), metadata: ResourceMetadata { source: "auto".to_string(), scope: scope.to_string(), origin: "top-level".to_string(), base_dir: None } });
     }
-    results.sort_by(|a, b| a.name.cmp(&b.name));
+    results.sort_by(|left, right| left.name.cmp(&right.name));
     results
 }
 
-fn scan_themes_dir(dir: &Path, scope: &str, settings_list: &[String]) -> Vec<ResourceInfo> {
+fn scan_themes_dir(dir: &Path, base_dir: &Path, scope: &str, settings_list: &[String], discovery: &str) -> Vec<ResourceInfo> {
     let mut results = Vec::new();
-    let entries = match fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return results,
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-        if file_name.starts_with('.') {
-            continue;
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            if !path.is_file() || file_name.starts_with('.') || !file_name.ends_with(".json") {
+                continue;
+            }
+            let Some(relative) = relative_resource_path(&path, base_dir) else {
+                continue;
+            };
+            results.push(ResourceInfo {
+                name: file_name,
+                path: relative.clone(),
+                description: String::new(),
+                enabled: is_resource_enabled(settings_list, &relative),
+                state: resource_override_state(settings_list, &relative),
+                resource_type: "themes".to_string(),
+                metadata: resource_metadata(scope, discovery, base_dir),
+            });
         }
-        let is_theme = (path.is_file() && file_name.ends_with(".json")) || path.is_dir();
-        if !is_theme {
-            continue;
-        }
-        let relative = format!("themes/{file_name}");
-        let enabled = is_resource_enabled(settings_list, &relative);
-        results.push(ResourceInfo { name: file_name, path: relative, description: String::new(), enabled, resource_type: "themes".to_string(), metadata: ResourceMetadata { source: "auto".to_string(), scope: scope.to_string(), origin: "top-level".to_string(), base_dir: None } });
     }
-    results.sort_by(|a, b| a.name.cmp(&b.name));
+    results.sort_by(|left, right| left.name.cmp(&right.name));
     results
+}
+
+fn resource_identity(item: &ResourceInfo) -> String {
+    let base = item.metadata.base_dir.as_deref().unwrap_or("");
+    let full = PathBuf::from(base).join(&item.path);
+    full.canonicalize().unwrap_or(full).to_string_lossy().to_string()
+}
+
+fn resource_precedence(item: &ResourceInfo) -> u8 {
+    match (item.metadata.origin.as_str(), item.metadata.scope.as_str(), item.metadata.discovery.as_str()) {
+        ("top-level", "project", "pi") => 0,
+        ("top-level", "project", "agents") => 1,
+        ("top-level", "user", "pi") => 2,
+        ("top-level", "user", "agents") => 3,
+        _ => 4,
+    }
+}
+
+fn dedupe_and_sort_resources(resources: Vec<ResourceInfo>) -> Vec<ResourceInfo> {
+    let mut seen = HashSet::new();
+    let mut deduped = Vec::new();
+    for resource in resources {
+        if seen.insert(resource_identity(&resource)) {
+            deduped.push(resource);
+        }
+    }
+    deduped.sort_by(|left, right| resource_precedence(left).cmp(&resource_precedence(right)).then_with(|| left.resource_type.cmp(&right.resource_type)).then_with(|| left.name.cmp(&right.name)));
+    deduped
 }
 
 pub async fn scan_all_resources_internal(cwd: Option<String>) -> Result<Vec<ResourceInfo>, String> {
-    let user_base = crate::paths::pi_agent_root_dir().map_err(|e| format!("Failed to get home directory: {e}"))?;
-    let user_settings_path = user_base.join("settings.json");
-    let user_settings = read_settings_value(&user_settings_path);
-
+    let user_base = crate::paths::pi_agent_root_dir().map_err(|error| format!("Failed to get Pi agent directory: {error}"))?;
+    let user_settings = read_settings_value(&user_base.join("settings.json"));
     let (user_skills_cfg, user_ext_cfg, user_prompts_cfg, user_themes_cfg) = settings_arrays_from_value(&user_settings);
+    let user_agents_base = crate::paths::home_dir().map_err(|error| format!("Failed to get home directory: {error}"))?.join(".agents");
+    let user_agents_skills = user_agents_base.join("skills");
+    let user_agents_canonical = user_agents_skills.canonicalize().unwrap_or_else(|_| user_agents_skills.clone());
 
-    let mut all: Vec<ResourceInfo> = Vec::new();
+    let mut all = Vec::new();
 
-    all.extend(scan_skills_dir(&user_base.join("skills"), "user", &user_skills_cfg));
-    all.extend(scan_extensions_dir(&user_base.join("extensions"), "user", &user_ext_cfg));
-    all.extend(scan_prompts_dir(&user_base.join("prompts"), "user", &user_prompts_cfg));
-    all.extend(scan_themes_dir(&user_base.join("themes"), "user", &user_themes_cfg));
-    all.extend(scan_packages_from_settings(&user_settings, "user", &user_base, None));
+    if let Some(cwd_str) = cwd.as_deref().filter(|value| !value.trim().is_empty()) {
+        let cwd_path = PathBuf::from(cwd_str);
+        let trust = super::resource_trust::get_project_resource_trust_internal(cwd_str.to_string()).await?;
+        if trust.trusted {
+            let project_base = crate::paths::project_pi_dir(&cwd_path);
+            let project_settings = read_settings_value(&project_base.join("settings.json"));
+            let (project_skills_cfg, project_ext_cfg, project_prompts_cfg, project_themes_cfg) = settings_arrays_from_value(&project_settings);
 
-    if let Some(cwd_str) = cwd {
-        let project_base = crate::paths::project_pi_dir(&PathBuf::from(&cwd_str));
-        if project_base.exists() {
-            let project_settings_path = project_base.join("settings.json");
-            let project_settings = read_settings_value(&project_settings_path);
-            let (proj_skills_cfg, proj_ext_cfg, proj_prompts_cfg, proj_themes_cfg) = settings_arrays_from_value(&project_settings);
+            all.extend(scan_skills_dir(&project_base.join("skills"), &project_base, "project", &project_skills_cfg, "pi", true));
+            all.extend(scan_extensions_dir(&project_base.join("extensions"), &project_base, "project", &project_ext_cfg, "pi"));
+            all.extend(scan_prompts_dir(&project_base.join("prompts"), &project_base, "project", &project_prompts_cfg, "pi"));
+            all.extend(scan_themes_dir(&project_base.join("themes"), &project_base, "project", &project_themes_cfg, "pi"));
 
-            all.extend(scan_skills_dir(&project_base.join("skills"), "project", &proj_skills_cfg));
-            all.extend(scan_extensions_dir(&project_base.join("extensions"), "project", &proj_ext_cfg));
-            all.extend(scan_prompts_dir(&project_base.join("prompts"), "project", &proj_prompts_cfg));
-            all.extend(scan_themes_dir(&project_base.join("themes"), "project", &proj_themes_cfg));
+            for skills_dir in super::resource_trust::ancestor_agents_skill_dirs(&cwd_path)? {
+                let canonical = skills_dir.canonicalize().unwrap_or_else(|_| skills_dir.clone());
+                if canonical == user_agents_canonical {
+                    continue;
+                }
+                let Some(agents_base) = skills_dir.parent() else {
+                    continue;
+                };
+                all.extend(scan_skills_dir(&skills_dir, agents_base, "project", &project_skills_cfg, "agents", false));
+            }
+
             all.extend(scan_packages_from_settings(&project_settings, "project", &user_base, Some(&project_base)));
         }
     }
 
-    Ok(all)
+    all.extend(scan_skills_dir(&user_base.join("skills"), &user_base, "user", &user_skills_cfg, "pi", true));
+    all.extend(scan_extensions_dir(&user_base.join("extensions"), &user_base, "user", &user_ext_cfg, "pi"));
+    all.extend(scan_prompts_dir(&user_base.join("prompts"), &user_base, "user", &user_prompts_cfg, "pi"));
+    all.extend(scan_themes_dir(&user_base.join("themes"), &user_base, "user", &user_themes_cfg, "pi"));
+    all.extend(scan_skills_dir(&user_agents_skills, &user_agents_base, "user", &user_skills_cfg, "agents", false));
+    all.extend(scan_packages_from_settings(&user_settings, "user", &user_base, None));
+
+    Ok(dedupe_and_sort_resources(all))
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -438,6 +554,19 @@ fn parse_git_host_path(source: &str) -> Option<(String, String, String)> {
 
 fn to_posix_rel(path: &str) -> String {
     path.replace('\\', "/")
+}
+
+fn package_resource_override_state(patterns: Option<&[String]>, relative_path: &str) -> String {
+    let Some(patterns) = patterns else {
+        return "inherit".to_string();
+    };
+    if patterns.iter().filter_map(|pattern| pattern.strip_prefix('-')).any(|pattern| exact_pattern_matches(pattern, relative_path)) {
+        return "disabled".to_string();
+    }
+    if patterns.iter().filter_map(|pattern| pattern.strip_prefix('+')).any(|pattern| exact_pattern_matches(pattern, relative_path)) {
+        return "enabled".to_string();
+    }
+    "inherit".to_string()
 }
 
 fn package_resource_enabled(patterns: Option<&[String]>, relative_path: &str) -> bool {
@@ -591,10 +720,15 @@ fn collect_package_files(package_root: &Path, resource_type: &str, manifest: Opt
                         continue;
                     }
                     let is_ext_file = path.is_file() && (file_name.ends_with(".ts") || file_name.ends_with(".js"));
-                    let is_ext_dir = path.is_dir() && (path.join("index.ts").exists() || path.join("index.js").exists());
-                    if is_ext_file || is_ext_dir {
+                    if is_ext_file {
                         let rel = format!("extensions/{file_name}");
                         files.push((rel, path));
+                    } else if path.is_dir() {
+                        for resolved in resolve_extension_entries(&path) {
+                            if let Some(relative) = relative_resource_path(&resolved, package_root) {
+                                files.push((relative, resolved));
+                            }
+                        }
                     }
                 }
             }
@@ -623,8 +757,7 @@ fn collect_package_files(package_root: &Path, resource_type: &str, manifest: Opt
                     if file_name.starts_with('.') {
                         continue;
                     }
-                    let is_theme = (path.is_file() && file_name.ends_with(".json")) || path.is_dir();
-                    if is_theme {
+                    if path.is_file() && file_name.ends_with(".json") {
                         let rel = format!("themes/{file_name}");
                         files.push((rel, path));
                     }
@@ -684,7 +817,15 @@ fn scan_package_resources(package_root: &Path, source: &str, scope: &str, filter
                 String::new()
             };
 
-            results.push(ResourceInfo { name, path: rel, description, enabled, resource_type: resource_type.to_string(), metadata: ResourceMetadata { source: source.to_string(), scope: scope.to_string(), origin: "package".to_string(), base_dir: Some(base_dir.clone()) } });
+            results.push(ResourceInfo {
+                name,
+                path: rel.clone(),
+                description,
+                enabled,
+                state: package_resource_override_state(patterns_ref, &rel),
+                resource_type: resource_type.to_string(),
+                metadata: ResourceMetadata { source: source.to_string(), scope: scope.to_string(), origin: "package".to_string(), discovery: "package".to_string(), base_dir: Some(base_dir.clone()) },
+            });
         }
     }
 
@@ -697,7 +838,11 @@ fn display_name_for_resource(resource_type: &str, relative_path: &str) -> String
         let parent = rel.trim_end_matches("/SKILL.md");
         return parent.rsplit('/').next().unwrap_or(parent).to_string();
     }
-    Path::new(&rel).file_name().and_then(|n| n.to_str()).unwrap_or(&rel).to_string()
+    if resource_type == "extensions" && (rel.ends_with("/index.ts") || rel.ends_with("/index.js")) {
+        let parent = Path::new(&rel).parent().unwrap_or_else(|| Path::new(&rel));
+        return parent.file_name().and_then(|name| name.to_str()).unwrap_or(&rel).to_string();
+    }
+    Path::new(&rel).file_name().and_then(|name| name.to_str()).unwrap_or(&rel).to_string()
 }
 
 fn scan_packages_from_settings(settings: &serde_json::Value, scope: &str, agent_dir: &Path, project_base: Option<&Path>) -> Vec<ResourceInfo> {
@@ -834,6 +979,39 @@ mod package_resource_tests {
         assert!(package_resource_enabled(Some(&patterns), "extensions/c.ts"));
         assert!(!package_resource_enabled(Some(&[]), "extensions/a.ts"));
         assert!(package_resource_enabled(None, "extensions/a.ts"));
+    }
+
+    #[test]
+    fn recursive_skill_discovery_tracks_inherited_effectiveness() {
+        let root = tempdir().unwrap();
+        let base = root.path().join(".agents");
+        let skills = base.join("skills").join("nested").join("demo");
+        fs::create_dir_all(&skills).unwrap();
+        fs::write(skills.join("SKILL.md"), "---\ndescription: Nested skill\n---\n").unwrap();
+        let settings = vec!["!skills/**".to_string()];
+
+        let items = scan_skills_dir(&base.join("skills"), &base, "user", &settings, "agents", false);
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].path, "skills/nested/demo/SKILL.md");
+        assert_eq!(items[0].description, "Nested skill");
+        assert!(!items[0].enabled);
+        assert_eq!(items[0].state, "inherit");
+        assert_eq!(items[0].metadata.discovery, "agents");
+    }
+
+    #[test]
+    fn top_level_themes_ignore_directories() {
+        let root = tempdir().unwrap();
+        let base = root.path().join("agent");
+        let themes = base.join("themes");
+        fs::create_dir_all(themes.join("not-a-theme")).unwrap();
+        fs::write(themes.join("valid.json"), "{}").unwrap();
+
+        let items = scan_themes_dir(&themes, &base, "user", &[], "pi");
+
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].path, "themes/valid.json");
     }
 
     #[test]
