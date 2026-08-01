@@ -90,6 +90,16 @@ export function normalizeDashboardTimeSelection(
 ): DashboardTimeSelection {
   if (selection.granularity === 'all' || selection.granularity === 'recent') return selection
 
+  // Week navigation deliberately permits weeks without session data, including
+  // weeks in an adjacent year. Clamping the year to available data would make
+  // the "next week" action appear to do nothing at a year boundary.
+  if (selection.granularity === 'week') {
+    const month = Math.min(12, Math.max(1, selection.month))
+    const daysInMonth = new Date(selection.year, month, 0).getDate()
+    const day = Math.min(daysInMonth, Math.max(1, selection.day))
+    return { ...selection, month, day }
+  }
+
   let next = selection
   let options = getDashboardTimeOptions(sessions, next)
   const year = options.years.includes(next.year) ? next.year : options.years[0]
@@ -104,6 +114,20 @@ export function normalizeDashboardTimeSelection(
   if (day !== next.day) next = { ...next, day }
 
   return next
+}
+
+export function shiftDashboardWeekSelection(
+  selection: DashboardTimeSelection,
+  offsetWeeks: number,
+): DashboardTimeSelection {
+  const anchor = new Date(selection.year, selection.month - 1, selection.day)
+  anchor.setDate(anchor.getDate() + offsetWeeks * 7)
+  return {
+    ...selection,
+    year: anchor.getFullYear(),
+    month: anchor.getMonth() + 1,
+    day: anchor.getDate(),
+  }
 }
 
 export function getDashboardDateBounds(selection: DashboardTimeSelection): DashboardDateBounds {

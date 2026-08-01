@@ -1,6 +1,11 @@
-import { CalendarDays, Check, RotateCcw } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { DashboardTimeOptions, DashboardTimeSelection, DashboardTimeGranularity } from './dashboardTimeRange'
+import {
+  shiftDashboardWeekSelection,
+  type DashboardTimeOptions,
+  type DashboardTimeSelection,
+  type DashboardTimeGranularity,
+} from './dashboardTimeRange'
 
 interface DashboardTimeFilterProps {
   selection: DashboardTimeSelection
@@ -16,9 +21,11 @@ const GRANULARITIES: DashboardTimeGranularity[] = ['recent', 'week', 'month', 'y
 export default function DashboardTimeFilter({ selection, options, rangeLabel, resultCount, totalCount, onChange }: DashboardTimeFilterProps) {
   const { t } = useTranslation()
   const updateGranularity = (granularity: DashboardTimeGranularity) => onChange({ ...selection, granularity })
-  const needsYear = !['recent', 'all'].includes(selection.granularity)
-  const needsMonth = ['month', 'week', 'day'].includes(selection.granularity)
-  const needsDay = ['week', 'day'].includes(selection.granularity)
+  const isWeek = selection.granularity === 'week'
+  const needsYear = ['year', 'month', 'day'].includes(selection.granularity)
+  const needsMonth = ['month', 'day'].includes(selection.granularity)
+  const needsDay = selection.granularity === 'day'
+  const moveWeek = (offsetWeeks: number) => onChange(shiftDashboardWeekSelection(selection, offsetWeeks))
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded border border-border/70 bg-card/35 px-2.5 py-2">
@@ -44,21 +51,36 @@ export default function DashboardTimeFilter({ selection, options, rangeLabel, re
         })}
       </div>
 
-      {needsYear ? (
-        <select value={selection.year} onChange={(event) => onChange({ ...selection, year: Number(event.target.value) })} aria-label={t('dashboard.timeFilter.year', 'Year')} className="focus-ring h-7 rounded border border-border bg-background px-2 text-[10px] text-foreground">
-          {options.years.map((year) => <option key={year} value={year}>{year}</option>)}
-        </select>
-      ) : null}
-      {needsMonth ? (
-        <select value={selection.month} onChange={(event) => onChange({ ...selection, month: Number(event.target.value) })} aria-label={t('dashboard.timeFilter.month', 'Month')} className="focus-ring h-7 rounded border border-border bg-background px-2 text-[10px] text-foreground">
-          {options.months.map((month) => <option key={month} value={month}>{t('dashboard.timeFilter.monthValue', 'Month {{month}}', { month })}</option>)}
-        </select>
-      ) : null}
-      {needsDay ? (
-        <select value={selection.day} onChange={(event) => onChange({ ...selection, day: Number(event.target.value) })} aria-label={selection.granularity === 'week' ? t('dashboard.timeFilter.weekAnchor', 'A day inside the week') : t('dashboard.timeFilter.day', 'Day')} className="focus-ring h-7 rounded border border-border bg-background px-2 text-[10px] text-foreground">
-          {options.days.map((day) => <option key={day} value={day}>{t('dashboard.timeFilter.dayValue', 'Day {{day}}', { day })}</option>)}
-        </select>
-      ) : null}
+      {isWeek ? (
+        <div className="flex overflow-hidden rounded border border-border" role="group" aria-label={t('dashboard.timeFilter.weekNavigation', 'Week navigation')}>
+          <button type="button" onClick={() => moveWeek(-1)} className="focus-ring flex h-7 items-center gap-1 border-r border-border bg-background/20 px-2 text-[10px] font-medium text-foreground/80 hover:bg-muted/40 hover:text-foreground">
+            <ChevronLeft className="h-3 w-3" aria-hidden="true" />
+            {t('dashboard.timeFilter.previousWeek', 'Previous week')}
+          </button>
+          <button type="button" onClick={() => moveWeek(1)} className="focus-ring flex h-7 items-center gap-1 bg-background/20 px-2 text-[10px] font-medium text-foreground/80 hover:bg-muted/40 hover:text-foreground">
+            {t('dashboard.timeFilter.nextWeek', 'Next week')}
+            <ChevronRight className="h-3 w-3" aria-hidden="true" />
+          </button>
+        </div>
+      ) : (
+        <>
+          {needsYear ? (
+            <select value={selection.year} onChange={(event) => onChange({ ...selection, year: Number(event.target.value) })} aria-label={t('dashboard.timeFilter.year', 'Year')} className="focus-ring h-7 rounded border border-border bg-background px-2 text-[10px] text-foreground">
+              {options.years.map((year) => <option key={year} value={year}>{year}</option>)}
+            </select>
+          ) : null}
+          {needsMonth ? (
+            <select value={selection.month} onChange={(event) => onChange({ ...selection, month: Number(event.target.value) })} aria-label={t('dashboard.timeFilter.month', 'Month')} className="focus-ring h-7 rounded border border-border bg-background px-2 text-[10px] text-foreground">
+              {options.months.map((month) => <option key={month} value={month}>{t('dashboard.timeFilter.monthValue', 'Month {{month}}', { month })}</option>)}
+            </select>
+          ) : null}
+          {needsDay ? (
+            <select value={selection.day} onChange={(event) => onChange({ ...selection, day: Number(event.target.value) })} aria-label={t('dashboard.timeFilter.day', 'Day')} className="focus-ring h-7 rounded border border-border bg-background px-2 text-[10px] text-foreground">
+              {options.days.map((day) => <option key={day} value={day}>{t('dashboard.timeFilter.dayValue', 'Day {{day}}', { day })}</option>)}
+            </select>
+          ) : null}
+        </>
+      )}
 
       <div className="min-w-0 flex-1 text-right text-[10px] text-muted-foreground">
         {rangeLabel ? <span className="mr-2 text-foreground">{rangeLabel}</span> : null}

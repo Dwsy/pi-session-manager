@@ -380,11 +380,12 @@ export default function Dashboard({
     setPreviewSession(session);
   };
 
-  const isInitialStatsLoading =
+  const isInitialDashboardLoading =
     stats === null &&
-    visibleSessions.length > 0 &&
-    (parentLoading || isStatsLoading);
-  const showDelayedDashboardSkeleton = useDelayedLoading(isInitialStatsLoading);
+    !statsError &&
+    (parentLoading ||
+      (visibleSessions.length > 0 &&
+        (isStatsLoading || loadedScopeKeyRef.current !== statsKey)));
   const isScopeTransition =
     stats !== null &&
     loadedScopeKeyRef.current !== statsKey &&
@@ -394,12 +395,17 @@ export default function Dashboard({
     statsError && loadedScopeKeyRef.current !== statsKey,
   );
 
-  if (showDelayedDashboardSkeleton) {
-    return <DashboardSkeleton />;
-  }
-
-  if (isInitialStatsLoading) {
-    return <div className="flex-1 min-h-0" aria-hidden="true" />;
+  if (isInitialDashboardLoading) {
+    return (
+      <div
+        className="h-full"
+        role="status"
+        aria-live="polite"
+        aria-label={t("dashboard.loading", "Loading dashboard...")}
+      >
+        <DashboardSkeleton />
+      </div>
+    );
   }
 
   const displayStats: SessionStats = stats || emptyDashboardStats();
@@ -651,7 +657,7 @@ export default function Dashboard({
       {/* Main Grid - Dense Layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
         {/* Left Column - 8 cols */}
-        <div className="md:col-span-8 space-y-3">
+        <div className="min-w-0 space-y-3 md:col-span-8">
           {/* Token Trend Chart - Full Width */}
           <TokenTrendChart
             stats={displayStats}
@@ -663,7 +669,7 @@ export default function Dashboard({
           />
 
           {/* Message Distribution + Heatmap */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2">
             <MessageDistribution
               stats={displayStats}
               onClick={openMessageMixInsight}
@@ -692,7 +698,7 @@ export default function Dashboard({
         </div>
 
         {/* Right Column - 4 cols */}
-        <div className="md:col-span-4 space-y-3">
+        <div className="min-w-0 space-y-3 md:col-span-4">
           {/* Top Models */}
           <TopModelsChart
             stats={displayStats}

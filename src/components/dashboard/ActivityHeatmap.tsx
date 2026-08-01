@@ -24,8 +24,11 @@ const HEATMAP_COLORS = [
   'rgb(var(--color-success) / 0.42)',
   'rgb(var(--color-success) / 0.62)',
   'rgb(var(--color-success) / 0.82)',
-  'rgb(var(--color-success))',
+  'rgb(var(--heatmap-active-background))',
 ]
+
+const STRONG_ACTIVITY_LEVEL = 5
+const STRONG_HEATMAP_FOREGROUND = 'rgb(var(--heatmap-active-foreground))'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -124,18 +127,25 @@ export default function ActivityHeatmap({
         {days.map((date) => {
           const key = dateKey(date)
           const point = dataMap.get(key)
+          const level = point?.level || 0
+          const usesStrongForeground = level >= STRONG_ACTIVITY_LEVEL
           const cell = (
             <button
               type="button"
               onClick={() => point && onDayClick?.(point)}
               disabled={!point}
               className="focus-ring flex min-h-14 w-full flex-col items-center justify-center rounded border border-border/55 px-1.5 py-2 text-center disabled:cursor-default"
-              style={{ backgroundColor: HEATMAP_COLORS[point?.level || 0] }}
+              style={{
+                backgroundColor: HEATMAP_COLORS[level],
+                color: usesStrongForeground
+                  ? STRONG_HEATMAP_FOREGROUND
+                  : undefined,
+              }}
               aria-label={`${monthDayFormatter.format(date)}: ${point?.total_messages || 0} messages`}
             >
-              <span className="text-[9px] text-muted-foreground">{dayFormatter.format(date)}</span>
-              <strong className="mt-0.5 text-xs tabular-nums text-foreground">{date.getDate()}</strong>
-              <span className="mt-1 text-[9px] tabular-nums text-muted-foreground">{point?.total_messages || 0}</span>
+              <span className={`text-[9px] ${usesStrongForeground ? '' : 'text-muted-foreground'}`}>{dayFormatter.format(date)}</span>
+              <strong className={`mt-0.5 text-xs tabular-nums ${usesStrongForeground ? '' : 'text-foreground'}`}>{date.getDate()}</strong>
+              <span className={`mt-1 text-[9px] tabular-nums ${usesStrongForeground ? '' : 'text-muted-foreground'}`}>{point?.total_messages || 0}</span>
             </button>
           )
           return wrapPoint(point, cell, key)
@@ -162,17 +172,24 @@ export default function ActivityHeatmap({
           {days.map((date) => {
             const key = dateKey(date)
             const point = dataMap.get(key)
+            const level = point?.level || 0
+            const usesStrongForeground = level >= STRONG_ACTIVITY_LEVEL
             const cell = (
               <button
                 type="button"
                 onClick={() => point && onDayClick?.(point)}
                 disabled={!point}
                 className="focus-ring flex min-h-11 w-full flex-col items-start justify-between rounded border border-border/45 p-1.5 text-left disabled:cursor-default"
-                style={{ backgroundColor: HEATMAP_COLORS[point?.level || 0] }}
+                style={{
+                  backgroundColor: HEATMAP_COLORS[level],
+                  color: usesStrongForeground
+                    ? STRONG_HEATMAP_FOREGROUND
+                    : undefined,
+                }}
                 aria-label={`${monthDayFormatter.format(date)}: ${point?.total_messages || 0} messages`}
               >
-                <span className="text-[9px] font-medium tabular-nums text-foreground">{date.getDate()}</span>
-                <span className="self-end text-[8px] tabular-nums text-muted-foreground">{point?.total_messages || 0}</span>
+                <span className={`text-[9px] font-medium tabular-nums ${usesStrongForeground ? '' : 'text-foreground'}`}>{date.getDate()}</span>
+                <span className={`self-end text-[8px] tabular-nums ${usesStrongForeground ? '' : 'text-muted-foreground'}`}>{point?.total_messages || 0}</span>
               </button>
             )
             return wrapPoint(point, cell, key)
@@ -191,7 +208,7 @@ export default function ActivityHeatmap({
     start.setDate(start.getDate() - mondayIndex(start))
     const end = new Date(rawEnd.getFullYear(), rawEnd.getMonth(), rawEnd.getDate())
     end.setDate(end.getDate() + (6 - mondayIndex(end)))
-    const weeks = Math.max(1, Math.round((end.getTime() - start.getTime()) / (7 * DAY_MS)) + 1)
+    const weeks = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (7 * DAY_MS)))
     const rows = Array.from({ length: 7 }, (_, dayIndex) =>
       Array.from({ length: weeks }, (_, weekIndex) => {
         const date = new Date(start)
@@ -200,33 +217,35 @@ export default function ActivityHeatmap({
       }),
     )
     return (
-      <div className="overflow-x-auto pb-1">
-        <div className="w-max space-y-0.5">
-          {rows.map((row, dayIndex) => (
-            <div key={dayIndex} className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${weeks}, 12px)` }}>
-              {row.map(({ date, point }) => {
-                const key = dateKey(date)
-                const cell = (
-                  <button
-                    type="button"
-                    onClick={() => point && onDayClick?.(point)}
-                    disabled={!point}
-                    className="focus-ring h-3 w-3 rounded-[2px] disabled:cursor-default"
-                    style={{ backgroundColor: HEATMAP_COLORS[point?.level || 0] }}
-                    aria-label={`${monthDayFormatter.format(date)}: ${point?.total_messages || 0} messages`}
-                  />
-                )
-                return wrapPoint(point, cell, key)
-              })}
-            </div>
-          ))}
-        </div>
+      <div className="space-y-px">
+        {rows.map((row, dayIndex) => (
+          <div
+            key={dayIndex}
+            className="activity-heatmap__history-row grid w-full min-w-0 gap-px"
+            style={{ gridTemplateColumns: `repeat(${weeks}, minmax(0, 1fr))` }}
+          >
+            {row.map(({ date, point }) => {
+              const key = dateKey(date)
+              const cell = (
+                <button
+                  type="button"
+                  onClick={() => point && onDayClick?.(point)}
+                  disabled={!point}
+                  className="activity-heatmap__history-cell focus-ring aspect-square w-full min-w-0 rounded-[2px] disabled:cursor-default"
+                  style={{ backgroundColor: HEATMAP_COLORS[point?.level || 0] }}
+                  aria-label={`${monthDayFormatter.format(date)}: ${point?.total_messages || 0} messages`}
+                />
+              )
+              return wrapPoint(point, cell, key)
+            })}
+          </div>
+        ))}
       </div>
     )
   }
 
   return (
-    <DashboardCardShell className="rounded-xl p-3">
+    <DashboardCardShell className="min-w-0 rounded-xl p-3">
       {displayTitle ? (
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
