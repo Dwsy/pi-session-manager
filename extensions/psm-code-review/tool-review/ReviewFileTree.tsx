@@ -10,7 +10,8 @@ import {
 import { createPortal } from "react-dom";
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import type { FileTreeIconConfig } from "@pierre/trees";
-import { Copy, ExternalLink, FileText, FolderOpen } from "lucide-react";
+import { Copy, ExternalLink, FileText, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import type { ReviewFileNode, ReviewTreeModel } from "./viewModel";
 
@@ -55,8 +56,8 @@ const REVIEW_TREE_UNSAFE_CSS = `
   }
 
   [data-type='item'] {
-    border-radius: 5px;
-    box-shadow: inset 0 0 0 1px transparent, inset 2px 0 0 transparent;
+    border-radius: 4px;
+    box-shadow: inset 2px 0 0 transparent;
     transition:
       background-color 140ms ease,
       box-shadow 140ms ease,
@@ -64,17 +65,18 @@ const REVIEW_TREE_UNSAFE_CSS = `
   }
 
   [data-type='item']:hover {
-    background: rgb(var(--color-background) / 0.52);
-    box-shadow: inset 0 0 0 1px rgb(var(--color-border) / 0.28), inset 2px 0 0 transparent;
+    background: rgb(var(--color-surface) / 0.48);
+    box-shadow: inset 2px 0 0 transparent;
   }
 
   [data-type='item'][data-item-selected] {
-    background: rgb(var(--color-background) / 0.88);
-    box-shadow: inset 0 0 0 1px rgb(var(--color-border) / 0.62), inset 2px 0 0 var(--trees-accent), inset 0 1px 2px rgb(0 0 0 / 0.14);
+    background: color-mix(in srgb, var(--trees-accent) 12%, transparent);
+    box-shadow: inset 2px 0 0 var(--trees-accent);
   }
 
   [data-type='item'][data-item-selected] [data-item-section='label'] {
-    font-weight: 600;
+    color: var(--trees-accent);
+    font-weight: 500;
   }
 
   [data-item-section='icon'] {
@@ -110,7 +112,7 @@ const reviewTreeStyle = {
   "--trees-fg-muted-override": "rgb(var(--color-muted-foreground))",
   "--trees-accent-override": "var(--accent)",
   "--trees-border-color-override": "rgb(var(--color-border) / 0.25)",
-  "--trees-selected-bg-override": "rgb(var(--color-background) / 0.88)",
+  "--trees-selected-bg-override": "color-mix(in srgb, var(--accent) 12%, transparent)",
   "--trees-selected-fg-override": "rgb(var(--color-foreground))",
   "--trees-focus-ring-color-override": "rgb(var(--color-ring) / 0.62)",
   "--trees-scrollbar-thumb-override": "rgb(var(--color-muted-foreground) / 0.34)",
@@ -120,10 +122,10 @@ const reviewTreeStyle = {
   "--trees-font-family-override": "var(--font-family)",
   "--trees-font-size-override": "12px",
   "--trees-item-margin-x-override": "0px",
-  "--trees-item-padding-x-override": "7px",
-  "--trees-padding-inline-override": "4px",
+  "--trees-item-padding-x-override": "6px",
+  "--trees-padding-inline-override": "3px",
   "--trees-scrollbar-gutter-override": "6px",
-  "--trees-border-radius-override": "5px",
+  "--trees-border-radius-override": "4px",
   "--trees-git-lane-width-override": "16px",
 } as CSSProperties;
 
@@ -143,7 +145,7 @@ function getDeltaText(node: ReviewFileNode) {
 }
 
 const REVIEW_TREE_MENU_WIDTH = 192;
-const REVIEW_TREE_MENU_ROW_HEIGHT = 36;
+const REVIEW_TREE_MENU_ROW_HEIGHT = 32;
 const REVIEW_TREE_MENU_VIEWPORT_PADDING = 10;
 
 function clampReviewTreeMenuPosition(
@@ -186,6 +188,7 @@ export default function ReviewFileTree({
   onSelectPath,
   ariaLabel,
 }: ReviewFileTreeProps) {
+  const { t } = useTranslation();
   const nodeByDisplayPath = useMemo(() => {
     return new Map(
       tree.nodes.map((node) => [
@@ -215,7 +218,7 @@ export default function ReviewFileTree({
           tree.displayPathByCanonical.get(selectedPath) ?? selectedPath,
         ]
       : [],
-    itemHeight: 26,
+    itemHeight: 24,
     onSelectionChange: (paths) => {
       const path = paths[paths.length - 1];
       if (!path) return;
@@ -356,7 +359,7 @@ export default function ReviewFileTree({
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col bg-transparent py-1.5"
+      className="flex h-full min-h-0 flex-col bg-transparent py-1"
       onContextMenu={(e) => {
         const path = hoveredPathRef.current;
         if (path) {
@@ -376,43 +379,49 @@ export default function ReviewFileTree({
         createPortal(
           <div
             id="review-file-tree-context-menu"
-            className="fixed z-[10050] w-48 rounded-lg border border-border bg-card shadow-xl overflow-hidden py-1"
+            className="fixed z-[10050] w-48 overflow-hidden rounded-md border border-border/70 bg-popover py-1 shadow-[0_12px_30px_-14px_rgba(var(--shadow-rgb),0.45)]"
             style={{ left: menuPosition.x, top: menuPosition.y }}
             onContextMenu={(e) => e.preventDefault()}
+            role="menu"
+            aria-label={t("components.toolCallReview.contextMenu.title", "File actions")}
           >
             <button
               type="button"
               onClick={() => handleCopyPath(contextMenu.path)}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-secondary"
+              className="focus-ring flex h-8 w-full items-center gap-2 px-2.5 text-left text-xs text-foreground hover:bg-secondary"
+              role="menuitem"
             >
-              <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>复制路径</span>
+              <Copy className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              <span>{t("components.toolCallReview.contextMenu.copyPath", "Copy path")}</span>
             </button>
             <button
               type="button"
               onClick={() => handleCopyRelativePath(contextMenu.path)}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-secondary"
+              className="focus-ring flex h-8 w-full items-center gap-2 px-2.5 text-left text-xs text-foreground hover:bg-secondary"
+              role="menuitem"
             >
-              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>复制相对路径</span>
+              <FileText className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              <span>{t("components.toolCallReview.contextMenu.copyRelativePath", "Copy relative path")}</span>
             </button>
             {!contextMenu.isDir && (
               <button
                 type="button"
                 onClick={() => handleOpenDefault(contextMenu.path)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-secondary"
+                className="focus-ring flex h-8 w-full items-center gap-2 px-2.5 text-left text-xs text-foreground hover:bg-secondary"
+                role="menuitem"
               >
-                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>打开 (默认程序)</span>
+                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                <span>{t("components.toolCallReview.contextMenu.openDefault", "Open with default app")}</span>
               </button>
             )}
             <button
               type="button"
               onClick={handleCloseContextMenu}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground hover:bg-secondary border-t border-border/50 mt-1"
+              className="focus-ring mt-1 flex h-8 w-full items-center gap-2 border-t border-border/50 px-2.5 text-left text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
+              role="menuitem"
             >
-              <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>取消</span>
+              <X className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              <span>{t("common.cancel", "Cancel")}</span>
             </button>
           </div>,
           document.body,

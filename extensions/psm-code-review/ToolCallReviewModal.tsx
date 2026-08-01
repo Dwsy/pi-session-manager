@@ -155,9 +155,9 @@ const FILTER_OPTIONS: Array<{
 }> = [
   {
     id: "all",
-    icon: Wrench,
+    icon: FileText,
     labelKey: "components.toolCallReview.filters.all",
-    fallbackLabel: "All",
+    fallbackLabel: "Files",
     predicate: () => true,
   },
   {
@@ -193,13 +193,6 @@ const FILTER_OPTIONS: Array<{
     iconClass: "text-destructive",
   },
 ];
-
-const FILTER_ACTIVE_ICON_COLOR: Partial<Record<ReviewFilter, string>> = {
-  shell: "var(--tool-color-bash)",
-  changes: "var(--tool-color-edit)",
-  reads: "var(--tool-color-read)",
-  errors: "rgb(var(--color-destructive))",
-};
 
 const REVIEW_CODE_VIEW_STYLE = {
   "--diffs-light-bg": "rgb(var(--color-background))",
@@ -361,12 +354,12 @@ function SummaryItem({
           : "text-foreground";
 
   return (
-    <div className="min-w-0 px-3 py-2.5">
-      <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="min-w-0 px-2.5 py-2">
+      <div className="truncate text-[9px] font-medium text-muted-foreground">
         {t(label, fallbackLabel)}
       </div>
       <div
-        className={`mt-1 font-mono text-[14px] font-semibold leading-none tabular-nums ${valueClass}`}
+        className={`mt-0.5 font-mono text-[13px] font-semibold leading-none tabular-nums ${valueClass}`}
       >
         {value}
       </div>
@@ -387,19 +380,17 @@ function FilterBar({
 
   return (
     <div
-      className="flex min-w-0 flex-wrap items-center gap-1 rounded-lg border border-border/40 bg-background/50 p-1"
+      className="custom-scrollbar flex min-w-0 flex-nowrap items-center gap-0.5 overflow-x-auto rounded-md border border-border/45 bg-background/55 p-0.5"
       role="radiogroup"
       aria-label={t("components.toolCallReview.filterLabel", "Review filter")}
     >
       {FILTER_OPTIONS.map((option) => {
         const active = activeFilter === option.id;
-        const disabled = counts[option.id] === 0 && option.id !== "all";
+        const disabled = counts[option.id] === 0;
         const Icon = option.icon;
         const label = t(option.labelKey, option.fallbackLabel);
-        const activeIconColor = active ? FILTER_ACTIVE_ICON_COLOR[option.id] : undefined;
-        const inactiveIconClass =
+        const inactiveIconClass = option.iconClass ??
           "text-muted-foreground group-hover:text-foreground group-disabled:text-muted-foreground";
-        const activeLabelStyle = activeIconColor ? { color: activeIconColor } : undefined;
         return (
           <button
             key={option.id}
@@ -409,44 +400,25 @@ function FilterBar({
             aria-checked={active}
             disabled={disabled}
             title={`${label} (${counts[option.id]})`}
-            className={`group flex h-7 max-w-full items-center gap-1 rounded-md px-2 text-[11px] font-medium transition-all ${
+            className={`group flex h-7 max-w-full flex-none items-center gap-1 rounded px-2 text-[11px] font-medium motion-surface focus-ring ${
               active
-                ? "bg-surface shadow-sm ring-1 ring-border/50"
+                ? "theme-accent-bg-soft theme-accent-ring theme-accent-fg font-semibold"
                 : disabled
-                  ? "opacity-40 cursor-not-allowed text-muted-foreground"
+                  ? "cursor-not-allowed text-muted-foreground opacity-40"
                   : "text-muted-foreground hover:bg-surface/50 hover:text-foreground"
             }`}
           >
             <Icon
-              className={`h-3.5 w-3.5 flex-shrink-0 transition-colors ${
-                active
-                  ? activeIconColor
-                    ? ""
-                    : "text-accent"
-                  : inactiveIconClass
-              }`}
-              style={activeIconColor ? { color: activeIconColor } : undefined}
+              className={`h-3.5 w-3.5 flex-shrink-0 ${active ? "theme-accent-fg" : inactiveIconClass}`}
               aria-hidden="true"
             />
-            <span
-              className={`truncate ${active && !activeIconColor ? "text-foreground" : ""}`}
-              style={activeLabelStyle}
-            >
-              {label}
-            </span>
+            <span className="truncate">{label}</span>
             <span
               className={`inline-flex h-4 min-w-[1.125rem] flex-shrink-0 items-center justify-center rounded-full px-1 font-mono text-[10px] tabular-nums ${
                 active
-                  ? "bg-background/70 font-semibold"
+                  ? "bg-background/70 font-semibold theme-accent-fg"
                   : "bg-background/60 text-muted-foreground"
               }`}
-              style={
-                active && activeIconColor
-                  ? { color: activeIconColor }
-                  : active
-                    ? { color: "rgb(var(--color-foreground))" }
-                    : undefined
-              }
             >
               {counts[option.id]}
             </span>
@@ -713,7 +685,7 @@ function ViewControlsToolbar({ controls }: { controls: CodeViewControls }) {
             aria-label={label}
             className={`inline-flex h-7 w-7 items-center justify-center rounded-[4px] motion-surface focus-ring ${
               button.active
-                ? "bg-surface text-foreground shadow-[0_1px_2px_rgba(var(--shadow-rgb),0.14)]"
+                ? "theme-accent-bg-soft theme-accent-ring theme-accent-fg"
                 : "text-muted-foreground hover:bg-surface/55 hover:text-foreground"
             }`}
           >
@@ -742,9 +714,9 @@ function ShellSplitPanel({
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-3 p-3">
-      <section className="flex min-h-0 max-h-[min(300px,44dvh)] flex-shrink-0 flex-col overflow-hidden rounded-[8px] border border-border/45 bg-background">
-        <header className="flex flex-shrink-0 items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.52)] px-3 py-2.5">
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-background">
+      <section className="flex min-h-[96px] max-h-[min(220px,34dvh)] flex-shrink-0 flex-col overflow-hidden border-b border-border/55 bg-background">
+        <header className="flex h-8 flex-shrink-0 items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.38)] px-3">
           <Terminal
             className="h-3.5 w-3.5 text-[var(--tool-color-bash)]"
             aria-hidden="true"
@@ -753,7 +725,7 @@ function ShellSplitPanel({
             {t("components.bashExecution.command", "Command")}
           </span>
         </header>
-        <div className="min-h-0 flex-1 overflow-auto bg-[rgb(var(--color-surface-dark)/0.18)]">
+        <div className="min-h-0 flex-1 overflow-auto bg-[rgb(var(--color-surface-dark)/0.12)]">
           <ShellCodeSnippet
             code={commandText.trim() || emptyLabel}
             language="bash"
@@ -763,8 +735,8 @@ function ShellSplitPanel({
           />
         </div>
       </section>
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[8px] border border-border/45 bg-background">
-        <header className="flex flex-shrink-0 items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.52)] px-3 py-2.5">
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+        <header className="flex h-8 flex-shrink-0 items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.38)] px-3">
           <Code2 className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
           <span className="text-[11px] font-semibold text-foreground">
             {isError
@@ -772,7 +744,7 @@ function ShellSplitPanel({
               : t("components.bashExecution.output", "Output")}
           </span>
         </header>
-        <div className="min-h-0 flex-1 overflow-auto bg-[rgb(var(--color-surface-dark)/0.18)]">
+        <div className="min-h-0 flex-1 overflow-auto bg-[rgb(var(--color-surface-dark)/0.12)]">
           {hasOutput ? (
             <ShellCodeSnippet
               code={output!}
@@ -901,7 +873,7 @@ function DetailPanel({
       className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-background"
       style={getReviewAccentStyle(operation.toolName)}
     >
-      <div className="relative flex min-h-[50px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.58)] px-3 py-1.5">
+      <div className="relative flex min-h-[46px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.48)] px-3 py-1.5">
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-px opacity-80"
           style={{
@@ -925,8 +897,9 @@ function DetailPanel({
             <button
               type="button"
               onClick={() => onNavigateToPath?.(displayPath)}
-              title="点击自动在左侧树结构中定位导航"
-              className="group flex min-w-0 items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-xs font-medium text-foreground hover:bg-surface/60 transition-colors"
+              title={t("components.toolCallReview.locateInTree", "Reveal in file tree")}
+              aria-label={t("components.toolCallReview.locateInTree", "Reveal in file tree")}
+              className="group flex min-w-0 items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-xs font-medium text-foreground motion-surface focus-ring hover:bg-surface/60"
             >
               <span className="truncate group-hover:text-accent group-hover:underline">
                 {displayPath}
@@ -949,7 +922,7 @@ function DetailPanel({
               onClick={() => setMarkdownPreview((v) => !v)}
               className={`inline-flex h-8 items-center gap-1 rounded-[5px] border px-2.5 py-1.5 text-xs motion-surface focus-ring ${
                 markdownPreview
-                  ? "border-border-hover bg-surface text-foreground"
+                  ? "theme-accent-bg-soft theme-accent-ring theme-accent-fg border-transparent"
                   : "border-border/45 bg-background/60 text-muted-foreground hover:border-border-hover hover:bg-surface hover:text-foreground"
               }`}
               title={
@@ -981,7 +954,7 @@ function DetailPanel({
             )}
             className={`inline-flex h-8 items-center gap-1.5 rounded-[5px] border px-2.5 py-1.5 text-xs motion-surface focus-ring ${
               inspectorOpen
-                ? "border-border-hover bg-surface text-foreground"
+                ? "theme-accent-bg-soft theme-accent-ring theme-accent-fg border-transparent"
                 : "border-border/45 bg-background/60 text-muted-foreground hover:border-border-hover hover:bg-surface hover:text-foreground"
             }`}
           >
@@ -1033,18 +1006,20 @@ function DetailPanel({
           ) : (
             <Copy className="h-3.5 w-3.5" aria-hidden="true" />
           )}
-          {copied
-            ? t("components.codeBlock.copied", "Copied!")
-            : operation.toolName === "bash"
-              ? t("components.toolCallReview.copyCommand", "Copy command")
-              : t("components.codeBlock.copy", "Copy")}
+          <span className="hidden xl:inline">
+            {copied
+              ? t("components.codeBlock.copied", "Copied!")
+              : operation.toolName === "bash"
+                ? t("components.toolCallReview.copyCommand", "Copy command")
+                : t("components.codeBlock.copy", "Copy")}
+          </span>
         </button>
       </div>
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div
           className={`custom-scrollbar min-h-0 min-w-0 flex-1 overscroll-contain ${
-            usesCodeView || operation.toolName === "bash"
+            usesCodeView || operation.toolName === "bash" || operation.toolName === "read"
               ? "overflow-hidden"
               : "overflow-auto"
           }`}
@@ -1052,9 +1027,9 @@ function DetailPanel({
         >
           <div
             className={`min-h-0 bg-[rgb(var(--color-surface-dark)/0.24)] ${
-              usesCodeView || operation.toolName === "bash"
+              usesCodeView || operation.toolName === "bash" || operation.toolName === "read"
                 ? "flex h-full min-h-0 flex-col"
-                : "space-y-2"
+                : "space-y-2 p-2"
             }`}
           >
             {isChangeOperation(operation) && !usesCodeView && (
@@ -1131,9 +1106,9 @@ function DetailPanel({
                 isError={operation.isError}
               />
             ) : operation.toolName === "read" ? (
-              <div className="space-y-3">
+              <div className="flex h-full min-h-0 flex-col">
                 {operation.images && operation.images.length > 0 && (
-                  <div className="tool-review-code-surface space-y-3 border border-border/45 bg-background p-3">
+                  <div className="tool-review-code-surface flex-none space-y-3 border-b border-border/45 bg-background p-3">
                     {operation.images.map((image, index) => (
                       <img
                         key={`${image.mimeType}-${index}`}
@@ -1145,13 +1120,15 @@ function DetailPanel({
                   </div>
                 )}
                 {(operation.content || operation.output) ? (
-                  <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
+                  <div className="tool-review-code-surface tool-review-code-surface--fill min-h-0 flex-1 overflow-auto bg-background">
                     {markdownPreview && displayPath.toLowerCase().endsWith(".md") ? (
-                      <div className="max-h-[60vh] overflow-auto p-4">
-                        <MarkdownContent
-                          content={operation.content || operation.output || ""}
-                          className="text-sm"
-                        />
+                      <div className="h-full overflow-auto px-5 py-4">
+                        <div className="mx-auto max-w-[920px]">
+                          <MarkdownContent
+                            content={operation.content || operation.output || ""}
+                            className="text-sm"
+                          />
+                        </div>
                       </div>
                     ) : (
                       <CodeBlock
@@ -1162,8 +1139,8 @@ function DetailPanel({
                     )}
                   </div>
                 ) : operation.images && operation.images.length > 0 ? null : (
-                  <div className="tool-review-code-surface overflow-hidden border border-border/45 bg-background">
-                    <div className="flex items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.45)] px-3 py-2">
+                  <div className="tool-review-code-surface flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+                    <div className="flex h-9 items-center gap-2 border-b border-border/35 bg-[rgb(var(--color-surface-dark)/0.35)] px-3">
                       <FileText className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                       <div className="min-w-0 flex-1 text-xs font-medium text-foreground">
                         {displayPath}
@@ -1601,13 +1578,13 @@ export default function ToolCallReviewModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-background/45 p-2 backdrop-blur-md ui-enter-fade sm:p-3"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-background/60 p-2 ui-enter-fade sm:p-3"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
       <div
-        className="relative flex h-[calc(100dvh_-_16px_-_40px)] w-[calc(100vw_-_16px_-_40px)] flex-col overflow-hidden rounded-[10px] border border-border/70 bg-background text-foreground shadow-[0_24px_80px_-36px_rgba(var(--shadow-rgb),0.72),0_0_0_1px_rgba(var(--highlight-rgb),0.04)] ui-enter-fade ui-enter-zoom sm:h-[min(1120px,calc(100dvh_-_24px_-_40px))] sm:w-[min(1960px,calc(100vw_-_24px_-_40px))]"
+        className="relative flex h-[calc(100dvh_-_16px_-_40px)] w-[calc(100vw_-_16px_-_40px)] flex-col overflow-hidden rounded-[8px] border border-border/70 bg-background text-foreground shadow-[0_20px_56px_-30px_rgba(var(--shadow-rgb),0.58),0_0_0_1px_rgba(var(--highlight-rgb),0.04)] ui-enter-fade ui-enter-zoom sm:h-[min(1120px,calc(100dvh_-_24px_-_40px))] sm:w-[min(1960px,calc(100vw_-_24px_-_40px))]"
         role="dialog"
         data-tool-call-review-modal="true"
         aria-modal="true"
@@ -1615,7 +1592,7 @@ export default function ToolCallReviewModal({
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="relative flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.66)] px-4 py-2">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/10" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[rgb(var(--highlight-rgb)/0.08)]" />
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <Wrench
               className="h-4 w-4 flex-shrink-0 text-muted-foreground"
@@ -1705,8 +1682,8 @@ export default function ToolCallReviewModal({
             data-tool-review-content-expanded={contentExpanded ? "true" : "false"}
           >
             {!contentExpanded && (
-              <aside className="flex h-[min(300px,38dvh)] min-h-0 flex-shrink-0 flex-col border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.42)] ui-enter-fade md:h-auto md:w-[360px] md:border-b-0 md:border-r xl:w-[400px]">
-                <div className="flex flex-col gap-2 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.55)] p-2">
+              <aside className="flex h-[min(320px,42dvh)] min-h-0 flex-shrink-0 flex-col border-b border-border/55 bg-background ui-enter-fade md:h-auto md:w-[320px] md:border-b-0 md:border-r xl:w-[352px]">
+                <div className="flex flex-col gap-1.5 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.38)] p-1.5">
                   <FilterBar
                     activeFilter={activeFilter}
                     counts={filterCounts}
@@ -1719,9 +1696,12 @@ export default function ToolCallReviewModal({
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder={
-                        listShowsShell ? "搜索命令..." : "搜索文件名、路径或内容..."
+                        listShowsShell
+                          ? t("components.toolCallReview.searchShell", "Search commands...")
+                          : t("components.toolCallReview.searchFiles", "Search files, paths, or content...")
                       }
-                      className="w-full rounded-md border border-border/40 bg-background/50 py-1 pl-8 pr-7 text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                      aria-label={t("components.toolCallReview.search", "Search review operations")}
+                      className="focus-ring h-7 w-full rounded-md border border-border/45 bg-background/70 pl-8 pr-7 text-xs text-foreground placeholder:text-muted-foreground/60"
                     />
                     {searchQuery && (
                       <button
@@ -1734,7 +1714,7 @@ export default function ToolCallReviewModal({
                     )}
                   </div>
                 </div>
-                <div className="min-h-0 flex-1 overflow-hidden bg-[rgb(var(--color-surface-dark)/0.34)]">
+                <div className="min-h-0 flex-1 overflow-hidden bg-background">
                   {searchedOperations.length === 0 ? (
                     <div className="flex h-full items-center justify-center px-5 py-8 text-center">
                       <div>
@@ -1772,7 +1752,7 @@ export default function ToolCallReviewModal({
                     />
                   )}
                 </div>
-                <div className="grid grid-cols-4 divide-x divide-border/35 border-t border-border/45 bg-[rgb(var(--color-surface-dark)/0.62)]">
+                <div className="grid grid-cols-4 divide-x divide-border/35 border-t border-border/45 bg-[rgb(var(--color-surface-dark)/0.36)]">
                     <SummaryItem
                       label="components.toolCallReview.summary.changes"
                       fallbackLabel="Changes"

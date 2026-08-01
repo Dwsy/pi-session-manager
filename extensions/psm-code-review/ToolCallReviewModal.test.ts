@@ -82,8 +82,8 @@ async function getFileTreeShadowRoot() {
 }
 
 /**
- * Shell mode renders operations via ReviewShellList as a plain `role="list"`
- * of clickable <div>s in the light DOM (NOT the shadow-root file tree), each
+ * Shell mode renders operations via ReviewShellList as a semantic `role="list"`
+ * of compact list items in the light DOM (NOT the shadow-root file tree), each
  * labeled with the command text and a `#<sequence>` prefix. This finds the
  * list item whose command matches `pattern`.
  */
@@ -98,7 +98,7 @@ async function findShellListItem(pattern: RegExp): Promise<HTMLElement> {
         pattern.test(item.textContent ?? ""),
       );
       if (hit) {
-        match = hit;
+        match = hit.querySelector<HTMLElement>("button") ?? hit;
         break;
       }
     }
@@ -110,7 +110,7 @@ async function findShellListItem(pattern: RegExp): Promise<HTMLElement> {
 
 
 describe("ToolCallReviewModal data model", () => {
-  it("defaults to the full operation timeline", () => {
+  it("defaults to the file review view", () => {
     expect(DEFAULT_REVIEW_FILTER).toBe("all");
   });
 
@@ -532,7 +532,7 @@ describe("ToolCallReviewModal UI behavior", () => {
       toolResultByCallId: new Map([["call-bash", toolResult]]),
     });
 
-    expect(screen.getByText("Error")).toBeTruthy();
+    expect(screen.getAllByText("Error").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Copy command" }));
 
     await waitFor(() => {
@@ -885,7 +885,7 @@ describe("ToolCallReviewModal UI behavior", () => {
       ],
     });
 
-    expect(screen.getByRole("radio", { name: /All\s*1/ }).getAttribute("aria-checked")).toBe(
+    expect(screen.getByRole("radio", { name: /Files\s*1/ }).getAttribute("aria-checked")).toBe(
       "true",
     );
     expect(screen.getByRole("radio", { name: /Shell\s*1/ })).toBeTruthy();
