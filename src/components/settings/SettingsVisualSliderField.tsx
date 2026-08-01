@@ -68,7 +68,7 @@ export default function SettingsVisualSliderField({
       <div className="relative h-6 flex items-center">
         <div className={`absolute inset-x-0 ${trackClassName}`} />
         <div
-          className={`absolute ${fillClassName}`}
+          className={`absolute left-0 ${fillClassName}`}
           style={{ width: `${clampedProgress}%` }}
         />
         <input
@@ -78,7 +78,7 @@ export default function SettingsVisualSliderField({
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className={`absolute inset-0 w-full h-full opacity-0 ${inputClassName}`}
+          className={`absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 ${inputClassName}`}
         />
         <div
           className={`absolute pointer-events-none ${thumbClassName}`}

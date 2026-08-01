@@ -177,15 +177,34 @@ export const MONOSPACE_FONTS: FontPreset[] = [
   },
 ]
 
+const CODE_THEME_SCHEME_PAIRS: Record<string, { dark: string; light: string }> = {
+  'github-dark': { dark: 'github-dark', light: 'github-light' },
+  'github-light': { dark: 'github-dark', light: 'github-light' },
+  'catppuccin-mocha': { dark: 'catppuccin-mocha', light: 'catppuccin-latte' },
+  'catppuccin-latte': { dark: 'catppuccin-mocha', light: 'catppuccin-latte' },
+  'solarized-dark': { dark: 'solarized-dark', light: 'solarized-light' },
+  'solarized-light': { dark: 'solarized-dark', light: 'solarized-light' },
+  'one-dark-pro': { dark: 'one-dark-pro', light: 'one-light' },
+  'one-light': { dark: 'one-dark-pro', light: 'one-light' },
+}
+
+function isLightAppTheme(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.classList.contains('theme-light')
+}
+
 /**
  * Get the actual Shiki theme name from a code block theme id.
- * 'github' follows the current app dark/light mode.
+ * Paired light/dark families follow the current app color scheme so code never
+ * renders as a bright island inside a dark app (or vice versa).
  */
 export function resolveShikiTheme(themeId: string): string {
-  if (themeId === 'monokai' || themeId === 'dracula') return themeId
-  if (themeId === 'one-dark-pro') return 'one-dark-pro'
+  const pairedTheme = CODE_THEME_SCHEME_PAIRS[themeId]
+  if (pairedTheme && typeof document !== 'undefined') {
+    return isLightAppTheme() ? pairedTheme.light : pairedTheme.dark
+  }
 
-  // All other explicit themes use their id directly
+  if (themeId === 'monokai' || themeId === 'dracula') return themeId
+
   if (themeId !== 'github') return themeId
 
   if (typeof document !== 'undefined') {

@@ -210,6 +210,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   }, [isOpen]);
 
   const settingsRef = useRef(settings);
+  const appliedAppearanceRef = useRef<AppSettings["appearance"] | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const hasLoadedRef = useRef(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -287,6 +288,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     try {
       const next = await loadAppSettings();
       setSettings(next);
+      appliedAppearanceRef.current = next.appearance;
     } catch (error) {
       console.error("Failed to load settings:", error);
     } finally {
@@ -304,53 +306,62 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
     setSaving(true);
     try {
       await saveAppSettings(current);
-      i18n.changeLanguage(current.language.locale);
-
-      const root = document.documentElement;
-      const {
-        theme,
-        customTheme,
-        fontFamily,
-        fontFamilyMono,
-        sidebarWidth,
-        fontSize,
-        messageSpacing,
-        codeBlockTheme,
-      } = current.appearance;
-      root.classList.remove("theme-dark", "theme-light");
-      if (theme === "dark") {
-        root.classList.add("theme-dark");
-      } else if (theme === "light") {
-        root.classList.add("theme-light");
-      } else if (theme === "custom") {
-        const resolvedScheme = await resolvePiThemeColorScheme(customTheme);
-        if (resolvedScheme === "dark") {
-          root.classList.add("theme-dark");
-        } else if (resolvedScheme === "light") {
-          root.classList.add("theme-light");
-        }
+      if (
+        i18n.language !== current.language.locale &&
+        i18n.resolvedLanguage !== current.language.locale
+      ) {
+        await i18n.changeLanguage(current.language.locale);
       }
-      if (sidebarWidth)
-        root.style.setProperty("--sidebar-width", `${sidebarWidth}px`);
-      const fontMap: Record<string, string> = {
-        small: "14px",
-        medium: "16px",
-        large: "18px",
-      };
-      root.style.setProperty("--font-size-base", fontMap[fontSize] || "16px");
-      root.style.setProperty("--font-family", fontFamily);
-      root.style.setProperty("--font-family-mono", fontFamilyMono);
-      const spacingMap: Record<string, string> = {
-        compact: "8px",
-        comfortable: "16px",
-        spacious: "24px",
-      };
-      root.style.setProperty(
-        "--spacing-base",
-        spacingMap[messageSpacing] || "16px",
-      );
-      if (codeBlockTheme) root.setAttribute("data-code-theme", codeBlockTheme);
-      await applyPiChatTheme(theme === "custom" ? customTheme : "app-default");
+
+      if (appliedAppearanceRef.current !== current.appearance) {
+        const root = document.documentElement;
+        const {
+          theme,
+          customTheme,
+          fontFamily,
+          fontFamilyMono,
+          sidebarWidth,
+          fontSize,
+          messageSpacing,
+          codeBlockTheme,
+        } = current.appearance;
+        root.classList.remove("theme-dark", "theme-light");
+        if (theme === "dark") {
+          root.classList.add("theme-dark");
+        } else if (theme === "light") {
+          root.classList.add("theme-light");
+        } else if (theme === "custom") {
+          const resolvedScheme = await resolvePiThemeColorScheme(customTheme);
+          if (resolvedScheme === "dark") {
+            root.classList.add("theme-dark");
+          } else if (resolvedScheme === "light") {
+            root.classList.add("theme-light");
+          }
+        }
+        if (sidebarWidth)
+          root.style.setProperty("--sidebar-width", `${sidebarWidth}px`);
+        const fontMap: Record<string, string> = {
+          small: "14px",
+          medium: "16px",
+          large: "18px",
+        };
+        root.style.setProperty("--font-size-base", fontMap[fontSize] || "16px");
+        root.style.setProperty("--font-family", fontFamily);
+        root.style.setProperty("--font-family-mono", fontFamilyMono);
+        const spacingMap: Record<string, string> = {
+          compact: "8px",
+          comfortable: "16px",
+          spacious: "24px",
+        };
+        root.style.setProperty(
+          "--spacing-base",
+          spacingMap[messageSpacing] || "16px",
+        );
+        if (codeBlockTheme) root.setAttribute("data-code-theme", codeBlockTheme);
+        await applyPiChatTheme(theme === "custom" ? customTheme : "app-default");
+        appliedAppearanceRef.current = current.appearance;
+      }
+
       await reloadSettings();
 
       setSaved(true);

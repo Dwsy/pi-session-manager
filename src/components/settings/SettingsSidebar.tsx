@@ -132,7 +132,7 @@ export default function SettingsSidebar({
   };
 
   return (
-    <div className="flex w-64 flex-col overflow-y-auto border-r border-border bg-background">
+    <div className="flex w-64 flex-col overflow-hidden border-r border-border bg-background">
       <div className="px-5 py-4 flex-shrink-0">
         <h2 className="text-base font-semibold text-foreground tracking-tight">
           {t("settings.title", "Settings")}
@@ -181,7 +181,7 @@ export default function SettingsSidebar({
         </div>
       </div>
 
-      <nav className="flex-1 p-2 space-y-2.5 overflow-y-auto">
+      <nav className="settings-scrollbar flex-1 space-y-2.5 overflow-y-auto p-2">
         {/* Search results from index */}
         {trimmedQuery && searchResults.length > 0 && (
           <div className="space-y-1">

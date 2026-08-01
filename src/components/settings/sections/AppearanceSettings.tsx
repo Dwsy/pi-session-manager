@@ -376,20 +376,18 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
   const resolvedCodeTheme = useResolvedCodeTheme()
   const currentCodeThemeMeta = useMemo(() => {
     const selected = CODE_THEMES.find((theme) => theme.id === currentCodeTheme) ?? CODE_THEMES[0]
-    if (currentCodeTheme !== 'github') {
-      return selected
-    }
     const resolved = CODE_THEMES.find((theme) => theme.id === resolvedCodeTheme)
     return {
       ...selected,
+      scheme: resolved?.scheme ?? selected.scheme,
       accent: resolved?.accent ?? selected.accent,
       previewColors: resolved?.previewColors ?? selected.previewColors,
     }
   }, [currentCodeTheme, resolvedCodeTheme])
   const currentFontLabel = extractPrimaryFontName(currentMonoFont)
   const codePreviewHtml = useMemo(
-    () => renderCodeHtmlWithTheme(CODE_PREVIEW_SNIPPET, 'rust', currentCodeTheme === 'github' ? resolvedCodeTheme : currentCodeTheme),
-    [currentCodeTheme, resolvedCodeTheme],
+    () => renderCodeHtmlWithTheme(CODE_PREVIEW_SNIPPET, 'rust', resolvedCodeTheme),
+    [resolvedCodeTheme],
   )
 
   const customThemeSwatch = useMemo<SwatchColors | undefined>(() => {

@@ -244,6 +244,34 @@
     box-shadow: inset 0 1px 2px rgba(var(--highlight-rgb), 0.05);
   }
 
+  // Settings navigation scrollbar follows semantic theme colors instead of
+  // inheriting the WebView's bright native scrollbar.
+  .settings-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--color-muted-foreground) / 0.32) transparent;
+  }
+
+  .settings-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .settings-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .settings-scrollbar::-webkit-scrollbar-thumb {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: rgb(var(--color-muted-foreground) / 0.28);
+    background-clip: padding-box;
+  }
+
+  .settings-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--color-muted-foreground) / 0.46);
+    background-clip: padding-box;
+  }
+
   // Custom Scrollbar
   .custom-scrollbar {
     scrollbar-width: thin;

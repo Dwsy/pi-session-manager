@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSettings } from '@/hooks/useSettings'
-import { listen } from '@/transport'
-import { checkAppUpdate } from '@/utils/appUpdater'
+import { isTauri, listen } from '@/transport'
+import { checkAppUpdate, downloadAndInstallAppUpdate } from '@/utils/appUpdater'
 import {
   dismissUpdateVersion,
   getDismissedUpdateVersion,
@@ -26,6 +26,7 @@ export function useUpdateChecker(options?: UseUpdateCheckerOptions): UseUpdateCh
   const [updateInfo, setUpdateInfo] = useState<AvailableUpdateInfo | null>(null)
   const setShowSettings = options?.setShowSettings
   const setShowSettingsRef = useRef(setShowSettings)
+  const autoInstallAttemptRef = useRef<string | null>(null)
   useEffect(() => {
     setShowSettingsRef.current = setShowSettings
   }, [setShowSettings])
@@ -47,8 +48,20 @@ export function useUpdateChecker(options?: UseUpdateCheckerOptions): UseUpdateCh
         if (!active || !update) return
 
         const dismissedVersion = getDismissedUpdateVersion(channel)
-        if (dismissedVersion === update.latestVersion) return
-        setUpdateInfo(update)
+        if (dismissedVersion !== update.latestVersion) {
+          setUpdateInfo(update)
+        }
+
+        if (!isTauri()) return
+        const updateKey = `${channel}:${update.latestVersion}`
+        if (autoInstallAttemptRef.current === updateKey) return
+        autoInstallAttemptRef.current = updateKey
+
+        try {
+          await downloadAndInstallAppUpdate(channel)
+        } catch {
+          // Keep the notice visible so the user can retry from Updates.
+        }
       } catch {
         // Startup auto-check is silent on network / updater failures.
       }
@@ -77,7 +90,7 @@ export function useUpdateChecker(options?: UseUpdateCheckerOptions): UseUpdateCh
     }
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent(SETTINGS_NAVIGATE_EVENT, {
-        detail: { section: 'app-behavior' },
+        detail: { section: 'updates' },
       }))
     }, 50)
   }, [])

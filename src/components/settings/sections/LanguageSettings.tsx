@@ -2,6 +2,7 @@
  * Language settings component
  */
 
+import { startTransition } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check } from 'lucide-react'
 import SettingsField from '@/components/settings/SettingsField'
@@ -22,7 +23,9 @@ export default function LanguageSettings({ settings, onUpdate }: LanguageSetting
 
   const handleLanguageChange = (langCode: string) => {
     onUpdate('language', 'locale', langCode)
-    i18n.changeLanguage(langCode)
+    startTransition(() => {
+      void i18n.changeLanguage(langCode)
+    })
   }
   const languageOptionsMap = new Map(languages.map((lang) => [lang.code, lang] as const))
 

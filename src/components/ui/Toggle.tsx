@@ -37,12 +37,14 @@ export default function Toggle({
           className="sr-only peer"
         />
         <div
-          className={`absolute inset-0 rounded-full motion-color pointer-events-none ${
-            checked ? 'settings-accent-bg-strong' : 'bg-secondary'
+          className={`absolute inset-0 rounded-full border shadow-inner motion-surface pointer-events-none ${
+            checked
+              ? 'settings-accent-bg-strong border-transparent'
+              : 'bg-secondary border-border-hover/80'
           }`}
         />
         <div
-          className={`absolute w-4 h-4 rounded-full bg-white motion-transform pointer-events-none ${
+          className={`absolute w-4 h-4 rounded-full border border-border/80 bg-card shadow-sm motion-transform pointer-events-none ${
             isSmall
               ? 'top-0.5 left-0.5 peer-checked:translate-x-5'
               : 'top-1 left-1 peer-checked:translate-x-4'

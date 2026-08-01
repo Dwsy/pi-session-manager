@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import {
   Coins,
   Cpu,
+  Eye,
+  EyeOff,
   FileText,
   CloudDownload,
   Image as ImageIcon,
@@ -115,6 +117,12 @@ export function ConfigureTab({
   const { t } = useTranslation();
   const [providerFilter, setProviderFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
+  const [revealedApiKeyProvider, setRevealedApiKeyProvider] = useState("");
+  const apiKeyVisible =
+    Boolean(selectedProvider) && revealedApiKeyProvider === selectedProvider;
+  const apiKeyVisibilityLabel = apiKeyVisible
+    ? t("settings.modelConfigCenter.actions.hideApiKey", "Hide API key")
+    : t("settings.modelConfigCenter.actions.showApiKey", "Show API key");
 
   const filteredProviderNames = useMemo(() => {
     const query = providerFilter.trim().toLowerCase();
@@ -715,18 +723,40 @@ export function ConfigureTab({
                         "优先级高于环境变量，以密文形式存储",
                       )}
                     >
-                      <SettingsInput
-                        type="password"
-                        value={selectedProviderEntry.apiKey ?? ""}
-                        onChange={(e) =>
-                          updateSelectedProviderEntry((prev) => ({
-                            ...prev,
-                            apiKey: e.target.value,
-                          }))
-                        }
-                        placeholder="sk-..."
-                        className="font-mono text-xs"
-                      />
+                      <div className="relative">
+                        <SettingsInput
+                          type={apiKeyVisible ? "text" : "password"}
+                          value={selectedProviderEntry.apiKey ?? ""}
+                          onChange={(e) =>
+                            updateSelectedProviderEntry((prev) => ({
+                              ...prev,
+                              apiKey: e.target.value,
+                            }))
+                          }
+                          placeholder="sk-..."
+                          className="pr-9 font-mono text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRevealedApiKeyProvider((current) =>
+                              current === selectedProvider
+                                ? ""
+                                : selectedProvider,
+                            )
+                          }
+                          aria-pressed={apiKeyVisible}
+                          aria-label={apiKeyVisibilityLabel}
+                          title={apiKeyVisibilityLabel}
+                          className="absolute right-1 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent/10 hover:text-foreground focus-ring"
+                        >
+                          {apiKeyVisible ? (
+                            <EyeOff className="h-3.5 w-3.5" />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
                     </SettingsField>
                   </div>
                 </div>

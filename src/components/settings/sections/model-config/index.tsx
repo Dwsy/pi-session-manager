@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ExternalLink,
   FileJson,
   FlaskConical,
   History,
@@ -97,6 +98,7 @@ export default function ModelConfigCenter() {
     requestDeleteModel,
     requestDeleteModelsByIds,
     saveConfig,
+    openModelConfigFile,
     refreshConfig,
     createBackup,
     exportToPath,
@@ -225,6 +227,17 @@ export default function ModelConfigCenter() {
               <span className="hidden max-w-[240px] truncate rounded border border-border/30 bg-surface/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground 2xl:inline-block">
                 {MODEL_CONFIG_PATH}
               </span>
+              <button
+                type="button"
+                onClick={() => void openModelConfigFile()}
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 text-[11px] font-medium text-foreground hover:border-border hover:bg-surface transition-colors active:scale-95 focus-ring"
+              >
+                <ExternalLink className="h-3 w-3" />
+                {t(
+                  "settings.modelConfigCenter.actions.openFile",
+                  "Open JSON",
+                )}
+              </button>
               <button
                 type="button"
                 onClick={refreshConfig}

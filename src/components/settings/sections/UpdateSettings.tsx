@@ -212,8 +212,9 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
             </div>
 
             <button
+              type="button"
               onClick={handleCheck}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground focus-ring hover:bg-primary/90"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-info/40 bg-info px-3 py-2 text-xs font-semibold text-white shadow-sm focus-ring motion-color hover:bg-info/90"
             >
               <RefreshCw className="h-4 w-4" />
               {t('settings.update.checkNow', 'Check for updates now')}

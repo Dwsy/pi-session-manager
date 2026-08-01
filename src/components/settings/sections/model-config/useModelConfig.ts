@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { homeDir, join } from "@tauri-apps/api/path";
 import {
   open as openDialog,
   save as saveDialog,
@@ -22,7 +23,7 @@ import type {
   FeedbackTone,
   JsonValue,
 } from "./types";
-import { EMPTY_CONFIG } from "./types";
+import { EMPTY_CONFIG, MODEL_CONFIG_PATH } from "./types";
 import {
   asModelConfigShape,
   asErrorMessage,
@@ -1061,6 +1062,24 @@ export function useModelConfig() {
     }
   }
 
+  async function openModelConfigFile() {
+    try {
+      const path = MODEL_CONFIG_PATH.startsWith("~/")
+        ? await join(await homeDir(), MODEL_CONFIG_PATH.slice(2))
+        : MODEL_CONFIG_PATH;
+      await invoke("open_path_with_default_app", { path });
+    } catch (error) {
+      pushFeedback(
+        "error",
+        t(
+          "settings.modelConfigCenter.feedback.openFileFailed",
+          "Failed to open model config file: {{reason}}",
+          { reason: asErrorMessage(error) },
+        ),
+      );
+    }
+  }
+
   function refreshConfig() {
     guardUnsaved(
       t(
@@ -1575,6 +1594,7 @@ export function useModelConfig() {
     requestDeleteModelById,
     requestDeleteModelsByIds,
     saveConfig,
+    openModelConfigFile,
     refreshConfig,
     createBackup,
     exportToPath,
