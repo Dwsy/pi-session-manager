@@ -1,0 +1,16 @@
+{
+  "name": "pi-session-jsonl-tools",
+  "version": "0.1.0",
+  "description": "Pi skill and dependency-free TypeScript CLI for indexing, searching, and auditing raw Pi session JSONL files.",
+  "type": "module",
+  "keywords": ["pi-package", "pi-session", "jsonl", "agent-skill"],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "pi": {
+    "skills": ["./skills"]
+  },
+  "scripts": {
+    "check": "node --experimental-strip-types ./skills/pi-session-jsonl/scripts/pi-session-index.ts self-test"
+  }
+}

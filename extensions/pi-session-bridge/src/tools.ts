@@ -56,7 +56,7 @@ export const sessionSearchTool = {
   name: "session_search",
   label: "Session Search",
   description:
-    "Search across all indexed Pi sessions. Use this to find relevant past conversations.",
+    "Search indexed Pi sessions and return matching excerpts plus session IDs. Use when the user refers to past sessions or historical context is materially needed; skip for self-contained current-session tasks.",
   parameters: {
     type: "object" as const,
     properties: {
@@ -151,14 +151,15 @@ export const sessionSearchTool = {
 export const sessionContextTool = {
   name: "session_context",
   label: "Session Context",
-  description: "Fetch message context from a specific session.",
+  description:
+    "Return the most recent message tail from one known session. This is not anchored to a search hit; use session_recall when context must surround matching messages.",
   parameters: {
     type: "object" as const,
     properties: {
       sessionId: { type: "string", description: "Session ID from search results." },
       sessionPath: { type: "string", description: "Full session path." },
-      before: { type: "number", description: "Entries before target. Default: 4." },
-      after: { type: "number", description: "Entries after target. Default: 4." },
+      before: { type: "number", description: "Contributes to the tail size; total returned is before + after + 1. Default: 4." },
+      after: { type: "number", description: "Contributes to the tail size; total returned is before + after + 1. Default: 4." },
     },
   },
   async execute(_toolCallId: string, params: Record<string, unknown>) {
@@ -208,7 +209,8 @@ export const sessionContextTool = {
 export const sessionRecallTool = {
   name: "session_recall",
   label: "Session Recall",
-  description: "Search and retrieve surrounding dialogue context from past sessions.",
+  description:
+    "Search past sessions and return small dialogue windows around matching messages. Use when excerpts alone are insufficient; prefer session_search when only hits or session IDs are needed.",
   parameters: {
     type: "object" as const,
     properties: {
@@ -304,7 +306,8 @@ function findTag(name: string, tags: TagItem[]): TagItem | null {
 export const sessionTagTool = {
   name: "session_tag",
   label: "Session Tag Manager",
-  description: "Manage session status tags. Actions: list(show tags), set(assign tag), remove(unassign tag).",
+  description:
+    "Inspect or change tags on the current session. list is read-only. set/remove mutate session metadata and should be used only when the user explicitly requests a tag change; set creates the named tag if no existing tag matches.",
   parameters: {
     type: "object" as const,
     properties: {
