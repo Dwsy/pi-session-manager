@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type {
   GlobalMapSettings,
   SemanticNoteType,
@@ -16,63 +17,92 @@ interface GlobalMapToolbarProps {
 
 const SCOPES: Array<{
   value: TopologyScope;
-  label: string;
-  description: string;
+  key: string;
+  fallbackLabel: string;
+  fallbackDescription: string;
 }> = [
   {
     value: "structure",
-    label: "结构",
-    description: "只显示线性分支段、真实分叉和终点",
+    key: "structure",
+    fallbackLabel: "Structure",
+    fallbackDescription: "Show only linear segments, real forks, and endings",
   },
   {
     value: "user",
-    label: "用户",
-    description: "在线性分支轨道上只标出用户消息",
+    key: "user",
+    fallbackLabel: "User",
+    fallbackDescription: "Mark only user messages on linear branch rails",
   },
   {
     value: "conversation",
-    label: "对话",
-    description: "标出用户消息与有文本的 assistant 消息",
+    key: "conversation",
+    fallbackLabel: "Conversation",
+    fallbackDescription: "Mark user messages and assistant replies with text",
   },
   {
     value: "all",
-    label: "全部",
-    description: "标出所有 entry；分支层级仍只由真实 fork 决定",
+    key: "all",
+    fallbackLabel: "All",
+    fallbackDescription:
+      "Mark every entry while keeping hierarchy limited to real forks",
   },
 ];
 
 const NOTE_TYPES: Array<{
   type: SemanticNoteType;
-  label: string;
-  description: string;
+  key: string;
+  fallbackLabel: string;
+  fallbackDescription: string;
 }> = [
   {
     type: "user",
-    label: "用户输入",
-    description: "在用户消息位置显示注记（与地图事件筛选独立）",
+    key: "user",
+    fallbackLabel: "User input",
+    fallbackDescription:
+      "Show notes at user messages independently from map event filtering",
   },
   {
     type: "assistant_reply",
-    label: "AI 末条回复",
-    description: "每轮用户消息之后，锚定到该轮最后一条 assistant 回复",
+    key: "assistantReply",
+    fallbackLabel: "Final AI reply",
+    fallbackDescription:
+      "Anchor each turn to its last assistant reply after the user message",
   },
-  { type: "rename", label: "Rename", description: "session_info 会话名称变更" },
+  {
+    type: "rename",
+    key: "rename",
+    fallbackLabel: "Rename",
+    fallbackDescription: "Session name changes from session_info entries",
+  },
   {
     type: "label",
-    label: "Label",
-    description: "标签设置与清除，锚定到 target entry",
+    key: "label",
+    fallbackLabel: "Label",
+    fallbackDescription: "Label changes anchored to their target entry",
   },
-  { type: "model", label: "模型切换", description: "model_change 事件" },
+  {
+    type: "model",
+    key: "model",
+    fallbackLabel: "Model change",
+    fallbackDescription: "model_change events",
+  },
   {
     type: "thinking",
-    label: "思考级别",
-    description: "thinking_level_change 事件",
+    key: "thinking",
+    fallbackLabel: "Thinking level",
+    fallbackDescription: "thinking_level_change events",
   },
-  { type: "compaction", label: "Compaction", description: "上下文压缩事件" },
+  {
+    type: "compaction",
+    key: "compaction",
+    fallbackLabel: "Compaction",
+    fallbackDescription: "Context compaction events",
+  },
   {
     type: "error",
-    label: "异常",
-    description: "error、aborted 与失败工具结果",
+    key: "error",
+    fallbackLabel: "Error",
+    fallbackDescription: "Errors, aborted turns, and failed tool results",
   },
 ];
 
@@ -82,9 +112,11 @@ export function GlobalMapToolbar({
   onSettingsChange,
   compact = false,
 }: GlobalMapToolbarProps): React.ReactElement {
+  const { t } = useTranslation();
   const noteCounts = new Map<SemanticNoteType, number>();
-  for (const note of model.notes)
+  for (const note of model.notes) {
     noteCounts.set(note.type, (noteCounts.get(note.type) ?? 0) + 1);
+  }
   const enabledNoteCount = NOTE_TYPES.filter(
     (item) => settings.enabledNotes[item.type],
   ).length;
@@ -111,7 +143,10 @@ export function GlobalMapToolbar({
       <div
         className="map-scope-switch"
         role="group"
-        aria-label="Global Map 事件筛选"
+        aria-label={t(
+          "components.branchMap.toolbar.eventFilter",
+          "Global Map event filter",
+        )}
       >
         {SCOPES.map((scope) => (
           <button
@@ -119,27 +154,43 @@ export function GlobalMapToolbar({
             type="button"
             className={settings.scope === scope.value ? "is-active" : ""}
             aria-pressed={settings.scope === scope.value}
-            title={scope.description}
+            title={t(
+              `components.branchMap.scopes.${scope.key}.description`,
+              scope.fallbackDescription,
+            )}
             onClick={() =>
               onSettingsChange({ ...settings, scope: scope.value })
             }
           >
-            {scope.label}
+            {t(
+              `components.branchMap.scopes.${scope.key}.label`,
+              scope.fallbackLabel,
+            )}
           </button>
         ))}
       </div>
 
       <details className="filter-menu notes-menu">
-        <summary title="选择覆盖在线性分支轨道上的语义注记">
+        <summary
+          title={t(
+            "components.branchMap.notes.summaryTitle",
+            "Choose semantic notes overlaid on linear branch rails",
+          )}
+        >
           <NoteIcon />
-          <span>注记</span>
+          <span>{t("components.branchMap.notes.summary", "Notes")}</span>
           <b>{enabledNoteCount}</b>
         </summary>
         <div className="filter-popover">
           <div className="filter-popover-head">
             <div>
-              <strong>语义注记</strong>
-              <span>作为事件覆盖层，不会被误画成分支层级。</span>
+              <strong>{t("components.branchMap.notes.title", "Semantic notes")}</strong>
+              <span>
+                {t(
+                  "components.branchMap.notes.description",
+                  "Event overlays never become branch hierarchy.",
+                )}
+              </span>
             </div>
           </div>
           <div className="filter-option-list">
@@ -155,8 +206,18 @@ export function GlobalMapToolbar({
                 />
                 <i />
                 <span>
-                  <strong>{item.label}</strong>
-                  <small>{item.description}</small>
+                  <strong>
+                    {t(
+                      `components.branchMap.noteTypes.${item.key}.label`,
+                      item.fallbackLabel,
+                    )}
+                  </strong>
+                  <small>
+                    {t(
+                      `components.branchMap.noteTypes.${item.key}.description`,
+                      item.fallbackDescription,
+                    )}
+                  </small>
                 </span>
                 <b>{formatNumber(noteCounts.get(item.type) ?? 0)}</b>
               </label>
@@ -175,14 +236,20 @@ export function GlobalMapToolbar({
             />
             <i />
             <span>
-              <strong>智能布局</strong>
+              <strong>
+                {t("components.branchMap.notes.smartLayout", "Smart layout")}
+              </strong>
               <small>
-                全景留白与间距；相邻 model/thinking
-                只保留最后一条；相同用户输入合并为 ×N。
+                {t(
+                  "components.branchMap.notes.smartLayoutDescription",
+                  "Balance whitespace and spacing, collapse adjacent model or thinking events, and merge repeated user input as ×N.",
+                )}
               </small>
             </span>
           </label>
-          <div className="filter-popover-subhead">地图标识</div>
+          <div className="filter-popover-subhead">
+            {t("components.branchMap.notes.mapLabels", "Map labels")}
+          </div>
           <label className="filter-option is-secondary">
             <input
               type="checkbox"
@@ -196,8 +263,18 @@ export function GlobalMapToolbar({
             />
             <i />
             <span>
-              <strong>分支段编号</strong>
-              <small>显示 B0、B0.1 等线性段标签。</small>
+              <strong>
+                {t(
+                  "components.branchMap.notes.segmentLabels",
+                  "Segment codes",
+                )}
+              </strong>
+              <small>
+                {t(
+                  "components.branchMap.notes.segmentLabelsDescription",
+                  "Show linear segment codes such as B0 and B0.1.",
+                )}
+              </small>
             </span>
           </label>
           <label className="filter-option is-secondary">
@@ -213,24 +290,46 @@ export function GlobalMapToolbar({
             />
             <i />
             <span>
-              <strong>分叉编号</strong>
-              <small>显示 F1、F2 等真实 fork 标签。</small>
+              <strong>
+                {t("components.branchMap.notes.forkLabels", "Fork codes")}
+              </strong>
+              <small>
+                {t(
+                  "components.branchMap.notes.forkLabelsDescription",
+                  "Show real fork codes such as F1 and F2.",
+                )}
+              </small>
             </span>
           </label>
         </div>
       </details>
 
       <details className="filter-menu model-menu">
-        <summary title="按有效模型筛选事件标记">
+        <summary
+          title={t(
+            "components.branchMap.models.summaryTitle",
+            "Filter event markers by effective model",
+          )}
+        >
           <ModelIcon />
-          <span>模型</span>
-          <b>{settings.selectedModels.length || "全"}</b>
+          <span>{t("components.branchMap.models.summary", "Models")}</span>
+          <b>
+            {settings.selectedModels.length ||
+              t("components.branchMap.models.allShort", "All")}
+          </b>
         </summary>
         <div className="filter-popover is-models">
           <div className="filter-popover-head">
             <div>
-              <strong>有效模型</strong>
-              <span>只筛选事件；所有线性分支轨道和 fork 始终保留。</span>
+              <strong>
+                {t("components.branchMap.models.title", "Effective model")}
+              </strong>
+              <span>
+                {t(
+                  "components.branchMap.models.description",
+                  "Only event markers are filtered; all branch rails and forks remain.",
+                )}
+              </span>
             </div>
             <button
               type="button"
@@ -239,7 +338,7 @@ export function GlobalMapToolbar({
                 onSettingsChange({ ...settings, selectedModels: [] })
               }
             >
-              全部
+              {t("components.branchMap.models.all", "All")}
             </button>
           </div>
           <div className="filter-option-list model-option-list">
@@ -270,14 +369,23 @@ export function GlobalMapToolbar({
                   <span>
                     <strong>{stat.model.label}</strong>
                     <small>
-                      {formatNumber(stat.assistants)} assistant ·{" "}
-                      {formatNumber(stat.entries)} entries
+                      {t("components.branchMap.models.assistantEntries", {
+                        assistants: formatNumber(stat.assistants),
+                        entries: formatNumber(stat.entries),
+                        defaultValue:
+                          "{{assistants}} assistant · {{entries}} entries",
+                      })}
                     </small>
                   </span>
                 </label>
               ))
             ) : (
-              <div className="filter-empty">会话中没有模型元数据</div>
+              <div className="filter-empty">
+                {t(
+                  "components.branchMap.models.empty",
+                  "No model metadata in this session",
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -286,7 +394,10 @@ export function GlobalMapToolbar({
       <button
         type="button"
         className="map-axis-button"
-        title="切换纵轴：路径序列 / 实际时间"
+        title={t(
+          "components.branchMap.axis.title",
+          "Switch vertical axis between path sequence and actual time",
+        )}
         onClick={() =>
           onSettingsChange({
             ...settings,
@@ -295,7 +406,9 @@ export function GlobalMapToolbar({
         }
       >
         <FilterIcon />
-        {settings.axis === "sequence" ? "序列" : "时间"}
+        {settings.axis === "sequence"
+          ? t("components.branchMap.axis.sequence", "Sequence")
+          : t("components.branchMap.axis.time", "Time")}
       </button>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { GlobalMapSettings, SessionModel } from "@/utils/session-branch";
 import {
   buildTopologyLayout,
@@ -34,6 +35,7 @@ export function GlobalMap({
   onActivateNode,
   onOpenAtlas,
 }: GlobalMapProps): React.ReactElement {
+  const { t } = useTranslation();
   const projection = useMemo(() => {
     const layout = buildTopologyLayout(model, settings.axis);
     return buildTopologyProjection(
@@ -44,30 +46,44 @@ export function GlobalMap({
     );
   }, [model, settings, activeLeafUid, selectedUid]);
 
-  const summary = `${formatNumber(model.segments.length)} linear · ${formatNumber(model.forks.length)} forks · ${formatNumber(projection.events.length)} events`;
+  const summary = t("components.branchMap.summary", {
+    segments: formatNumber(model.segments.length),
+    forks: formatNumber(model.forks.length),
+    events: formatNumber(projection.events.length),
+    defaultValue: "{{segments}} linear · {{forks}} forks · {{events}} events",
+  });
 
   return (
     <section
       className={`global-map-panel branch-map-panel ${collapsed ? "is-collapsed" : ""}`}
-      aria-label="Pi 分支地图"
+      aria-label={t("components.branchMap.ariaLabel", "Pi branch map")}
     >
       <div className="global-map-head">
         <div className="global-map-title">
-          <strong>BRANCH MAP</strong>
+          <strong>{t("components.branchMap.title", "BRANCH MAP")}</strong>
           <span>{summary}</span>
         </div>
         <div className="global-map-head-actions">
           <span
             className="map-semantic-chip"
-            title="parentId 链不会被逐条解释为 UI 层级"
+            title={t(
+              "components.branchMap.forkOnlyHierarchyHelp",
+              "The parentId chain is not rendered as a nested UI hierarchy",
+            )}
           >
-            fork-only hierarchy
+            {t(
+              "components.branchMap.forkOnlyHierarchy",
+              "fork-only hierarchy",
+            )}
           </span>
           <button
             type="button"
             className="icon-button"
             onClick={onOpenAtlas}
-            title="打开可缩放 Branch Atlas"
+            title={t(
+              "components.branchMap.openAtlas",
+              "Open zoomable Branch Atlas",
+            )}
           >
             <ExpandIcon />
           </button>
@@ -75,7 +91,11 @@ export function GlobalMap({
             type="button"
             className="icon-button"
             onClick={() => onCollapsedChange(!collapsed)}
-            title={collapsed ? "展开 Branch Map" : "收起 Branch Map"}
+            title={
+              collapsed
+                ? t("components.branchMap.expand", "Expand Branch Map")
+                : t("components.branchMap.collapse", "Collapse Branch Map")
+            }
           >
             <CollapseIcon className={collapsed ? "is-rotated" : ""} />
           </button>
@@ -101,23 +121,23 @@ export function GlobalMap({
           <div className="global-map-legend" aria-hidden="true">
             <span>
               <i className="legend-line rail" />
-              线性段
+              {t("components.branchMap.legend.linear", "Linear segment")}
             </span>
             <span>
               <i className="legend-line active" />
-              活跃分支
+              {t("components.branchMap.legend.active", "Active branch")}
             </span>
             <span>
               <i className="legend-node fork" />
-              真实分叉
+              {t("components.branchMap.legend.fork", "Real fork")}
             </span>
             <span>
               <i className="legend-node event" />
-              筛选事件
+              {t("components.branchMap.legend.event", "Filtered event")}
             </span>
             <span>
               <i className="legend-note label" />
-              语义注记
+              {t("components.branchMap.legend.note", "Semantic note")}
             </span>
           </div>
         </>

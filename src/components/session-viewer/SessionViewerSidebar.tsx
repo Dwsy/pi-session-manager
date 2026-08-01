@@ -8,6 +8,7 @@ import {
   type RefObject,
 } from "react";
 import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import SessionTree, { type SessionTreeRef } from "@/components/session-tree/SessionTree";
 import { getRuntimeSessionLabels } from "@/runtime-data/sessionSource";
@@ -69,6 +70,7 @@ export default function SessionViewerSidebar({
   outlineTitle,
   hideSidebarTitle,
 }: SessionViewerSidebarProps) {
+  const { t } = useTranslation();
   const [labelState, setLabelState] = useState<SessionLabelState>({
     sessionPath,
     labels: {},
@@ -149,9 +151,6 @@ export default function SessionViewerSidebar({
             <h2 id="session-sidebar-title" className="session-sidebar-title">
               {outlineTitle}
             </h2>
-            <div className="session-sidebar-subtitle">
-              {entries.length} entries{pluginViews.length > 0 ? ` · ${pluginViews.length} views` : ""}
-            </div>
           </div>
           <button
             type="button"
@@ -184,7 +183,10 @@ export default function SessionViewerSidebar({
           style={isEmbedded ? undefined : { left: `${sidebarWidth}px` }}
           role="separator"
           aria-orientation="vertical"
-          aria-label={`${outlineTitle} width`}
+          aria-label={t("components.branchMap.resizeLabel", {
+            title: outlineTitle,
+            defaultValue: "{{title}} width",
+          })}
           aria-valuemin={sidebarMinWidth}
           aria-valuemax={sidebarMaxWidth}
           aria-valuenow={Math.round(sidebarWidth)}

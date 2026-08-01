@@ -66,6 +66,7 @@ function renderSessionTree(
 
 afterEach(() => {
   cleanup();
+  window.localStorage.removeItem("pi-session-manager:branch-map-collapsed");
 });
 
 describe("SessionTree", () => {
@@ -109,6 +110,7 @@ describe("SessionTree", () => {
       ],
     });
 
+    fireEvent.click(screen.getByText("Views"));
     fireEvent.click(screen.getByRole("button", { name: "Flow" }));
 
     const flowDialog = screen.getByRole("dialog");
@@ -159,6 +161,7 @@ describe("SessionTree", () => {
       ],
     });
 
+    fireEvent.click(screen.getByText("Views"));
     fireEvent.click(screen.getByRole("button", { name: "Broken Graph" }));
 
     expect(screen.getByText("Plugin UI failed")).not.toBeNull();
@@ -172,6 +175,20 @@ describe("SessionTree", () => {
       screen.getByText("Loading complete branch topology..."),
     ).not.toBeNull();
     expect(screen.queryByRole("region", { name: "Pi branch map" })).toBeNull();
+  });
+
+  it("defaults the branch map to collapsed and persists an explicit expansion", () => {
+    renderSessionTree({ activeLeafId: "assistant-1" });
+
+    const map = screen.getByRole("region", { name: "Pi branch map" });
+    expect(map.classList.contains("is-collapsed")).toBe(true);
+
+    fireEvent.click(screen.getByTitle("Expand Branch Map"));
+
+    expect(map.classList.contains("is-collapsed")).toBe(false);
+    expect(
+      window.localStorage.getItem("pi-session-manager:branch-map-collapsed"),
+    ).toBe("false");
   });
 
   it("shows the branch tree and compact topology status", () => {
@@ -264,7 +281,10 @@ describe("SessionTree", () => {
   it("shows only labeled target nodes when the labeled-only filter is active", () => {
     renderSessionTree();
 
-    fireEvent.click(screen.getByRole("button", { name: "Labels" }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Tree filter" }),
+      { target: { value: "labeled-only" } },
+    );
 
     expect(screen.getAllByText(/Pinned node/).length).toBeGreaterThan(0);
     expect(screen.getByText(/label.*Raw label/i)).not.toBeNull();

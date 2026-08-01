@@ -30,7 +30,6 @@ import type { SessionEntry } from "@/types";
 import {
   buildSessionBranchModel,
   buildTreeItems,
-  entryRelationLabel,
   formatNumber,
   formatTimestamp,
   pathSet,
@@ -49,15 +48,49 @@ import SessionTreeSearch, {
   type SessionTreeSearchRef,
 } from "./SessionTreeSearch";
 
-const ROW_HEIGHT = 44;
+const ROW_HEIGHT = 36;
 const OVERSCAN = 10;
-const FILTERS: Array<{ value: TreeFilter; label: string }> = [
-  { value: "default", label: "Default" },
-  { value: "no-tools", label: "No tools" },
-  { value: "user-only", label: "User" },
-  { value: "labeled-only", label: "Labels" },
-  { value: "all", label: "All" },
+const MAP_COLLAPSED_STORAGE_KEY = "pi-session-manager:branch-map-collapsed";
+const FILTERS: Array<{
+  value: TreeFilter;
+  translationKey: string;
+  fallback: string;
+}> = [
+  {
+    value: "default",
+    translationKey: "components.branchMap.filters.default",
+    fallback: "Default",
+  },
+  {
+    value: "no-tools",
+    translationKey: "components.branchMap.filters.noTools",
+    fallback: "No tools",
+  },
+  {
+    value: "user-only",
+    translationKey: "components.branchMap.filters.user",
+    fallback: "User",
+  },
+  {
+    value: "labeled-only",
+    translationKey: "components.branchMap.filters.labels",
+    fallback: "Labels",
+  },
+  {
+    value: "all",
+    translationKey: "components.branchMap.filters.all",
+    fallback: "All",
+  },
 ];
+
+function readMapCollapsed(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(MAP_COLLAPSED_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
 
 export interface SessionTreeRef {
   focusSearch: () => void;
@@ -102,7 +135,7 @@ const SessionTree = memo(
     );
     const [includeSearchContext, setIncludeSearchContext] = useState(true);
     const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-    const [mapCollapsed, setMapCollapsed] = useState(false);
+    const [mapCollapsed, setMapCollapsed] = useState(readMapCollapsed);
     const [atlasOpen, setAtlasOpen] = useState(false);
     const [mapSettings, setMapSettings] = useState<GlobalMapSettings>(
       readBranchMapSettings,
@@ -214,6 +247,18 @@ const SessionTree = memo(
     useEffect(() => {
       writeBranchMapSettings(mapSettings);
     }, [mapSettings]);
+
+    useEffect(() => {
+      try {
+        window.localStorage.setItem(
+          MAP_COLLAPSED_STORAGE_KEY,
+          String(mapCollapsed),
+        );
+      } catch {
+        // Storage can be unavailable in hardened WebViews; the in-memory state
+        // still keeps the control usable for the current session.
+      }
+    }, [mapCollapsed]);
 
     useEffect(() => {
       if (!activeLeafUid) return;
@@ -437,44 +482,30 @@ const SessionTree = memo(
           totalResults={searchMatches.length}
         />
 
-        {pluginViews.length > 0 ? (
-          <div className="tree-plugin-views" role="toolbar" aria-label="Plugin views">
-            {pluginViews.map((view) => (
-              <button
-                key={view.id}
-                type="button"
-                className="tree-plugin-view-button"
-                aria-haspopup="dialog"
-                onClick={() => setActivePluginViewId(view.id)}
-                title={view.title}
-              >
-                {view.title}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
         <div className="branch-outline-controls">
-          <div
-            className="branch-filter-switch"
-            role="group"
-            aria-label="Tree filter"
-          >
-            {FILTERS.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                className={treeFilter === item.value ? "is-active" : ""}
-                aria-pressed={treeFilter === item.value}
-                onClick={() => {
-                  setTreeFilter(item.value);
-                  setCollapsed(new Set());
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+          <label className="branch-filter-field">
+            <span className="sr-only">
+              {t("components.branchMap.filters.label", "Tree filter")}
+            </span>
+            <select
+              className="tree-filter-select"
+              aria-label={t(
+                "components.branchMap.filters.label",
+                "Tree filter",
+              )}
+              value={treeFilter}
+              onChange={(event) => {
+                setTreeFilter(event.target.value as TreeFilter);
+                setCollapsed(new Set());
+              }}
+            >
+              {FILTERS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {t(item.translationKey, item.fallback)}
+                </option>
+              ))}
+            </select>
+          </label>
           {search ? (
             <label className="branch-search-context">
               <input
@@ -484,8 +515,39 @@ const SessionTree = memo(
                   setIncludeSearchContext(event.target.checked)
                 }
               />
-              Context
+              {t("components.branchMap.filters.context", "Context")}
             </label>
+          ) : null}
+          {pluginViews.length > 0 ? (
+            <details className="tree-view-menu">
+              <summary>
+                <span>
+                  {t("components.branchMap.views.label", "Views")}
+                </span>
+                <b>{pluginViews.length}</b>
+              </summary>
+              <div
+                className="tree-view-popover"
+                role="toolbar"
+                aria-label={t(
+                  "components.branchMap.views.menu",
+                  "Plugin views",
+                )}
+              >
+                {pluginViews.map((view) => (
+                  <button
+                    key={view.id}
+                    type="button"
+                    className="tree-plugin-view-button"
+                    aria-haspopup="dialog"
+                    onClick={() => setActivePluginViewId(view.id)}
+                    title={view.title}
+                  >
+                    {view.title}
+                  </button>
+                ))}
+              </div>
+            </details>
           ) : null}
         </div>
 
@@ -493,7 +555,10 @@ const SessionTree = memo(
           ref={scrollRef}
           className="tree-container branch-outline-scroll"
           role="tree"
-          aria-label="Session branch outline"
+          aria-label={t(
+            "components.branchMap.treeAriaLabel",
+            "Session branch outline",
+          )}
           tabIndex={0}
           onKeyDown={handleKeyDown}
           onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
@@ -560,21 +625,28 @@ const SessionTree = memo(
 
         <footer className="tree-status branch-outline-status" role="status">
           <span>
-            {formatNumber(entryItems.length)} entries ·{" "}
-            {formatNumber(
-              items.filter((item) => item.kind === "segment").length,
-            )}{" "}
-            segments
-          </span>
-          <span>
-            {formatNumber(model?.terminalSegments.length ?? 0)} endings ·{" "}
-            {formatNumber(model?.forks.length ?? 0)} forks
+            {t("components.branchMap.status.compact", {
+              entries: formatNumber(entryItems.length),
+              segments: formatNumber(
+                items.filter((item) => item.kind === "segment").length,
+              ),
+              endings: formatNumber(model?.terminalSegments.length ?? 0),
+              forks: formatNumber(model?.forks.length ?? 0),
+              defaultValue:
+                "{{entries}} entries · {{segments}} segments · {{endings}} endings · {{forks}} forks",
+            })}
           </span>
           {model?.topologyQuality !== "full" ? (
             <span className="branch-topology-quality">
               {model?.topologyQuality === "unknown"
-                ? "linear fallback"
-                : "inferred topology"}
+                ? t(
+                    "components.branchMap.status.linearFallback",
+                    "linear fallback",
+                  )
+                : t(
+                    "components.branchMap.status.inferredTopology",
+                    "inferred topology",
+                  )}
             </span>
           ) : null}
         </footer>
@@ -614,14 +686,20 @@ const SessionTree = memo(
                         {activePluginView.title}
                       </h2>
                       <div className="session-tree-plugin-dialog-subtitle">
-                        {entries.length} JSONL entries
+                        {t("components.branchMap.views.dialogEntryCount", {
+                          count: entries.length,
+                          defaultValue: "{{count}} JSONL entries",
+                        })}
                       </div>
                     </div>
                     <button
                       type="button"
                       className="session-tree-plugin-dialog-close"
                       onClick={() => setActivePluginViewId(null)}
-                      aria-label="Close"
+                      aria-label={t(
+                        "components.branchMap.views.close",
+                        "Close",
+                      )}
                     >
                       ×
                     </button>
@@ -727,6 +805,7 @@ function SegmentRow({
   onSelect: () => void;
   onActivate: () => void;
 }) {
+  const { t } = useTranslation();
   const { segment } = item;
   const style: CSSProperties = sticky
     ? { top }
@@ -760,36 +839,67 @@ function SegmentRow({
           event.stopPropagation();
           onToggle();
         }}
-        aria-label={`${collapsed ? "Expand" : "Collapse"} ${segment.code}`}
+        aria-label={t(
+          collapsed
+            ? "components.branchMap.segment.expand"
+            : "components.branchMap.segment.collapse",
+          {
+            code: segment.code,
+            defaultValue: `${collapsed ? "Expand" : "Collapse"} {{code}}`,
+          },
+        )}
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
       </button>
       <span className="branch-segment-code">{segment.code}</span>
       <div className="branch-segment-copy">
         <div>
-          <strong>{segment.level === 0 ? "Main line" : "Branch"}</strong>
+          <strong>
+            {segment.level === 0
+              ? t("components.branchMap.segment.mainLine", "Main line")
+              : t("components.branchMap.segment.branch", "Branch")}
+          </strong>
           <span>
             {truncate(segment.firstUserSummary || segment.start.summary, 120)}
           </span>
         </div>
         <small>
-          {segment.nodes.length} entries
+          {t("components.branchMap.segment.entries", {
+            count: segment.nodes.length,
+            defaultValue: "{{count}} entries",
+          })}
           {segment.forkAnchor
-            ? ` · from #${segment.forkAnchor.sequence}`
-            : " · session root"}
-          {segment.noteCount ? ` · ${segment.noteCount} notes` : ""}
+            ? ` · ${t("components.branchMap.segment.from", {
+                sequence: segment.forkAnchor.sequence,
+                defaultValue: "from #{{sequence}}",
+              })}`
+            : ` · ${t(
+                "components.branchMap.segment.sessionRoot",
+                "session root",
+              )}`}
+          {segment.noteCount
+            ? ` · ${t("components.branchMap.segment.notes", {
+                count: segment.noteCount,
+                defaultValue: "{{count}} notes",
+              })}`
+            : ""}
         </small>
       </div>
       <div className="branch-segment-state">
         {item.activeTerminal ? (
-          <b>ACTIVE</b>
+          <b>{t("components.branchMap.segment.active", "ACTIVE")}</b>
         ) : item.activeLineage ? (
-          <b>PATH</b>
+          <b>{t("components.branchMap.segment.path", "PATH")}</b>
         ) : null}
         {segment.children.length > 1 ? (
-          <span>{segment.children.length} forks</span>
+          <span>
+            {t("components.branchMap.segment.forks", {
+              count: segment.children.length,
+              defaultValue: "{{count}} forks",
+            })}
+          </span>
         ) : segment.terminal ? (
-          <span>END</span>
+          <span>{t("components.branchMap.segment.end", "END")}</span>
         ) : null}
         {item.visibleEntryCount !== segment.nodes.length ? (
           <em>
@@ -824,7 +934,25 @@ function EntryRow({
   onActivate: () => void;
   onFocus: () => void;
 }) {
+  const { t } = useTranslation();
   const { node } = item;
+  const relationLabel =
+    node.relation === "branch-start"
+      ? t(
+          "components.branchMap.entry.relation.branchStart",
+          "Branch start",
+        )
+      : node.relation === "root"
+        ? t("components.branchMap.entry.relation.root", "Sequence start")
+        : node.children.length > 1
+          ? t(
+              "components.branchMap.entry.relation.forkAnchor",
+              "Fork anchor",
+            )
+          : t(
+              "components.branchMap.entry.relation.linear",
+              "Linear continuation",
+            );
   return (
     <div
       className={[
@@ -857,21 +985,37 @@ function EntryRow({
       <div className="branch-entry-copy">
         <div>
           {node.label ? <mark>#{node.label}</mark> : null}
-          {node.entry.type === "session_info" ? <mark>RENAME</mark> : null}
-          {node.entry.type === "model_change" ? <mark>MODEL</mark> : null}
-          {node.entry.type === "label" ? <mark>LABEL</mark> : null}
+          {node.entry.type === "session_info" ? (
+            <mark>{t("components.branchMap.entry.rename", "RENAME")}</mark>
+          ) : null}
+          {node.entry.type === "model_change" ? (
+            <mark>{t("components.branchMap.entry.model", "MODEL")}</mark>
+          ) : null}
+          {node.entry.type === "label" ? (
+            <mark>{t("components.branchMap.entry.label", "LABEL")}</mark>
+          ) : null}
           <span>{truncate(node.summary, 180)}</span>
         </div>
         <small>
-          {entryRelationLabel(node)} · {node.id} ·{" "}
-          {formatTimestamp(node.timestampMs).slice(-8)}
+          {relationLabel} · {node.id} · {formatTimestamp(node.timestampMs).slice(-8)}
         </small>
       </div>
       {item.isForkAnchor ? (
-        <span className="branch-fork-chip">FORK {node.children.length}</span>
+        <span className="branch-fork-chip">
+          {t("components.branchMap.entry.fork", {
+            count: node.children.length,
+            defaultValue: "FORK {{count}}",
+          })}
+        </span>
       ) : null}
       {activePath ? (
-        <span className="branch-path-dot" aria-label="Active path">
+        <span
+          className="branch-path-dot"
+          aria-label={t(
+            "components.branchMap.entry.activePath",
+            "Active path",
+          )}
+        >
           ●
         </span>
       ) : null}

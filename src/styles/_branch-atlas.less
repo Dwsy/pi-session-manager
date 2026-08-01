@@ -3,17 +3,81 @@
   --branch-rail: rgb(var(--color-muted-foreground) / 0.42);
   --branch-rail-soft: rgb(var(--color-border) / 0.48);
   min-width: 0;
+  container-type: inline-size;
 }
 
 .branch-outline-controls {
   display: flex;
-  min-height: 36px;
+  min-height: 32px;
   flex: 0 0 auto;
   align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
+  gap: 6px;
+  padding: 4px 8px;
   border-bottom: 1px solid rgb(var(--color-border) / 0.65);
   background: rgb(var(--color-background));
+}
+
+.branch-filter-field {
+  min-width: 88px;
+  max-width: 144px;
+  flex: 1 1 112px;
+}
+
+.tree-view-menu {
+  position: relative;
+  z-index: 24;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.tree-view-menu > summary {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgb(var(--color-border) / 0.7);
+  border-radius: 4px;
+  padding: 0 7px;
+  color: rgb(var(--color-muted-foreground));
+  font: 9px var(--font-family-mono, ui-monospace, monospace);
+  cursor: pointer;
+  list-style: none;
+}
+
+.tree-view-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tree-view-menu > summary:hover,
+.tree-view-menu[open] > summary {
+  border-color: rgb(var(--color-ring) / 0.42);
+  background: rgb(var(--color-secondary) / 0.62);
+  color: rgb(var(--color-foreground));
+}
+
+.tree-view-menu > summary b {
+  color: var(--accent);
+  font-size: 8px;
+}
+
+.tree-view-popover {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  display: grid;
+  width: min(210px, calc(100cqw - 16px));
+  gap: 3px;
+  padding: 5px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 6px;
+  background: rgb(var(--color-popover));
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.26);
+}
+
+.tree-view-popover .tree-plugin-view-button {
+  width: 100%;
+  max-width: none;
+  justify-content: flex-start;
 }
 
 .branch-filter-switch {
@@ -95,10 +159,10 @@
   position: absolute;
   inset-inline: 0;
   display: flex;
-  height: 44px;
+  height: 36px;
   min-width: 0;
   align-items: center;
-  padding-right: 7px;
+  padding-right: 5px;
   border-bottom: 1px solid rgb(var(--color-border) / 0.34);
   cursor: default;
   user-select: none;
@@ -137,19 +201,19 @@
 
 .branch-entry-row.is-selected {
   z-index: 3;
-  background: rgb(var(--color-info) / 0.12);
-  box-shadow: inset 3px 0 rgb(var(--color-info));
+  background: rgb(var(--color-secondary) / 0.58);
+  box-shadow: inset 2px 0 rgb(var(--color-ring) / 0.72);
 }
 
 .branch-entry-row.is-focused {
   outline: none;
-  box-shadow: inset 0 0 0 1px rgb(var(--color-ring) / 0.54);
+  box-shadow: inset 0 0 0 1px rgb(var(--color-ring) / 0.44);
 }
 
 .branch-entry-row.is-selected.is-active-leaf {
   box-shadow:
-    inset 3px 0 var(--accent),
-    inset 0 0 0 1px rgb(var(--color-ring) / 0.44);
+    inset 2px 0 var(--accent),
+    inset 0 0 0 1px rgb(var(--color-ring) / 0.34);
 }
 
 .branch-entry-row.is-match {
@@ -196,9 +260,9 @@
 
 .branch-segment-fold {
   display: grid;
-  width: 22px;
-  height: 28px;
-  flex: 0 0 22px;
+  width: 20px;
+  height: 24px;
+  flex: 0 0 20px;
   place-items: center;
   padding: 0;
   border: 0;
@@ -213,10 +277,10 @@
 }
 
 .branch-segment-code {
-  min-width: 43px;
+  min-width: 38px;
   flex: 0 0 auto;
-  margin-right: 6px;
-  padding: 3px 5px;
+  margin-right: 4px;
+  padding: 2px 4px;
   border: 1px solid rgb(var(--color-border) / 0.8);
   border-radius: 5px;
   background: rgb(var(--color-background) / 0.42);
@@ -265,10 +329,10 @@
 .branch-segment-copy small,
 .branch-entry-copy small {
   display: block;
-  margin-top: 3px;
+  margin-top: 1px;
   overflow: hidden;
   color: rgb(var(--color-muted-foreground));
-  font: 8px var(--font-family-mono, ui-monospace, monospace);
+  font: 7.5px var(--font-family-mono, ui-monospace, monospace);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -297,9 +361,9 @@
 }
 
 .branch-entry-sequence {
-  min-width: 44px;
+  min-width: 36px;
   flex: 0 0 auto;
-  margin-right: 5px;
+  margin-right: 4px;
   color: rgb(var(--color-muted-foreground));
   font: 700 8px var(--font-family-mono, ui-monospace, monospace);
   text-align: right;
@@ -307,11 +371,11 @@
 
 .branch-entry-kind {
   display: grid;
-  width: 19px;
-  height: 19px;
-  flex: 0 0 19px;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
   place-items: center;
-  margin-right: 7px;
+  margin-right: 5px;
   border: 1px solid rgb(var(--color-border) / 0.56);
   border-radius: 5px;
   color: rgb(var(--color-muted-foreground));
@@ -342,8 +406,8 @@
 
 .branch-fork-chip {
   flex: 0 0 auto;
-  margin-left: 5px;
-  padding: 3px 5px;
+  margin-left: 4px;
+  padding: 2px 4px;
   border: 1px solid rgb(var(--color-warning) / 0.44);
   border-radius: 5px;
   background: rgb(var(--color-warning) / 0.08);
@@ -369,17 +433,43 @@
 
 .branch-outline-status {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: space-between;
-  gap: 3px 8px;
+  gap: 8px;
+  overflow: hidden;
   border-top: 1px solid rgb(var(--color-border) / 0.65);
   background: rgb(var(--color-background));
   font-family: var(--font-family-mono, ui-monospace, monospace);
+  white-space: nowrap;
+}
+
+.branch-outline-status > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .branch-topology-quality {
-  width: 100%;
+  flex: 0 0 auto;
   color: rgb(var(--color-warning));
+}
+
+@container (max-width: 340px) {
+  .branch-entry-sequence,
+  .branch-fork-chip,
+  .branch-segment-state {
+    display: none;
+  }
+
+  .branch-segment-code {
+    min-width: 34px;
+    padding-inline: 3px;
+  }
+
+  .branch-segment-copy small,
+  .branch-entry-copy small {
+    opacity: 0.76;
+  }
 }
 
 .branch-map-view,
@@ -440,6 +530,9 @@
   }
   .global-map-panel.is-collapsed {
     flex-basis: 36px;
+  }
+  .global-map-panel.is-collapsed .map-semantic-chip {
+    display: none;
   }
   .global-map-head {
     height: 36px;
