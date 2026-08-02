@@ -138,6 +138,56 @@ pub fn parse_pi_session_entries(path: &Path) -> Result<Vec<SessionEntry>, String
     Ok(raw_entries.iter().map(RawPiEntry::to_session_entry).collect())
 }
 
+#[derive(serde::Deserialize)]
+struct PiLabelLine<'a> {
+    #[serde(rename = "type")]
+    entry_type: Option<&'a str>,
+    #[serde(rename = "targetId")]
+    target_id: Option<&'a str>,
+    label: Option<&'a str>,
+}
+
+pub fn parse_pi_session_labels(path: &Path) -> Result<HashMap<String, String>, String> {
+    let start = std::time::Instant::now();
+    let file = File::open(path).map_err(|e| format!("Failed to open Pi session {}: {e}", path.display()))?;
+    let file_size = file.metadata().map(|metadata| metadata.len()).unwrap_or(0);
+    let mut reader = BufReader::new(file);
+    let mut line = String::new();
+    let mut labels = HashMap::new();
+    let mut label_rows = 0usize;
+
+    loop {
+        line.clear();
+        let bytes_read = reader.read_line(&mut line).map_err(|e| format!("Failed to read Pi session {}: {e}", path.display()))?;
+        if bytes_read == 0 {
+            break;
+        }
+
+        let Ok(entry) = serde_json::from_str::<PiLabelLine<'_>>(line.trim()) else {
+            continue;
+        };
+        if entry.entry_type != Some("label") {
+            continue;
+        }
+
+        let Some(target_id) = entry.target_id.map(str::trim).filter(|value| !value.is_empty()) else {
+            continue;
+        };
+        label_rows += 1;
+
+        if let Some(label) = entry.label.map(str::trim).filter(|value| !value.is_empty()) {
+            labels.insert(target_id.to_string(), label.to_string());
+        } else {
+            labels.remove(target_id);
+        }
+    }
+
+    let elapsed = start.elapsed();
+    crate::core::io_trace::trace_file_read(&path.to_string_lossy(), file_size, elapsed);
+    tracing::info!("[IO] parse_pi_session_labels path={} bytes={} rows={} labels={} elapsed={:?}", path.display(), file_size, label_rows, labels.len(), elapsed);
+    Ok(labels)
+}
+
 pub fn resolve_labels(entries: &[SessionEntry]) -> HashMap<String, ResolvedLabel> {
     let mut labels_by_target = HashMap::new();
 
@@ -431,8 +481,9 @@ fn truncate_text(text: &str, max_len: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_pi_session_entries, parse_pi_session_header_only, parse_pi_session_info, resolve_labels};
+    use super::{parse_pi_session_entries, parse_pi_session_header_only, parse_pi_session_info, parse_pi_session_labels, resolve_labels};
     use chrono::{DateTime, Utc};
+    use std::collections::HashMap;
     use std::fs;
     use tempfile::tempdir;
 
@@ -561,6 +612,31 @@ mod tests {
         assert_eq!(message.content[1].text.as_deref(), Some("hidden"));
         assert_eq!(message.content[2].content_type, "toolCall");
         assert_eq!(message.content[2].name.as_deref(), Some("ignored"));
+    }
+
+    #[test]
+    fn streaming_labels_match_full_entry_resolution() {
+        let payload = "x".repeat(128 * 1024);
+        let contents = format!(
+            concat!(
+                "{{\"type\":\"session\",\"version\":3,\"id\":\"sess-1\",\"timestamp\":\"2026-04-09T10:00:00Z\",\"cwd\":\"/workspace/project\"}}\n",
+                "{{\"type\":\"message\",\"id\":\"m1\",\"parentId\":null,\"timestamp\":\"2026-04-09T10:01:00Z\",\"message\":{{\"role\":\"user\",\"content\":[{{\"type\":\"text\",\"text\":\"{payload}\"}}]}}}}\n",
+                "not-json\n",
+                "{{\"type\":\"label\",\"id\":\"l1\",\"timestamp\":\"2026-04-09T10:02:00Z\",\"targetId\":\"m1\",\"label\":\"first\"}}\n",
+                "{{\"type\":\"label\",\"id\":\"l2\",\"timestamp\":\"2026-04-09T10:03:00Z\",\"targetId\":\"m2\",\"label\":\"kept\"}}\n",
+                "{{\"type\":\"label\",\"id\":\"l3\",\"timestamp\":\"2026-04-09T10:04:00Z\",\"targetId\":\"m1\",\"label\":\"second\"}}\n",
+                "{{\"type\":\"label\",\"id\":\"l4\",\"timestamp\":\"2026-04-09T10:05:00Z\",\"targetId\":\"m2\",\"label\":null}}\n"
+            ),
+            payload = payload,
+        );
+        let (_temp_dir, path) = write_session_file(&contents);
+
+        let expected = resolve_labels(&parse_pi_session_entries(&path).expect("parse full entries")).into_iter().map(|(target_id, resolved)| (target_id, resolved.text)).collect::<HashMap<_, _>>();
+        let streamed = parse_pi_session_labels(&path).expect("stream labels");
+
+        assert_eq!(streamed, expected);
+        assert_eq!(streamed.get("m1").map(String::as_str), Some("second"));
+        assert!(!streamed.contains_key("m2"));
     }
 
     #[test]

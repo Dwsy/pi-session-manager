@@ -31,10 +31,12 @@ struct TransformedSessionCacheEntry {
 struct SessionLabelsCacheEntry {
     modified_at_ms: u128,
     file_size: u64,
+    tail_fingerprint: Option<u64>,
     labels: HashMap<String, String>,
 }
 
 const PROVIDER_DETECTION_PROBE_BYTES: usize = 64 * 1024;
+const SESSION_LABELS_TAIL_FINGERPRINT_BYTES: u64 = 4 * 1024;
 
 fn transformed_session_cache() -> &'static RwLock<HashMap<String, TransformedSessionCacheEntry>> {
     static CACHE: OnceLock<RwLock<HashMap<String, TransformedSessionCacheEntry>>> = OnceLock::new();
@@ -60,34 +62,103 @@ fn file_modified_ms_and_size(path: &str) -> Result<(u128, u64), String> {
     Ok((modified_at_ms, metadata.len()))
 }
 
-fn appended_range_may_contain_label(path: &str, from_size: u64, to_size: u64) -> bool {
+fn session_labels_tail_bytes(file: &mut fs::File, file_size: u64) -> Option<Vec<u8>> {
+    let start = file_size.saturating_sub(SESSION_LABELS_TAIL_FINGERPRINT_BYTES);
+    file.seek(SeekFrom::Start(start)).ok()?;
+
+    let mut buffer = vec![0u8; (file_size - start) as usize];
+    file.read_exact(&mut buffer).ok()?;
+    Some(buffer)
+}
+
+fn session_labels_tail_fingerprint_bytes(buffer: &[u8]) -> u64 {
+    // Compact FNV-1a hash avoids retaining a per-session byte buffer while
+    // still rejecting changed old suffixes before the append fast path.
+    let mut fingerprint = 0xcbf29ce484222325u64;
+    for byte in buffer {
+        fingerprint ^= u64::from(*byte);
+        fingerprint = fingerprint.wrapping_mul(0x100000001b3);
+    }
+    fingerprint
+}
+
+fn session_labels_tail_fingerprint(path: &str, file_size: u64) -> Option<u64> {
+    let backing_path = crate::domain::session_bridge::backing_file_path(Path::new(path));
+    let mut file = fs::File::open(backing_path).ok()?;
+    let tail = session_labels_tail_bytes(&mut file, file_size)?;
+    Some(session_labels_tail_fingerprint_bytes(&tail))
+}
+
+fn label_free_append_tail_fingerprint(path: &str, from_size: u64, to_size: u64, expected_old_tail_fingerprint: u64) -> Option<u64> {
     const LABEL_APPEND_PROBE_BYTES: u64 = 64 * 1024;
 
     if to_size <= from_size {
-        return true;
+        return None;
     }
 
     let appended_bytes = to_size - from_size;
     if appended_bytes > LABEL_APPEND_PROBE_BYTES {
-        return true;
+        return None;
     }
 
     let backing_path = crate::domain::session_bridge::backing_file_path(Path::new(path));
-    let Ok(mut file) = fs::File::open(backing_path) else {
-        return true;
-    };
-    if file.seek(SeekFrom::Start(from_size)).is_err() {
-        return true;
+    let mut file = fs::File::open(backing_path).ok()?;
+    let old_tail = session_labels_tail_bytes(&mut file, from_size)?;
+    if session_labels_tail_fingerprint_bytes(&old_tail) != expected_old_tail_fingerprint {
+        return None;
     }
 
-    let mut buffer = vec![0u8; appended_bytes as usize];
-    let Ok(bytes_read) = file.read(&mut buffer) else {
-        return true;
-    };
-    buffer.truncate(bytes_read);
+    // Only inspect a self-contained JSONL suffix. If the previous snapshot or
+    // the current append ends mid-line, refresh conservatively so a label split
+    // across writes cannot be skipped when the cache offset advances.
+    if from_size > 0 && old_tail.last() != Some(&b'\n') {
+        return None;
+    }
 
-    let text = String::from_utf8_lossy(&buffer);
-    text.lines().filter_map(|line| serde_json::from_str::<Value>(line.trim()).ok()).any(|value| value.get("type").and_then(Value::as_str) == Some("label"))
+    file.seek(SeekFrom::Start(from_size)).ok()?;
+    let mut appended = vec![0u8; appended_bytes as usize];
+    file.read_exact(&mut appended).ok()?;
+    if appended.last() != Some(&b'\n') {
+        return None;
+    }
+
+    let text = String::from_utf8_lossy(&appended);
+    if text.lines().filter_map(|line| serde_json::from_str::<Value>(line.trim()).ok()).any(|value| value.get("type").and_then(Value::as_str) == Some("label")) {
+        return None;
+    }
+
+    let tail_bytes = SESSION_LABELS_TAIL_FINGERPRINT_BYTES as usize;
+    let appended_tail_start = appended.len().saturating_sub(tail_bytes);
+    let old_tail_bytes_to_keep = tail_bytes.saturating_sub(appended.len()).min(old_tail.len());
+    let mut new_tail = Vec::with_capacity(tail_bytes.min(old_tail_bytes_to_keep + appended.len()));
+    new_tail.extend_from_slice(&old_tail[old_tail.len() - old_tail_bytes_to_keep..]);
+    new_tail.extend_from_slice(&appended[appended_tail_start..]);
+
+    Some(session_labels_tail_fingerprint_bytes(&new_tail))
+}
+
+fn get_cached_session_labels(path: &str, modified_at_ms: u128, file_size: u64) -> Option<HashMap<String, String>> {
+    let entry = session_labels_cache().read().ok()?.get(path).cloned()?;
+
+    if entry.modified_at_ms == modified_at_ms && entry.file_size == file_size {
+        return Some(entry.labels);
+    }
+
+    // Active Pi sessions append ordinary message rows much more often than
+    // labels. Verify the previous suffix, inspect the appended JSONL rows, and
+    // derive the new suffix fingerprint with a single file open.
+    let expected_old_tail_fingerprint = entry.tail_fingerprint?;
+    if let Some(tail_fingerprint) = label_free_append_tail_fingerprint(path, entry.file_size, file_size, expected_old_tail_fingerprint) {
+        if let Ok(mut guard) = session_labels_cache().write() {
+            let still_current = guard.get(path).map(|current| current.modified_at_ms == entry.modified_at_ms && current.file_size == entry.file_size && current.tail_fingerprint == entry.tail_fingerprint).unwrap_or(false);
+            if still_current {
+                guard.insert(path.to_string(), SessionLabelsCacheEntry { modified_at_ms, file_size, tail_fingerprint: Some(tail_fingerprint), labels: entry.labels.clone() });
+            }
+        }
+        return Some(entry.labels);
+    }
+
+    None
 }
 
 fn detect_session_provider(path: &Path) -> Result<Option<crate::domain::casr_min::providers::ProviderKind>, String> {
@@ -115,10 +186,10 @@ fn detect_session_provider(path: &Path) -> Result<Option<crate::domain::casr_min
 
 fn resolve_pi_session_labels(path: &Path) -> Result<HashMap<String, String>, String> {
     let start = std::time::Instant::now();
-    let entries = crate::domain::pi_session::parse_pi_session_entries(path)?;
+    let labels = crate::domain::pi_session::parse_pi_session_labels(path)?;
     let elapsed = start.elapsed();
-    info!("[IO] resolve_pi_session_labels path={} entries={} elapsed={:?}", path.display(), entries.len(), elapsed);
-    Ok(crate::domain::pi_session::resolve_labels(&entries).into_iter().map(|(target_id, resolved)| (target_id, resolved.text)).collect())
+    info!("[IO] resolve_pi_session_labels path={} labels={} elapsed={:?}", path.display(), labels.len(), elapsed);
+    Ok(labels)
 }
 
 fn get_session_labels_sync(path: &str) -> Result<HashMap<String, String>, String> {
@@ -128,20 +199,8 @@ fn get_session_labels_sync(path: &str) -> Result<HashMap<String, String>, String
     }
 
     let (modified_at_ms, file_size) = file_modified_ms_and_size(path)?;
-    if let Ok(guard) = session_labels_cache().read() {
-        if let Some(entry) = guard.get(path) {
-            if entry.modified_at_ms == modified_at_ms && entry.file_size == file_size {
-                return Ok(entry.labels.clone());
-            }
-
-            // Active sessions often append ordinary message rows. Avoid a full
-            // label reparse unless the append tail contains label rows; rewrites,
-            // truncations, or large appends refresh conservatively.
-            let cache_age_ms = entry.modified_at_ms.abs_diff(modified_at_ms);
-            if cache_age_ms < 10_000 && file_size > entry.file_size && !appended_range_may_contain_label(path, entry.file_size, file_size) {
-                return Ok(entry.labels.clone());
-            }
-        }
+    if let Some(labels) = get_cached_session_labels(path, modified_at_ms, file_size) {
+        return Ok(labels);
     }
 
     let start = std::time::Instant::now();
@@ -150,7 +209,8 @@ fn get_session_labels_sync(path: &str) -> Result<HashMap<String, String>, String
     info!("[IO] get_session_labels cache_miss path={} elapsed={:?}", path, elapsed);
 
     if let Ok(mut guard) = session_labels_cache().write() {
-        guard.insert(path.to_string(), SessionLabelsCacheEntry { modified_at_ms, file_size, labels: labels.clone() });
+        let tail_fingerprint = session_labels_tail_fingerprint(path, file_size);
+        guard.insert(path.to_string(), SessionLabelsCacheEntry { modified_at_ms, file_size, tail_fingerprint, labels: labels.clone() });
     }
 
     Ok(labels)
@@ -739,7 +799,10 @@ pub async fn fork_session_impl(source_path: String, target_name: Option<String>)
 
 #[cfg(test)]
 mod tests {
-    use super::{file_modified_ms, get_session_labels_impl, read_session_file_chunk_impl, read_session_file_incremental_impl, read_session_file_incremental_offset_impl, rename_session_impl_with_db_path, session_labels_cache, utf8_safe_cut};
+    use super::{
+        file_modified_ms, file_modified_ms_and_size, get_cached_session_labels, get_session_labels_impl, label_free_append_tail_fingerprint, read_session_file_chunk_impl, read_session_file_incremental_impl, read_session_file_incremental_offset_impl, rename_session_impl_with_db_path,
+        session_labels_cache, session_labels_tail_fingerprint, utf8_safe_cut, SessionLabelsCacheEntry,
+    };
     use std::collections::HashMap;
     use std::fs;
     use std::path::Path;
@@ -845,6 +908,77 @@ mod tests {
 
         let _ = fs::remove_file(&path);
         let _ = fs::remove_dir_all(&base_dir);
+    }
+
+    #[test]
+    fn cached_session_labels_reuses_and_advances_stale_label_free_append() {
+        let temp_dir = tempdir().expect("tempdir");
+        let path = temp_dir.path().join("session.jsonl");
+        let initial = concat!("{\"type\":\"session\",\"version\":3,\"id\":\"sess-1\",\"timestamp\":\"2026-04-09T10:00:00Z\",\"cwd\":\"/workspace\"}\n", "{\"type\":\"label\",\"id\":\"l1\",\"parentId\":null,\"timestamp\":\"2026-04-09T10:01:00Z\",\"targetId\":\"m1\",\"label\":\"cached\"}\n");
+        fs::write(&path, initial).expect("write initial session");
+
+        let path_str = path.to_str().expect("path utf8").to_string();
+        let (initial_modified_at_ms, initial_file_size) = file_modified_ms_and_size(&path_str).expect("initial metadata");
+        let labels = HashMap::from([("m1".to_string(), "cached".to_string())]);
+        session_labels_cache()
+            .write()
+            .expect("cache lock")
+            .insert(path_str.clone(), SessionLabelsCacheEntry { modified_at_ms: initial_modified_at_ms.saturating_sub(20_000), file_size: initial_file_size, tail_fingerprint: session_labels_tail_fingerprint(&path_str, initial_file_size), labels: labels.clone() });
+
+        let appended = format!("{initial}{}", "{\"type\":\"message\",\"id\":\"m1\",\"parentId\":null,\"timestamp\":\"2026-04-09T10:02:00Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"}]}}\n");
+        let updated_modified_at_ms = rewrite_until_modified(&path, &appended, initial_modified_at_ms);
+        let (_, updated_file_size) = file_modified_ms_and_size(&path_str).expect("updated metadata");
+
+        let cached = get_cached_session_labels(&path_str, updated_modified_at_ms, updated_file_size).expect("label-free append should reuse cache");
+        assert_eq!(cached, labels);
+
+        let cache = session_labels_cache().read().expect("cache lock");
+        let cache_entry = cache.get(&path_str).expect("cache entry");
+        assert_eq!(cache_entry.modified_at_ms, updated_modified_at_ms);
+        assert_eq!(cache_entry.file_size, updated_file_size);
+        assert_eq!(cache_entry.tail_fingerprint, session_labels_tail_fingerprint(&path_str, updated_file_size));
+    }
+
+    #[test]
+    fn label_free_append_tail_fingerprint_matches_full_tail_after_large_append() {
+        let temp_dir = tempdir().expect("tempdir");
+        let path = temp_dir.path().join("session.jsonl");
+        let initial = "{\"type\":\"session\",\"version\":3,\"id\":\"sess-1\",\"timestamp\":\"2026-04-09T10:00:00Z\",\"cwd\":\"/workspace\"}\n";
+        fs::write(&path, initial).expect("write initial session");
+
+        let path_str = path.to_str().expect("path utf8").to_string();
+        let initial_size = fs::metadata(&path).expect("initial metadata").len();
+        let initial_fingerprint = session_labels_tail_fingerprint(&path_str, initial_size).expect("initial fingerprint");
+        let payload = "x".repeat(8 * 1024);
+        let appended = format!("{{\"type\":\"message\",\"id\":\"m1\",\"parentId\":null,\"timestamp\":\"2026-04-09T10:02:00Z\",\"message\":{{\"role\":\"user\",\"content\":[{{\"type\":\"text\",\"text\":\"{payload}\"}}]}}}}\n");
+        fs::write(&path, format!("{initial}{appended}")).expect("append large message");
+        let updated_size = fs::metadata(&path).expect("updated metadata").len();
+
+        let incremental = label_free_append_tail_fingerprint(&path_str, initial_size, updated_size, initial_fingerprint).expect("label-free append should produce fingerprint");
+        let full = session_labels_tail_fingerprint(&path_str, updated_size).expect("full fingerprint");
+        assert_eq!(incremental, full);
+    }
+
+    #[tokio::test]
+    async fn get_session_labels_rejects_growth_after_in_place_tail_rewrite() {
+        let temp_dir = tempdir().expect("tempdir");
+        let path = temp_dir.path().join("session.jsonl");
+        let initial = concat!("{\"type\":\"session\",\"version\":3,\"id\":\"sess-1\",\"timestamp\":\"2026-04-09T10:00:00Z\",\"cwd\":\"/workspace\"}\n", "{\"type\":\"label\",\"id\":\"l1\",\"parentId\":null,\"timestamp\":\"2026-04-09T10:01:00Z\",\"targetId\":\"m1\",\"label\":\"cached\"}\n",);
+        fs::write(&path, initial).expect("write initial session");
+
+        let path_str = path.to_str().expect("path utf8").to_string();
+        let initial_labels = get_session_labels_impl(path_str.clone()).await.expect("initial labels should succeed");
+        assert_eq!(initial_labels.get("m1").map(String::as_str), Some("cached"));
+
+        let (initial_modified_at_ms, initial_file_size) = file_modified_ms_and_size(&path_str).expect("initial metadata");
+        let rewritten = initial.replace("\"cached\"", "\"edited\"");
+        let grown = format!("{rewritten}{}", "{\"type\":\"message\",\"id\":\"m1\",\"parentId\":null,\"timestamp\":\"2026-04-09T10:02:00Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"}]}}\n");
+        rewrite_until_modified(&path, &grown, initial_modified_at_ms);
+        let (_, updated_file_size) = file_modified_ms_and_size(&path_str).expect("updated metadata");
+        assert!(updated_file_size > initial_file_size);
+
+        let refreshed = get_session_labels_impl(path_str).await.expect("rewritten labels should refresh");
+        assert_eq!(refreshed.get("m1").map(String::as_str), Some("edited"));
     }
 
     #[tokio::test]

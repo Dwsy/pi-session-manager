@@ -4,9 +4,11 @@
 
 ```
 src-tauri/src/
-  lib.rs, main.rs, main-cli.rs, dispatch.rs
-  commands/    # Tauri commands (thin layer)
-  domain/       # Business logic
+  lib.rs, main.rs, main-cli.rs
+  app/         # Tauri GUI composition and handler registration
+  commands/    # Typed Tauri adapters (thin layer)
+  dispatch/    # HTTP/WS/plugin JSON adapters by capability
+  domain/      # Business logic and orchestration
   core/        # Core utilities
   data/        # Data access
   server/      # Protocol adapters
@@ -25,6 +27,7 @@ src-tauri/src/
 |--------|-------------|
 | `model_config/` | reader, writer, backup, http_tester |
 | `session_list/` | filtering, pagination, sorting |
+| `session_search/` | search orchestration, ranking, pagination, timeout, metrics |
 | `stats/` | aggregator, day_stats, heatmap |
 | `terminal/` | api, launch, utils |
 | `trace/` | trace analytics extraction |
@@ -91,19 +94,34 @@ pub async fn my_new_command(
 }
 ```
 
-### Step 3: Register in dispatch.rs
+### Step 3: Add the Protocol Adapter
 
-**This makes the command available via HTTP and WS:**
+**This makes the command available via HTTP, WS, and plugin dispatch:**
 
 ```rust
-// dispatch.rs — inside dispatch_impl()
-"my_new_command" => {
-    // For simple commands that don't need app_state:
-    my_new_command(payload).await
-    // Or if app_state is needed:
-    // my_new_command(app_state, payload).await
+// dispatch/my_feature.rs
+pub(super) const COMMANDS: &[&str] = &["my_new_command"];
+
+pub(super) async fn dispatch(
+    app_state: &Option<DispatchAppState>,
+    command: &str,
+    payload: &Value,
+) -> DispatchResult {
+    if !COMMANDS.contains(&command) {
+        return None;
+    }
+
+    Some(match command {
+        "my_new_command" => {
+            let id = extract(payload, "id")?;
+            Ok(to_val(crate::my_new_command(id).await?, "serialize result")?)
+        }
+        _ => unreachable!("catalog and match arms diverged"),
+    })
 }
 ```
+
+For an existing feature area, add the command to its current capability module. Create a new dispatch module only when the feature has distinct ownership.
 
 ### Step 4: Export from commands/mod.rs
 
@@ -116,7 +134,7 @@ pub use my_feature::*;
 ### Step 5: Register Tauri Command (GUI only)
 
 ```rust
-// lib.rs
+// app/mod.rs
 tauri::generate_handler![
     // ... existing commands ...
     my_new_command,

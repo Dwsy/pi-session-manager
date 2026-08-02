@@ -78,7 +78,7 @@ pub async fn test_model_http(provider: String, model: String, prompt: Option<Str
     domain::test_model_http_internal(provider, model, prompt, timeout_ms).await
 }
 
-// Internal helpers (called from dispatch.rs)
+// Internal helpers (called from the model dispatch adapter)
 pub async fn list_model_config_versions_internal() -> Result<Vec<ConfigVersionMeta>, String> {
     use crate::domain::model_config::reader::get_models_json_path;
     let file_path = get_models_json_path()?.to_string_lossy().to_string();

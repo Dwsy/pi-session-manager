@@ -4,15 +4,20 @@
 
 ```
 src/
-  App.tsx, main.tsx, transport.ts, types.ts
-  components/    # ~199 .tsx files
-  hooks/         # ~51 hooks
-  contexts/      # 3 contexts
-  plugins/       # Plugin system
-  utils/         # 15+ utilities
-  i18n/          # i18n (en-US, zh-CN, ja-JP, de-DE, fr-FR, es-ES)
-  styles/        # 20 Less files
+  App.tsx        # Application composition root
+  main.tsx, transport.ts, types.ts
+  components/app/ # Mobile/desktop layout and pane adapters
+  components/    # Feature and shared UI components
+  hooks/app/     # Application-shell feature controllers
+  hooks/         # Feature/data/UI hooks
+  contexts/      # Shared React contexts
+  plugins/       # Plugin system and runtime host
+  utils/         # Pure utilities and API helpers
+  i18n/          # i18n resources
+  styles/        # Global and feature styles
 ```
+
+`App.tsx` is the composition root: it wires feature hooks, route state, and mobile/desktop panes. Cohesive state machines and side-effectful feature controllers belong in `hooks/app/`; presentational layout belongs in `components/app/`. New app-shell behavior should extend the owning controller instead of adding another inline state cluster to `App.tsx`.
 
 ## Components (components/)
 
@@ -274,7 +279,16 @@ view implementations live under `extensions/psm-*`.
 
 ### App Hooks (hooks/app/)
 
-`useAppBootstrap` | `useAppUiEffects` | `useDesktopSidebarActions` | `useFavorites` | `useSidebarSessions` | `useUpdateChecker`
+| Hook | Ownership |
+|------|-----------|
+| `useAppBootstrap` | Startup, initial data loading, file watcher, terminal settings bootstrap |
+| `useAppUiEffects` | Mobile modal body state and pending-entry cleanup |
+| `useAppViewNavigation` | Plugin app-view routes, mobile tabs, sidebar items, and app-view shortcuts |
+| `useDesktopSidebarActions` | Desktop sidebar navigation actions |
+| `useFavorites` | Favorite item loading and mutations |
+| `useSidebarSessions` | Sidebar filtering, pagination, project summary, and list props |
+| `useTerminalScopes` | Terminal visibility, active scope, bounded scope cache, and pending commands |
+| `useUpdateChecker` | Desktop update checks and update-notice actions |
 
 ### Session Hooks
 

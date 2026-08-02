@@ -3,8 +3,8 @@
 ## Four-Layer Architecture
 
 ```
-Commands (thin) ← Tauri IPC / HTTP / WS
-Domain (business) ← model_config, session_list, stats, terminal
+Adapters ← Tauri `commands/` + capability-oriented `dispatch/`
+Domain (business) ← model_config, session_list, session_search, stats, terminal
 Data ← search (SQLite FTS5 normalized index) sqlite (cache)
 Server (protocol) ← HTTP adapter, WebSocket adapter
 ```
@@ -69,7 +69,7 @@ async fn handle_message(&self, msg: WsRequest) -> WsResponse {
 **All HTTP and WS requests converge at `dispatch()`**, and plugin-style Tauri capability calls can do the same via `plugin_dispatch_command`:
 
 ```rust
-// dispatch.rs
+// dispatch/mod.rs
 // CLI/external callers (no app_state)
 pub async fn dispatch(command: &str, payload: &Value) -> Result<Value, String> {
     dispatch_impl(&None, command, payload).await
@@ -86,7 +86,9 @@ pub async fn dispatch_with_state(
 }
 ```
 
-**Adding a command once in `dispatch.rs` makes it available via both HTTP and WS.**
+`dispatch/mod.rs` performs permission checks and delegates to capability adapters such as `dispatch/sessions.rs`, `dispatch/search.rs`, and `dispatch/plugins.rs`. Adding an HTTP/WS command means adding its payload adapter to the matching capability module; no central 1,500-line match is involved.
+
+GUI composition and the compile-time Tauri handler list live in `app/mod.rs`. `lib.rs` keeps public modules, shared window helpers, aliases, and the re-exported `run()` entry point.
 
 ## Module Aliases (lib.rs)
 

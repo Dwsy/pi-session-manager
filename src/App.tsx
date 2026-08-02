@@ -36,7 +36,12 @@ import { useAppBootstrap } from "./hooks/app/useAppBootstrap";
 import { useAppUiEffects } from "./hooks/app/useAppUiEffects";
 import { useUpdateChecker } from "./hooks/app/useUpdateChecker";
 import { useDesktopSidebarActions } from "./hooks/app/useDesktopSidebarActions";
+import { useAppViewNavigation } from "./hooks/app/useAppViewNavigation";
 import { useSidebarSessions } from "./hooks/app/useSidebarSessions";
+import {
+  useTerminalScopes,
+  type TerminalScope,
+} from "./hooks/app/useTerminalScopes";
 import { registerBuiltinToolPlugins } from "./plugins/tools-render";
 import ConnectionBanner from "./components/ConnectionBanner";
 import UpdateNoticeToast from "./components/UpdateNoticeToast";
@@ -46,7 +51,6 @@ import type { SessionConvertTarget, SessionInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
 import {
   initializePsmPluginHost,
-  type PsmAppViewRuntimeRegistration,
   psmPluginHost,
   usePsmPluginUi,
 } from "./plugins/runtime-host";
@@ -66,9 +70,7 @@ import { shouldSkipOnboardingForRuntime } from "./runtime-data/mode";
 import AppMobileLayout, {
   type MobileTab,
 } from "./components/app/AppMobileLayout";
-import AppDesktopSidebar, {
-  type AppDesktopSidebarAppViewItem,
-} from "./components/app/AppDesktopSidebar";
+import AppDesktopSidebar from "./components/app/AppDesktopSidebar";
 import AppDesktopContent from "./components/app/AppDesktopContent";
 import AppDesktopSearchBar from "./components/app/AppDesktopSearchBar";
 import { usePiLive } from "./hooks/usePiLive";
@@ -108,56 +110,6 @@ const startDragging = () => {
   }
 };
 
-const MAX_TERMINAL_SCOPES = 5;
-
-const GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY = [
-  // Keep app-level navigation shortcuts available while typing, but do not
-  // allow destructive or session-launch actions to fire from text inputs.
-  "cmd+1",
-  "cmd+2",
-  "cmd+shift+e",
-  "cmd+shift+g",
-  "cmd+shift+p",
-  "cmd+p",
-  "cmd+,",
-  "cmd+`",
-  "cmd+j",
-  "cmd+shift+f",
-  "cmd+shift+i",
-  "cmd+alt+i",
-  "cmd+shift+r",
-  "cmd+alt+b",
-  "f12",
-];
-
-function normalizeShortcutKey(shortcut?: string) {
-  return shortcut
-    ?.trim()
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/^command\+/, "cmd+")
-    .replace(/^⌘/, "cmd+");
-}
-
-function normalizeAppRoute(route?: string) {
-  if (!route) return null;
-  const [pathname] = route.split(/[?#]/);
-  const normalized = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  return normalized.replace(/\/+$/, "") || "/";
-}
-
-function getAppViewRoute(view: Pick<PsmAppViewRuntimeRegistration, "id" | "route">) {
-  return normalizeAppRoute(view.route) ?? `/app/${encodeURIComponent(view.id)}`;
-}
-
-function appViewMobileTabId(viewId: string): MobileTab {
-  return `app:${viewId}`;
-}
-
-function appViewIdFromMobileTab(tab: MobileTab) {
-  return tab.startsWith("app:") ? tab.slice(4) : null;
-}
-
 // Lazy load heavy components
 const Dashboard = lazy(() => import("./components/dashboard/Dashboard"));
 const SettingsPanel = lazy(() => import("./components/settings/SettingsPanel"));
@@ -173,12 +125,6 @@ const LoadingSpinner = () => (
     <span className="sr-only">Loading</span>
   </div>
 );
-
-interface TerminalScope {
-  key: string;
-  cwd: string;
-  label: string;
-}
 
 function App() {
   const { t } = useTranslation();
@@ -339,12 +285,30 @@ function App() {
       return false;
     }
   });
-  const [showTerminal, setShowTerminal] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [activeTerminalScopeKey, setActiveTerminalScopeKey] = useState<string | null>(null);
-  const [terminalScopes, setTerminalScopes] = useState<Record<string, TerminalScope>>({});
-  const [terminalPendingCommands, setTerminalPendingCommands] = useState<Record<string, string | null>>({});
   const [versionDowngradeInfo, setVersionDowngradeInfo] = useState<VersionDowngradeInfo | null>(null);
+  const {
+    showTerminal,
+    setShowTerminal,
+    terminalMaximized,
+    setTerminalMaximized,
+    activeTerminalScopeKey,
+    terminalScopeList,
+    terminalPendingCommands,
+    currentTerminalScope,
+    getTerminalScopeForSession,
+    openTerminalScope,
+    toggleCurrentTerminalScope: toggleTerminalScope,
+    closeDesktopTerminal,
+    clearTerminalPendingCommand,
+    handleBuiltinTerminalDisabled,
+  } = useTerminalScopes({
+    selectedSession,
+    selectedProject,
+    sessions,
+    standaloneDatasetRuntime,
+    workspaceLabel: t("app.workspace", "Workspace"),
+  });
 
   useEffect(() => {
     if (!standaloneDatasetRuntime || typeof window === "undefined") return;
@@ -443,89 +407,26 @@ function App() {
   const routeMainPending = pendingSessionRoute || pendingAppRoute;
   const showRouteMainPendingSpinner = useDelayedLoading(routeMainPending);
 
-  const openPluginAppView = useCallback(
-    (view: PsmAppViewRuntimeRegistration) => {
-      setSidebarMode("app");
-      setActiveAppViewId(view.id);
-      setSelectedSession(null);
-      setSelectedProject(null);
-      navigateToPath(getAppViewRoute(view));
-    },
-    [navigateToPath, setSelectedSession],
-  );
-  const openPluginAppViewById = useCallback(
-    (viewId: string) => {
-      const view = appViews.find((item) => item.id === viewId);
-      if (view) openPluginAppView(view);
-    },
-    [appViews, openPluginAppView],
-  );
-  const appViewItems = useMemo<AppDesktopSidebarAppViewItem[]>(
-    () => appViews.map((view) => ({
-        id: view.id,
-        label: view.title,
-        icon: view.icon,
-        shortcut: view.shortcut,
-        active: sidebarMode === "app" && activeAppViewId === view.id,
-        onSelect: () => openPluginAppView(view),
-      })),
-    [activeAppViewId, appViews, openPluginAppView, sidebarMode],
-  );
-  const mobileAppViewItems = useMemo(
-    () => appViews.map((view) => ({
-      id: view.id,
-      tabId: appViewMobileTabId(view.id),
-      label: view.title,
-      icon: view.icon,
-    })),
-    [appViews],
-  );
-  const handleMobileTabChange = useCallback(
-    (tab: MobileTab) => {
-      const appViewId = appViewIdFromMobileTab(tab);
-      if (appViewId) {
-        const appView = appViews.find((view) => view.id === appViewId);
-        setMobileTab(tab);
-        if (appView) {
-          openPluginAppView(appView);
-        }
-        return;
-      }
-
-      setActiveAppViewId(null);
-      if (tab === "list") {
-        setSidebarMode("list");
-      } else if (tab === "projects") {
-        setSidebarMode("project");
-      }
-      setMobileTab(tab);
-    },
-    [appViews, openPluginAppView],
-  );
-  useEffect(() => {
-    if (!isMobile || sidebarMode !== "app" || !activeAppViewId) return;
-    setMobileTab(appViewMobileTabId(activeAppViewId));
-  }, [activeAppViewId, isMobile, sidebarMode]);
-  const primaryAppViewShortcutHandler = useMemo(() => {
-    const kanbanView = appViewItems.find((item) => item.id === 'builtin.kanban-board.view');
-    return kanbanView?.onSelect ?? appViewItems[0]?.onSelect ?? null;
-  }, [appViewItems]);
-
-  const appViewShortcuts = useMemo(
-    () => Object.fromEntries(
-      appViewItems
-        .map((item) => [normalizeShortcutKey(item.shortcut), item.onSelect] as const)
-        .filter((entry): entry is readonly [string, () => void] => Boolean(entry[0])),
-    ),
-    [appViewItems],
-  );
-  const shortcutsAllowedInTextEntry = useMemo(
-    () => [
-      ...GLOBAL_SHORTCUTS_ALLOWED_IN_TEXT_ENTRY,
-      ...Object.keys(appViewShortcuts),
-    ],
-    [appViewShortcuts],
-  );
+  const {
+    openPluginAppViewById,
+    appViewItems,
+    mobileAppViewItems,
+    handleMobileTabChange,
+    primaryAppViewShortcutHandler,
+    appViewShortcuts,
+    shortcutsAllowedInTextEntry,
+  } = useAppViewNavigation({
+    appViews,
+    sidebarMode,
+    activeAppViewId,
+    isMobile,
+    setSidebarMode,
+    setActiveAppViewId,
+    setSelectedSession,
+    setSelectedProject,
+    setMobileTab,
+    navigateToPath,
+  });
 
   // Deep link: pi-session://sessions/{id} etc.
   const handleDeepLink = useCallback(
@@ -555,11 +456,6 @@ function App() {
   const triggerSelectionMode = useCallback(() => {
     setSelectionModeTrigger((value) => value + 1);
   }, []);
-  const [terminalMaximized, setTerminalMaximized] = useState(false);
-  const handleBuiltinTerminalDisabled = useCallback(() => {
-    setShowTerminal(false);
-    setTerminalMaximized(false);
-  }, []);
   useEffect(() => {
     if (standaloneDatasetRuntime) {
       setSourceOptions([]);
@@ -587,84 +483,9 @@ function App() {
       patchSessions,
       onBuiltinTerminalDisabled: handleBuiltinTerminalDisabled,
     });
-  const getTerminalScopeForSession = useCallback((session: SessionInfo): TerminalScope => ({
-    key: `session:${session.id || session.path}`,
-    cwd: session.cwd || "/",
-    label: session.name || session.id || "Session",
-  }), []);
-  const currentTerminalScope = useMemo<TerminalScope>(() => {
-    if (selectedSession) {
-      return getTerminalScopeForSession(selectedSession);
-    }
-    if (selectedProject) {
-      return {
-        key: `project:${selectedProject}`,
-        cwd: selectedProject,
-        label: getPathBasename(selectedProject) || selectedProject,
-      };
-    }
-    return {
-      key: "workspace",
-      cwd: sessions[0]?.cwd || "/",
-      label: t("app.workspace", "Workspace"),
-    };
-  }, [getTerminalScopeForSession, selectedProject, selectedSession, sessions, t]);
-  const ensureTerminalScope = useCallback((scope: TerminalScope) => {
-    setTerminalScopes((prev) => {
-      const existing = prev[scope.key];
-      if (
-        existing &&
-        pathsEqual(existing.cwd, scope.cwd) &&
-        existing.label === scope.label
-      ) {
-        return prev;
-      }
-
-      const next = { ...prev, [scope.key]: scope };
-      const keys = Object.keys(next);
-      if (keys.length <= MAX_TERMINAL_SCOPES) {
-        return next;
-      }
-
-      const evictKey = keys.find((key) => key !== scope.key && key !== activeTerminalScopeKey) ?? keys[0];
-      if (evictKey) {
-        delete next[evictKey];
-      }
-      return next;
-    });
-  }, [activeTerminalScopeKey]);
-  const openTerminalScope = useCallback((scope: TerminalScope, command?: string | null) => {
-    ensureTerminalScope(scope);
-    setActiveTerminalScopeKey(scope.key);
-    if (command != null) {
-      setTerminalPendingCommands((prev) => ({ ...prev, [scope.key]: command }));
-    }
-    setShowTerminal(true);
-  }, [ensureTerminalScope]);
   const toggleCurrentTerminalScope = useCallback(() => {
-    if (!terminalConfig.enabled || standaloneDatasetRuntime) {
-      return;
-    }
-    ensureTerminalScope(currentTerminalScope);
-    setActiveTerminalScopeKey(currentTerminalScope.key);
-    setShowTerminal((open) => !(open && activeTerminalScopeKey === currentTerminalScope.key));
-  }, [
-    activeTerminalScopeKey,
-    currentTerminalScope,
-    ensureTerminalScope,
-    standaloneDatasetRuntime,
-    terminalConfig.enabled,
-  ]);
-  useEffect(() => {
-    if (!showTerminal) {
-      return;
-    }
-    ensureTerminalScope(currentTerminalScope);
-    setActiveTerminalScopeKey(currentTerminalScope.key);
-  }, [currentTerminalScope, ensureTerminalScope, showTerminal]);
-  useEffect(() => {
-    setTerminalMaximized(false);
-  }, [activeTerminalScopeKey]);
+    toggleTerminalScope(terminalConfig.enabled);
+  }, [terminalConfig.enabled, toggleTerminalScope]);
 
   // Signal frontend ready to native shell (prevents white flash)
   useEffect(() => {
@@ -1612,23 +1433,6 @@ function App() {
     navigateToProjects,
     navigateToProject,
   });
-
-  const terminalScopeList = useMemo(
-    () => Object.values(terminalScopes),
-    [terminalScopes],
-  );
-  const closeDesktopTerminal = useCallback(() => {
-    setShowTerminal(false);
-    setTerminalMaximized(false);
-  }, []);
-  const clearTerminalPendingCommand = useCallback((scopeKey: string) => {
-    setTerminalPendingCommands((prev) => {
-      if (prev[scopeKey] == null) {
-        return prev;
-      }
-      return { ...prev, [scopeKey]: null };
-    });
-  }, []);
 
   // ═══════════════════════════════════
   // Mobile layout: full-screen pages + bottom nav

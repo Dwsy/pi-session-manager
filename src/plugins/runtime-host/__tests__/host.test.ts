@@ -1423,4 +1423,118 @@ describe('PsmPluginHost', () => {
     })
     expect(await host.executeCommand('npm.test.command')).toBe('ok')
   })
+
+  it('rolls back every UI contribution owned by a plugin when activation fails', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/ui-healthy',
+          async load() {
+            return {
+              manifest: {
+                manifestVersion: 1,
+                id: 'builtin.ui.healthy',
+                name: 'UI Healthy',
+                version: '1.0.0',
+              },
+              activate: (ctx: any) => {
+                ctx.ui.registerAppView({
+                  id: 'healthy.app',
+                  title: 'Healthy',
+                  render: () => 'healthy',
+                })
+              },
+            }
+          },
+        },
+        {
+          source: 'builtin',
+          sourceId: 'extensions/ui-failed',
+          async load() {
+            return {
+              manifest: {
+                manifestVersion: 1,
+                id: 'builtin.ui.failed',
+                name: 'UI Failed',
+                version: '1.0.0',
+              },
+              activate: (ctx: any) => {
+                ctx.ui.registerAppView({ id: 'failed.app', title: 'App', render: () => 'app' })
+                ctx.ui.registerAppSidebarView({
+                  id: 'failed.sidebar',
+                  title: 'Sidebar',
+                  appViewId: 'failed.app',
+                  render: () => 'sidebar',
+                })
+                ctx.ui.registerSessionListAction({
+                  id: 'failed.session-list',
+                  title: 'Session List',
+                  run: () => undefined,
+                })
+                ctx.ui.registerProjectListAction({
+                  id: 'failed.project-list',
+                  title: 'Project List',
+                  run: () => undefined,
+                })
+                ctx.ui.registerSessionContextMenuAction({
+                  id: 'failed.context-menu',
+                  title: 'Context Menu',
+                  run: () => undefined,
+                })
+                ctx.ui.registerSessionToolbarItem({
+                  id: 'failed.toolbar',
+                  title: 'Toolbar',
+                  render: () => 'toolbar',
+                })
+                ctx.ui.registerSessionPanel({
+                  id: 'failed.panel',
+                  title: 'Panel',
+                  render: () => 'panel',
+                })
+                ctx.ui.registerSessionTreeView({
+                  id: 'failed.tree',
+                  title: 'Tree',
+                  render: () => 'tree',
+                })
+                ctx.ui.registerSessionMainView({
+                  id: 'failed.main',
+                  title: 'Main',
+                  render: () => 'main',
+                })
+                throw new Error('activation exploded')
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    const plugins = await host.reload()
+    const failed = plugins.find((plugin) => plugin.id === 'builtin.ui.failed')
+
+    expect(failed).toMatchObject({
+      state: 'error',
+      diagnostics: [
+        { level: 'error', message: 'Failed to activate plugin: activation exploded' },
+      ],
+    })
+    expect(host.getSessionUiSnapshot()).toEqual({
+      ready: true,
+      appViews: [expect.objectContaining({ id: 'healthy.app', pluginId: 'builtin.ui.healthy' })],
+      appSidebarViews: [],
+      sessionListActions: [],
+      projectListActions: [],
+      sessionContextMenuActions: [],
+      toolbarItems: [],
+      panels: [],
+      treeViews: [],
+      mainViews: [],
+    })
+  })
+
 })

@@ -46,6 +46,29 @@ examples live in [Extensions Overview](../extensions/README.md).
 - Heavy or experimental dependencies belong inside the plugin package, not the main app.
 - Use least permissions. Declare only the `ctx.psm` capabilities the plugin actually calls.
 
+## Host Internals
+
+The public plugin contract lives in `packages/runtime-sdk/` and is published as
+`@pi-session-manager/plugin-sdk`. Runtime implementation details stay under
+`src/plugins/runtime-host/` and must not leak into external plugin bundles.
+
+| Runtime module | Ownership |
+|----------------|-----------|
+| `host.ts` | discovery, activation, permissions, commands/tools, status, and lifecycle orchestration |
+| `uiContributionCatalog.ts` | ownership, duplicate policy, sorting, snapshots, reload clearing, and activation rollback for UI contributions |
+| `appTransport.ts` | plugin command transport for Tauri and web runtimes |
+| `service.ts` | plugin config, npm/path/dev discovery, install/build operations |
+| `agentBridge.ts` | plugin-owned agent sessions and model/tool bridging |
+
+When adding a new public UI contribution type:
+
+1. Define the complete public registration contract in `packages/runtime-sdk/src/types.ts`.
+2. Add ownership-aware registration, sorted listing, snapshot publication, and per-plugin removal to `uiContributionCatalog.ts`.
+3. Expose the registration callback through `PsmPluginHostContext` and wire it in `host.ts`.
+4. Add duplicate, reload, and activation-failure rollback tests before documenting the API.
+
+Do not add a new parallel `Map` and id array directly to `PsmPluginHost`; the catalog is the single owner of UI contribution lifecycle.
+
 ## Source Types
 
 The Settings -> PSM Plugins page presents these sources as a grouped list: built-in, npm, local path, and dev preview.
@@ -168,8 +191,10 @@ For plugin changes, run the narrowest relevant checks first, then broaden:
 
 ```bash
 pnpm exec vitest run extensions/<plugin>/__tests__/*.test.tsx
-pnpm exec vitest run src/plugins/runtime-host/__tests__/host.test.ts
-pnpm exec tsc --noEmit
+pnpm exec vitest run src/plugins/runtime-host/__tests__/uiContributionCatalog.test.ts src/plugins/runtime-host/__tests__/host.test.ts
+pnpm typecheck:extensions
+pnpm --dir packages/runtime-sdk build
+pnpm build
 ```
 
 If the plugin contributes Cmd+K commands, include `src/components/__tests__/CommandMenu.test.tsx`.

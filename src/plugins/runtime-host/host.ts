@@ -31,6 +31,7 @@ import {
 } from './agentBridge'
 import { psmRuntimeEventBus } from './eventBus'
 import { sessionEntryTransformers } from './sessionEntryTransformers'
+import { PsmPluginUiContributionCatalog } from './uiContributionCatalog'
 
 import { builtinPsmPluginEntries } from './builtins'
 import {
@@ -53,21 +54,12 @@ import type {
   PsmPluginDiagnostic,
   PsmDevPluginEntry,
   PsmPathPluginEntry,
-  PsmAppSidebarViewRuntimeRegistration,
-  PsmAppViewRuntimeRegistration,
-  PsmProjectListActionRuntimeRegistration,
-  PsmSessionContextMenuActionRuntimeRegistration,
-  PsmSessionListActionRuntimeRegistration,
   PsmPluginLoadEntry,
   PsmPluginSessionUiSnapshot,
   PsmPluginSource,
   PsmPluginStatus,
   PsmPluginToolRuntimeRegistration,
   PsmPluginsConfig,
-  PsmSessionMainViewRuntimeRegistration,
-  PsmSessionPanelRuntimeRegistration,
-  PsmSessionToolbarItemRuntimeRegistration,
-  PsmSessionTreeViewRuntimeRegistration,
   PsmToolRendererRuntimeRegistration,
 } from './types'
 
@@ -411,15 +403,7 @@ export class PsmPluginHost {
   private commands = new Map<string, PsmPluginCommandRuntimeRegistration>()
   private tools = new Map<string, PsmPluginToolRuntimeRegistration>()
   private toolRenderers = new Map<string, PsmToolRendererRuntimeRegistration>()
-  private appViews = new Map<string, PsmAppViewRuntimeRegistration>()
-  private appSidebarViews = new Map<string, PsmAppSidebarViewRuntimeRegistration>()
-  private sessionListActions = new Map<string, PsmSessionListActionRuntimeRegistration>()
-  private projectListActions = new Map<string, PsmProjectListActionRuntimeRegistration>()
-  private sessionContextMenuActions = new Map<string, PsmSessionContextMenuActionRuntimeRegistration>()
-  private sessionToolbarItems = new Map<string, PsmSessionToolbarItemRuntimeRegistration>()
-  private sessionPanels = new Map<string, PsmSessionPanelRuntimeRegistration>()
-  private sessionTreeViews = new Map<string, PsmSessionTreeViewRuntimeRegistration>()
-  private sessionMainViews = new Map<string, PsmSessionMainViewRuntimeRegistration>()
+  private readonly uiContributions = new PsmPluginUiContributionCatalog()
   private commandSnapshot: PsmPluginCommandRuntimeRegistration[] = []
   private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { ready: false, appViews: [], appSidebarViews: [], sessionListActions: [], projectListActions: [], sessionContextMenuActions: [], toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
   private listeners = new Set<() => void>()
@@ -467,40 +451,40 @@ export class PsmPluginHost {
     return Array.from(this.toolRenderers.keys()).sort()
   }
 
-  listAppViews(): PsmAppViewRuntimeRegistration[] {
-    return Array.from(this.appViews.values()).sort((a, b) => a.id.localeCompare(b.id))
+  listAppViews() {
+    return this.uiContributions.listAppViews()
   }
 
-  listAppSidebarViews(): PsmAppSidebarViewRuntimeRegistration[] {
-    return Array.from(this.appSidebarViews.values()).sort((a, b) => a.id.localeCompare(b.id))
+  listAppSidebarViews() {
+    return this.uiContributions.listAppSidebarViews()
   }
 
-  listSessionListActions(): PsmSessionListActionRuntimeRegistration[] {
-    return Array.from(this.sessionListActions.values()).sort((a, b) => a.id.localeCompare(b.id))
+  listSessionListActions() {
+    return this.uiContributions.listSessionListActions()
   }
 
-  listProjectListActions(): PsmProjectListActionRuntimeRegistration[] {
-    return Array.from(this.projectListActions.values()).sort((a, b) => a.id.localeCompare(b.id))
+  listProjectListActions() {
+    return this.uiContributions.listProjectListActions()
   }
 
-  listSessionContextMenuActions(): PsmSessionContextMenuActionRuntimeRegistration[] {
-    return Array.from(this.sessionContextMenuActions.values()).sort((a, b) => a.id.localeCompare(b.id))
+  listSessionContextMenuActions() {
+    return this.uiContributions.listSessionContextMenuActions()
   }
 
-  listSessionToolbarItems(): PsmSessionToolbarItemRuntimeRegistration[] {
-    return Array.from(this.sessionToolbarItems.values()).sort((a, b) => a.id.localeCompare(b.id))
+  listSessionToolbarItems() {
+    return this.uiContributions.listSessionToolbarItems()
   }
 
-  listSessionPanels(): PsmSessionPanelRuntimeRegistration[] {
-    return Array.from(this.sessionPanels.values()).sort((a, b) => a.id.localeCompare(b.id))
+  listSessionPanels() {
+    return this.uiContributions.listSessionPanels()
   }
 
-  listSessionTreeViews(): PsmSessionTreeViewRuntimeRegistration[] {
-    return Array.from(this.sessionTreeViews.values()).sort((a, b) => a.id.localeCompare(b.id))
+  listSessionTreeViews() {
+    return this.uiContributions.listSessionTreeViews()
   }
 
-  listSessionMainViews(): PsmSessionMainViewRuntimeRegistration[] {
-    return Array.from(this.sessionMainViews.values()).sort((a, b) => a.id.localeCompare(b.id))
+  listSessionMainViews() {
+    return this.uiContributions.listSessionMainViews()
   }
 
   getSessionUiSnapshot(): PsmPluginSessionUiSnapshot {
@@ -529,18 +513,7 @@ export class PsmPluginHost {
   }
 
   private refreshSessionUiSnapshot() {
-    this.sessionUiSnapshot = {
-      ready: true,
-      appViews: this.listAppViews(),
-      appSidebarViews: this.listAppSidebarViews(),
-      sessionListActions: this.listSessionListActions(),
-      projectListActions: this.listProjectListActions(),
-      sessionContextMenuActions: this.listSessionContextMenuActions(),
-      toolbarItems: this.listSessionToolbarItems(),
-      panels: this.listSessionPanels(),
-      treeViews: this.listSessionTreeViews(),
-      mainViews: this.listSessionMainViews(),
-    }
+    this.sessionUiSnapshot = this.uiContributions.snapshot(true)
   }
 
   private refreshCommandSnapshot() {
@@ -579,15 +552,7 @@ export class PsmPluginHost {
     this.unregisterToolRenderers()
     this.commands.clear()
     this.tools.clear()
-    this.appViews.clear()
-    this.appSidebarViews.clear()
-    this.sessionListActions.clear()
-    this.projectListActions.clear()
-    this.sessionContextMenuActions.clear()
-    this.sessionToolbarItems.clear()
-    this.sessionPanels.clear()
-    this.sessionTreeViews.clear()
-    this.sessionMainViews.clear()
+    this.uiContributions.clear()
     this.statuses.clear()
 
     const config = await this.services.loadConfig()
@@ -829,15 +794,6 @@ export class PsmPluginHost {
     const toolNames: string[] = []
     const toolRendererIds: string[] = []
     const sessionEntryTransformerIds: string[] = []
-    const appViewIds: string[] = []
-    const appSidebarViewIds: string[] = []
-    const sessionListActionIds: string[] = []
-    const projectListActionIds: string[] = []
-    const sessionContextMenuActionIds: string[] = []
-    const toolbarItemIds: string[] = []
-    const panelIds: string[] = []
-    const treeViewIds: string[] = []
-    const mainViewIds: string[] = []
     const diagnostics: PsmPluginDiagnostic[] = []
     const permissions = {
       pluginId: manifest.id,
@@ -860,67 +816,37 @@ export class PsmPluginHost {
       log: loggerClient(manifest.id),
       ui: {
         registerAppView: (view) => {
-          if (this.appViews.has(view.id)) {
-            diagnostics.push(diagnostic('warn', `App view already registered: ${view.id}`))
-            return
-          }
-          this.appViews.set(view.id, { ...view, pluginId: manifest.id })
-          appViewIds.push(view.id)
+          const result = this.uiContributions.registerAppView(manifest.id, view)
+          if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
         },
         registerAppSidebarView: (view) => {
-          if (this.appSidebarViews.has(view.id)) {
-            diagnostics.push(diagnostic('warn', `App sidebar view already registered: ${view.id}`))
-            return
-          }
-          this.appSidebarViews.set(view.id, { ...view, pluginId: manifest.id })
-          appSidebarViewIds.push(view.id)
+          const result = this.uiContributions.registerAppSidebarView(manifest.id, view)
+          if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
         },
         registerSessionListAction: (action) => {
-          if (this.sessionListActions.has(action.id)) return
-          this.sessionListActions.set(action.id, { ...action, pluginId: manifest.id })
-          sessionListActionIds.push(action.id)
+          this.uiContributions.registerSessionListAction(manifest.id, action)
         },
         registerProjectListAction: (action) => {
-          if (this.projectListActions.has(action.id)) return
-          this.projectListActions.set(action.id, { ...action, pluginId: manifest.id })
-          projectListActionIds.push(action.id)
+          this.uiContributions.registerProjectListAction(manifest.id, action)
         },
         registerSessionContextMenuAction: (action) => {
-          if (this.sessionContextMenuActions.has(action.id)) return
-          this.sessionContextMenuActions.set(action.id, { ...action, pluginId: manifest.id })
-          sessionContextMenuActionIds.push(action.id)
+          this.uiContributions.registerSessionContextMenuAction(manifest.id, action)
         },
         registerSessionToolbarItem: (item) => {
-          if (this.sessionToolbarItems.has(item.id)) {
-            diagnostics.push(diagnostic('warn', `Session toolbar item already registered: ${item.id}`))
-            return
-          }
-          this.sessionToolbarItems.set(item.id, { ...item, pluginId: manifest.id })
-          toolbarItemIds.push(item.id)
+          const result = this.uiContributions.registerSessionToolbarItem(manifest.id, item)
+          if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
         },
         registerSessionPanel: (panel) => {
-          if (this.sessionPanels.has(panel.id)) {
-            diagnostics.push(diagnostic('warn', `Session panel already registered: ${panel.id}`))
-            return
-          }
-          this.sessionPanels.set(panel.id, { ...panel, pluginId: manifest.id, side: panel.side ?? 'right' })
-          panelIds.push(panel.id)
+          const result = this.uiContributions.registerSessionPanel(manifest.id, panel)
+          if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
         },
         registerSessionTreeView: (view) => {
-          if (this.sessionTreeViews.has(view.id)) {
-            diagnostics.push(diagnostic('warn', `Session tree view already registered: ${view.id}`))
-            return
-          }
-          this.sessionTreeViews.set(view.id, { ...view, pluginId: manifest.id })
-          treeViewIds.push(view.id)
+          const result = this.uiContributions.registerSessionTreeView(manifest.id, view)
+          if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
         },
         registerSessionMainView: (view) => {
-          if (this.sessionMainViews.has(view.id)) {
-            diagnostics.push(diagnostic('warn', `Session main view already registered: ${view.id}`))
-            return
-          }
-          this.sessionMainViews.set(view.id, { ...view, pluginId: manifest.id })
-          mainViewIds.push(view.id)
+          const result = this.uiContributions.registerSessionMainView(manifest.id, view)
+          if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
         },
         registerToolRenderer: (renderer: PsmToolRendererRegistration) => {
           if (this.toolRenderers.has(renderer.id) || toolRenderRegistry.get(renderer.id)) {
@@ -982,6 +908,7 @@ export class PsmPluginHost {
         deactivate: module.deactivate,
         cleanup,
       })
+      const uiContributionIds = this.uiContributions.idsForPlugin(manifest.id)
       this.statuses.set(manifest.id, {
         id: manifest.id,
         name: manifest.name,
@@ -996,8 +923,8 @@ export class PsmPluginHost {
         manifest,
         commands: commandNames,
         tools: toolNames,
-        appViews: appViewIds,
-        appSidebarViews: appSidebarViewIds,
+        appViews: uiContributionIds.appViews,
+        appSidebarViews: uiContributionIds.appSidebarViews,
         toolRenderers: toolRendererIds,
         diagnostics,
         permissions: permissionStatuses,
@@ -1011,15 +938,7 @@ export class PsmPluginHost {
       for (const name of toolNames) this.tools.delete(name)
       this.unregisterToolRenderers(toolRendererIds)
       for (const id of sessionEntryTransformerIds) sessionEntryTransformers.unregister(id)
-      for (const id of appViewIds) this.appViews.delete(id)
-      for (const id of appSidebarViewIds) this.appSidebarViews.delete(id)
-      for (const id of sessionListActionIds) this.sessionListActions.delete(id)
-      for (const id of projectListActionIds) this.projectListActions.delete(id)
-      for (const id of sessionContextMenuActionIds) this.sessionContextMenuActions.delete(id)
-      for (const id of toolbarItemIds) this.sessionToolbarItems.delete(id)
-      for (const id of panelIds) this.sessionPanels.delete(id)
-      for (const id of treeViewIds) this.sessionTreeViews.delete(id)
-      for (const id of mainViewIds) this.sessionMainViews.delete(id)
+      this.uiContributions.removePlugin(manifest.id)
       this.statuses.set(manifest.id, {
         id: manifest.id,
         name: manifest.name,

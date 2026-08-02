@@ -22,10 +22,12 @@ cargo test                       # Tests
 
 | Scenario | Location |
 |----------|----------|
-| New command | `commands/` + `lib.rs` |
+| New Tauri command | `commands/` + `app/mod.rs` |
+| New HTTP/WS/plugin command | matching `dispatch/<capability>.rs` |
 | Business logic | `domain/` |
+| Session search behavior | `domain/session_search/` |
+| Search storage/index | `data/search/` |
 | Database | `data/sqlite/` |
-| Search | `data/search/` |
 | HTTP | `server/http/` |
 | WS | `server/ws.rs` |
 | Frontend component | `components/` |
@@ -35,8 +37,9 @@ cargo test                       # Tests
 
 1. **Domain-first**: Business logic in `domain/`
 2. **Thin commands**: `commands/` only validates params
-3. **Protocol agnostic**: `dispatch.rs`
-4. **Feature gates**: `#[cfg(feature = "gui")]`
+3. **Capability adapters**: JSON payload conversion stays in `dispatch/<capability>.rs`
+4. **Composition root**: GUI registration and lifecycle stay in `app/mod.rs`
+5. **Feature gates**: Use `#[cfg(feature = "gui")]` for GUI-only behavior
 
 ## Release
 
