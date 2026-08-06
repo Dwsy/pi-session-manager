@@ -13,6 +13,7 @@
 
 import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import * as path from "node:path";
+import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { matchesKey, getKeybindings } from "@earendil-works/pi-tui";
@@ -33,6 +34,23 @@ function getHostDistDir(): string {
 
 function hostUrl(relativePath: string): string {
   return new URL(relativePath, pathToFileURL(getHostDistDir()).href + "/").href;
+}
+
+function copySessionReference(sessionPath: string, sessionName?: string): void {
+  if (process.platform !== "darwin") {
+    throw new Error("clipboard copy currently requires macOS");
+  }
+
+  const text = sessionName ? `path: ${sessionPath}\nname: ${sessionName}` : `path: ${sessionPath}`;
+  const result = spawnSync("pbcopy", [], {
+    input: text,
+    encoding: "utf8",
+  });
+
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(result.stderr.trim() || `pbcopy exited with status ${result.status}`);
+  }
 }
 
 // ── Extension entry ──────────────────────────────────────────────────
@@ -157,6 +175,21 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
         let escTimer: ReturnType<typeof setTimeout> | null = null;
         let searchSelectedSession: { sessionId?: string; sessionPath?: string; created?: string; modified?: string; messageCount?: number; lastMessage?: string; lastMessageRole?: string } | null = null;
 
+        const copySelectedSession = (sessionPath?: string, sessionName?: string) => {
+          if (!sessionPath) {
+            ctx.ui.notify("No session selected.", "warning");
+            return;
+          }
+
+          try {
+            copySessionReference(sessionPath, sessionName);
+            ctx.ui.notify("Copied session path and name.", "info");
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            ctx.ui.notify(`Copy failed: ${message}`, "error");
+          }
+        };
+
         return {
           render(width: number) {
             if (mode === "search") {
@@ -199,6 +232,14 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
 
             // ── List mode ──
             if (mode === "list") {
+              // ⌥C — copy selected session path + name
+              if (matchesKey(data, "alt+c")) {
+                const sl = selector.getSessionList?.();
+                const session = sl?.filteredSessions?.[sl.selectedIndex]?.session;
+                copySelectedSession(session?.path, session?.name);
+                return;
+              }
+
               // ⌥Q — enter search mode
               if (matchesKey(data, "alt+q")) {
                 mode = "search";
@@ -333,6 +374,12 @@ export default async function resumeXExtension(pi: ExtensionAPI) {
 
               const isConfirm = kb.matches(data, "tui.select.confirm") || keybindings.matches(data, "tui.select.confirm") || data === "\n";
               const maxResults = Math.min(searchResults.length, 10);
+
+              if (matchesKey(data, "alt+c")) {
+                const selected = searchResults[searchSelectedIdx];
+                copySelectedSession(selected?.sessionPath, selected?.sessionName);
+                return;
+              }
 
               if (isConfirm && maxResults > 0) {
                 const selected = searchResults[searchSelectedIdx];

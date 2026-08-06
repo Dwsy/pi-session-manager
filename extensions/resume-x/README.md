@@ -9,6 +9,7 @@ Enhanced resume command using PSM SQLite — fast, no disk scan.
 - **Detail pane** — model, tokens, cost per session (monkey-patches SessionList.render)
 - **Message preview** — press `→` to browse full conversation history, `←` to return
 - **Full-text search** — `⌥Q` to search sessions, messages, tags
+- **Clipboard copy** — `⌥C` copies the selected session path and name
 - **Fast scrolling** — `↑/↓` = 3 lines, `Shift+↑/↓` = half-page, `PgUp/PgDn` = full-page
 
 ## Usage
@@ -25,6 +26,7 @@ Alt+X              # Shortcut (limited: no switchSession, falls back to setSessi
 |-----|--------|
 | `↑/↓` | Navigate sessions (main list) |
 | `Enter` | Resume selected session |
+| `⌥C` | Copy selected session path and name |
 | `→` | Enter preview mode (browse messages) |
 | `←` | Exit preview mode |
 | `⌥Q` | Enter search mode |

@@ -28,6 +28,10 @@ export function patchSessionListRender(sessionList: any): void {
 
   proto.render = function patchedRender(this: any, width: number): string[] {
     const lines: string[] = originalRender.call(this, width);
+    const theme = getTheme();
+    if (theme) {
+      lines.push(theme.fg("muted", " ⌥C copy path/name"));
+    }
     try {
       const selected = this.filteredSessions?.[this.selectedIndex];
       const session = selected?.session;

@@ -306,7 +306,7 @@ export function buildSearchLines(
   }
 
   lines.push("");
-  lines.push(theme.fg("muted", "  ↑↓ navigate · ⏎ open · → preview · Tab scope · Esc back"));
+  lines.push(theme.fg("muted", "  ↑↓ navigate · ⏎ open · → preview · ⌥C copy · Tab scope · Esc back"));
 
   return lines;
 }
