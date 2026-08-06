@@ -15,6 +15,7 @@ import {
   formatShortTime,
   getDirectoryName,
 } from "@/utils/sessionDisplay";
+import { getPathComparisonKey } from "@/utils/path";
 
 interface ProjectListProps {
   sessions: SessionInfo[];
@@ -50,20 +51,20 @@ export default function ProjectList({
   const { projectListActions = [] } = usePsmPluginUi();
 
   const projects: Project[] = useMemo(() => {
-    const projectMap = sessions.reduce(
-      (acc, session) => {
-        const cwd = session.cwd || t("common.unknown");
-        if (!acc[cwd]) {
-          acc[cwd] = [];
-        }
-        acc[cwd].push(session);
-        return acc;
-      },
-      {} as Record<string, SessionInfo[]>,
-    );
+    const projectMap = sessions.reduce((acc, session) => {
+      const dir = session.cwd || t("common.unknown");
+      const key = getPathComparisonKey(dir);
+      const existingProject = acc.get(key);
+      if (existingProject) {
+        existingProject.sessions.push(session);
+      } else {
+        acc.set(key, { dir, sessions: [session] });
+      }
+      return acc;
+    }, new Map<string, { dir: string; sessions: SessionInfo[] }>());
 
     const normalizedQuery = searchQuery.trim().toLowerCase();
-    const list = Object.entries(projectMap).map(([dir, dirSessions]) => {
+    const list = Array.from(projectMap.values()).map(({ dir, sessions: dirSessions }) => {
       const liveCount = dirSessions.filter(
         (s) => s.isLive || (liveSessionIds?.has(s.id) ?? false),
       ).length;

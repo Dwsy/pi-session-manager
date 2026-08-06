@@ -43,28 +43,31 @@ export function stripJsonlExt(name: string): string {
 }
 
 /**
+ * Create a stable key for filesystem path comparisons and grouping.
+ *
+ * Separators and trailing separators are normalized on every platform. On
+ * Windows, paths are also lower-cased to match the filesystem's
+ * case-insensitivity. Drive-letter paths retain Windows semantics even when
+ * evaluated outside a Windows browser environment.
+ */
+export function getPathComparisonKey(path: string): string {
+  const normalized = trimTrailingPathSeparators(path)
+  const isWindows =
+    (typeof navigator !== 'undefined' &&
+      /Win/i.test(navigator.userAgent || navigator.platform || '')) ||
+    /^[A-Za-z]:\//.test(normalized)
+  return isWindows ? normalized.toLowerCase() : normalized
+}
+
+/**
  * Compare two filesystem paths for equality across platforms.
  *
- * - Normalizes both `\` and `/` separators
- * - Strips trailing separators
- * - On Windows (case-insensitive filesystem), compares case-insensitively
- *
  * Use this anywhere `cwd`/`path` is matched against a stored key instead of
- * raw `===`, so project grouping, favorites, and filtering survive the Windows
- * filesystem's case-insensitivity (e.g. `C:\Code\Foo` vs `c:\code\foo`).
+ * raw `===`, so project grouping, favorites, and filtering survive Windows
+ * path casing and separator differences.
  */
 export function pathsEqual(a: string | null | undefined, b: string | null | undefined): boolean {
   if (a === b) return true
   if (!a || !b) return false
-  const normA = trimTrailingPathSeparators(a)
-  const normB = trimTrailingPathSeparators(b)
-  if (normA === normB) return true
-  // Detect Windows via the same heuristic the rest of the app uses
-  // (navigator.userAgent). Default to case-insensitive when either path is a
-  // drive-letter path, since those are always Windows and always case-insensitive.
-  const isWindows =
-    typeof navigator !== 'undefined' && /Win/i.test(navigator.userAgent || navigator.platform || '') ||
-    /^[A-Za-z]:[\\/]/.test(normA) ||
-    /^[A-Za-z]:[\\/]/.test(normB)
-  return isWindows ? normA.toLowerCase() === normB.toLowerCase() : normA === normB
+  return getPathComparisonKey(a) === getPathComparisonKey(b)
 }
