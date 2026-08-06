@@ -194,7 +194,8 @@ fn resolve_pi_session_labels(path: &Path) -> Result<HashMap<String, String>, Str
 
 fn get_session_labels_sync(path: &str) -> Result<HashMap<String, String>, String> {
     let session_path = Path::new(path);
-    if detect_session_provider(session_path)? != Some(crate::domain::casr_min::providers::ProviderKind::Pi) {
+    let provider = detect_session_provider(session_path)?;
+    if !matches!(provider, Some(crate::domain::casr_min::providers::ProviderKind::Pi) | Some(crate::domain::casr_min::providers::ProviderKind::Omp)) {
         return Ok(HashMap::new());
     }
 
@@ -221,8 +222,8 @@ fn transformed_session_content(path: &str) -> Result<Option<String>, String> {
 
     // Fast path: detect provider without reading file content
     if let Some(provider) = crate::domain::casr_min::providers::detect_provider(Some(session_path), "") {
-        if provider == crate::domain::casr_min::providers::ProviderKind::Pi {
-            return Ok(None); // Pi sessions use native chunked reading
+        if matches!(provider, crate::domain::casr_min::providers::ProviderKind::Pi | crate::domain::casr_min::providers::ProviderKind::Omp) {
+            return Ok(None); // Pi/OMP sessions use native chunked reading
         }
     }
 
@@ -242,7 +243,7 @@ fn transformed_session_content(path: &str) -> Result<Option<String>, String> {
     let elapsed = start.elapsed();
     info!("[IO] transformed_session_content casr_parse path={} elapsed={:?}", path, elapsed);
 
-    if source == crate::domain::session_bridge::SessionBridgeSource::Pi {
+    if matches!(source, crate::domain::session_bridge::SessionBridgeSource::Pi | crate::domain::session_bridge::SessionBridgeSource::Omp) {
         return Ok(None);
     }
 

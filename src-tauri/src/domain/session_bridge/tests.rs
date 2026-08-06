@@ -1210,3 +1210,104 @@ fn codex_read_does_not_merge_isolated_assistant_text_messages() {
     let assistants: Vec<_> = canonical.messages.iter().filter(|m| m.role == MessageRole::Assistant).collect();
     assert_eq!(assistants.len(), 2, "back-to-back assistant text messages without tool calls stay separate");
 }
+
+#[test]
+fn omp_session_parses_from_omp_sessions_dir() {
+    let _env_lock = crate::paths::acquire_test_env_lock();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let _home = crate::paths::TestHomeGuard::set(temp.path());
+
+    // OMP stores Pi-format JSONL under ~/.omp/agent/sessions.
+    let omp_dir = temp.path().join(".omp/agent/sessions");
+    std::fs::create_dir_all(&omp_dir).expect("create omp sessions dir");
+    let source_path = omp_dir.join("2026-04-08T10-00-00_omp-session-1.jsonl");
+    let lines = [
+        serde_json::json!({
+            "type": "session",
+            "version": 3,
+            "id": "omp-session-1",
+            "timestamp": "2026-04-08T10:00:00.000Z",
+            "cwd": "/repo/demo",
+            "provider": "anthropic",
+            "modelId": "claude-sonnet-4-5"
+        }),
+        serde_json::json!({
+            "type": "message",
+            "id": "msg-1",
+            "parentId": null,
+            "timestamp": "2026-04-08T10:00:01.000Z",
+            "message": { "role": "user", "content": "Fix auth" }
+        }),
+        serde_json::json!({
+            "type": "message",
+            "id": "msg-2",
+            "parentId": "msg-1",
+            "timestamp": "2026-04-08T10:00:02.000Z",
+            "message": { "role": "assistant", "content": "Done" }
+        }),
+    ]
+    .iter()
+    .map(|value| serde_json::to_string(value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&source_path, lines).expect("write omp session");
+
+    let (source, canonical) = read_canonical_session_from_path(&source_path).expect("read omp session");
+    assert_eq!(source, SessionBridgeSource::Omp);
+    assert_eq!(canonical.session_id, "omp-session-1");
+    assert_eq!(canonical.messages.len(), 2);
+    assert_eq!(canonical.messages[0].content, "Fix auth");
+    assert_eq!(canonical.messages[1].content, "Done");
+}
+
+#[test]
+fn convert_codex_to_omp_writes_omp_bridge_file_and_resume_command() {
+    let _env_lock = crate::paths::acquire_test_env_lock();
+    let temp = tempfile::tempdir().expect("tempdir");
+    let _home = crate::paths::TestHomeGuard::set(temp.path());
+
+    let codex_dir = temp.path().join(".codex/sessions/2026/07/06");
+    std::fs::create_dir_all(&codex_dir).expect("create codex sessions dir");
+    let source_path = codex_dir.join("rollout-2026-07-06T11-35-33-omp-source-1.jsonl");
+    let lines = [
+        serde_json::json!({
+            "type": "session_meta",
+            "timestamp": 1737300000.0,
+            "payload": { "id": "omp-source-1", "cwd": "/repo/demo" }
+        }),
+        serde_json::json!({
+            "type": "event_msg",
+            "timestamp": 1737300001.0,
+            "payload": { "type": "user_message", "message": "Fix auth" }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": 1737300002.0,
+            "payload": { "type": "function_call", "call_id": "call-read", "name": "read_file", "arguments": { "path": "src/auth.ts" } }
+        }),
+        serde_json::json!({
+            "type": "response_item",
+            "timestamp": 1737300003.0,
+            "payload": { "type": "function_call_output", "call_id": "call-read", "output": "file contents" }
+        }),
+    ]
+    .iter()
+    .map(|value| serde_json::to_string(value).unwrap())
+    .collect::<Vec<_>>()
+    .join("\n");
+    std::fs::write(&source_path, lines).expect("write source");
+
+    let result = convert_session_format(&source_path, SessionBridgeSource::Omp, SessionBridgeConvertOptions { dry_run: false, force: false }).expect("convert codex to omp");
+
+    let written_path = PathBuf::from(&result.written_paths[0]);
+    assert!(written_path.exists(), "converted OMP bridge file should exist");
+    let written = written_path.to_string_lossy().replace('\\', "/");
+    assert!(written.contains("/.omp/agent/sessions/bridge/") || written.contains(".omp/agent/sessions/bridge"), "unexpected bridge path: {written}");
+    assert!(result.resume_command.starts_with("omp --session"), "resume command should use omp binary: {}", result.resume_command);
+    assert!(result.resume_command.contains(written_path.to_string_lossy().as_ref()));
+
+    let content = std::fs::read_to_string(&written_path).expect("read written");
+    let entries = content.lines().map(|line| serde_json::from_str::<Value>(line).expect("json line")).collect::<Vec<_>>();
+    assert_eq!(entries[0]["type"], Value::String("session".to_string()));
+    assert!(entries[1..].iter().all(|entry| entry["type"] == "message"));
+}

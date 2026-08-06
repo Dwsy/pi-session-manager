@@ -61,7 +61,10 @@ pub fn is_session_allowed_in_search(path: &Path, config: &Config) -> bool {
 
 pub fn read_canonical_session_from_path(path: &Path) -> Result<(SessionBridgeSource, CanonicalSession), String> {
     let started_at = Instant::now();
-    let should_try_vendor = SessionBridgeSource::ALL.into_iter().any(|source| source.matches_path(path));
+    // OMP shares the Pi-Agent JSONL format but CASR has no distinct OMP
+    // provider, so its sessions are read via the casr_min provider path (which
+    // attributes them to OMP) instead of the vendored CASR registry.
+    let should_try_vendor = SessionBridgeSource::ALL.into_iter().any(|source| source != SessionBridgeSource::Omp && source.matches_path(path));
 
     if should_try_vendor {
         let vendor_started_at = Instant::now();
@@ -114,7 +117,7 @@ pub fn parse_session_info_from_path(path: &Path) -> Result<(SessionInfo, Vec<Ses
 pub fn parse_session_info_header_only(path: &Path, file_modified: DateTime<Utc>) -> Result<SessionInfo, String> {
     // Use path detection first, then a bounded header probe for custom Pi roots.
     if let Some(provider) = detect_provider_from_path_or_probe(path) {
-        if provider == ProviderKind::Pi {
+        if provider == ProviderKind::Pi || provider == ProviderKind::Omp {
             return crate::domain::pi_session::parse_pi_session_header_only(path, file_modified);
         }
     }
@@ -190,7 +193,7 @@ pub fn convert_session_format(path: &Path, target: SessionBridgeSource, options:
     if !target.can_convert_target() {
         return Err(format!("Provider {} is scan/source only and cannot be used as a conversion target", target.display_name()));
     }
-    if !options.dry_run && target != SessionBridgeSource::Pi {
+    if !options.dry_run && !matches!(target, SessionBridgeSource::Pi | SessionBridgeSource::Omp) {
         return super::vendor::convert_session_format(path, target, options.force);
     }
 

@@ -60,6 +60,7 @@ import { getSessionSourceSlug } from "./utils/session";
 import { getPathBasename, pathsEqual } from "./utils/path";
 import {
   buildPiResumeCommand,
+  buildOmpResumeCommand,
   buildPiForkCommand,
   buildCopyResumeCommandForTarget,
   buildChangeDirAndRun,
@@ -545,11 +546,15 @@ function App() {
   );
 
   const buildResumeCommand = useCallback(
-    (session: SessionInfo) =>
-      buildPiResumeCommand(session, {
+    (session: SessionInfo) => {
+      if (getSessionSourceSlug(session.path) === "omp") {
+        return buildOmpResumeCommand(session, { piPath, resumeCommand });
+      }
+      return buildPiResumeCommand(session, {
         piPath,
         resumeCommand,
-      }),
+      });
+    },
     [piPath, resumeCommand],
   );
 
@@ -592,6 +597,16 @@ function App() {
       const sourceSlug = getSessionSourceSlug(session.path);
       if ((!sourceSlug || sourceSlug === "pi") && target === "pi") {
         const command = isTauri() ? null : buildResumeCommand(session);
+        await openResumeCommandInTerminal(
+          session.path,
+          session.cwd,
+          command,
+          getTerminalScopeForSession(session),
+        );
+        return;
+      }
+      if (sourceSlug === "omp" && target === "omp") {
+        const command = isTauri() ? null : buildOmpResumeCommand(session, { piPath, resumeCommand });
         await openResumeCommandInTerminal(
           session.path,
           session.cwd,

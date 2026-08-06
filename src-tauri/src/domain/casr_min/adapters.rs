@@ -125,7 +125,7 @@ pub fn canonical_to_session_entries(canonical: &CanonicalSession) -> Vec<Session
 }
 
 fn canonical_session_cache_id(canonical: &CanonicalSession, path: &Path) -> String {
-    if canonical.provider_slug == "pi-agent" || canonical.provider_slug == "pi" {
+    if matches!(canonical.provider_slug.as_str(), "pi-agent" | "pi" | "omp") {
         return canonical.session_id.clone();
     }
 

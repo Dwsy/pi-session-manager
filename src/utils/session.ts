@@ -896,6 +896,8 @@ export function getSessionSourceTag(sessionPath: string): string | null {
   switch (slug) {
     case 'pi':
       return 'Pi'
+    case 'omp':
+      return 'OMP'
     case 'claude-code':
       return 'Claude Code'
     case 'codex':
@@ -924,6 +926,10 @@ export function getSessionSourceSlug(sessionPath: string): string | null {
 
   if (normalized.includes('/.pi/agent/sessions')) {
     return 'pi'
+  }
+
+  if (normalized.includes('/.omp/agent/sessions')) {
+    return 'omp'
   }
 
   if (normalized.includes('/.claude/projects')) {

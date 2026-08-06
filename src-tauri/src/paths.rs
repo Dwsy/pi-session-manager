@@ -169,6 +169,18 @@ pub fn pi_agent_models_path() -> Result<PathBuf, String> {
     Ok(pi_agent_root_dir()?.join("models.json"))
 }
 
+pub fn omp_root_dir() -> Result<PathBuf, String> {
+    Ok(home_dir()?.join(".omp"))
+}
+
+pub fn omp_agent_root_dir() -> Result<PathBuf, String> {
+    Ok(omp_root_dir()?.join("agent"))
+}
+
+pub fn omp_agent_sessions_dir() -> Result<PathBuf, String> {
+    Ok(omp_agent_root_dir()?.join("sessions"))
+}
+
 pub fn project_pi_dir(cwd: &Path) -> PathBuf {
     cwd.join(".pi")
 }

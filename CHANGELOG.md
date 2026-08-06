@@ -4,6 +4,13 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **OMP (oh-my-pi) session support** — the Pi fork's sessions (`~/.omp/agent/sessions`) are now scanned, parsed, and shown with their own source badge/icon alongside Pi and other external agents
+  - Added `Omp` to the backend provider registry (`ProviderKind` / `SessionBridgeSource`) with `omp --session` resume and `~/.omp/...` session roots
+  - Added `omp` binary to export command candidates
+  - Added OMP source detection, AgentIcon (from the omp icon.svg), i18n strings, and resume-target support in the frontend
+
 ## [0.7.0] - 2026-07-14
 
 ### Added

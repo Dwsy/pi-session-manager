@@ -48,6 +48,27 @@ function applyResumeTemplate(
     .replace(/\{pi\}/g, piCommand);
 }
 
+/**
+ * Build the resume command for an OMP session. OMP is a Pi fork that resumes
+ * via the `omp` binary with `--session <path>`.
+ */
+export function buildOmpResumeCommand(
+  session: SessionInfo,
+  overrides: ResumeCommandOverrides = {},
+): string {
+  const settings = getCachedSettings();
+  const template =
+    overrides.resumeCommand ?? settings.terminal?.resumeCommand ?? "";
+  const ompCommand = overrides.piPath ?? "omp";
+
+  if (!template.trim()) {
+    const baseCommand = `${ompCommand} --session "${session.path}"`;
+    return buildChangeDirAndRun(session.cwd || "", baseCommand);
+  }
+
+  return applyResumeTemplate(template, session, ompCommand);
+}
+
 export function buildPiResumeCommand(
   session: SessionInfo,
   overrides: ResumeCommandOverrides = {},
@@ -134,6 +155,9 @@ export async function buildCopyResumeCommand(
   if (!sourceSlug || sourceSlug === "pi") {
     return buildPiResumeCommand(session, overrides);
   }
+  if (sourceSlug === "omp") {
+    return buildOmpResumeCommand(session, overrides);
+  }
 
   const result = await invoke<SessionConvertResult>("convert_session_format", {
     path: session.path,
@@ -152,6 +176,9 @@ export async function buildCopyResumeCommandForTarget(
   const sourceSlug = getSessionSourceSlug(session.path);
   if ((!sourceSlug || sourceSlug === "pi") && target === "pi") {
     return buildPiResumeCommand(session, overrides);
+  }
+  if (sourceSlug === "omp" && target === "omp") {
+    return buildOmpResumeCommand(session, overrides);
   }
 
   const result = await invoke<SessionConvertResult>("convert_session_format", {

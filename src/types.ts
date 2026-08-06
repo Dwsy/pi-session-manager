@@ -173,6 +173,7 @@ export type FullTextSearchSourceFilter = "all" | "labels_only" | "content_only";
 
 export type SessionConvertTarget =
   | "pi"
+  | "omp"
   | "claude-code"
   | "codex"
   | "opencode"

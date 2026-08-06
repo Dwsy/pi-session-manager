@@ -173,6 +173,7 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
     externalResumePromptEnabled:
       rawSession?.externalResumePromptEnabled !== false,
     defaultExternalResumeTarget: (
+      rawSession?.defaultExternalResumeTarget === "omp" ||
       rawSession?.defaultExternalResumeTarget === "claude-code" ||
       rawSession?.defaultExternalResumeTarget === "codex" ||
       rawSession?.defaultExternalResumeTarget === "opencode" ||

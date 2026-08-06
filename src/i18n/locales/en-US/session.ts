@@ -194,6 +194,7 @@ export const session = {
     openFailed: 'Failed to open target path',
     targets: {
       pi: 'Pi',
+      omp: 'OMP',
       'claude-code': 'Claude Code',
       codex: 'Codex',
       opencode: 'OpenCode',
@@ -203,6 +204,7 @@ export const session = {
     },
     targetDescriptions: {
       pi: 'Write a Pi session JSONL that can be resumed locally.',
+      omp: 'Write an OMP session JSONL that can be resumed locally.',
       'claude-code': 'Write a Claude Code JSONL transcript for resume.',
       codex: 'Write a Codex rollout JSONL session.',
       opencode: 'Write an OpenCode SQLite-backed session.',

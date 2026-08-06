@@ -501,6 +501,19 @@ describe('parseSessionEntriesWithLineCount', () => {
 
 
 describe('getSessionSourceSlug', () => {
+  it('detects omp sessions under the .omp agent dir', () => {
+    expect(
+      getSessionSourceSlug(
+        '/Users/demo/.omp/agent/sessions/2026-04-08T10-00-00_omp-1.jsonl',
+      ),
+    ).toBe('omp');
+    expect(
+      getSessionSourceTag(
+        '/Users/demo/.omp/agent/sessions/2026-04-08T10-00-00_omp-1.jsonl',
+      ),
+    ).toBe('OMP');
+  });
+
   it('detects cursor vscdb virtual paths', () => {
     expect(
       getSessionSourceSlug(

@@ -115,13 +115,19 @@ fn pi_command_candidates() -> Vec<String> {
     if let Some(path) = find_pi_executable() {
         candidates.push(path.to_string_lossy().to_string());
     }
+    if let Some(path) = find_omp_executable() {
+        candidates.push(path.to_string_lossy().to_string());
+    }
 
     candidates.push("pi".to_string());
+    candidates.push("omp".to_string());
 
     #[cfg(target_os = "windows")]
     {
         candidates.push("pi.cmd".to_string());
         candidates.push("pi.exe".to_string());
+        candidates.push("omp.cmd".to_string());
+        candidates.push("omp.exe".to_string());
     }
 
     candidates
@@ -129,6 +135,10 @@ fn pi_command_candidates() -> Vec<String> {
 
 fn find_pi_executable() -> Option<PathBuf> {
     find_executable_in_path("pi").or_else(|| find_executable_in_path("pi.cmd")).or_else(|| find_executable_in_path("pi.exe"))
+}
+
+fn find_omp_executable() -> Option<PathBuf> {
+    find_executable_in_path("omp").or_else(|| find_executable_in_path("omp.cmd")).or_else(|| find_executable_in_path("omp.exe"))
 }
 
 fn find_executable_in_path(executable: &str) -> Option<PathBuf> {

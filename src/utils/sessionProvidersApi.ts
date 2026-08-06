@@ -18,6 +18,11 @@ const FALLBACK_PROVIDERS: SessionProviderInfo[] = [
     capabilities: { canScan: true, canConvertTarget: true },
   },
   {
+    slug: "omp",
+    display_name: "OMP",
+    capabilities: { canScan: true, canConvertTarget: true },
+  },
+  {
     slug: "claude-code",
     display_name: "Claude Code",
     capabilities: { canScan: true, canConvertTarget: true },
@@ -62,6 +67,7 @@ const FALLBACK_PROVIDERS: SessionProviderInfo[] = [
 function normalizeProviderSlug(value: string): SessionConvertTarget | null {
   switch (value) {
     case "pi":
+    case "omp":
     case "claude-code":
     case "codex":
     case "opencode":

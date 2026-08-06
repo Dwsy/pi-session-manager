@@ -8,6 +8,7 @@ use crate::domain::casr_min::providers::ProviderKind;
 #[serde(rename_all = "snake_case")]
 pub enum SessionBridgeSource {
     Pi,
+    Omp,
     ClaudeCode,
     Codex,
     OpenCode,
@@ -19,11 +20,12 @@ pub enum SessionBridgeSource {
 }
 
 impl SessionBridgeSource {
-    pub const ALL: [Self; 9] = [Self::Pi, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot, Self::Cursor, Self::Antigravity];
+    pub const ALL: [Self; 10] = [Self::Pi, Self::Omp, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot, Self::Cursor, Self::Antigravity];
 
     pub fn slug(self) -> &'static str {
         match self {
             Self::Pi => "pi",
+            Self::Omp => "omp",
             Self::ClaudeCode => "claude_code",
             Self::Codex => "codex",
             Self::OpenCode => "opencode",
@@ -38,6 +40,7 @@ impl SessionBridgeSource {
     pub fn display_name(self) -> &'static str {
         match self {
             Self::Pi => "Pi",
+            Self::Omp => "OMP",
             Self::ClaudeCode => "Claude Code",
             Self::Codex => "Codex",
             Self::OpenCode => "OpenCode",
@@ -52,6 +55,7 @@ impl SessionBridgeSource {
     pub fn session_roots(self) -> Vec<PathBuf> {
         match self {
             Self::Pi => crate::paths::pi_agent_sessions_dir().ok().filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default(),
+            Self::Omp => crate::paths::omp_agent_sessions_dir().ok().filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default(),
             Self::ClaudeCode => crate::domain::casr_min::providers::claude_code::session_roots(),
             Self::Codex => crate::domain::casr_min::providers::codex::session_roots(),
             Self::Gemini => crate::domain::casr_min::providers::gemini::session_roots(),
@@ -67,6 +71,7 @@ impl SessionBridgeSource {
         let normalized = path.to_string_lossy().replace('\\', "/");
         match self {
             Self::Pi => crate::paths::pi_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
+            Self::Omp => crate::paths::omp_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
             Self::ClaudeCode => normalized.contains("/.claude/projects/"),
             Self::Codex => normalized.contains("/.codex/sessions/"),
             Self::Gemini => crate::domain::casr_min::providers::gemini::is_session_file(path),
@@ -81,6 +86,7 @@ impl SessionBridgeSource {
     pub fn parse_alias(value: &str) -> Result<Self, String> {
         match value.trim().replace('_', "-").to_ascii_lowercase().as_str() {
             "pi" => Ok(Self::Pi),
+            "omp" | "oh-my-pi" => Ok(Self::Omp),
             "claude-code" | "claudecode" | "cc" => Ok(Self::ClaudeCode),
             "codex" | "cod" => Ok(Self::Codex),
             "opencode" | "oc" => Ok(Self::OpenCode),
@@ -106,6 +112,7 @@ impl From<SessionBridgeSource> for ProviderKind {
     fn from(value: SessionBridgeSource) -> Self {
         match value {
             SessionBridgeSource::Pi => ProviderKind::Pi,
+            SessionBridgeSource::Omp => ProviderKind::Omp,
             SessionBridgeSource::ClaudeCode => ProviderKind::ClaudeCode,
             SessionBridgeSource::Codex => ProviderKind::Codex,
             SessionBridgeSource::OpenCode => ProviderKind::OpenCode,
@@ -122,6 +129,7 @@ impl From<ProviderKind> for SessionBridgeSource {
     fn from(value: ProviderKind) -> Self {
         match value {
             ProviderKind::Pi => SessionBridgeSource::Pi,
+            ProviderKind::Omp => SessionBridgeSource::Omp,
             ProviderKind::ClaudeCode => SessionBridgeSource::ClaudeCode,
             ProviderKind::Codex => SessionBridgeSource::Codex,
             ProviderKind::OpenCode => SessionBridgeSource::OpenCode,

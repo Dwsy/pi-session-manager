@@ -194,6 +194,7 @@ export const session = {
     openFailed: '打开目标路径失败',
     targets: {
       pi: 'Pi',
+      omp: 'OMP',
       'claude-code': 'Claude Code',
       codex: 'Codex',
       opencode: 'OpenCode',
@@ -203,6 +204,7 @@ export const session = {
     },
     targetDescriptions: {
       pi: '写出可本地恢复的 Pi 会话 JSONL。',
+      omp: '写出可本地恢复的 OMP 会话 JSONL。',
       'claude-code': '写出可恢复的 Claude Code JSONL transcript。',
       codex: '写出 Codex rollout JSONL 会话。',
       opencode: '写出 OpenCode 的 SQLite 会话。',

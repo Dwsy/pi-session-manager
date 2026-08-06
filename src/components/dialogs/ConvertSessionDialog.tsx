@@ -28,6 +28,11 @@ const FALLBACK_TARGETS: SessionProviderInfo[] = [
     capabilities: { canScan: true, canConvertTarget: true },
   },
   {
+    slug: 'omp',
+    display_name: 'OMP',
+    capabilities: { canScan: true, canConvertTarget: true },
+  },
+  {
     slug: 'claude-code',
     display_name: 'Claude Code',
     capabilities: { canScan: true, canConvertTarget: true },

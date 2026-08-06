@@ -57,8 +57,10 @@ pub fn read_canonical_session_from_str(content: &str, path_hint: Option<&Path>) 
 
 pub fn parse_session_info_from_path(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
     let modified = file_modified_time(path)?;
-    if detect_provider_from_path_or_content(path)? == Some(ProviderKind::Pi) {
-        return pi_session::parse_pi_session_info(path, modified);
+    if let Some(provider) = detect_provider_from_path_or_content(path)? {
+        if provider == ProviderKind::Pi || provider == ProviderKind::Omp {
+            return pi_session::parse_pi_session_info(path, modified);
+        }
     }
 
     // Read file once and reuse content for provider detection + parsing.
@@ -77,8 +79,10 @@ pub fn parse_session_info_from_path(path: &Path) -> Result<(SessionInfo, Vec<Ses
 }
 
 pub fn parse_session_entries_from_path(path: &Path) -> Result<Vec<SessionEntry>, String> {
-    if detect_provider_from_path_or_content(path)? == Some(ProviderKind::Pi) {
-        return pi_session::parse_pi_session_entries(path);
+    if let Some(provider) = detect_provider_from_path_or_content(path)? {
+        if provider == ProviderKind::Pi || provider == ProviderKind::Omp {
+            return pi_session::parse_pi_session_entries(path);
+        }
     }
 
     let (_, canonical) = read_canonical_session_from_path(path)?;
