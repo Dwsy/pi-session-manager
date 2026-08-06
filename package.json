@@ -1,6 +1,6 @@
 {
   "name": "pi-session-manager",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "Pi Session Manager - Tauri2 Desktop App",
   "type": "module",
   "scripts": {
