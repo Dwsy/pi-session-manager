@@ -99,11 +99,14 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
       <article
         className={`user-message ${className}`}
         id={`entry-${id}`}
-        aria-label={t('components.userMessage.you')}
+        aria-label="You"
       >
         <div className="user-message-header">
           <div className="user-message-meta">
-            <span className="user-message-role">{t('components.userMessage.you')}</span>
+            <span className="user-message-role">You</span>
+            {timestamp && (
+              <span className="user-message-timestamp">{formatDate(timestamp)}</span>
+            )}
           </div>
           <div className="flex items-center gap-1">
             {text.trim() && (
