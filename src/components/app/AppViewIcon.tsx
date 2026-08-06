@@ -1,6 +1,7 @@
 import {
   BookOpen,
   Boxes,
+  CalendarDays,
   ChartNoAxesColumn,
   Columns3,
   FileText,
@@ -17,6 +18,7 @@ import {
 const appViewIconMap = {
   "book-open": BookOpen,
   boxes: Boxes,
+  "calendar-days": CalendarDays,
   columns3: Columns3,
   "chart-column": ChartNoAxesColumn,
   "file-text": FileText,
