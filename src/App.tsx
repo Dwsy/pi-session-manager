@@ -548,7 +548,7 @@ function App() {
   const buildResumeCommand = useCallback(
     (session: SessionInfo) => {
       if (getSessionSourceSlug(session.path) === "omp") {
-        return buildOmpResumeCommand(session, { piPath, resumeCommand });
+        return buildOmpResumeCommand(session, { resumeCommand });
       }
       return buildPiResumeCommand(session, {
         piPath,
@@ -606,7 +606,7 @@ function App() {
         return;
       }
       if (sourceSlug === "omp" && target === "omp") {
-        const command = isTauri() ? null : buildOmpResumeCommand(session, { piPath, resumeCommand });
+        const command = buildOmpResumeCommand(session, { resumeCommand });
         await openResumeCommandInTerminal(
           session.path,
           session.cwd,

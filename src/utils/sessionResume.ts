@@ -59,7 +59,7 @@ export function buildOmpResumeCommand(
   const settings = getCachedSettings();
   const template =
     overrides.resumeCommand ?? settings.terminal?.resumeCommand ?? "";
-  const ompCommand = overrides.piPath ?? "omp";
+  const ompCommand = "omp";
 
   if (!template.trim()) {
     const baseCommand = `${ompCommand} --session "${session.path}"`;
@@ -205,15 +205,19 @@ export async function openSessionInTerminalDirect(
     getPlatformDefaults().defaultTerminal;
   const customCommand =
     settings.terminal?.customTerminalCommand || overrides.customCommand || "";
+  const sourceSlug = getSessionSourceSlug(session.path);
   const piPath = overrides.piPath ?? settings.terminal?.piCommandPath ?? "pi";
   const resumeCommand =
     overrides.resumeCommand ?? settings.terminal?.resumeCommand ?? "";
+  const isOmpSession = sourceSlug === "omp";
 
   await invoke("open_session_in_terminal", {
     path: session.path,
     cwd: session.cwd,
     terminal: terminal === "custom" ? customCommand : terminal,
-    piPath: piPath || null,
-    resumeCommand: resumeCommand || null,
+    piPath: isOmpSession ? "omp" : piPath || null,
+    resumeCommand: isOmpSession
+      ? buildOmpResumeCommand(session, { resumeCommand })
+      : resumeCommand || null,
   });
 }
