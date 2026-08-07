@@ -912,6 +912,8 @@ export function getSessionSourceTag(sessionPath: string): string | null {
       return 'Cursor'
     case 'antigravity':
       return 'Antigravity'
+    case 'omp':
+      return 'oh-my-pi'
     default:
       return slug
   }
@@ -932,6 +934,10 @@ export function getSessionSourceSlug(sessionPath: string): string | null {
 
   if (normalized.includes('/.codex/sessions')) {
     return 'codex'
+  }
+
+  if (normalized.includes('/.omp/agent/sessions')) {
+    return 'omp'
   }
 
   if (normalized.includes('/.opencode/') || normalized.includes('/opencode.db')) {

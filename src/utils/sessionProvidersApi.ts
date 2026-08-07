@@ -57,6 +57,11 @@ const FALLBACK_PROVIDERS: SessionProviderInfo[] = [
     display_name: "Antigravity",
     capabilities: { canScan: true, canConvertTarget: false },
   },
+  {
+    slug: "omp",
+    display_name: "oh-my-pi",
+    capabilities: { canScan: true, canConvertTarget: false },
+  },
 ];
 
 function normalizeProviderSlug(value: string): SessionConvertTarget | null {
@@ -70,6 +75,7 @@ function normalizeProviderSlug(value: string): SessionConvertTarget | null {
     case "clawdbot":
     case "cursor":
     case "antigravity":
+    case "omp":
       return value;
     default:
       return null;

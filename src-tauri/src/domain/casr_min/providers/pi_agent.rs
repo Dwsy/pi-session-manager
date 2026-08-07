@@ -197,7 +197,7 @@ pub fn render_session(session: &CanonicalSession, target_session_id: &str) -> Re
     Ok(lines.join("\n"))
 }
 
-fn flatten_pi_content(content: &Value) -> String {
+pub(super) fn flatten_pi_content(content: &Value) -> String {
     if let Some(s) = content.as_str() {
         return s.to_string();
     }
@@ -215,7 +215,7 @@ fn flatten_pi_content(content: &Value) -> String {
     String::new()
 }
 
-fn extract_tool_calls(content: &Value) -> Vec<ToolCall> {
+pub(super) fn extract_tool_calls(content: &Value) -> Vec<ToolCall> {
     let Some(arr) = content.as_array() else {
         return vec![];
     };
@@ -251,7 +251,7 @@ fn original_content_is_thinking_only(extra: &Value) -> bool {
     has_thinking && !has_non_thinking
 }
 
-fn shell_escape(path: &Path) -> String {
+pub(super) fn shell_escape(path: &Path) -> String {
     let text = path.to_string_lossy();
     if cfg!(windows) {
         format!("\"{}\"", text.replace('"', "\\\""))

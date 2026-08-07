@@ -16,10 +16,11 @@ pub enum SessionBridgeSource {
     ClawdBot,
     Cursor,
     Antigravity,
+    Omp,
 }
 
 impl SessionBridgeSource {
-    pub const ALL: [Self; 9] = [Self::Pi, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot, Self::Cursor, Self::Antigravity];
+    pub const ALL: [Self; 10] = [Self::Pi, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot, Self::Cursor, Self::Antigravity, Self::Omp];
 
     pub fn slug(self) -> &'static str {
         match self {
@@ -32,6 +33,7 @@ impl SessionBridgeSource {
             Self::ClawdBot => "clawdbot",
             Self::Cursor => "cursor",
             Self::Antigravity => "antigravity",
+            Self::Omp => "omp",
         }
     }
 
@@ -46,6 +48,7 @@ impl SessionBridgeSource {
             Self::ClawdBot => "ClawdBot",
             Self::Cursor => "Cursor",
             Self::Antigravity => "Antigravity",
+            Self::Omp => "oh-my-pi",
         }
     }
 
@@ -60,6 +63,7 @@ impl SessionBridgeSource {
             Self::OpenCode => crate::domain::casr_min::providers::opencode::session_roots(),
             Self::Cursor => crate::domain::casr_min::providers::cursor::session_roots(),
             Self::Antigravity => crate::domain::casr_min::providers::antigravity::session_roots(),
+            Self::Omp => crate::domain::casr_min::providers::omp::session_roots(),
         }
     }
 
@@ -75,6 +79,7 @@ impl SessionBridgeSource {
             Self::OpenCode => path.file_name().and_then(|value| value.to_str()) == Some("opencode.db") || normalized.contains("/.opencode/") || normalized.contains("/opencode.db/"),
             Self::Cursor => crate::domain::casr_min::providers::cursor::matches_path(path),
             Self::Antigravity => crate::domain::casr_min::providers::antigravity::matches_path(path),
+            Self::Omp => crate::domain::casr_min::providers::omp::matches_path(path),
         }
     }
 
@@ -89,6 +94,7 @@ impl SessionBridgeSource {
             "clawdbot" | "clawd-bot" | "cb" => Ok(Self::ClawdBot),
             "cursor" | "cur" => Ok(Self::Cursor),
             "antigravity" | "agy" => Ok(Self::Antigravity),
+            "omp" | "oh-my-pi" => Ok(Self::Omp),
             other => Err(format!("Unsupported session provider alias: {other}")),
         }
     }
@@ -98,7 +104,7 @@ impl SessionBridgeSource {
     }
 
     pub fn can_convert_target(self) -> bool {
-        !matches!(self, Self::Cursor | Self::Antigravity)
+        !matches!(self, Self::Cursor | Self::Antigravity | Self::Omp)
     }
 }
 
@@ -114,6 +120,7 @@ impl From<SessionBridgeSource> for ProviderKind {
             SessionBridgeSource::ClawdBot => ProviderKind::ClawdBot,
             SessionBridgeSource::Cursor => ProviderKind::Cursor,
             SessionBridgeSource::Antigravity => ProviderKind::Antigravity,
+            SessionBridgeSource::Omp => ProviderKind::Omp,
         }
     }
 }
@@ -130,6 +137,7 @@ impl From<ProviderKind> for SessionBridgeSource {
             ProviderKind::ClawdBot => SessionBridgeSource::ClawdBot,
             ProviderKind::Cursor => SessionBridgeSource::Cursor,
             ProviderKind::Antigravity => SessionBridgeSource::Antigravity,
+            ProviderKind::Omp => SessionBridgeSource::Omp,
         }
     }
 }

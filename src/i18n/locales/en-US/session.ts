@@ -200,6 +200,7 @@ export const session = {
       gemini: 'Gemini CLI',
       factory: 'Factory',
       clawdbot: 'ClawdBot',
+      omp: 'oh-my-pi',
     },
     targetDescriptions: {
       pi: 'Write a Pi session JSONL that can be resumed locally.',

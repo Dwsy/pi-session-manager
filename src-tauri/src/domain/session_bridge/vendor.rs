@@ -22,6 +22,9 @@ fn casr_slug_from_target(target: SessionBridgeSource) -> &'static str {
         SessionBridgeSource::Cursor => "cursor",
         // Antigravity is not yet present in the vendored CASR registry.
         SessionBridgeSource::Antigravity => "antigravity",
+        // Neither is oh-my-pi; resolution through the vendored registry fails
+        // cleanly if the convert path ever reaches this arm.
+        SessionBridgeSource::Omp => "omp",
     }
 }
 
@@ -36,6 +39,7 @@ fn session_bridge_source_from_casr_slug(slug: &str) -> Result<SessionBridgeSourc
         "clawdbot" => Ok(SessionBridgeSource::ClawdBot),
         "cursor" => Ok(SessionBridgeSource::Cursor),
         "antigravity" => Ok(SessionBridgeSource::Antigravity),
+        "omp" => Ok(SessionBridgeSource::Omp),
         other => Err(format!("Unsupported CASR provider slug: {other}")),
     }
 }

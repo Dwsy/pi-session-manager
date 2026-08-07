@@ -1,5 +1,5 @@
 import { ClaudeCode, Codex, GeminiCLI, OpenCode } from "@lobehub/icons";
-import { Bot, Boxes, Orbit, Sparkles } from "lucide-react";
+import { Bot, Boxes, Orbit, Sparkles, Terminal } from "lucide-react";
 import type { CSSProperties, SVGProps } from "react";
 
 interface AgentIconProps {
@@ -187,6 +187,9 @@ export function getAgentIconColor(source: string): string {
     case "antigravity":
     case "agy":
       return "#34D399";
+    case "omp":
+    case "oh-my-pi":
+      return "#F59E0B";
     default:
       return "var(--accent)";
   }
@@ -223,6 +226,9 @@ export function AgentIcon({
     case "antigravity":
     case "agy":
       return <Orbit className={className} size={size} style={style} />;
+    case "omp":
+    case "oh-my-pi":
+      return <Terminal className={className} size={size} style={style} />;
     default:
       return <Bot className={className} size={size} style={style} />;
   }
@@ -259,6 +265,9 @@ export function AgentColorIcon({
     case "antigravity":
     case "agy":
       return <Orbit className={className} size={size} style={style} />;
+    case "omp":
+    case "oh-my-pi":
+      return <Terminal className={className} size={size} style={style} />;
     default:
       return <Bot className={className} size={size} style={style} />;
   }

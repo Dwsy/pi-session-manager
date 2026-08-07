@@ -181,6 +181,7 @@ export type SessionConvertTarget =
   | "clawdbot"
   | "cursor"
   | "antigravity"
+  | "omp"
   | "cline"
   | "aider"
   | "amp"

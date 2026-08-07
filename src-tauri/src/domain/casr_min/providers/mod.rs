@@ -5,6 +5,7 @@ pub mod codex;
 pub mod cursor;
 pub mod factory;
 pub mod gemini;
+pub mod omp;
 pub mod opencode;
 pub mod pi_agent;
 
@@ -23,10 +24,11 @@ pub enum ProviderKind {
     ClawdBot,
     Cursor,
     Antigravity,
+    Omp,
 }
 
 impl ProviderKind {
-    pub const ALL: [Self; 9] = [Self::Pi, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot, Self::Cursor, Self::Antigravity];
+    pub const ALL: [Self; 10] = [Self::Pi, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot, Self::Cursor, Self::Antigravity, Self::Omp];
 
     pub fn slug(self) -> &'static str {
         match self {
@@ -39,6 +41,7 @@ impl ProviderKind {
             Self::ClawdBot => "clawdbot",
             Self::Cursor => "cursor",
             Self::Antigravity => "antigravity",
+            Self::Omp => "omp",
         }
     }
 
@@ -53,6 +56,7 @@ impl ProviderKind {
             Self::ClawdBot => "ClawdBot",
             Self::Cursor => "Cursor",
             Self::Antigravity => "Antigravity",
+            Self::Omp => "oh-my-pi",
         }
     }
 
@@ -76,6 +80,7 @@ impl ProviderKind {
             "clawdbot" | "clawd-bot" | "cwb" => Ok(Self::ClawdBot),
             "cursor" | "cur" => Ok(Self::Cursor),
             "antigravity" | "agy" => Ok(Self::Antigravity),
+            "omp" | "oh-my-pi" | "oh-my-pi-coding-agent" => Ok(Self::Omp),
             _ => Err(format!("Unsupported target format: {value}")),
         }
     }
@@ -91,6 +96,7 @@ impl ProviderKind {
             Self::ClawdBot => clawdbot::session_roots(),
             Self::Cursor => cursor::session_roots(),
             Self::Antigravity => antigravity::session_roots(),
+            Self::Omp => omp::session_roots(),
         }
     }
 
@@ -106,6 +112,7 @@ impl ProviderKind {
             Self::ClawdBot => clawdbot::matches_path(path),
             Self::Cursor => cursor::matches_path(path),
             Self::Antigravity => antigravity::matches_path(path),
+            Self::Omp => omp::matches_path(path),
         }
     }
 
@@ -120,6 +127,7 @@ impl ProviderKind {
             Self::ClawdBot => clawdbot::read_session(path),
             Self::Cursor => cursor::read_session(path),
             Self::Antigravity => antigravity::read_session(path),
+            Self::Omp => omp::read_session(path),
         }
     }
 
@@ -134,6 +142,7 @@ impl ProviderKind {
             Self::ClawdBot => clawdbot::read_session_from_str(path_hint, content),
             Self::Cursor => cursor::read_session_from_str(path_hint, content),
             Self::Antigravity => antigravity::read_session_from_str(path_hint, content),
+            Self::Omp => omp::read_session_from_str(path_hint, content),
         }
     }
 
@@ -148,6 +157,7 @@ impl ProviderKind {
             Self::ClawdBot => clawdbot::render_session(session, target_session_id),
             Self::Cursor => cursor::render_session(session, target_session_id),
             Self::Antigravity => antigravity::render_session(session, target_session_id),
+            Self::Omp => omp::render_session(session, target_session_id),
         }
     }
 
@@ -162,6 +172,7 @@ impl ProviderKind {
             Self::ClawdBot => clawdbot::build_target_path(target_session_id),
             Self::Cursor => cursor::build_target_path(session, target_session_id, now),
             Self::Antigravity => antigravity::build_target_path(session, target_session_id, now),
+            Self::Omp => omp::build_target_path(session, target_session_id, now),
         }
     }
 
@@ -176,6 +187,7 @@ impl ProviderKind {
             Self::ClawdBot => clawdbot::resume_command(target_session_id),
             Self::Cursor => cursor::resume_command(),
             Self::Antigravity => antigravity::resume_command(target_session_id),
+            Self::Omp => omp::resume_command(target_path),
         }
     }
 
@@ -183,7 +195,7 @@ impl ProviderKind {
         match self {
             Self::OpenCode => opencode::backing_store_path(path),
             Self::Cursor => cursor::backing_store_path(path),
-            Self::Pi | Self::ClaudeCode | Self::Codex | Self::Gemini | Self::Factory | Self::ClawdBot | Self::Antigravity => path.to_path_buf(),
+            Self::Pi | Self::ClaudeCode | Self::Codex | Self::Gemini | Self::Factory | Self::ClawdBot | Self::Antigravity | Self::Omp => path.to_path_buf(),
         }
     }
 }
@@ -191,7 +203,7 @@ impl ProviderKind {
 pub fn detect_provider(path_hint: Option<&Path>, content: &str) -> Option<ProviderKind> {
     if let Some(path) = path_hint {
         // Prefer path-specific detectors before content heuristics.
-        for provider in [ProviderKind::Antigravity, ProviderKind::Cursor, ProviderKind::Pi, ProviderKind::ClaudeCode, ProviderKind::Codex, ProviderKind::OpenCode, ProviderKind::Gemini, ProviderKind::Factory, ProviderKind::ClawdBot] {
+        for provider in [ProviderKind::Antigravity, ProviderKind::Cursor, ProviderKind::Omp, ProviderKind::Pi, ProviderKind::ClaudeCode, ProviderKind::Codex, ProviderKind::OpenCode, ProviderKind::Gemini, ProviderKind::Factory, ProviderKind::ClawdBot] {
             if provider.matches_path(path) {
                 return Some(provider);
             }
@@ -211,6 +223,9 @@ pub fn detect_provider(path_hint: Option<&Path>, content: &str) -> Option<Provid
         && matches!(entry_type, Some("USER_INPUT") | Some("PLANNER_RESPONSE") | Some("VIEW_FILE") | Some("EDIT_FILE") | Some("RUN_COMMAND") | Some("SYSTEM_MESSAGE") | Some("EPHEMERAL_MESSAGE") | Some("CONVERSATION_HISTORY"))
     {
         return Some(ProviderKind::Antigravity);
+    }
+    if omp::looks_like_session_content(trimmed) {
+        return Some(ProviderKind::Omp);
     }
     if entry_type == Some("session") {
         return Some(ProviderKind::Pi);
