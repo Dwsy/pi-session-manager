@@ -5,5 +5,19 @@ export const manifest: PsmPluginManifest = {
   id: 'builtin.session-graph',
   name: 'Branch Map',
   version: '0.2.0',
-  permissions: ['sessions:read'],
+  defaultEnabled: false,
+  permissions: [
+    'sessions:read',
+    'records:read',
+    'records:write',
+    'agent:invoke',
+    'model:invoke',
+  ],
+  records: [
+    {
+      type: 'session.decision_graph',
+      scope: 'session',
+      schemaVersion: 1,
+    },
+  ],
 }
