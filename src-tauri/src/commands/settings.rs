@@ -661,9 +661,7 @@ mod lightweight_mode_preservation_tests {
             save_app_settings(frontend_settings).await.unwrap();
 
             // The orphaned key must survive the whole-section overwrite.
-            let stored = crate::settings_store::get::<bool>("lightweight_mode")
-                .unwrap()
-                .unwrap_or(false);
+            let stored = crate::settings_store::get::<bool>("lightweight_mode").unwrap().unwrap_or(false);
             assert!(stored, "lightweight_mode should persist after save_app_settings");
         });
     }
