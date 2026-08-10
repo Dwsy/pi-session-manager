@@ -1171,6 +1171,9 @@ export default function SessionList({
               : undefined
           }
           pluginActions={renderSessionContextActions(contextMenuSession)}
+          onCopyPath={() => {
+            void copyText(contextMenuSession.path).catch(console.error);
+          }}
           onCopyResume={
             onCopyResumeSession
               ? async () => {

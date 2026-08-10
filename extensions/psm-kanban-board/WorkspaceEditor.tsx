@@ -58,6 +58,9 @@ export default function WorkspaceEditor({
         projectFilter,
         filterTagIds,
         sourceFilterSlugs,
+        columnOrder: workspace?.config.columnOrder ?? [],
+        cardDensity: workspace?.config.cardDensity ?? 'comfortable',
+        viewMode: workspace?.config.viewMode ?? 'board',
       },
     })
     onClose()

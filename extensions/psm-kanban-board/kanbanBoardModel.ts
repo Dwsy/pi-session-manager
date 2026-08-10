@@ -4,6 +4,7 @@ export const UNTAGGED_COLUMN_ID = '__untagged__'
 export const DESKTOP_KANBAN_COLUMN_WIDTH = 240
 
 export type KanbanCardDensity = 'comfortable' | 'compact'
+export type KanbanViewMode = 'board' | 'table' | 'roadmap'
 
 export interface KanbanColumnData {
   id: string

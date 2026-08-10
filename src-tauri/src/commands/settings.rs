@@ -106,7 +106,21 @@ pub async fn save_app_settings(settings: Value) -> Result<(), String> {
         }
         crate::config::save_config(&config)?;
     }
-    crate::unified_config::write_section("app", settings)
+    crate::unified_config::write_section("app", preserve_lightweight_mode(settings))
+}
+
+/// lightweightMode is stored separately via get/set_lightweight_mode and is not
+/// part of the frontend AppSettings model. Re-merge the current value into a
+/// whole-section write, otherwise the next save wipes it (window reverts to
+/// quitting on close instead of minimizing to tray).
+fn preserve_lightweight_mode(settings: Value) -> Value {
+    let mut merged = settings;
+    if let Ok(Some(current)) = crate::settings_store::get::<bool>("lightweight_mode") {
+        if let Some(obj) = merged.as_object_mut() {
+            obj.insert("lightweightMode".to_string(), Value::Bool(current));
+        }
+    }
+    merged
 }
 
 fn inject_session_source_settings(settings: &mut Value) {
@@ -621,6 +635,52 @@ mod resource_state_tests {
 
         let enabled = update_resource_entries(&entries, "skills/demo/SKILL.md", "enabled").unwrap();
         assert_eq!(enabled.last().map(String::as_str), Some("+skills/demo/SKILL.md"));
+    }
+}
+
+#[cfg(test)]
+mod lightweight_mode_preservation_tests {
+    use super::*;
+
+    #[test]
+    fn save_app_settings_keeps_lightweight_mode_when_frontend_omits_it() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let _env_lock = crate::paths::acquire_test_env_lock();
+            let home = tempfile::tempdir().unwrap();
+            let _home = crate::paths::TestHomeGuard::set(home.path());
+
+            // Enable lightweight mode through its dedicated store path.
+            crate::settings_store::set("lightweight_mode", &true).unwrap();
+
+            // Frontend saves a full app-settings object that has no lightweightMode key.
+            let frontend_settings = serde_json::json!({
+                "appearance": { "theme": "light" },
+                "language": { "locale": "zh-CN" }
+            });
+            save_app_settings(frontend_settings).await.unwrap();
+
+            // The orphaned key must survive the whole-section overwrite.
+            let stored = crate::settings_store::get::<bool>("lightweight_mode")
+                .unwrap()
+                .unwrap_or(false);
+            assert!(stored, "lightweight_mode should persist after save_app_settings");
+        });
+    }
+
+    #[test]
+    fn preserve_lightweight_mode_merges_existing_value() {
+        let _env_lock = crate::paths::acquire_test_env_lock();
+        let home = tempfile::tempdir().unwrap();
+        let _home = crate::paths::TestHomeGuard::set(home.path());
+
+        crate::settings_store::set("lightweight_mode", &true).unwrap();
+
+        let merged = preserve_lightweight_mode(serde_json::json!({
+            "appearance": { "theme": "light" }
+        }));
+        assert_eq!(merged["lightweightMode"], serde_json::json!(true));
+        assert_eq!(merged["appearance"]["theme"], serde_json::json!("light"));
     }
 }
 

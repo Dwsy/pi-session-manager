@@ -63,6 +63,28 @@ describe('SessionContextMenu delete action', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('copies the session JSONL path and closes the menu', () => {
+    const onCopyPath = vi.fn()
+    const onClose = vi.fn()
+
+    render(
+      <SessionContextMenu
+        x={0}
+        y={0}
+        sessionId="session-1"
+        tags={[]}
+        sessionTagIds={[]}
+        onToggleTag={() => {}}
+        onCopyPath={onCopyPath}
+        onClose={onClose}
+      />,
+    )
+
+    fireEvent.click(screen.getByText('session.copyPath'))
+    expect(onCopyPath).toHaveBeenCalledTimes(1)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('cancels the delete when the cancel (X) button is pressed', () => {
     const onDelete = vi.fn()
 

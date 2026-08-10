@@ -29,7 +29,7 @@ function formatHeaderTime(value: string, t: TFunction): string {
 function SessionHeader({ session, timestamp, stats, previewMode = false, isLive = false }: SessionHeaderProps) {
   const { t } = useTranslation()
   const { copyText } = useClipboard()
-  const [copiedTarget, setCopiedTarget] = useState<'path' | 'id' | null>(null)
+  const [copiedTarget, setCopiedTarget] = useState<'path' | null>(null)
   const modelSummary = stats.models.join(', ') || session.models?.join(', ') || session.model || t('session.header.unknown')
   const displayPath = shortenPath(session.cwd || session.path, previewMode ? 54 : 72)
   const displayId = session.id || t('session.header.unknown')
@@ -46,9 +46,9 @@ function SessionHeader({ session, timestamp, stats, previewMode = false, isLive 
     stats.tokens.cacheWrite && `W${formatTokens(stats.tokens.cacheWrite)}`,
   ].filter(Boolean)
 
-  const copyValue = async (target: 'path' | 'id', value: string) => {
+  const copyValue = async (value: string) => {
     await copyText(value)
-    setCopiedTarget(target)
+    setCopiedTarget('path')
     window.setTimeout(() => setCopiedTarget(null), 1500)
   }
 
@@ -67,7 +67,7 @@ function SessionHeader({ session, timestamp, stats, previewMode = false, isLive 
             <button
               type="button"
               className="session-header__copy-button"
-              onClick={() => void copyValue('path', session.path)}
+              onClick={() => void copyValue(session.path)}
               title={t('session.copyPath', 'Copy JSONL path')}
               aria-label={t('session.copyPath', 'Copy JSONL path')}
             >
@@ -91,11 +91,11 @@ function SessionHeader({ session, timestamp, stats, previewMode = false, isLive 
           <button
             type="button"
             className="session-header__copy-button"
-            onClick={() => void copyValue('id', displayId)}
-            title={t('session.header.copyId', 'Copy session ID')}
-            aria-label={t('session.header.copyId', 'Copy session ID')}
+            onClick={() => void copyValue(session.path)}
+            title={t('session.copyPath', 'Copy JSONL path')}
+            aria-label={t('session.copyPath', 'Copy JSONL path')}
           >
-            {copiedTarget === 'id' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+            {copiedTarget === 'path' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
           </button>
         </div>
       </div>

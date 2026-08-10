@@ -66,6 +66,7 @@ function KanbanAppView({
   const sourceFilterSlugs = workspace.activeWorkspace.config.sourceFilterSlugs
   const columnOrder = workspace.activeWorkspace.config.columnOrder
   const cardDensity = workspace.activeWorkspace.config.cardDensity
+  const viewMode = workspace.activeWorkspace.config.viewMode
 
   return (
     <Suspense
@@ -84,11 +85,15 @@ function KanbanAppView({
         sourceFilterSlugs={sourceFilterSlugs}
         columnOrder={columnOrder}
         cardDensity={cardDensity}
+        viewMode={viewMode}
         onColumnOrderChange={(tagIds) => {
           void workspaceStore.updateActiveWorkspaceConfig({ columnOrder: tagIds })
         }}
         onCardDensityChange={(density) => {
           void workspaceStore.updateActiveWorkspaceConfig({ cardDensity: density })
+        }}
+        onViewModeChange={(nextViewMode) => {
+          void workspaceStore.updateActiveWorkspaceConfig({ viewMode: nextViewMode })
         }}
         onFilterChange={(tagIds) => {
           void workspaceStore.updateActiveWorkspaceConfig({ filterTagIds: tagIds })

@@ -28,6 +28,11 @@ export const manifest: PsmPluginManifest = {
             comfortable: 'Comfortable',
             compact: 'Compact',
           },
+          view: {
+            board: 'Board',
+            table: 'Table',
+            roadmap: 'Roadmap',
+          },
           bulk: {
             selected: '{{count}} selected',
             moveSelected: 'Move selected',
@@ -72,6 +77,11 @@ export const manifest: PsmPluginManifest = {
           density: {
             comfortable: '舒适',
             compact: '紧凑',
+          },
+          view: {
+            board: '看板',
+            table: '表格',
+            roadmap: '路线图',
           },
           bulk: {
             selected: '已选择 {{count}} 项',

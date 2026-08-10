@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "private": true,
+  "main": "./dist/index.mjs",
   "scripts": {
     "build": "vite build"
   },
@@ -13,6 +14,11 @@
   "psm": {
     "extensions": [
       "./dist/index.mjs"
+    ]
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
     ]
   }
 }

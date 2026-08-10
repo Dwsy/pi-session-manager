@@ -36,6 +36,7 @@ export interface UseSessionViewerToolbarPropsOptions {
   onScrollToBottom: () => void;
   onRenameSession?: (newName: string) => void | Promise<void>;
   onRename?: () => void;
+  onCopyPath?: () => void;
   onFork?: () => void;
   onExport: () => void;
   onConvert?: () => void;
@@ -76,6 +77,7 @@ export function useSessionViewerToolbarProps({
   onScrollToBottom,
   onRenameSession,
   onRename,
+  onCopyPath,
   onFork,
   onExport,
   onConvert,
@@ -116,6 +118,7 @@ export function useSessionViewerToolbarProps({
     onScrollToBottom,
     onRenameSession,
     onRename,
+    onCopyPath,
     onFork,
     onExport,
     onConvert,

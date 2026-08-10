@@ -42,6 +42,7 @@ export interface SessionViewerToolbarProps {
   /** Inline rename on toolbar title blur */
   onRenameSession?: (newName: string) => void | Promise<void>;
   onRename?: () => void;
+  onCopyPath?: () => void;
   onFork?: () => void;
   onExport: () => void;
   onConvert?: () => void;

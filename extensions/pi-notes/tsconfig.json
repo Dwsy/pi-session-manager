@@ -9,7 +9,12 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "declaration": false
+    "declaration": false,
+    "baseUrl": "../..",
+    "paths": {
+      "@/*": ["src/*"],
+      "@pi-session-manager/plugin-sdk": ["packages/runtime-sdk/src"]
+    }
   },
   "include": ["*.ts", "*.tsx"]
 }

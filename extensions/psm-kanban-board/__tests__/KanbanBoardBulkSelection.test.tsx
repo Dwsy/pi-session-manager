@@ -25,6 +25,11 @@ vi.mock('@/hooks/useSettings', () => ({
   }),
 }))
 
+vi.mock('@/utils/sessionResume', () => ({
+  buildCopyResumeCommand: () => '',
+  openSessionInTerminalDirect: vi.fn(),
+}))
+
 vi.mock('@/components/search/SearchFilterBar', () => ({
   default: () => <div data-testid="search-filter" />,
 }))
@@ -80,5 +85,73 @@ describe('KanbanBoard bulk selection', () => {
     expect(screen.getByText('2 selected')).toBeTruthy()
     expect(screen.getByLabelText('Move selected')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Clear selection' })).toBeTruthy()
+  })
+})
+
+describe('KanbanBoard view modes', () => {
+  afterEach(() => cleanup())
+
+  it('renders alternate views and reports view mode changes', () => {
+    const onViewModeChange = vi.fn()
+    const { rerender } = render(
+      <KanbanBoard
+        sessions={[session('a')]}
+        tags={[tag('todo', 'Todo')]}
+        sessionTags={[]}
+        selectedSession={null}
+        onSelectSession={() => {}}
+        onMoveSession={() => {}}
+        getTagsForSession={() => []}
+        onToggleTag={() => {}}
+        viewMode="table"
+        onViewModeChange={onViewModeChange}
+      />,
+    )
+
+    expect(screen.getByTestId('kanban-table-view')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Roadmap' }))
+    expect(onViewModeChange).toHaveBeenCalledWith('roadmap')
+
+    rerender(
+      <KanbanBoard
+        sessions={[session('a')]}
+        tags={[tag('todo', 'Todo')]}
+        sessionTags={[]}
+        selectedSession={null}
+        onSelectSession={() => {}}
+        onMoveSession={() => {}}
+        getTagsForSession={() => []}
+        onToggleTag={() => {}}
+        viewMode="roadmap"
+        onViewModeChange={onViewModeChange}
+      />,
+    )
+
+    expect(screen.getByTestId('kanban-roadmap-view')).toBeTruthy()
+  })
+
+  it('passes filtered sessions to table view and opens the selected session', () => {
+    const onSelectSession = vi.fn()
+    render(
+      <KanbanBoard
+        sessions={[session('keep'), { ...session('drop'), cwd: '/tmp/other' }]}
+        tags={[]}
+        sessionTags={[]}
+        selectedSession={null}
+        onSelectSession={onSelectSession}
+        onMoveSession={() => {}}
+        getTagsForSession={() => []}
+        onToggleTag={() => {}}
+        projectFilter="/tmp/project"
+        viewMode="table"
+      />,
+    )
+
+    const rows = screen.getAllByTestId('kanban-table-row')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].getAttribute('data-session-id')).toBe('keep')
+
+    fireEvent.click(rows[0])
+    expect(onSelectSession).toHaveBeenCalledWith(expect.objectContaining({ id: 'keep' }))
   })
 })

@@ -322,6 +322,14 @@ function SessionViewerContent({
     restoreSearchExpandedTools,
   });
 
+  const handleCopyPath = useCallback(async () => {
+    try {
+      await copyText(session.path);
+    } catch (err) {
+      console.error("Failed to copy session path:", err);
+    }
+  }, [copyText, session.path]);
+
   const handleCopyResumeCommand = useCallback(async () => {
     try {
       const command = await buildCopyResumeCommand(session, {
@@ -410,6 +418,7 @@ function SessionViewerContent({
     onScrollToBottom: handleScrollToBottom,
     onRenameSession,
     onRename,
+    onCopyPath: previewMode ? undefined : handleCopyPath,
     onFork,
     onExport,
     onConvert,

@@ -24,6 +24,8 @@ import type { TerminalType } from '@/components/settings/types'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
 import KanbanBulkToolbar from './KanbanBulkToolbar'
+import KanbanRoadmapView from './KanbanRoadmapView'
+import KanbanTableView from './KanbanTableView'
 import SearchFilterBar from '@/components/search/SearchFilterBar'
 import SessionPreviewModal from '@/components/session-preview/SessionPreviewModal'
 import TimeRangeSelector from './TimeRangeSelector'
@@ -38,6 +40,7 @@ import {
   UNTAGGED_COLUMN_ID,
   type KanbanCardDensity,
   type KanbanColumnData,
+  type KanbanViewMode,
 } from './kanbanBoardModel'
 
 interface KanbanBoardProps {
@@ -73,6 +76,8 @@ interface KanbanBoardProps {
   onColumnOrderChange?: (tagIds: string[]) => void | Promise<void>
   cardDensity?: KanbanCardDensity
   onCardDensityChange?: (density: KanbanCardDensity) => void | Promise<void>
+  viewMode?: KanbanViewMode
+  onViewModeChange?: (viewMode: KanbanViewMode) => void | Promise<void>
   projectFilter?: string | null // null = all projects
   filterTagIds?: string[]
   sourceFilterSlugs?: string[]
@@ -177,6 +182,8 @@ export default function KanbanBoard({
   onColumnOrderChange,
   cardDensity = 'comfortable',
   onCardDensityChange,
+  viewMode = 'board',
+  onViewModeChange,
   projectFilter,
   filterTagIds = [],
   sourceFilterSlugs = [],
@@ -524,6 +531,23 @@ export default function KanbanBoard({
             compact
           />
         </div>
+        <div className="flex shrink-0 items-center rounded-md border border-border/35 bg-background/40 p-0.5" role="group" aria-label={t('plugins.kanbanBoard.viewMode', 'View mode')}>
+          {(['board', 'table', 'roadmap'] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={viewMode === mode}
+              onClick={() => onViewModeChange?.(mode)}
+              className={`rounded px-2 py-1 text-[10px] font-medium motion-color motion-press focus-ring ${
+                viewMode === mode
+                  ? 'bg-secondary text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t(`plugins.kanbanBoard.view.${mode}`, mode === 'board' ? 'Board' : mode === 'table' ? 'Table' : 'Roadmap')}
+            </button>
+          ))}
+        </div>
         <span className="text-[10px] text-muted-foreground shrink-0">
           {filteredSessions.length} {t('project.list.sessions')}
         </span>
@@ -534,7 +558,7 @@ export default function KanbanBoard({
           onDeleteSelected={handleBulkDelete}
           onClearSelection={clearBulkSelection}
         />
-        <div className="flex items-center rounded-md border border-border/35 bg-background/40 p-0.5">
+        {viewMode === 'board' && <div className="flex items-center rounded-md border border-border/35 bg-background/40 p-0.5">
           <button
             type="button"
             className={`flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-foreground focus-ring ${cardDensity === 'comfortable' ? 'bg-secondary text-foreground' : ''}`}
@@ -553,7 +577,7 @@ export default function KanbanBoard({
           >
             <AlignJustify className="h-3.5 w-3.5" />
           </button>
-        </div>
+        </div>}
         <TimeRangeSelector
           value={timeRange}
           onChange={setTimeRange}
@@ -571,7 +595,31 @@ export default function KanbanBoard({
         )}
       </div>
 
-      {/* Board */}
+      {viewMode === 'table' ? (
+        <KanbanTableView
+          sessions={filteredSessions}
+          selectedSession={selectedSession}
+          selectedSessionIds={selectedSessionIds}
+          selectionMode={selectedSessionIds.size > 0}
+          getTagsForSession={getTagsForSession}
+          onToggleBulkSelect={toggleBulkSelect}
+          onOpenSession={onSelectSession}
+          hideProjectInfo={!!projectFilter}
+          liveSessionIds={liveSessionIds}
+        />
+      ) : viewMode === 'roadmap' ? (
+        <KanbanRoadmapView
+          sessions={filteredSessions}
+          selectedSession={selectedSession}
+          selectedSessionIds={selectedSessionIds}
+          selectionMode={selectedSessionIds.size > 0}
+          getTagsForSession={getTagsForSession}
+          onToggleBulkSelect={toggleBulkSelect}
+          onOpenSession={onSelectSession}
+          hideProjectInfo={!!projectFilter}
+          liveSessionIds={liveSessionIds}
+        />
+      ) : (
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
@@ -698,6 +746,7 @@ export default function KanbanBoard({
           )}
         </DragOverlay>
       </DndContext>
+      )}
 
       {/* Session Preview Modal */}
       <SessionPreviewModal

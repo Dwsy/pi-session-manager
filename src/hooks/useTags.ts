@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import type { Tag, SessionTag } from "@/types";
 import {
   assignRuntimeTag,
@@ -135,16 +135,36 @@ export function useTags() {
     await reorderRuntimeTags(tagIds);
   }, []);
 
+  const tagsBySessionId = useMemo(() => {
+    const sessionIdsByTagId = new Map<string, Set<string>>();
+    for (const assignment of sessionTags) {
+      let sessionIds = sessionIdsByTagId.get(assignment.tagId);
+      if (!sessionIds) {
+        sessionIds = new Set<string>();
+        sessionIdsByTagId.set(assignment.tagId, sessionIds);
+      }
+      sessionIds.add(assignment.sessionId);
+    }
+
+    const indexed = new Map<string, Tag[]>();
+    for (const tag of tags) {
+      const sessionIds = sessionIdsByTagId.get(tag.id);
+      if (!sessionIds) continue;
+      for (const sessionId of sessionIds) {
+        const sessionTagsForId = indexed.get(sessionId);
+        if (sessionTagsForId) {
+          sessionTagsForId.push(tag);
+        } else {
+          indexed.set(sessionId, [tag]);
+        }
+      }
+    }
+    return indexed;
+  }, [tags, sessionTags]);
+
   const getTagsForSession = useCallback(
-    (sessionId: string): Tag[] => {
-      const ids = new Set(
-        sessionTags
-          .filter((tag) => tag.sessionId === sessionId)
-          .map((tag) => tag.tagId),
-      );
-      return tags.filter((tag) => ids.has(tag.id));
-    },
-    [tags, sessionTags],
+    (sessionId: string): Tag[] => tagsBySessionId.get(sessionId) ?? [],
+    [tagsBySessionId],
   );
 
   const getSessionsForTag = useCallback(

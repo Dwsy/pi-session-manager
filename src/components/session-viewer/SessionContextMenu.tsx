@@ -32,6 +32,7 @@ interface SessionContextMenuProps {
   onOpenBrowser?: () => void
   onConvert?: () => void
   onToggleFavorite?: () => void
+  onCopyPath?: () => void
   onCopyResume?: () => void
   onFork?: () => void
   onRename?: () => void
@@ -74,6 +75,7 @@ export default function SessionContextMenu({
   onOpenBrowser,
   onConvert,
   onToggleFavorite,
+  onCopyPath,
   onCopyResume,
   onFork,
   onRename,
@@ -134,7 +136,7 @@ export default function SessionContextMenu({
     onOpenTerminal || onOpenBrowser || onConvert || onToggleFavorite,
   )
   const hasPluginActions = Children.count(pluginActions) > 0
-  const hasSessionActions = Boolean(onCopyResume || onFork || onRename)
+  const hasSessionActions = Boolean(onCopyPath || onCopyResume || onFork || onRename)
   const hasContentBeforeDelete = Boolean(
     tags.length > 0 || hasLaunchActions || hasPluginActions || hasSessionActions,
   )
@@ -278,6 +280,13 @@ export default function SessionContextMenu({
         <div className="session-context-menu__separator" role="separator" />
       ) : null}
 
+      {onCopyPath ? (
+        <MenuAction
+          icon={<Copy />}
+          label={t('session.copyPath', 'Copy JSONL path')}
+          onSelect={() => runAndClose(onCopyPath)}
+        />
+      ) : null}
       {onCopyResume ? (
         <MenuAction
           icon={<Copy />}

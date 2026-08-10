@@ -54,6 +54,7 @@ export default function SessionViewerToolbar({
   onScrollToBottom,
   onRenameSession,
   onRename,
+  onCopyPath,
   onFork,
   onExport,
   onConvert,
@@ -264,14 +265,15 @@ export default function SessionViewerToolbar({
                       {t("common.rename")}
                     </button>
                   )}
-                  {onFork && (
+                  {onCopyPath && (
                     <button
-                      onClick={onFork}
+                      onClick={onCopyPath}
                       className="px-2.5 py-1 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors flex items-center gap-1"
-                      title={t("session.fork.title")}
+                      title={t("session.copyPath", "Copy JSONL path")}
+                      aria-label={t("session.copyPath", "Copy JSONL path")}
                     >
                       <Copy className="h-3 w-3" />
-                      {t("session.fork.confirm")}
+                      {t("session.copyPath", "Copy JSONL path")}
                     </button>
                   )}
                   <KbdTooltip shortcut="Cmd+E">
