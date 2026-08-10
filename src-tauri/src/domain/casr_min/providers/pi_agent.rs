@@ -37,6 +37,7 @@ fn read_session_from_reader<R: BufRead>(path: &Path, reader: R) -> Result<Canoni
     let mut session_id_from_header: Option<String> = None;
     let mut model_id: Option<String> = None;
     let mut provider_name: Option<String> = None;
+    let mut title: Option<String> = None;
 
     for line_result in reader.lines() {
         let line = match line_result {
@@ -57,8 +58,16 @@ fn read_session_from_reader<R: BufRead>(path: &Path, reader: R) -> Result<Canoni
                 session_cwd = val.get("cwd").and_then(|v| v.as_str()).map(String::from);
                 provider_name = val.get("provider").and_then(|v| v.as_str()).map(String::from);
                 model_id = val.get("modelId").and_then(|v| v.as_str()).map(String::from);
+                if title.is_none() {
+                    title = val.get("title").and_then(|v| v.as_str()).or_else(|| val.get("name").and_then(|v| v.as_str())).map(str::trim).filter(|value| !value.is_empty()).map(String::from);
+                }
                 if let Some(ts) = val.get("timestamp").and_then(parse_timestamp) {
                     started_at = Some(ts);
+                }
+            }
+            "title" => {
+                if let Some(value) = val.get("title").and_then(|v| v.as_str()).map(str::trim).filter(|value| !value.is_empty()) {
+                    title = Some(value.to_string());
                 }
             }
             "message" => {
@@ -112,7 +121,7 @@ fn read_session_from_reader<R: BufRead>(path: &Path, reader: R) -> Result<Canoni
 
     reindex_messages(&mut messages);
     let session_id = session_id_from_header.unwrap_or_else(|| path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string());
-    let title = messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100));
+    let title = title.or_else(|| messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100)));
     let workspace = session_cwd.as_ref().map(PathBuf::from);
     Ok(CanonicalSession { session_id, provider_slug: "pi-agent".to_string(), workspace, title, started_at, ended_at, messages, metadata: json!({"source": "pi_agent", "provider": provider_name, "model_id": model_id}), source_path: path.to_path_buf(), model_name: model_id })
 }

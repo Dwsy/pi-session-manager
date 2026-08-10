@@ -220,16 +220,13 @@ fn parse_pi_session(path: &Path) -> Result<(PiSessionHeader, Vec<RawPiEntry>), S
     parse_pi_session_reader(BufReader::new(file), path)
 }
 
-/// Lightweight header-only parse: reads only the first line.
+/// Lightweight header-only parse: reads leading metadata through the session header.
 /// Returns a minimal SessionInfo with empty message fields.
 /// Used for fast initial scan when DB is empty.
 pub fn parse_pi_session_header_only(path: &Path, file_modified: DateTime<Utc>) -> Result<SessionInfo, String> {
     let file = File::open(path).map_err(|e| format!("Failed to open Pi session {}: {e}", path.display()))?;
     let mut reader = BufReader::new(file);
-    let mut header_line = String::new();
-    reader.read_line(&mut header_line).map_err(|e| format!("Failed to read Pi session header {}: {e}", path.display()))?;
-
-    let header = parse_header(header_line.trim(), path)?;
+    let (header, _) = read_session_header(&mut reader, path)?;
 
     let metadata = std::fs::metadata(path).ok();
     let file_size = metadata.as_ref().map(|item| item.len()).unwrap_or(0);
@@ -312,14 +309,11 @@ fn message_text_hint(message: &Value) -> Option<String> {
     }
 }
 
-fn parse_pi_session_reader<R: BufRead>(reader: R, path: &Path) -> Result<(PiSessionHeader, Vec<RawPiEntry>), String> {
-    let mut lines = reader.lines();
-    let header_line = lines.next().ok_or_else(|| format!("Pi session {} is empty", path.display()))?.map_err(|e| format!("Failed to read Pi session header {}: {e}", path.display()))?;
-
-    let header = parse_header(&header_line, path)?;
+fn parse_pi_session_reader<R: BufRead>(mut reader: R, path: &Path) -> Result<(PiSessionHeader, Vec<RawPiEntry>), String> {
+    let (header, header_line_number) = read_session_header(&mut reader, path)?;
     let mut entries = Vec::new();
 
-    for (line_number, line_result) in lines.enumerate() {
+    for (line_offset, line_result) in reader.lines().enumerate() {
         let line = match line_result {
             Ok(line) => line,
             Err(_) => continue,
@@ -332,13 +326,47 @@ fn parse_pi_session_reader<R: BufRead>(reader: R, path: &Path) -> Result<(PiSess
         let Ok(value) = serde_json::from_str::<Value>(trimmed) else {
             continue;
         };
-        let Some(entry) = parse_raw_entry(&value, header.timestamp, line_number + 2) else {
+        let Some(entry) = parse_raw_entry(&value, header.timestamp, header_line_number + line_offset + 1) else {
             continue;
         };
         entries.push(entry);
     }
 
     Ok((header, entries))
+}
+
+fn read_session_header<R: BufRead>(reader: &mut R, path: &Path) -> Result<(PiSessionHeader, usize), String> {
+    let mut line = String::new();
+    let mut title = None;
+    let mut line_number = 0usize;
+
+    loop {
+        line.clear();
+        let bytes_read = reader.read_line(&mut line).map_err(|e| format!("Failed to read Pi session header {}: {e}", path.display()))?;
+        if bytes_read == 0 {
+            return Err(if line_number == 0 { format!("Pi session {} is empty", path.display()) } else { format!("Invalid Pi session header in {}: expected type=session", path.display()) });
+        }
+        line_number += 1;
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let value = serde_json::from_str::<Value>(trimmed).map_err(|e| format!("Invalid Pi session header in {}: {e}", path.display()))?;
+        match value.get("type").and_then(Value::as_str) {
+            Some("title") => {
+                if let Some(value) = optional_trimmed_string(&value, "title") {
+                    title = Some(value);
+                }
+            }
+            Some("session") => {
+                let mut header = parse_header(trimmed, path)?;
+                header.name = title.or(header.name);
+                return Ok((header, line_number));
+            }
+            _ => return Err(format!("Invalid Pi session header in {}: expected type=session", path.display())),
+        }
+    }
 }
 
 fn parse_header(line: &str, path: &Path) -> Result<PiSessionHeader, String> {
@@ -352,7 +380,7 @@ fn parse_header(line: &str, path: &Path) -> Result<PiSessionHeader, String> {
     let cwd = required_string_field(&value, "cwd").ok_or_else(|| format!("Invalid Pi session header in {}: missing cwd", path.display()))?;
     let timestamp = value.get("timestamp").and_then(Value::as_str).and_then(parse_rfc3339_timestamp).ok_or_else(|| format!("Invalid Pi session header in {}: missing or invalid timestamp", path.display()))?;
 
-    Ok(PiSessionHeader { id, cwd, timestamp, name: optional_trimmed_string(&value, "name"), parent_session_path: optional_trimmed_string(&value, "parentSession") })
+    Ok(PiSessionHeader { id, cwd, timestamp, name: optional_trimmed_string(&value, "name").or_else(|| optional_trimmed_string(&value, "title")), parent_session_path: optional_trimmed_string(&value, "parentSession") })
 }
 
 fn parse_raw_entry(value: &Value, fallback_timestamp: DateTime<Utc>, synthetic_index: usize) -> Option<RawPiEntry> {
@@ -540,6 +568,23 @@ mod tests {
         assert_eq!(info.last_message_role, "assistant");
         assert!(info.message_count > 0);
         assert!(info.first_message.is_empty());
+    }
+
+    #[test]
+    fn parses_omp_title_before_session_header() {
+        let (_temp_dir, path) = write_session_file(concat!(
+            "{\"type\":\"title\",\"v\":1,\"title\":\"Mutable OMP title\",\"source\":\"auto\",\"updatedAt\":\"2026-04-09T10:00:30Z\",\"pad\":\"   \"}\n",
+            "{\"type\":\"session\",\"version\":3,\"id\":\"omp-1\",\"timestamp\":\"2026-04-09T10:00:00Z\",\"cwd\":\"/workspace/project\",\"title\":\"Header title\"}\n",
+            "{\"type\":\"message\",\"id\":\"m1\",\"parentId\":null,\"timestamp\":\"2026-04-09T10:01:00Z\",\"message\":{\"role\":\"user\",\"content\":\"hello\"}}\n"
+        ));
+
+        let (info, entries) = parse_pi_session_info(&path, timestamp("2026-04-09T10:02:00Z")).expect("parse omp session");
+        let header_only = parse_pi_session_header_only(&path, timestamp("2026-04-09T10:02:00Z")).expect("parse omp header");
+
+        assert_eq!(info.id, "omp-1");
+        assert_eq!(info.name.as_deref(), Some("Mutable OMP title"));
+        assert_eq!(entries.len(), 1);
+        assert_eq!(header_only.name.as_deref(), Some("Mutable OMP title"));
     }
 
     #[test]

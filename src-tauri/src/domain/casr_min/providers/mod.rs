@@ -224,6 +224,9 @@ pub fn detect_provider(path_hint: Option<&Path>, content: &str) -> Option<Provid
     {
         return Some(ProviderKind::Antigravity);
     }
+    if omp_agent::looks_like_session_content(trimmed) {
+        return Some(ProviderKind::Omp);
+    }
     if entry_type == Some("session") {
         return Some(ProviderKind::Pi);
     }

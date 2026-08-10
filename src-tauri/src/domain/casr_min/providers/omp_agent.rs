@@ -7,10 +7,21 @@
 
 use std::path::{Path, PathBuf};
 
+use serde_json::Value;
+
 use crate::domain::casr_min::model::CanonicalSession;
 
 pub fn session_roots() -> Vec<PathBuf> {
     crate::paths::omp_agent_sessions_dir().ok().filter(|p| p.is_dir()).map(|p| vec![p]).unwrap_or_default()
+}
+
+pub fn looks_like_session_content(content: &str) -> bool {
+    content
+        .trim_start()
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .and_then(|line| serde_json::from_str::<Value>(line).ok())
+        .is_some_and(|value| value.get("type").and_then(Value::as_str) == Some("title") && value.get("v").and_then(Value::as_u64).is_some() && value.get("updatedAt").and_then(Value::as_str).is_some())
 }
 
 pub fn build_target_path(target_session_id: &str, now: chrono::DateTime<chrono::Utc>) -> Result<PathBuf, String> {
@@ -46,5 +57,41 @@ fn shell_escape(path: &Path) -> String {
         format!("\"{}\"", text.replace('"', "\\\""))
     } else {
         format!("'{}'", text.replace('\'', "'\\''"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::{looks_like_session_content, read_session_from_str};
+
+    #[test]
+    fn detects_omp_title_record() {
+        assert!(looks_like_session_content("{\"type\":\"title\",\"v\":1,\"title\":\"OMP\",\"updatedAt\":\"2026-08-10T00:00:00Z\",\"pad\":\" \"}\n{\"type\":\"session\"}"));
+        assert!(!looks_like_session_content("{\"type\":\"session\",\"version\":3}"));
+    }
+
+    #[test]
+    fn falls_back_to_header_name_when_title_is_null() {
+        let content = concat!(
+            "{\"type\":\"session\",\"version\":3,\"id\":\"omp-1\",\"timestamp\":\"2026-08-10T00:00:00Z\",\"cwd\":\"/tmp\",\"title\":null,\"name\":\"Named session\"}\n",
+            "{\"type\":\"message\",\"id\":\"m1\",\"timestamp\":\"2026-08-10T00:01:00Z\",\"message\":{\"role\":\"user\",\"content\":\"fallback title\"}}\n"
+        );
+
+        let session = read_session_from_str(Path::new("/tmp/.omp/agent/sessions/session.jsonl"), content).expect("parse omp canonical session");
+        assert_eq!(session.title.as_deref(), Some("Named session"));
+    }
+
+    #[test]
+    fn preserves_mutable_omp_title_in_canonical_session() {
+        let content = concat!(
+            "{\"type\":\"title\",\"v\":1,\"title\":\"Mutable title\",\"updatedAt\":\"2026-08-10T00:00:00Z\",\"pad\":\" \"}\n",
+            "{\"type\":\"session\",\"version\":3,\"id\":\"omp-1\",\"timestamp\":\"2026-08-10T00:00:00Z\",\"cwd\":\"/tmp\",\"title\":\"Header title\"}\n",
+            "{\"type\":\"message\",\"id\":\"m1\",\"timestamp\":\"2026-08-10T00:01:00Z\",\"message\":{\"role\":\"user\",\"content\":\"fallback title\"}}\n"
+        );
+
+        let session = read_session_from_str(Path::new("/tmp/.omp/agent/sessions/session.jsonl"), content).expect("parse omp canonical session");
+        assert_eq!(session.title.as_deref(), Some("Mutable title"));
     }
 }
