@@ -355,10 +355,7 @@ fn test_init_db_upgrades_legacy_message_entries_before_new_indexes() {
 
     let _guard = MIGRATION_LOCK.lock().unwrap();
     let temp_dir = tempdir().unwrap();
-    let original_home = std::env::var("HOME").ok();
-    std::env::set_var("HOME", temp_dir.path());
-
-    let db_path = sqlite_cache::get_db_path().unwrap();
+    let db_path = temp_dir.path().join("sessions.db");
     let conn = Connection::open(&db_path).unwrap();
     conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)", []).unwrap();
     conn.execute("INSERT INTO schema_version (version) VALUES (3)", []).unwrap();
@@ -399,7 +396,7 @@ fn test_init_db_upgrades_legacy_message_entries_before_new_indexes() {
     drop(conn);
 
     let config = Config::default();
-    let conn = sqlite_cache::init_db_with_config(&config).unwrap();
+    let conn = sqlite_cache::init_db_with_path(&db_path, &config).unwrap();
 
     let mut stmt = conn.prepare("PRAGMA table_info(message_entries)").unwrap();
     let columns: Vec<String> = stmt.query_map([], |row| row.get(1)).unwrap().collect::<Result<Vec<_>, _>>().unwrap();
@@ -409,10 +406,4 @@ fn test_init_db_upgrades_legacy_message_entries_before_new_indexes() {
 
     let index_count: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_message_entries_entry_id'", [], |row| row.get(0)).unwrap();
     assert_eq!(index_count, 1);
-
-    if let Some(home) = original_home {
-        std::env::set_var("HOME", home);
-    } else {
-        std::env::remove_var("HOME");
-    }
 }
