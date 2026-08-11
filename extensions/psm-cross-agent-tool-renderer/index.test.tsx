@@ -4,9 +4,34 @@ import { crossAgentToolRenderer } from './index'
 
 describe('crossAgentToolRenderer', () => {
   it('keeps matching legacy cross-agent tool names', () => {
-    for (const name of ['Bash', 'bash', 'shell', 'Read', 'read_file', 'Write', 'write_file', 'Edit', 'MultiEdit', 'edit_file', 'apply_patch']) {
+    for (const name of ['Bash', 'bash', 'shell', 'Read', 'read_file', 'Write', 'write_file', 'Edit', 'MultiEdit', 'edit_file', 'apply_patch', 'search', 'find']) {
       expect(crossAgentToolRenderer.match({ type: 'toolCall', name })).toBe(true)
     }
+  })
+
+  it('matches every canonical OMP built-in tool', () => {
+    const ompBuiltins = [
+      'read', 'bash', 'edit', 'ast_grep', 'ast_edit', 'ask', 'debug', 'eval', 'github', 'glob',
+      'grep', 'lsp', 'inspect_image', 'browser', 'computer', 'checkpoint', 'rewind', 'security_scan',
+      'task', 'hub', 'todo', 'web_search', 'write', 'memory_edit', 'retain', 'recall', 'reflect',
+      'learn', 'manage_skill', 'yield', 'goal',
+    ]
+
+    for (const name of ompBuiltins) {
+      expect(crossAgentToolRenderer.match({ type: 'toolCall', name })).toBe(true)
+    }
+  })
+
+  it('uses generic OMP arguments in collapsed previews', () => {
+    const toolCall = {
+      type: 'toolCall' as const,
+      id: 'call-ask',
+      name: 'ask',
+      arguments: { prompt: 'Choose a strategy' },
+    }
+    const data = crossAgentToolRenderer.resolveData!(toolCall, 0, new Map())
+
+    expect(crossAgentToolRenderer.getPreview!(toolCall, data)).toBe('Ask: Choose a strategy')
   })
 
   it('keeps legacy structured shell arguments in the preview', () => {
