@@ -72,8 +72,8 @@ fn setup_test_db(sessions: &[(&str, &str, &[(&str, &str)])]) -> tempfile::TempDi
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
 
-    // Set HOME so config uses temp dir for DB
-    let original_home = env::var("HOME").ok();
+    // Set the explicit cross-platform test home so config uses this temp dir for DB.
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     env::set_var("HOME", temp_dir.path());
 
     let config = Config::default();
@@ -99,6 +99,7 @@ fn setup_test_db_from_raw_sessions(sessions: &[(&str, &str)]) -> tempfile::TempD
     let temp_dir = tempdir().unwrap();
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     env::set_var("HOME", temp_dir.path());
 
     let config = Config::default();
@@ -255,6 +256,7 @@ async fn test_full_text_search_excludes_external_sessions_by_default() {
 
     let temp_dir = tempdir().unwrap();
     let home = temp_dir.path();
+    std::env::set_var("PPM_TEST_HOME", home);
     std::env::set_var("HOME", home);
 
     let pi_dir = home.join(".pi").join("agent").join("sessions").join("local");
@@ -610,6 +612,7 @@ async fn test_full_text_search_indexes_tool_result_entries_during_upsert() {
     let temp_dir = tempdir().unwrap();
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     env::set_var("HOME", temp_dir.path());
 
     let config = Config::default();
@@ -646,6 +649,7 @@ async fn test_full_text_search_thinking_toggle() {
     let temp_dir = tempdir().unwrap();
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     env::set_var("HOME", temp_dir.path());
 
     write_app_settings(false);
@@ -704,6 +708,7 @@ async fn test_full_text_search_excludes_external_sessions_when_search_disabled()
     let _lock = TEST_DB_LOCK.lock().unwrap();
 
     let temp_dir = tempdir().unwrap();
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     env::set_var("HOME", temp_dir.path());
 
     let pi_sessions_dir = temp_dir.path().join(".pi").join("agent").join("sessions").join("project");
@@ -747,6 +752,7 @@ async fn test_full_text_search_ignores_legacy_enable_fts5_flag() {
     let temp_dir = tempdir().unwrap();
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     env::set_var("HOME", temp_dir.path());
 
     let path = sessions_dir.join("legacy-fts-flag.jsonl");
