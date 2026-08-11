@@ -61,6 +61,36 @@ if (
   }
 }
 
+// Node declares a `localStorage` global that stays undefined without
+// --localstorage-file, and it shadows jsdom's. Modules that read localStorage at
+// import time then crash during collection, so install an in-memory Storage.
+if (
+  typeof window !== 'undefined' &&
+  typeof globalThis.localStorage === 'undefined'
+) {
+  const entries = new Map<string, string>()
+  const memoryStorage: Storage = {
+    get length() {
+      return entries.size
+    },
+    key: (index: number) => Array.from(entries.keys())[index] ?? null,
+    getItem: (key: string) => entries.get(String(key)) ?? null,
+    setItem: (key: string, value: string) => {
+      entries.set(String(key), String(value))
+    },
+    removeItem: (key: string) => {
+      entries.delete(String(key))
+    },
+    clear: () => {
+      entries.clear()
+    },
+  }
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: memoryStorage,
+  })
+}
+
 // jsdom lacks window.matchMedia; some components query prefers-color-scheme etc.
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   window.matchMedia = ((query: string) => ({

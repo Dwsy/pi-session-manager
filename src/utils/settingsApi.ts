@@ -198,6 +198,10 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
     search: { ...defaultSettings.search, ...raw.search },
     export: { ...defaultSettings.export, ...raw.export },
     update,
+    onboarding: {
+      ...defaultSettings.onboarding,
+      completed: raw.onboarding?.completed === true,
+    },
     subagents: normalizeSubagentCompatibilitySettings(raw.subagents),
     advanced,
   };

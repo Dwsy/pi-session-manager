@@ -30,11 +30,15 @@ const providers: SessionProviderInfo[] = [
     slug: 'pi',
     display_name: 'Pi',
     capabilities: { canScan: true, canConvertTarget: true },
+    detected: true,
+    roots: ['/home/demo/.pi/agent/sessions'],
   },
   {
     slug: 'codex',
     display_name: 'Codex',
     capabilities: { canScan: true, canConvertTarget: true },
+    detected: false,
+    roots: [],
   },
 ]
 

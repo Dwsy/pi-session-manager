@@ -198,6 +198,10 @@ export interface SessionProviderInfo {
   slug: SessionConvertTarget;
   display_name: string;
   capabilities: SessionProviderCapabilities;
+  /** True when this agent has session files on the current machine. */
+  detected: boolean;
+  /** Existing session roots reported by the backend. */
+  roots: string[];
 }
 
 export interface SessionConvertResult {

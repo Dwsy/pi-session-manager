@@ -1,43 +1,109 @@
 export const onboarding = {
+  subtitle: 'Ersteinrichtung',
+  progressLabel: 'Einrichtungsschritte',
+  stepProgress: 'Schritt {{current}} von {{total}}',
   skip: 'Überspringen',
   next: 'Weiter',
   prev: 'Zurück',
   finish: 'Loslegen',
   steps: {
     welcome: {
-      title: 'Willkommen beim Pi Session Manager',
-      description: 'Ein leistungsstarkes Tool zum Durchsuchen, Suchen und Verwalten Ihrer Pi-KI-Coding-Sitzungen. Lassen Sie uns einen kurzen Rundgang durch die wichtigsten Funktionen machen.',
+      title: 'Deine Sitzungsbibliothek',
+      description:
+        'Pi Session Manager hat diesen Rechner bereits durchsucht. Das wurde gefunden.',
+      stats: {
+        sessions: 'Sitzungen',
+        projects: 'Projekte',
+        since: 'Älteste Sitzung',
+      },
+      scanning: 'Sitzungen werden durchsucht…',
+      topProjectsTitle: 'Aktivste Projekte',
+      topProjectsEmpty:
+        'Noch keine Sitzungen gefunden. Füge im nächsten Schritt eine Quelle hinzu, dann erscheinen sie hier.',
+      sessionCount: '{{count}} Sitzungen',
+      sessionCount_one: '{{count}} Sitzung',
     },
-    browse: {
-      title: 'Sitzungen nach Projekt durchsuchen',
-      description: 'Alle Ihre Coding-Sitzungen sind nach Projekt organisiert. Wechseln Sie zwischen Listen- und Projektansicht, um genau das zu finden, was Sie brauchen.',
-      hint: 'Cmd+Shift+G zum Wechseln zur Projektansicht',
+    sources: {
+      title: 'Sitzungsquellen',
+      description:
+        'Wähle, welche Coding-Agents in deine Bibliothek gehören. Jederzeit in den Einstellungen änderbar.',
+      piTitle: 'Pi-Sitzungen',
+      piDescription:
+        'Das Standardverzeichnis für Pi-Sitzungen gehört immer zur Bibliothek.',
+      alwaysOn: 'Immer durchsucht',
+      supportedTitle: 'Von PSM durchsuchbare Agents',
+      detectedTitle: 'Weitere Agents auf diesem Rechner',
+      detectedDescription:
+        'Erkannt anhand des Sitzungsverzeichnisses jedes Agents. Aktiviert erscheinen dessen Sitzungen in Liste, Suche und Konvertierung.',
+      selectedCount: '{{selected}} von {{total}} aktiviert',
+      enabled: 'Enthalten',
+      disabled: 'Übersprungen',
+      noneTitle: 'Nur Pi-Sitzungen gefunden',
+      noneDescription:
+        'Claude Code, Codex, Cursor und andere tauchen hier auf, sobald sie Sitzungen auf diesem Rechner haben. Eigene Verzeichnisse lassen sich später in den Einstellungen ergänzen.',
     },
-    search: {
-      title: 'Über alle Sitzungen suchen',
-      description: 'Verwenden Sie die globale Suche, um Nachrichten, Sitzungen und Projekte in Ihrem gesamten Arbeitsbereich zu finden. Die Sitzungssuche hilft Ihnen, innerhalb einer einzelnen Konversation zu navigieren.',
-      hint: 'Cmd+P / Cmd+Shift+F für globale Suche, Cmd+F für Sitzungssuche',
+    appearance: {
+      title: 'Aussehen und Sprache',
+      description:
+        'Jede Änderung wirkt sofort — du siehst das Ergebnis, bevor du weitergehst.',
+      themeLabel: 'Design',
+      themes: {
+        dark: 'Dunkel',
+        light: 'Hell',
+        system: 'System',
+      },
+      themeHints: {
+        dark: 'Tokyo-Night-Palette',
+        light: 'Hell und kontrastreich',
+        system: 'Dem System folgen',
+      },
+      fontSizeLabel: 'Textgröße',
+      fontSizeHint: 'Gilt sofort für die gesamte App.',
+      fontSizes: {
+        small: 'Klein',
+        medium: 'Mittel',
+        large: 'Groß',
+      },
+      languageLabel: 'Sprache',
+      previewLabel: 'Live-Vorschau',
+      preview: {
+        sidebar: 'Sitzungen',
+        userMessage: 'Warum schlägt der Build fehl?',
+        assistantMessage:
+          'Der Bundler kann den Alias nicht auflösen — ich sehe mir die Konfiguration an.',
+        toolResult: 'in 1,24 s gebaut',
+      },
     },
-    tree: {
-      title: 'Im Sitzungsbaum navigieren',
-      description: 'Die Seitenleiste zeigt den Gesprächsverlauf mit aufklappbaren Zweigen. Klicken Sie auf die Pfeile, um Abschnitte ein- oder auszuklappen und sich auf das Wesentliche zu konzentrieren.',
-      hint: 'Knoten anklicken, um zu Nachrichten zu springen; Pfeile zum Ein-/Ausklappen',
-    },
-    settings: {
-      title: 'Passen Sie Ihr Erlebnis an',
-      description: 'Passen Sie Themes, Schriftgrößen, Codeblock-Stile, Exportformate und mehr an. Alles ist konfigurierbar, um Ihrem Workflow zu entsprechen.',
-      hint: 'Cmd+, um Einstellungen jederzeit zu öffnen',
-    },
-    services: {
-      title: 'Dienste & Funktionen',
-      description: 'Wählen Sie, welche Dienste aktiviert werden sollen. WebSocket und HTTP API ermöglichen externen Tools die Verbindung. Das integrierte Terminal ermöglicht direktes Arbeiten in der App.',
-      terminal: 'Integriertes Terminal',
-      terminalHint: 'Terminal direkt in der App verwenden',
-      bindLocal: 'Nur lokaler Zugriff',
-      bindRemote: 'LAN-Geräte (Handy/Tablet) verbinden lassen',
-      mobileHint: 'Zugriff vom Handy über http://<Ihre-PC-IP>:{{port}} im Browser — HTTP-Modus wird automatisch gewählt',
-      websocket: 'WebSocket',
-      httpApi: 'HTTP API',
+    ready: {
+      title: 'Startklar',
+      description:
+        'Ein paar Kürzel zum Navigieren und die Stellen für mehr Kontrolle.',
+      shortcutsTitle: 'Wichtige Tastenkürzel',
+      shortcuts: {
+        palette: 'Befehlspalette',
+        search: 'Alle Sitzungen durchsuchen',
+        inSessionSearch: 'In dieser Sitzung suchen',
+        sidebar: 'Seitenleiste umschalten',
+        projectView: 'Nach Projekt gruppieren',
+        terminal: 'Terminal umschalten',
+        settings: 'Einstellungen öffnen',
+        resume: 'Sitzung fortsetzen',
+      },
+      nextTitle: 'Später feinjustieren',
+      links: {
+        sources: {
+          title: 'Sitzungsquellen',
+          description: 'Eigene Verzeichnisse, Datensätze und externe Agents',
+        },
+        server: {
+          title: 'Server und Zugriff',
+          description: 'HTTP- und WebSocket-Ports, LAN-Zugriff vom Handy-Browser',
+        },
+        plugins: {
+          title: 'Plugins',
+          description: 'Eingebaute Plugins aktivieren oder neue installieren',
+        },
+      },
     },
   },
 } as const

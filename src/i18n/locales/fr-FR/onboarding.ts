@@ -1,43 +1,110 @@
 export const onboarding = {
-  skip: 'Passer',
+  subtitle: 'Configuration initiale',
+  progressLabel: 'Étapes de configuration',
+  stepProgress: 'Étape {{current}} sur {{total}}',
+  skip: 'Ignorer',
   next: 'Suivant',
   prev: 'Retour',
   finish: 'Commencer',
   steps: {
     welcome: {
-      title: 'Bienvenue dans Pi Session Manager',
-      description: 'Un outil puissant pour parcourir, rechercher et gérer vos sessions de codage Pi AI. Faisons un rapide tour des fonctionnalités principales.',
+      title: 'Votre bibliothèque de sessions',
+      description:
+        'Pi Session Manager a déjà analysé cette machine. Voici ce qu’il a trouvé.',
+      stats: {
+        sessions: 'Sessions',
+        projects: 'Projets',
+        since: 'Session la plus ancienne',
+      },
+      scanning: 'Analyse des sessions…',
+      topProjectsTitle: 'Projets les plus actifs',
+      topProjectsEmpty:
+        'Aucune session pour le moment. Ajoutez une source à l’étape suivante et elles apparaîtront ici.',
+      sessionCount: '{{count}} sessions',
+      sessionCount_one: '{{count}} session',
     },
-    browse: {
-      title: 'Parcourir les sessions par projet',
-      description: 'Toutes vos sessions de codage sont organisées par projet. Basculez entre la vue liste et la vue projet pour trouver exactement ce que vous cherchez.',
-      hint: 'Cmd+Shift+G pour passer en vue projet',
+    sources: {
+      title: 'Sources de sessions',
+      description:
+        'Choisissez les agents de code à inclure dans votre bibliothèque. Modifiable à tout moment dans les réglages.',
+      piTitle: 'Sessions Pi',
+      piDescription:
+        'Le dossier de sessions Pi par défaut fait toujours partie de la bibliothèque.',
+      alwaysOn: 'Toujours analysé',
+      supportedTitle: 'Agents analysables par PSM',
+      detectedTitle: 'Autres agents trouvés sur cette machine',
+      detectedDescription:
+        'Détectés en cherchant le dossier de sessions de chaque agent. Une fois activés, leurs sessions rejoignent la liste, la recherche et les conversions.',
+      selectedCount: '{{selected}} sur {{total}} activés',
+      enabled: 'Inclus',
+      disabled: 'Ignoré',
+      noneTitle: 'Seules des sessions Pi ont été trouvées',
+      noneDescription:
+        'Claude Code, Codex, Cursor et les autres apparaîtront ici dès qu’ils auront des sessions sur cette machine. Les dossiers personnalisés s’ajoutent plus tard dans les réglages.',
     },
-    search: {
-      title: 'Rechercher dans toutes les sessions',
-      description: 'Utilisez la recherche globale pour trouver des messages, sessions et projets dans tout votre espace de travail. La recherche dans la session vous aide à naviguer dans une conversation.',
-      hint: 'Cmd+P / Cmd+Shift+F pour la recherche globale, Cmd+F pour la recherche dans la session',
+    appearance: {
+      title: 'Apparence et langue',
+      description:
+        'Chaque changement s’applique immédiatement : vous voyez le résultat avant de continuer.',
+      themeLabel: 'Thème',
+      themes: {
+        dark: 'Sombre',
+        light: 'Clair',
+        system: 'Système',
+      },
+      themeHints: {
+        dark: 'Palette Tokyo Night',
+        light: 'Lumineux, fort contraste',
+        system: 'Suivre le système',
+      },
+      fontSizeLabel: 'Taille du texte',
+      fontSizeHint: 'S’applique immédiatement à toute l’application.',
+      fontSizes: {
+        small: 'Petite',
+        medium: 'Moyenne',
+        large: 'Grande',
+      },
+      languageLabel: 'Langue',
+      previewLabel: 'Aperçu en direct',
+      preview: {
+        sidebar: 'Sessions',
+        userMessage: 'Pourquoi la compilation échoue-t-elle ?',
+        assistantMessage:
+          'Le bundler ne résout pas l’alias — je vérifie la configuration.',
+        toolResult: 'compilé en 1,24 s',
+      },
     },
-    tree: {
-      title: 'Naviguer dans l\'arbre de session',
-      description: 'L\'arbre latéral affiche le flux de conversation avec des branches dépliables. Cliquez sur les chevrons pour réduire ou développer les sections et vous concentrer sur l\'essentiel.',
-      hint: 'Cliquez sur les nœuds pour accéder aux messages, sur les chevrons pour réduire',
-    },
-    settings: {
-      title: 'Personnalisez votre expérience',
-      description: 'Ajustez les thèmes, tailles de police, styles de blocs de code, formats d\'exportation et plus encore. Tout est configurable pour s\'adapter à votre flux de travail.',
-      hint: 'Cmd+, pour ouvrir les paramètres à tout moment',
-    },
-    services: {
-      title: 'Services et fonctionnalités',
-      description: 'Choisissez les services à activer. WebSocket et HTTP API permettent aux outils externes de se connecter. Le terminal intégré vous permet de travailler directement dans l\'application.',
-      terminal: 'Terminal intégré',
-      terminalHint: 'Utilisez le terminal directement dans l\'application',
-      bindLocal: 'Accès local uniquement',
-      bindRemote: 'Autoriser les appareils du réseau local (téléphone/tablette) à se connecter',
-      mobileHint: 'Accédez depuis un mobile via http://<votre-IP-PC>:{{port}} dans un navigateur — le mode HTTP est sélectionné automatiquement',
-      websocket: 'WebSocket',
-      httpApi: 'HTTP API',
+    ready: {
+      title: 'Tout est prêt',
+      description:
+        'Quelques raccourcis pour naviguer, et où aller pour aller plus loin.',
+      shortcutsTitle: 'Raccourcis à connaître',
+      shortcuts: {
+        palette: 'Palette de commandes',
+        search: 'Rechercher dans toutes les sessions',
+        inSessionSearch: 'Rechercher dans cette session',
+        sidebar: 'Afficher/masquer la barre latérale',
+        projectView: 'Grouper par projet',
+        terminal: 'Afficher/masquer le terminal',
+        settings: 'Ouvrir les réglages',
+        resume: 'Reprendre la session',
+      },
+      nextTitle: 'À ajuster plus tard',
+      links: {
+        sources: {
+          title: 'Sources de sessions',
+          description: 'Dossiers personnalisés, jeux de données et agents externes',
+        },
+        server: {
+          title: 'Serveur et accès',
+          description:
+            'Ports HTTP et WebSocket, accès réseau local depuis un téléphone',
+        },
+        plugins: {
+          title: 'Extensions',
+          description: 'Activer les extensions intégrées ou en installer d’autres',
+        },
+      },
     },
   },
 } as const

@@ -7,9 +7,10 @@ import ConvertSessionResultDialog from "@/components/dialogs/ConvertSessionResul
 import ResumeSessionDialog from "@/components/dialogs/ResumeSessionDialog";
 import RenameDialog from "@/components/dialogs/RenameDialog";
 import ForkDialog from "@/components/dialogs/ForkDialog";
-import Onboarding from "@/components/Onboarding";
+import { Onboarding } from "@/components/onboarding";
 import PsmPluginPermissionRequestDialog from "@/components/plugins/PsmPluginPermissionRequestDialog";
 import DashboardRecapController from "@/components/dashboard/DashboardRecapController";
+import type { SettingsSection } from "@/components/settings/types";
 import type { SearchContext } from "@/plugins/types";
 import type {
   SessionConvertResult,
@@ -38,6 +39,7 @@ export interface AppOverlaysProps {
   showForkDialog: boolean;
   showSettings: boolean;
   showOnboarding: boolean;
+  sessionsLoading: boolean;
   selectedSession: SessionInfo | null;
   sessions: SessionInfo[];
   commandContext: SearchContext;
@@ -56,7 +58,7 @@ export interface AppOverlaysProps {
   onCloseRenameDialog: () => void;
   onCloseForkDialog: () => void;
   onCloseSettings: () => void;
-  onCompleteOnboarding: () => void;
+  onCompleteOnboarding: (openSettingsSection?: SettingsSection) => void;
   onOpenConvertedPath: (path: string) => Promise<void> | void;
   onRunConvertedResume: (command: string) => Promise<void> | void;
   onConvertAgain: () => void;
@@ -75,6 +77,7 @@ function AppOverlays({
   showForkDialog,
   showSettings,
   showOnboarding,
+  sessionsLoading,
   selectedSession,
   sessions,
   commandContext,
@@ -152,7 +155,13 @@ function AppOverlays({
       <Suspense fallback={null}>
         <CommandPalette context={commandContext} />
       </Suspense>
-      {showOnboarding && <Onboarding onComplete={onCompleteOnboarding} />}
+      {showOnboarding && (
+        <Onboarding
+          sessions={sessions}
+          sessionsLoading={sessionsLoading}
+          onComplete={onCompleteOnboarding}
+        />
+      )}
       <DashboardRecapController sessions={sessions} />
       <PsmPluginPermissionRequestDialog />
     </>

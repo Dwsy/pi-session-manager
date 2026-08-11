@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { FolderOpen, Plus, Settings2, X } from "lucide-react";
 
+import ShowOnboardingAgainButton from "@/components/onboarding/ShowOnboardingAgainButton";
 import SettingsCard from "@/components/settings/SettingsCard";
 import SettingsInput from "@/components/settings/SettingsInput";
 import SettingsSliderField from "@/components/settings/SettingsSliderField";
@@ -199,20 +200,7 @@ export default function StorageSettingsTab({
 
           <SettingsCard>
             <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => {
-                  localStorage.removeItem("onboarding-completed");
-                  alert(
-                    t(
-                      "settings.advanced.onboardingReset",
-                      "Onboarding will be shown next time the app opens",
-                    ),
-                  );
-                }}
-                className="px-4 py-2 bg-info/10 text-info hover:bg-info/20 rounded-lg text-sm font-medium motion-color focus-ring"
-              >
-                {t("settings.advanced.showOnboarding", "Show onboarding again")}
-              </button>
+              <ShowOnboardingAgainButton />
               <button
                 onClick={onClearCache}
                 className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium motion-color focus-ring"

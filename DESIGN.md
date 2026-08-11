@@ -620,19 +620,25 @@ All dialogs use:
 ### Onboarding
 ```css
 .onboarding-overlay {
-  position: fixed; inset: 0;
+  position: fixed; inset: 0; z-index: 100;
   bg: black/60; backdrop-filter: blur(4px);
 }
-.onboarding-card {
-  max-width: 560px;
-  bg: card; border-radius: 16px;
-  padding: 32px;
-  animation: ui-zoom-in;
+.onboarding-dialog {
+  width: 940px; height: 640px; max-height: 88vh;
+  bg: card; border: 1px solid border; border-radius: 16px;
+  box-shadow: shadow-2xl;
+  animation: ui-zoom-in (motion-overlay-surface-enter);
 }
 ```
-- Multi-step wizard with progress dots
-- Soft green theme accents (`#b5bd68`)
-- Settings integration (`OnboardingServiceSettings.tsx`)
+- **Two-pane layout**: 228px left rail (step list, `bg-background/40`) + content column
+- **Content column**: header (title + description) / scrollable body / footer (progress text + Back/Next)
+- **Fixed height** so step content never resizes the dialog between steps
+- **Four steps**: session library → session sources → look and language → ready
+- **Accent**: `settings-accent-*` utilities only, so the guide follows the active Pi theme
+- **Panels inside steps**: `rounded-xl border border-border bg-background/40`, header row separated by `border-border/60`
+- **Previews are real**: step 1 charts the user's own projects, step 3 renders a live token-driven
+  miniature of the session viewer that reacts to theme and text-size changes immediately
+- Mobile (`useIsMobile`) drops the left rail and moves Skip into the footer
 
 ---
 
@@ -945,7 +951,7 @@ All components support `env(safe-area-inset-*)` for mobile notches and keyboards
 | `components/app/` plugin panes | `AppPluginViewPane`, `AppPluginSidebarPane` | App-level plugin view shell and sidebar shell |
 | `components/settings/` | `SettingsPanel`, `SettingsToggleRow`, `SettingsSliderField`, `SettingsRadioCardGroup` | Form inputs, modals, sliders, toggles |
 | `components/dialogs/` | `DeleteSessionConfirmDialog`, `ExportDialog`, `ForkDialog`, `RenameDialog` | Modal dialogs, backdrop blur |
-| `components/onboarding/` | `OnboardingStepContent` | Wizard overlay, multi-step progress |
+| `components/onboarding/` | `Onboarding`, `steps/OnboardingThemePreview` | Two-pane first-launch dialog, live theme preview |
 | `components/ui/` | `Skeleton`, TagBadge | Loading states, tag pills |
 | `components/session-tree/` | Tree view, search | Hierarchy display |
 | `components/tool-calls/` | Tool execution cards | Expandable sections, diff rendering |

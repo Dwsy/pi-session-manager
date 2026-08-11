@@ -158,6 +158,10 @@ export interface AppSettings {
     autoCheck: boolean;
     channel: "stable" | "beta";
   };
+  onboarding: {
+    /** True once the first-launch guide has been finished or dismissed. */
+    completed: boolean;
+  };
   subagents: AppSubagentSettings;
   advanced: {
     sessionDirs: string[];
@@ -254,6 +258,9 @@ export const defaultSettings: AppSettings = {
   update: {
     autoCheck: true,
     channel: "stable",
+  },
+  onboarding: {
+    completed: false,
   },
   subagents: {
     mode: "smart",

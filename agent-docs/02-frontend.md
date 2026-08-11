@@ -40,6 +40,21 @@ src/
 | `AppSettingsPane.tsx` | Settings pane |
 | `AppTerminalPane.tsx` | Terminal pane |
 | `AppProjectListPane.tsx` | Project list pane |
+| `resolveDesktopMainContent.ts` | Picks the desktop main pane (session viewer / plugin view / explorer / dashboard) |
+
+### Explorer (explorer/)
+
+Full-width project and session browser rendered in the desktop main pane
+(route `/explorer`, toggled from the sidebar search row). It reuses the app-level
+search/tag/source/model/date filter state and shows more per-session metadata
+than the sidebar cards.
+
+| Component | Description |
+|-----------|-------------|
+| `ExplorerPane.tsx` | Tabs, project scope chip, filter bar slot, row actions, context menu |
+| `ExplorerSessionTable.tsx` | Virtualized session table incl. plugin-contributed columns |
+| `ExplorerProjectTable.tsx` | Virtualized project table incl. plugin project actions |
+| `explorerModel.ts` | Pure grouping/sorting helpers |
 
 ### Command Palette (command/)
 
@@ -103,7 +118,7 @@ view implementations live under `extensions/psm-*`.
 | Component | Description |
 |-----------|-------------|
 | `SessionList.tsx` | Main list |
-| `SessionListByDirectory.tsx` | Directory grouped |
+| `SessionRowContextMenu.tsx` | Shared right-click menu wiring for session rows |
 
 ### Session Tree (session-tree/)
 
@@ -251,12 +266,25 @@ view implementations live under `extensions/psm-*`.
 
 ### Onboarding (onboarding/)
 
-| Component | Description |
-|-----------|-------------|
-| `OnboardingServiceSettings.tsx` | Service settings step |
-| `OnboardingStepContent.tsx` | Step content |
-| `steps.tsx` | Step definitions |
-| `types.ts` | Type definitions |
+First-launch guide. Four environment-aware steps; deep configuration is delegated to
+Settings sections through `SETTINGS_NAVIGATE_EVENT` instead of being duplicated here.
+
+| File | Description |
+|------|-------------|
+| `Onboarding.tsx` | Dialog shell: layout, step nav, focus trap, completion |
+| `steps/OnboardingWelcomeStep.tsx` | Scanned library stats and busiest projects |
+| `steps/OnboardingSourcesStep.tsx` | Detected agents, per-provider include toggles |
+| `steps/OnboardingAppearanceStep.tsx` | Theme, text size, language |
+| `steps/OnboardingThemePreview.tsx` | Token-driven live preview of the session viewer |
+| `steps/OnboardingReadyStep.tsx` | Shortcut cheat sheet and settings deep links |
+| `onboardingStatus.ts` | Completion flags, local/settings reconciliation, reset |
+| `onboardingSummary.ts` | Pure session-library aggregation for the welcome step |
+| `ShowOnboardingAgainButton.tsx` | Shared reset control used by the maintenance sections |
+
+Completion is stored twice on purpose: `settings.onboarding.completed` is the source of
+truth across devices, and the `onboarding-completed` localStorage key is a fast path that
+avoids a flash of the guide on first paint. `psm-first-scan-done` is separate so skipping
+the guide does not suppress the initial scanning splash.
 
 ### Root Level
 
@@ -269,7 +297,6 @@ view implementations live under `extensions/psm-*`.
 | `ConnectionBanner.tsx` | Connection status |
 | `ErrorBoundary.tsx` | Error boundary |
 | `DiffTest.tsx` | Diff testing |
-| `Onboarding.tsx` | Onboarding wrapper |
 | `OpenInBrowserButton.tsx` | Open in browser |
 | `OpenInTerminalButton.tsx` | Open in terminal |
 | `SessionViewer.tsx` | Session viewer (standalone) |
@@ -286,6 +313,7 @@ view implementations live under `extensions/psm-*`.
 | `useAppViewNavigation` | Plugin app-view routes, mobile tabs, sidebar items, and app-view shortcuts |
 | `useDesktopSidebarActions` | Desktop sidebar navigation actions |
 | `useFavorites` | Favorite item loading and mutations |
+| `useOnboardingGate` | First-launch guide visibility and first-scan tracking |
 | `useSidebarSessions` | Sidebar filtering, pagination, project summary, and list props |
 | `useTerminalScopes` | Terminal visibility, active scope, bounded scope cache, and pending commands |
 | `useUpdateChecker` | Desktop update checks and update-notice actions |

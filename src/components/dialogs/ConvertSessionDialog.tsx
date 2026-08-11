@@ -10,7 +10,10 @@ import type {
 } from '@/types'
 import { getSessionSourceTag } from '@/utils/session'
 import { getSessionListDisplayName } from '@/utils/sessionDisplay'
-import { listSupportedSessionProviders } from '@/utils/sessionProvidersApi'
+import {
+  FALLBACK_SESSION_PROVIDERS,
+  listSupportedSessionProviders,
+} from '@/utils/sessionProvidersApi'
 
 interface ConvertSessionDialogProps {
   session: SessionInfo
@@ -21,48 +24,9 @@ interface ConvertSessionDialogProps {
   onClose: () => void
 }
 
-const FALLBACK_TARGETS: SessionProviderInfo[] = [
-  {
-    slug: 'pi',
-    display_name: 'Pi',
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: 'omp',
-    display_name: 'OMP',
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: 'claude-code',
-    display_name: 'Claude Code',
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: 'codex',
-    display_name: 'Codex',
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: 'opencode',
-    display_name: 'OpenCode',
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: 'gemini',
-    display_name: 'Gemini CLI',
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: 'factory',
-    display_name: 'Factory',
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: 'clawdbot',
-    display_name: 'ClawdBot',
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-]
+const FALLBACK_TARGETS: SessionProviderInfo[] = FALLBACK_SESSION_PROVIDERS.filter(
+  provider => provider.capabilities.canConvertTarget
+)
 
 export default function ConvertSessionDialog({
   session,

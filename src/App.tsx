@@ -67,7 +67,8 @@ import {
   getConfiguredExternalResumeTarget,
   getFallbackExternalResumeTarget,
 } from "./utils/sessionResume";
-import { shouldSkipOnboardingForRuntime } from "./runtime-data/mode";
+import { useOnboardingGate } from "./hooks/app/useOnboardingGate";
+import { SETTINGS_NAVIGATE_EVENT } from "./components/settings/navigation";
 import AppMobileLayout, {
   type MobileTab,
 } from "./components/app/AppMobileLayout";
@@ -273,19 +274,8 @@ function App() {
     DEFAULT_SESSION_SORT_ORDER,
   );
   const [selectionModeTrigger, setSelectionModeTrigger] = useState(0);
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    if (shouldSkipOnboardingForRuntime()) {
-      try {
-        localStorage.setItem("onboarding-completed", "true");
-      } catch {}
-      return false;
-    }
-    try {
-      return !localStorage.getItem("onboarding-completed");
-    } catch {
-      return false;
-    }
-  });
+  const { showOnboarding, firstScanDone, dismissOnboarding } =
+    useOnboardingGate({ sessionsLoading: loading });
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [versionDowngradeInfo, setVersionDowngradeInfo] = useState<VersionDowngradeInfo | null>(null);
   const {
@@ -1401,6 +1391,7 @@ function App() {
       showForkDialog={showForkDialog}
       showSettings={showSettings}
       showOnboarding={showOnboarding}
+      sessionsLoading={loading}
       selectedSession={selectedSession}
       sessions={sessions}
       commandContext={commandContext}
@@ -1419,9 +1410,15 @@ function App() {
         setShowSettings(false);
         reloadTerminalConfig();
       }}
-      onCompleteOnboarding={() => {
-        localStorage.setItem("onboarding-completed", "true");
-        setShowOnboarding(false);
+      onCompleteOnboarding={(openSettingsSection) => {
+        dismissOnboarding();
+        if (!openSettingsSection) return;
+        setShowSettings(true);
+        window.dispatchEvent(
+          new CustomEvent(SETTINGS_NAVIGATE_EVENT, {
+            detail: { section: openSettingsSection },
+          }),
+        );
       }}
       onOpenConvertedPath={handleOpenConvertedPath}
       onRunConvertedResume={handleRunConvertedResume}
@@ -1607,8 +1604,7 @@ function App() {
   // ═══════════════════════════════════
   // Scanning gate: show loading page while initial scan is in progress
   // ═══════════════════════════════════
-  const isFirstScanDone = !!localStorage.getItem("onboarding-completed");
-  if (showScanningPage && sessions.length === 0 && !isFirstScanDone) {
+  if (showScanningPage && sessions.length === 0 && !firstScanDone) {
     return (
       <div className="flex flex-col h-screen-safe bg-background text-foreground items-center justify-center">
         <div className="flex flex-col items-center gap-6" role="status" aria-live="polite">

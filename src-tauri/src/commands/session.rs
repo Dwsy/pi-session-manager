@@ -30,6 +30,10 @@ pub struct SessionProviderInfo {
     pub slug: String,
     pub display_name: String,
     pub capabilities: SessionProviderCapabilities,
+    /// True when at least one session root for this provider exists on this machine.
+    pub detected: bool,
+    /// Existing session roots, so callers can show where the sessions were found.
+    pub roots: Vec<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -193,7 +197,12 @@ pub async fn detect_session_format(path: String) -> Result<String, String> {
 pub async fn list_supported_session_providers() -> Result<Vec<SessionProviderInfo>, String> {
     Ok(crate::domain::session_bridge::SessionBridgeSource::ALL
         .into_iter()
-        .map(|source| SessionProviderInfo { slug: source.slug().replace('_', "-"), display_name: source.display_name().to_string(), capabilities: SessionProviderCapabilities { can_scan: source.can_scan(), can_convert_target: source.can_convert_target() } })
+        .map(|source| {
+            // session_roots() only yields directories that actually exist, so a
+            // non-empty result means the agent has sessions on this machine.
+            let roots: Vec<String> = source.session_roots().into_iter().map(|root| root.to_string_lossy().to_string()).collect();
+            SessionProviderInfo { slug: source.slug().replace('_', "-"), display_name: source.display_name().to_string(), capabilities: SessionProviderCapabilities { can_scan: source.can_scan(), can_convert_target: source.can_convert_target() }, detected: !roots.is_empty(), roots }
+        })
         .collect())
 }
 
@@ -259,5 +268,23 @@ mod tests {
         let stats = get_session_stats(vec![pi_session, codex_session]).await.expect("stats");
         assert_eq!(stats.total_sessions, 1);
         assert_eq!(stats.total_messages, 10);
+    }
+
+    #[tokio::test]
+    async fn list_supported_session_providers_reports_only_existing_roots_as_detected() {
+        let _env_lock = crate::paths::acquire_test_env_lock();
+        let home = tempfile::tempdir().expect("temp home");
+        let _home = crate::paths::TestHomeGuard::set(home.path());
+        let codex_root = home.path().join(".codex").join("sessions");
+        std::fs::create_dir_all(&codex_root).expect("codex sessions dir");
+
+        let providers = list_supported_session_providers().await.expect("providers");
+        let codex = providers.iter().find(|provider| provider.slug == "codex").expect("codex provider");
+        let claude_code = providers.iter().find(|provider| provider.slug == "claude-code").expect("claude-code provider");
+
+        assert!(codex.detected, "codex should be detected when its sessions dir exists");
+        assert_eq!(codex.roots, vec![codex_root.to_string_lossy().to_string()]);
+        assert!(!claude_code.detected, "claude-code should not be detected without its sessions dir");
+        assert!(claude_code.roots.is_empty());
     }
 }

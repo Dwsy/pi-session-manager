@@ -1,63 +1,109 @@
 export const onboarding = {
-  skip: 'Skip',
+  subtitle: 'First-launch setup',
+  progressLabel: 'Onboarding steps',
+  stepProgress: 'Step {{current}} of {{total}}',
+  skip: 'Skip setup',
   next: 'Next',
   prev: 'Back',
-  finish: 'Get Started',
+  finish: 'Start using',
   steps: {
     welcome: {
-      title: 'Welcome to Pi Session Manager',
-      description: 'A powerful tool for browsing, searching, and managing your Pi AI coding sessions. Let\'s take a quick tour of the key features.',
+      title: 'Your session library',
+      description:
+        'Pi Session Manager already scanned this machine. Here is what it found.',
+      stats: {
+        sessions: 'Sessions',
+        projects: 'Projects',
+        since: 'Earliest session',
+      },
+      scanning: 'Scanning sessions…',
+      topProjectsTitle: 'Busiest projects',
+      topProjectsEmpty:
+        'No sessions found yet. Add a source in the next step and they will show up here.',
+      sessionCount: '{{count}} sessions',
+      sessionCount_one: '{{count}} session',
     },
-    browse: {
-      title: 'Browse Sessions by Project',
-      description: 'All your coding sessions are organized by project. Switch between list view and project view to find exactly what you need.',
-      hint: 'Cmd+Shift+G to switch to project view',
+    sources: {
+      title: 'Session sources',
+      description:
+        'Choose which coding agents belong in your library. You can change this at any time in Settings.',
+      piTitle: 'Pi sessions',
+      piDescription:
+        'The default Pi session directory is always part of your library.',
+      alwaysOn: 'Always scanned',
+      supportedTitle: 'Agents PSM can scan',
+      detectedTitle: 'Other agents found on this machine',
+      detectedDescription:
+        "Detected by looking for each agent's session directory. Enabling one adds its sessions to the list, search, and conversions.",
+      selectedCount: '{{selected}} of {{total}} enabled',
+      enabled: 'Included',
+      disabled: 'Skipped',
+      noneTitle: 'Only Pi sessions found',
+      noneDescription:
+        'Claude Code, Codex, Cursor and others show up here once they have sessions on this machine. Custom directories can be added in Settings later.',
     },
-    search: {
-      title: 'Search Across All Sessions',
-      description: 'Use the global search to find messages, sessions, and projects across your entire workspace. In-session search helps you navigate within a single conversation.',
-      hint: 'Cmd+P / Cmd+Shift+F for global search, Cmd+F for in-session search',
+    appearance: {
+      title: 'Look and language',
+      description:
+        'Every change applies immediately, so you can see the result before moving on.',
+      themeLabel: 'Theme',
+      themes: {
+        dark: 'Dark',
+        light: 'Light',
+        system: 'System',
+      },
+      themeHints: {
+        dark: 'Tokyo Night surfaces',
+        light: 'Bright, high contrast',
+        system: 'Follow the OS',
+      },
+      fontSizeLabel: 'Text size',
+      fontSizeHint: 'Applies to the whole app right away.',
+      fontSizes: {
+        small: 'Small',
+        medium: 'Medium',
+        large: 'Large',
+      },
+      languageLabel: 'Language',
+      previewLabel: 'Live preview',
+      preview: {
+        sidebar: 'Sessions',
+        userMessage: 'Why is the build failing?',
+        assistantMessage:
+          'The bundler cannot resolve the alias — let me check the config.',
+        toolResult: 'built in 1.24s',
+      },
     },
-    tree: {
-      title: 'Navigate the Session Tree',
-      description: 'The sidebar tree shows the conversation flow with expandable branches. Click the chevrons to collapse or expand sections and focus on what matters.',
-      hint: 'Click nodes to jump to messages, chevrons to collapse',
-    },
-    settings: {
-      title: 'Customize Your Experience',
-      description: 'Adjust themes, font sizes, code block styles, export formats, and more. Everything is configurable to match your workflow.',
-      hint: 'Cmd+, to open settings anytime',
-    },
-    services: {
-      title: 'Services & Features',
-      description: 'Choose which services to enable. WebSocket and HTTP API allow external tools to connect. The built-in terminal lets you work directly inside the app.',
-      terminal: 'Built-in Terminal',
-      terminalHint: 'Use terminal directly in the app',
-      bindLocal: 'Local access only',
-      bindRemote: 'Allow LAN devices (phone/tablet) to connect',
-      mobileHint: 'Access from mobile via http://<your-PC-IP>:{{port}} in a browser — HTTP mode is auto-selected',
-      websocket: 'WebSocket',
-      httpApi: 'HTTP API',
-    },
-    subagents: {
-      title: 'Subagent Compatibility',
-      description: 'PSM can recognize multiple subagent extensions. Smart mode infers the protocol from JSON structure; forced mode prefers one provider first.',
-      modeLabel: 'Compatibility mode',
-      smartMode: 'Smart (Recommended)',
-      forcedMode: 'Forced',
-      smartHint: 'Infer the subagent protocol from JSON structure and session entries.',
-      forcedHint: 'Prefer one known subagent protocol, then safely fall back when needed.',
-      providerLabel: 'Forced provider',
-      detectedTitle: 'Detected from Pi settings',
-      enabledDetected: 'Enabled: {{providers}}',
-      disabledDetected: 'Installed but disabled: {{providers}}',
-      noDetection: 'No known subagent extension detected from Pi settings.',
-      recommended: 'Recommended provider: {{provider}}',
-    },
-    plugins: {
-      title: 'Built-in Plugins Configuration',
-      description: 'Configure options for built-in plugins. Toggle or adjust core extension features directly during the onboarding guide.',
-      empty: 'No plug-in configuration is available for onboarding.',
+    ready: {
+      title: 'Ready to go',
+      description:
+        'A few shortcuts to get around, and where to look when you want more control.',
+      shortcutsTitle: 'Shortcuts worth knowing',
+      shortcuts: {
+        palette: 'Command palette',
+        search: 'Search all sessions',
+        inSessionSearch: 'Search in this session',
+        sidebar: 'Toggle sidebar',
+        projectView: 'Group by project',
+        terminal: 'Toggle terminal',
+        settings: 'Open settings',
+        resume: 'Resume session',
+      },
+      nextTitle: 'Fine-tune later',
+      links: {
+        sources: {
+          title: 'Session sources',
+          description: 'Custom directories, datasets, and external agents',
+        },
+        server: {
+          title: 'Server and access',
+          description: 'HTTP and WebSocket ports, LAN access for phone browsers',
+        },
+        plugins: {
+          title: 'Plugins',
+          description: 'Enable built-in plugins or install new ones',
+        },
+      },
     },
   },
 } as const

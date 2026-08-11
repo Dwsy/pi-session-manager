@@ -1,4 +1,5 @@
-import { invoke, isTauri } from "@/transport";
+import { getRuntimeMode } from "@/runtime-data/runtimeMode";
+import { invoke } from "@/transport";
 import type { SessionConvertTarget, SessionProviderInfo } from "@/types";
 
 interface RawSessionProviderInfo {
@@ -9,60 +10,31 @@ interface RawSessionProviderInfo {
     canScan?: boolean;
     canConvertTarget?: boolean;
   };
+  detected?: boolean;
+  roots?: unknown;
 }
 
-const FALLBACK_PROVIDERS: SessionProviderInfo[] = [
-  {
-    slug: "pi",
-    display_name: "Pi",
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: "omp",
-    display_name: "OMP",
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: "claude-code",
-    display_name: "Claude Code",
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: "codex",
-    display_name: "Codex",
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: "opencode",
-    display_name: "OpenCode",
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: "gemini",
-    display_name: "Gemini CLI",
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: "factory",
-    display_name: "Factory",
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: "clawdbot",
-    display_name: "ClawdBot",
-    capabilities: { canScan: true, canConvertTarget: true },
-  },
-  {
-    slug: "cursor",
-    display_name: "Cursor",
-    capabilities: { canScan: true, canConvertTarget: false },
-  },
-  {
-    slug: "antigravity",
-    display_name: "Antigravity",
-    capabilities: { canScan: true, canConvertTarget: false },
-  },
-];
+/** Static provider table used when no backend is reachable (demo / dataset runtimes). */
+export const FALLBACK_SESSION_PROVIDERS: SessionProviderInfo[] = (
+  [
+    ["pi", "Pi", true],
+    ["omp", "OMP", true],
+    ["claude-code", "Claude Code", true],
+    ["codex", "Codex", true],
+    ["opencode", "OpenCode", true],
+    ["gemini", "Gemini CLI", true],
+    ["factory", "Factory", true],
+    ["clawdbot", "ClawdBot", true],
+    ["cursor", "Cursor", false],
+    ["antigravity", "Antigravity", false],
+  ] as const
+).map(([slug, displayName, canConvertTarget]) => ({
+  slug,
+  display_name: displayName,
+  capabilities: { canScan: true, canConvertTarget },
+  detected: false,
+  roots: [],
+}));
 
 function normalizeProviderSlug(value: string): SessionConvertTarget | null {
   switch (value) {
@@ -82,9 +54,14 @@ function normalizeProviderSlug(value: string): SessionConvertTarget | null {
   }
 }
 
+function normalizeRoots(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.length > 0);
+}
+
 export async function listSupportedSessionProviders(): Promise<SessionProviderInfo[]> {
-  if (!isTauri()) {
-    return FALLBACK_PROVIDERS;
+  if (getRuntimeMode() !== "backend") {
+    return FALLBACK_SESSION_PROVIDERS;
   }
 
   try {
@@ -95,6 +72,7 @@ export async function listSupportedSessionProviders(): Promise<SessionProviderIn
       .map((item) => {
         const slug = normalizeProviderSlug(item.slug ?? "");
         if (!slug) return null;
+        const roots = normalizeRoots(item.roots);
         return {
           slug,
           display_name: item.display_name ?? item.displayName ?? slug,
@@ -102,13 +80,15 @@ export async function listSupportedSessionProviders(): Promise<SessionProviderIn
             canScan: item.capabilities?.canScan ?? true,
             canConvertTarget: item.capabilities?.canConvertTarget ?? true,
           },
+          detected: item.detected ?? roots.length > 0,
+          roots,
         } satisfies SessionProviderInfo;
       })
       .filter((item): item is SessionProviderInfo => item !== null);
 
-    return normalized.length > 0 ? normalized : FALLBACK_PROVIDERS;
+    return normalized.length > 0 ? normalized : FALLBACK_SESSION_PROVIDERS;
   } catch (error) {
     console.warn("Failed to load supported session providers, using fallback:", error);
-    return FALLBACK_PROVIDERS;
+    return FALLBACK_SESSION_PROVIDERS;
   }
 }
