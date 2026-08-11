@@ -72,8 +72,8 @@ fn setup_test_db(sessions: &[(&str, &str, &[(&str, &str)])]) -> tempfile::TempDi
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
 
-    // Set HOME so config uses temp dir for DB
-    let original_home = env::var("HOME").ok();
+    // Set the explicit cross-platform test home so config uses this temp dir for DB.
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     env::set_var("HOME", temp_dir.path());
 
     let config = Config::default();
@@ -99,6 +99,7 @@ fn setup_test_db_from_raw_sessions(sessions: &[(&str, &str)]) -> tempfile::TempD
     let temp_dir = tempdir().unwrap();
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     env::set_var("HOME", temp_dir.path());
 
     let config = Config::default();
@@ -255,6 +256,7 @@ async fn test_full_text_search_excludes_external_sessions_by_default() {
 
     let temp_dir = tempdir().unwrap();
     let home = temp_dir.path();
+    std::env::set_var("PPM_TEST_HOME", home);
     std::env::set_var("HOME", home);
 
     let pi_dir = home.join(".pi").join("agent").join("sessions").join("local");
@@ -604,12 +606,13 @@ async fn test_full_text_search_project_path_filter() {
 }
 
 #[tokio::test]
-async fn test_full_text_search_ignores_tool_result_entries_during_upsert() {
+async fn test_full_text_search_indexes_tool_result_entries_during_upsert() {
     let _lock = TEST_DB_LOCK.lock().unwrap();
 
     let temp_dir = tempdir().unwrap();
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     env::set_var("HOME", temp_dir.path());
 
     let config = Config::default();
@@ -632,10 +635,12 @@ async fn test_full_text_search_ignores_tool_result_entries_during_upsert() {
     sqlite_cache::upsert_session(&mut conn, &session, Utc::now(), Some(&entries)).unwrap();
 
     let indexed_rows: i64 = conn.query_row("SELECT COUNT(*) FROM message_entries WHERE session_path = ?", params![path.to_string_lossy().to_string()], |row| row.get(0)).unwrap();
-    assert_eq!(indexed_rows, 3);
+    assert_eq!(indexed_rows, 4);
 
-    let tool_rows: i64 = conn.query_row("SELECT COUNT(*) FROM message_entries WHERE session_path = ? AND role NOT IN ('user', 'assistant')", params![path.to_string_lossy().to_string()], |row| row.get(0)).unwrap();
-    assert_eq!(tool_rows, 0);
+    let (tool_rows, tool_content): (i64, String) =
+        conn.query_row("SELECT COUNT(*), COALESCE(MAX(content), '') FROM message_entries WHERE session_path = ? AND role = 'toolResult' AND source_type = 'tool_result'", params![path.to_string_lossy().to_string()], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+    assert_eq!(tool_rows, 1);
+    assert_eq!(tool_content, "# README");
 }
 
 #[tokio::test]
@@ -644,6 +649,7 @@ async fn test_full_text_search_thinking_toggle() {
     let temp_dir = tempdir().unwrap();
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     env::set_var("HOME", temp_dir.path());
 
     write_app_settings(false);
@@ -702,6 +708,7 @@ async fn test_full_text_search_excludes_external_sessions_when_search_disabled()
     let _lock = TEST_DB_LOCK.lock().unwrap();
 
     let temp_dir = tempdir().unwrap();
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     env::set_var("HOME", temp_dir.path());
 
     let pi_sessions_dir = temp_dir.path().join(".pi").join("agent").join("sessions").join("project");
@@ -745,6 +752,7 @@ async fn test_full_text_search_ignores_legacy_enable_fts5_flag() {
     let temp_dir = tempdir().unwrap();
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     env::set_var("HOME", temp_dir.path());
 
     let path = sessions_dir.join("legacy-fts-flag.jsonl");
