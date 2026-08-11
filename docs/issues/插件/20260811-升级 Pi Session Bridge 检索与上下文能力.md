@@ -1,7 +1,7 @@
 ---
 id: "2026-08-11-升级 Pi Session Bridge 检索与上下文能力"
 title: "升级 Pi Session Bridge 检索与上下文能力"
-status: "in-progress"
+status: "done"
 created: "2026-08-11"
 updated: "2026-08-11"
 category: "插件"
@@ -162,7 +162,7 @@ Live current-session tail:
 - [x] 后端单测覆盖 bounded window、missing anchor、10k pagination、cache invalidation、unicode search cap、toolResult index、schema v20 migration。
 - [x] 已记录 `scan_sessions` vs paginated、整 session entries vs chunk/window 的本机基线；不在生产主库上额外跑 schema v20 迁移 benchmark。
 - [x] 更新 `extensions/pi-session-bridge/README.md`。
-- [ ] Git 分支提交/推送并回写 GitHub Issue #48（收尾步骤）。
+- [x] Git 分支提交/推送并回写 GitHub Issue #48。
 
 ## 关键决策
 
@@ -213,4 +213,5 @@ Live current-session tail:
 
 - **2026-08-11**: 完成架构/代码/数据规模研究，形成分阶段升级方案。
 - **2026-08-11**: 状态变更 → `in-progress`，GitHub Issue #48 已创建并开始开发。
-- **2026-08-11**: Gate 0–3 实现完成并通过完整受影响测试；等待 Git push / GitHub 跟踪收尾。
+- **2026-08-11**: Gate 0–3 实现完成并通过完整受影响测试。
+- **2026-08-11**: 状态变更 → `done`；分支 `feat/pi-session-bridge-retrieval-48` 已推送，提交 `e7c795b`，进入 GitHub Issue/PR 收尾。
