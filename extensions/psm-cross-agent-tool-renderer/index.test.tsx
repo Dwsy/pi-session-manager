@@ -31,7 +31,7 @@ describe('crossAgentToolRenderer', () => {
     }
     const data = crossAgentToolRenderer.resolveData!(toolCall, 0, new Map())
 
-    expect(crossAgentToolRenderer.getPreview!(toolCall, data)).toBe('ask: Choose a strategy')
+    expect(crossAgentToolRenderer.getPreview!(toolCall, data)).toBe('Ask: Choose a strategy')
   })
 
   it('keeps legacy structured shell arguments in the preview', () => {
