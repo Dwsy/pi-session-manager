@@ -33,21 +33,29 @@ type CrossAgentKind =
   | "wait"
   | "generic";
 
+const OMP_BUILTIN_TOOLS = new Set([
+  "read", "bash", "edit", "ast_grep", "ast_edit", "ask", "debug", "eval", "github", "glob",
+  "grep", "lsp", "inspect_image", "browser", "computer", "checkpoint", "rewind", "security_scan",
+  "task", "hub", "todo", "web_search", "write", "memory_edit", "retain", "recall", "reflect",
+  "learn", "manage_skill", "yield", "goal",
+]);
 const SHELL_TOOLS = new Set(["Bash", "bash", "shell", "exec"]);
-const READ_TOOLS = new Set(["Read", "read_file"]);
-const WRITE_TOOLS = new Set(["Write", "write_file"]);
-const EDIT_TOOLS = new Set(["Edit", "MultiEdit", "edit_file", "apply_patch"]);
-const SEARCH_TOOLS = new Set(["grep"]);
+const READ_TOOLS = new Set(["Read", "read", "read_file"]);
+const WRITE_TOOLS = new Set(["Write", "write", "write_file"]);
+const EDIT_TOOLS = new Set(["Edit", "MultiEdit", "edit", "ast_edit", "edit_file", "apply_patch"]);
+const SEARCH_TOOLS = new Set(["grep", "glob", "ast_grep", "web_search", "search", "find"]);
 const TODO_TOOLS = new Set(["todo"]);
 const AGENT_TOOLS = new Set([
+  "task",
   "spawn_agent",
   "send_message",
   "followup_task",
   "interrupt_agent",
   "list_agents",
 ]);
-const WAIT_TOOLS = new Set(["wait", "wait_agent"]);
+const WAIT_TOOLS = new Set(["wait", "wait_agent", "yield"]);
 const CROSS_AGENT_TOOLS = new Set([
+  ...OMP_BUILTIN_TOOLS,
   ...SHELL_TOOLS,
   ...READ_TOOLS,
   ...WRITE_TOOLS,
@@ -106,11 +114,16 @@ function getTitle(kind: CrossAgentKind, name: string): string {
   if (kind === "shell") return "Shell";
   if (kind === "read") return "Read";
   if (kind === "write") return "Write";
-  if (kind === "edit") return name === "apply_patch" ? "Patch" : "Edit";
-  if (kind === "search") return "Grep";
+  if (kind === "edit") return name === "apply_patch" ? "Patch" : name === "ast_edit" ? "AST Edit" : "Edit";
+  if (kind === "search") {
+    if (name === "glob" || name === "find") return "Glob";
+    if (name === "ast_grep") return "AST Grep";
+    if (name === "web_search") return "Web Search";
+    return "Grep";
+  }
   if (kind === "todo") return "Tasks";
-  if (kind === "agent") return name === "list_agents" ? "Agents" : "Agent";
-  if (kind === "wait") return "Wait";
+  if (kind === "agent") return name === "task" ? "Task" : name === "list_agents" ? "Agents" : "Agent";
+  if (kind === "wait") return name === "yield" ? "Yield" : "Wait";
   return name || "Tool";
 }
 
@@ -132,12 +145,13 @@ function getPrimaryText(
   if (kind === "todo")
     return getStringArg(args, "i", "op") || name;
   if (kind === "agent")
-    return getStringArg(args, "task_name", "target", "message") || name;
+    return getStringArg(args, "task_name", "description", "prompt", "task", "target", "message") || name;
   if (kind === "wait") {
     const duration = args.yield_time_ms ?? args.timeout_ms;
-    return typeof duration === "number" ? `${duration} ms` : name;
+    if (typeof duration === "number") return `${duration} ms`;
+    return getStringArg(args, "i", "message", "reason") || name;
   }
-  return name;
+  return getStringArg(args, "i", "query", "prompt", "description", "action", "op", "name", "path", "file_path", "url", "symbol", "text", "skill", "key", "value") || name;
 }
 
 function formatArgs(args: Record<string, unknown>): string {
