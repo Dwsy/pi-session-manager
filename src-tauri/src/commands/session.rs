@@ -59,6 +59,42 @@ pub struct SessionChunk {
     pub has_more: bool,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BridgeCapabilities {
+    pub protocol_version: u32,
+    pub capabilities: Vec<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionWindowEntry {
+    pub id: String,
+    pub role: String,
+    pub text: String,
+    pub timestamp: String,
+    pub tool_name: Option<String>,
+    pub is_error: Option<bool>,
+    pub truncated: bool,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionEntryWindow {
+    pub session_path: String,
+    pub modified_at: u64,
+    pub anchor_entry_id: Option<String>,
+    pub anchor_found: bool,
+    pub stale: bool,
+    pub truncated: bool,
+    pub entries: Vec<SessionWindowEntry>,
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn bridge_capabilities() -> BridgeCapabilities {
+    BridgeCapabilities { protocol_version: 1, capabilities: vec!["paginated_sessions".to_string(), "session_lookup".to_string(), "tag_api".to_string(), "bounded_search_content".to_string(), "tool_result_search".to_string(), "entry_window".to_string()] }
+}
+
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {
     scanner::scan_sessions().await
@@ -97,6 +133,19 @@ pub async fn get_file_stats(path: String) -> Result<FileStats, String> {
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn get_session_entries(path: String) -> Result<Vec<SessionEntry>, String> {
     super::session_file::get_session_entries_impl(path).await
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn get_session_entry_window(path: Option<String>, session_id: Option<String>, anchor_entry_id: Option<String>, before: Option<usize>, after: Option<usize>, include_tools: Option<bool>, max_chars: Option<usize>) -> Result<SessionEntryWindow, String> {
+    let resolved_path = if let Some(path) = path.filter(|value| !value.trim().is_empty()) {
+        path
+    } else if let Some(session_id) = session_id.filter(|value| !value.trim().is_empty()) {
+        get_session_by_id(session_id).await?.map(|session| session.path).ok_or_else(|| "Session not found".to_string())?
+    } else {
+        return Err("path or sessionId is required".to_string());
+    };
+
+    super::session_file::get_session_entry_window_impl(resolved_path, anchor_entry_id, before.unwrap_or(4).min(20), after.unwrap_or(4).min(20), include_tools.unwrap_or(false), max_chars.unwrap_or(16_000).clamp(512, 64 * 1024)).await
 }
 
 /// Preview mode: read user/assistant messages from SQLite instead of JSONL.

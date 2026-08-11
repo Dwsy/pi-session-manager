@@ -23,6 +23,13 @@ const PSM_PORT = readPsmPort();
 
 export const AUTH_TOKEN = process.env.PSM_TOKEN || "";
 
+// Agent-tool deadlines are intentionally shorter than PSM's backend safety
+// timeout so a stalled local service cannot block a model turn indefinitely.
+export const HTTP_TIMEOUT_FAST = 3_000;
+export const HTTP_TIMEOUT_SEARCH = 5_000;
+export const HTTP_TIMEOUT_CONTEXT = 10_000;
+export const HTTP_TIMEOUT_DEFAULT = 10_000;
+
 function resolveUrls(rawUrl: string): { wsUrl: string; httpBase: string } {
   const url = new URL(rawUrl);
   switch (url.protocol) {

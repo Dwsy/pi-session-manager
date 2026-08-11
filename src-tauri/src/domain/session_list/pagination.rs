@@ -34,3 +34,43 @@ pub fn build_paginated_result(sessions: &[SessionInfo], offset: Option<usize>, l
 
     PaginatedSessionsResult { sessions: page_sessions, total, offset: start, limit: normalized_limit, has_more: end < total }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::build_paginated_result;
+    use crate::types::SessionInfo;
+    use chrono::Utc;
+
+    fn session(index: usize) -> SessionInfo {
+        SessionInfo {
+            path: format!("/tmp/session-{index}.jsonl"),
+            id: format!("session-{index:05}"),
+            cwd: "/workspace".to_string(),
+            name: Some(format!("Session {index}")),
+            created: Utc::now(),
+            modified: Utc::now(),
+            message_count: 2,
+            first_message: "first".to_string(),
+            user_messages_text: "large user payload that must not leak into list pages".repeat(4),
+            assistant_messages_text: "large assistant payload that must not leak into list pages".repeat(4),
+            last_message: "last".to_string(),
+            last_message_role: "assistant".to_string(),
+            parent_session_path: None,
+            model: Some("test-model".to_string()),
+            models: Some(vec!["test-model".to_string()]),
+        }
+    }
+
+    #[test]
+    fn ten_thousand_session_fixture_returns_only_requested_page_and_strips_bulk_text() {
+        let sessions = (0..10_000).map(session).collect::<Vec<_>>();
+
+        let result = build_paginated_result(&sessions, Some(9_980), Some(20));
+
+        assert_eq!(result.total, 10_000);
+        assert_eq!(result.offset, 9_980);
+        assert_eq!(result.sessions.len(), 20);
+        assert!(!result.has_more);
+        assert!(result.sessions.iter().all(|session| session.user_messages_text.is_empty() && session.assistant_messages_text.is_empty()));
+    }
+}

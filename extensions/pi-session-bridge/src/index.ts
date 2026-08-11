@@ -22,6 +22,7 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import * as connMgr from "./connection-manager.js";
 import { registerAll } from "./commands.js";
 import {
+  sessionListTool,
   sessionSearchTool,
   sessionContextTool,
   sessionRecallTool,
@@ -30,6 +31,7 @@ import {
 
 export default async function (pi: ExtensionAPI) {
   // ── Register tools ──────────────────────────────────
+  pi.registerTool(sessionListTool);
   pi.registerTool(sessionSearchTool);
   pi.registerTool(sessionContextTool);
   pi.registerTool(sessionRecallTool);

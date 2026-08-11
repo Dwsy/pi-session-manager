@@ -43,6 +43,14 @@ struct ListCacheEntry {
 
 static LIST_CACHE: RwLock<Option<ListCacheEntry>> = RwLock::new(None);
 
+/// Invalidate the derived paginated-list cache after metadata mutations that
+/// do not change the scanner version (for example, session tag assignments).
+pub fn invalidate_list_cache() {
+    if let Ok(mut guard) = LIST_CACHE.write() {
+        *guard = None;
+    }
+}
+
 /// Main entry point: scan sessions with pagination, filtering, and sorting
 pub async fn scan_sessions_paginated_impl(offset: Option<usize>, limit: Option<usize>, search_query: Option<String>, project_filter: Option<String>, filter_tag_ids: Option<Vec<String>>, source_filter_slugs: Option<Vec<String>>, sort_by: Option<String>) -> Result<PaginatedSessionsResult, String> {
     use crate::{config, scanner};
@@ -106,4 +114,20 @@ pub async fn scan_sessions_paginated_impl(offset: Option<usize>, limit: Option<u
     let guard = LIST_CACHE.read().map_err(|e| format!("List cache lock: {e}"))?;
     let entry = guard.as_ref().ok_or("List cache empty after write")?;
     Ok(build_paginated_result(&entry.sessions, offset, limit))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{invalidate_list_cache, ListCacheEntry, LIST_CACHE};
+
+    #[test]
+    fn invalidate_list_cache_clears_metadata_only_staleness() {
+        *LIST_CACHE.write().expect("list cache lock") =
+            Some(ListCacheEntry { scanner_version: 1, scanner_count: 10, search_query: None, project_filter: None, filter_tag_ids: Some(vec!["tag-1".to_string()]), source_filter_slugs: None, sort_by: Some("modified_desc".to_string()), sessions: Vec::new() });
+        assert!(LIST_CACHE.read().expect("list cache lock").is_some());
+
+        invalidate_list_cache();
+
+        assert!(LIST_CACHE.read().expect("list cache lock").is_none());
+    }
 }
