@@ -604,7 +604,7 @@ async fn test_full_text_search_project_path_filter() {
 }
 
 #[tokio::test]
-async fn test_full_text_search_ignores_tool_result_entries_during_upsert() {
+async fn test_full_text_search_indexes_tool_result_entries_during_upsert() {
     let _lock = TEST_DB_LOCK.lock().unwrap();
 
     let temp_dir = tempdir().unwrap();
@@ -632,10 +632,12 @@ async fn test_full_text_search_ignores_tool_result_entries_during_upsert() {
     sqlite_cache::upsert_session(&mut conn, &session, Utc::now(), Some(&entries)).unwrap();
 
     let indexed_rows: i64 = conn.query_row("SELECT COUNT(*) FROM message_entries WHERE session_path = ?", params![path.to_string_lossy().to_string()], |row| row.get(0)).unwrap();
-    assert_eq!(indexed_rows, 3);
+    assert_eq!(indexed_rows, 4);
 
-    let tool_rows: i64 = conn.query_row("SELECT COUNT(*) FROM message_entries WHERE session_path = ? AND role NOT IN ('user', 'assistant')", params![path.to_string_lossy().to_string()], |row| row.get(0)).unwrap();
-    assert_eq!(tool_rows, 0);
+    let (tool_rows, tool_content): (i64, String) =
+        conn.query_row("SELECT COUNT(*), COALESCE(MAX(content), '') FROM message_entries WHERE session_path = ? AND role = 'toolResult' AND source_type = 'tool_result'", params![path.to_string_lossy().to_string()], |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+    assert_eq!(tool_rows, 1);
+    assert_eq!(tool_content, "# README");
 }
 
 #[tokio::test]
