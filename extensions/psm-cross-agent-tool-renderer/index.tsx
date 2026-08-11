@@ -1,7 +1,9 @@
 import {
   FilePenLine,
   FileText,
+  ListTodo,
   PlusSquare,
+  Search,
   Terminal,
   Wrench,
 } from "lucide-react";
@@ -25,6 +27,8 @@ type CrossAgentKind =
   | "read"
   | "write"
   | "edit"
+  | "search"
+  | "todo"
   | "agent"
   | "wait"
   | "generic";
@@ -33,6 +37,8 @@ const SHELL_TOOLS = new Set(["Bash", "bash", "shell", "exec"]);
 const READ_TOOLS = new Set(["Read", "read_file"]);
 const WRITE_TOOLS = new Set(["Write", "write_file"]);
 const EDIT_TOOLS = new Set(["Edit", "MultiEdit", "edit_file", "apply_patch"]);
+const SEARCH_TOOLS = new Set(["grep"]);
+const TODO_TOOLS = new Set(["todo"]);
 const AGENT_TOOLS = new Set([
   "spawn_agent",
   "send_message",
@@ -46,6 +52,8 @@ const CROSS_AGENT_TOOLS = new Set([
   ...READ_TOOLS,
   ...WRITE_TOOLS,
   ...EDIT_TOOLS,
+  ...SEARCH_TOOLS,
+  ...TODO_TOOLS,
   ...AGENT_TOOLS,
   ...WAIT_TOOLS,
 ]);
@@ -87,6 +95,8 @@ function getKind(name: string): CrossAgentKind {
   if (READ_TOOLS.has(name)) return "read";
   if (WRITE_TOOLS.has(name)) return "write";
   if (EDIT_TOOLS.has(name)) return "edit";
+  if (SEARCH_TOOLS.has(name)) return "search";
+  if (TODO_TOOLS.has(name)) return "todo";
   if (AGENT_TOOLS.has(name)) return "agent";
   if (WAIT_TOOLS.has(name)) return "wait";
   return "generic";
@@ -97,6 +107,8 @@ function getTitle(kind: CrossAgentKind, name: string): string {
   if (kind === "read") return "Read";
   if (kind === "write") return "Write";
   if (kind === "edit") return name === "apply_patch" ? "Patch" : "Edit";
+  if (kind === "search") return "Grep";
+  if (kind === "todo") return "Tasks";
   if (kind === "agent") return name === "list_agents" ? "Agents" : "Agent";
   if (kind === "wait") return "Wait";
   return name || "Tool";
@@ -115,6 +127,10 @@ function getPrimaryText(
     return getStringArg(args, "file_path", "path", "absolute_path") || name;
   if (kind === "edit")
     return getStringArg(args, "file_path", "path", "absolute_path") || name;
+  if (kind === "search")
+    return getStringArg(args, "i", "pattern", "query", "path") || name;
+  if (kind === "todo")
+    return getStringArg(args, "i", "op") || name;
   if (kind === "agent")
     return getStringArg(args, "task_name", "target", "message") || name;
   if (kind === "wait") {
@@ -160,7 +176,11 @@ function CrossAgentToolRenderer({
           ? PlusSquare
           : kind === "edit"
             ? FilePenLine
-            : Wrench;
+            : kind === "search"
+              ? Search
+              : kind === "todo"
+                ? ListTodo
+                : Wrench;
 
   return (
     <div
