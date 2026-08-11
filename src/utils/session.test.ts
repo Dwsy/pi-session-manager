@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { getSessionSourceSlug, getSessionSourceTag, parseSessionEntriesWithLineCount } from './session';
+import { findToolResult, getSessionSourceSlug, getSessionSourceTag, parseSessionEntriesWithLineCount } from './session';
 
 describe('parseSessionEntriesWithLineCount', () => {
   it('preserves raw Pi tree-advancing entries and their parent chain', () => {
@@ -131,6 +131,75 @@ describe('parseSessionEntriesWithLineCount', () => {
     expect(entries.find((entry) => entry.id === 'answer')?.parentId).toBe(
       'tool-call',
     )
+  })
+
+  it('preserves OMP v3 message blocks and links message-level tool results', () => {
+    const content = [
+      JSON.stringify({
+        type: 'message',
+        id: 'omp-user',
+        parentId: null,
+        timestamp: '2026-08-10T10:07:48.731Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Use direct upload' }],
+        },
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'omp-assistant',
+        parentId: 'omp-user',
+        timestamp: '2026-08-10T10:07:51.444Z',
+        message: {
+          role: 'assistant',
+          content: [{
+            type: 'toolCall',
+            id: 'call-grep',
+            name: 'grep',
+            arguments: { pattern: 'upload', i: 'find upload references' },
+            intent: 'find upload references',
+          }],
+        },
+      }),
+      JSON.stringify({
+        type: 'custom',
+        customType: 'tool_execution_start',
+        data: { toolCallId: 'call-grep', toolName: 'grep' },
+        id: 'omp-tool-start',
+        parentId: 'omp-assistant',
+        timestamp: '2026-08-10T10:07:51.452Z',
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'omp-result',
+        parentId: 'omp-tool-start',
+        timestamp: '2026-08-10T10:07:51.903Z',
+        message: {
+          role: 'toolResult',
+          toolCallId: 'call-grep',
+          toolName: 'grep',
+          content: [{ type: 'text', text: 'src/upload.ts:42' }],
+          isError: false,
+        },
+      }),
+    ].join('\n')
+
+    const { entries } = parseSessionEntriesWithLineCount(content)
+
+    expect(entries[0].message?.content).toEqual([
+      { type: 'text', text: 'Use direct upload' },
+    ])
+    expect(entries.find((entry) => entry.id === 'omp-tool-start')).toMatchObject({
+      type: 'custom',
+      customType: 'tool_execution_start',
+    })
+    expect(findToolResult(entries, 'call-grep')).toMatchObject({
+      id: 'omp-result',
+      message: {
+        role: 'toolResult',
+        toolCallId: 'call-grep',
+      },
+    })
   })
 
   it('links raw Codex function call output to its tool call id', () => {

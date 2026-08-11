@@ -185,7 +185,10 @@ export function findToolResult(
   return entries.find(
     e => e.type === 'message' &&
     e.message?.role === 'toolResult' &&
-    e.message?.content.some((c: any) => c.id === toolCallId)
+    (
+      e.message.toolCallId === toolCallId ||
+      e.message.content.some((c: any) => c.id === toolCallId || c.toolCallId === toolCallId)
+    )
   ) || null
 }
 
