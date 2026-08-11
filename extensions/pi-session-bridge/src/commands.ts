@@ -7,7 +7,7 @@
  */
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import * as connMgr from "./connection-manager.js";
-import * as psm from "./psm-client.js";
+import * as kanbanStore from "./kanban-store.js";
 import { openPsmSession } from "./open-psm.js";
 import type { TagItem } from "./types.js";
 
@@ -45,10 +45,9 @@ function statusLines(): string[] {
 }
 
 async function getTagsWithStatus(sid: string): Promise<{ tag: TagItem; assigned: boolean }[]> {
-  await psm.ensureBridgeCapabilities(["tag_api"]);
   const [allTags, allSessionTags] = await Promise.all([
-    psm.getAllTags(),
-    psm.getAllSessionTags(),
+    kanbanStore.getAllTags(),
+    kanbanStore.getAllSessionTags(),
   ]);
   const assignedIds = new Set(
     allSessionTags.filter((st) => st.session_id === sid).map((st) => st.tag_id),
@@ -138,10 +137,10 @@ register("psm", "PSM bridge panel", async (_args, ctx) => {
 
       try {
         if (entry.assigned) {
-          await psm.removeTagFromSession(sid, entry.tag.id);
+          await kanbanStore.removeTagFromSession(sid, entry.tag.id);
           ctx.ui.notify(`Removed: ${tagName}`, "info");
         } else {
-          await psm.assignTag(sid, entry.tag.id);
+          await kanbanStore.moveSessionTag(sid, null, entry.tag.id, 0);
           ctx.ui.notify(`Set: ${tagName}`, "info");
         }
         connMgr.notifyPsmTagChange(sid, []);
@@ -162,7 +161,7 @@ register("psm", "PSM bridge panel", async (_args, ctx) => {
     const ok = await ctx.ui.confirm("Clear Tags", `Remove ${assigned.length} tag(s)?`);
     if (ok) {
       for (const { tag } of assigned) {
-        await psm.removeTagFromSession(sid, tag.id);
+        await kanbanStore.removeTagFromSession(sid, tag.id);
       }
       connMgr.notifyPsmTagChange(sid, []);
       ctx.ui.notify(`Cleared ${assigned.length} tags`, "info");

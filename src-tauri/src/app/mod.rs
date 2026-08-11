@@ -13,7 +13,6 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             plugin_dispatch_command,
-            bridge_capabilities,
             scan_sessions,
             scan_sessions_paginated,
             read_session_file,
@@ -22,7 +21,6 @@ pub fn run() {
             read_session_file_incremental_offset,
             get_file_stats,
             get_session_entries,
-            get_session_entry_window,
             get_session_preview_entries,
             get_session_labels,
             detect_session_format,
@@ -257,7 +255,7 @@ mod tests {
         let handler_set = handlers.iter().copied().collect::<BTreeSet<_>>();
         let dispatch_set = crate::dispatch::capability_command_catalog().collect::<BTreeSet<_>>();
 
-        assert_eq!(handlers.len(), 176);
+        assert_eq!(handlers.len(), 174);
         assert_eq!(handler_set.len(), handlers.len());
 
         let dispatch_only = dispatch_set.difference(&handler_set).copied().collect::<Vec<_>>();

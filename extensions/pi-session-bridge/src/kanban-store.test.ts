@@ -1,43 +1,67 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
-const ensureBridgeCapabilities = vi.fn();
-const getAllTags = vi.fn();
-const getAllSessionTags = vi.fn();
-const createTag = vi.fn();
-const removeTagFromSession = vi.fn();
-const moveSessionTag = vi.fn();
+function withHome() {
+  const home = mkdtempSync(join(tmpdir(), "psm-kanban-"));
+  const previousHome = process.env.HOME;
+  process.env.HOME = home;
+  vi.resetModules();
+  return {
+    home,
+    configDir: join(home, ".pi", "pi-session-manager"),
+    cleanup() {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      rmSync(home, { recursive: true, force: true });
+      vi.resetModules();
+    },
+  };
+}
 
-vi.mock("./psm-client.js", () => ({
-  ensureBridgeCapabilities,
-  getAllTags,
-  getAllSessionTags,
-  createTag,
-  removeTagFromSession,
-  moveSessionTag,
-}));
-
-describe("kanban-store compatibility facade", () => {
-  beforeEach(() => {
-    for (const mock of [ensureBridgeCapabilities, getAllTags, getAllSessionTags, createTag, removeTagFromSession, moveSessionTag]) mock.mockReset();
-    ensureBridgeCapabilities.mockResolvedValue({ protocolVersion: 1, capabilities: ["tag_api"] });
-    vi.resetModules();
+describe("kanban file store", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it("reads tags through PSM dispatch", async () => {
-    const tags = [{ id: "tag-1", name: "review", color: "info", sort_order: 0, is_builtin: false, created_at: "now", parent_id: null }];
-    getAllTags.mockResolvedValue(tags);
-    const store = await import("./kanban-store.js");
+  it("loads tags and marks directly from PSM JSON files", async () => {
+    const env = withHome();
+    try {
+      const { mkdirSync } = await import("node:fs");
+      mkdirSync(env.configDir, { recursive: true });
+      writeFileSync(join(env.configDir, "tags_config.json"), JSON.stringify({
+        version: 1,
+        tags: [{ id: "tag-1", name: "review", color: "info", sortOrder: 2, isBuiltin: false, createdAt: "now", parentId: null }],
+      }));
+      writeFileSync(join(env.configDir, "session_mark.json"), JSON.stringify({
+        version: 1,
+        sessionTags: [{ sessionId: "sid", tagId: "tag-1", position: 3, assignedAt: "now" }],
+      }));
 
-    await expect(store.getAllTags()).resolves.toEqual(tags);
-    expect(ensureBridgeCapabilities).toHaveBeenCalledWith(["tag_api"]);
+      const store = await import("./kanban-store.js");
+
+      await expect(store.getAllTags()).resolves.toEqual([{ id: "tag-1", name: "review", color: "info", icon: undefined, sort_order: 2, is_builtin: false, created_at: "now", parent_id: null }]);
+      await expect(store.getAllSessionTags()).resolves.toEqual([{ session_id: "sid", tag_id: "tag-1", position: 3, assigned_at: "now" }]);
+    } finally {
+      env.cleanup();
+    }
   });
 
-  it("moves tags through PSM dispatch without filesystem writes", async () => {
-    moveSessionTag.mockResolvedValue(undefined);
-    const store = await import("./kanban-store.js");
+  it("creates missing files when setting a new session tag", async () => {
+    const env = withHome();
+    try {
+      const store = await import("./kanban-store.js");
 
-    await store.moveSessionTag("sid", null, "tag-1", 3);
+      const tag = await store.createTag("review", "info");
+      await store.moveSessionTag("sid", null, tag.id, 0);
 
-    expect(moveSessionTag).toHaveBeenCalledWith("sid", null, "tag-1", 3);
+      const tagsFile = JSON.parse(readFileSync(join(env.configDir, "tags_config.json"), "utf-8"));
+      const marksFile = JSON.parse(readFileSync(join(env.configDir, "session_mark.json"), "utf-8"));
+      expect(tagsFile.tags[0].name).toBe("review");
+      expect(marksFile.sessionTags).toEqual([expect.objectContaining({ sessionId: "sid", tagId: tag.id, position: 0 })]);
+    } finally {
+      env.cleanup();
+    }
   });
 });

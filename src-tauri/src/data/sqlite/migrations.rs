@@ -26,7 +26,6 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             17 => migration_17(conn)?,
             18 => migration_18(conn)?,
             19 => migration_19(conn)?,
-            20 => migration_20(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -422,107 +421,6 @@ fn migration_19(conn: &Connection) -> Result<(), String> {
 
     info!("[migration:19] invalidated {} Claude Code / Codex sessions for re-parse", affected_paths.len());
     Ok(())
-}
-
-/// Migration to version 20: allow bounded tool-result evidence in message_entries.
-///
-/// Preserve existing user/assistant rows while widening the CHECK constraints.
-/// The content-synced FTS table and triggers are dropped before the table rebuild;
-/// bootstrap calls ensure_message_fts_schema after versioned migrations, which
-/// recreates them and rebuilds FTS from the preserved rows.
-fn migration_20(conn: &Connection) -> Result<(), String> {
-    let message_entries_exists: bool = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, i64>(0)).map(|count| count > 0).unwrap_or(false);
-
-    if !message_entries_exists {
-        conn.execute_batch(
-            "CREATE TABLE message_entries (
-                id TEXT PRIMARY KEY,
-                entry_id TEXT NOT NULL,
-                session_path TEXT NOT NULL,
-                role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'toolResult')),
-                source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking', 'label', 'tool_result')),
-                content TEXT NOT NULL,
-                search_text TEXT NOT NULL DEFAULT '',
-                timestamp TEXT NOT NULL,
-                label TEXT,
-                FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
-            );
-            CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id);
-            CREATE INDEX IF NOT EXISTS idx_message_entries_session_time ON message_entries(session_path, timestamp);
-            CREATE INDEX IF NOT EXISTS idx_message_entries_label ON message_entries(label) WHERE label IS NOT NULL;",
-        )
-        .map_err(|e| format!("Migration 20 failed creating message_entries: {e}"))?;
-        return Ok(());
-    }
-
-    conn.execute_batch(
-        "BEGIN IMMEDIATE;
-         DROP TRIGGER IF EXISTS message_entries_ai;
-         DROP TRIGGER IF EXISTS message_entries_ad;
-         DROP TRIGGER IF EXISTS message_entries_au;
-         DROP TABLE IF EXISTS message_fts;
-         ALTER TABLE message_entries RENAME TO message_entries_v19;
-         CREATE TABLE message_entries (
-            id TEXT PRIMARY KEY,
-            entry_id TEXT NOT NULL,
-            session_path TEXT NOT NULL,
-            role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'toolResult')),
-            source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking', 'label', 'tool_result')),
-            content TEXT NOT NULL,
-            search_text TEXT NOT NULL DEFAULT '',
-            timestamp TEXT NOT NULL,
-            label TEXT,
-            FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
-         );
-         INSERT INTO message_entries (id, entry_id, session_path, role, source_type, content, search_text, timestamp, label)
-         SELECT id, entry_id, session_path, role, source_type, content, search_text, timestamp, label
-         FROM message_entries_v19;
-         DROP TABLE message_entries_v19;
-         CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id);
-         CREATE INDEX IF NOT EXISTS idx_message_entries_session_time ON message_entries(session_path, timestamp);
-         CREATE INDEX IF NOT EXISTS idx_message_entries_label ON message_entries(label) WHERE label IS NOT NULL;
-         COMMIT;",
-    )
-    .map_err(|e| format!("Migration 20 failed rebuilding message_entries constraints: {e}"))?;
-
-    Ok(())
-}
-
-#[cfg(test)]
-mod migration_20_tests {
-    use super::*;
-    use rusqlite::Connection;
-
-    #[test]
-    fn widens_message_entry_constraints_without_losing_existing_rows() {
-        let conn = Connection::open_in_memory().expect("open db");
-        conn.execute("CREATE TABLE sessions (path TEXT PRIMARY KEY)", []).expect("sessions table");
-        conn.execute("INSERT INTO sessions(path) VALUES('/tmp/session.jsonl')", []).expect("session row");
-        conn.execute_batch(
-            "CREATE TABLE message_entries (
-                id TEXT PRIMARY KEY,
-                entry_id TEXT NOT NULL,
-                session_path TEXT NOT NULL,
-                role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
-                source_type TEXT NOT NULL CHECK(source_type IN ('user', 'assistant', 'thinking', 'label')),
-                content TEXT NOT NULL,
-                search_text TEXT NOT NULL DEFAULT '',
-                timestamp TEXT NOT NULL,
-                label TEXT,
-                FOREIGN KEY (session_path) REFERENCES sessions(path) ON DELETE CASCADE
-            );
-            INSERT INTO message_entries(id, entry_id, session_path, role, source_type, content, search_text, timestamp, label)
-            VALUES('old', 'e1', '/tmp/session.jsonl', 'assistant', 'assistant', 'kept', 'kept', '2026-01-01T00:00:00Z', NULL);",
-        )
-        .expect("old schema");
-
-        migration_20(&conn).expect("migration");
-
-        let preserved: String = conn.query_row("SELECT content FROM message_entries WHERE id='old'", [], |row| row.get(0)).expect("preserved row");
-        assert_eq!(preserved, "kept");
-        conn.execute("INSERT INTO message_entries(id, entry_id, session_path, role, source_type, content, search_text, timestamp) VALUES('tool', 'e2', '/tmp/session.jsonl', 'toolResult', 'tool_result', 'compiler error', 'compiler error', '2026-01-01T00:00:01Z')", [])
-            .expect("toolResult row allowed");
-    }
 }
 
 #[cfg(test)]

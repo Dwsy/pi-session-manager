@@ -100,7 +100,7 @@ mod tests {
     fn capability_command_catalog_is_unique_and_complete() {
         let commands = capability_command_catalog().collect::<Vec<_>>();
         let unique = commands.iter().copied().collect::<std::collections::HashSet<_>>();
-        assert_eq!(commands.len(), 162);
+        assert_eq!(commands.len(), 160);
         assert_eq!(unique.len(), commands.len());
     }
 

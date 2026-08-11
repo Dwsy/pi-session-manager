@@ -65,39 +65,6 @@ export interface FullTextSearchResponse {
   has_more: boolean;
 }
 
-export interface BridgeCapabilities {
-  protocolVersion: number;
-  capabilities: string[];
-}
-
-export interface PaginatedSessionsResult {
-  sessions: SessionInfo[];
-  total: number;
-  offset: number;
-  limit: number;
-  has_more: boolean;
-}
-
-export interface SessionWindowEntry {
-  id: string;
-  role: string;
-  text: string;
-  timestamp: string;
-  toolName?: string;
-  isError?: boolean;
-  truncated: boolean;
-}
-
-export interface SessionEntryWindow {
-  sessionPath: string;
-  modifiedAt: number;
-  anchorEntryId?: string;
-  anchorFound: boolean;
-  stale: boolean;
-  truncated: boolean;
-  entries: SessionWindowEntry[];
-}
-
 // ── Tags (PSM backend schema) ─────────────────────────
 
 export interface TagItem {

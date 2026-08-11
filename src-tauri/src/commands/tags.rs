@@ -181,7 +181,6 @@ pub async fn create_tag(name: String, color: String, icon: Option<String>, paren
     let tag = TagItem { id: next_tag_id(&file.tags), name, color, icon, sort_order: next_sort_order(&file.tags), is_builtin: false, created_at: Utc::now().to_rfc3339(), parent_id };
     file.tags.push(tag.clone());
     save_tags_file(&file)?;
-    crate::domain::session_list::invalidate_list_cache();
     Ok(tag)
 }
 
@@ -206,9 +205,7 @@ pub async fn update_tag(id: String, name: Option<String>, color: Option<String>,
     if let Some(value) = parent_id {
         tag.parent_id = value;
     }
-    save_tags_file(&file)?;
-    crate::domain::session_list::invalidate_list_cache();
-    Ok(())
+    save_tags_file(&file)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -218,9 +215,7 @@ pub async fn delete_tag(id: String) -> Result<(), String> {
     tags_file.tags.retain(|tag| tag.id != id);
     marks_file.session_tags.retain(|item| item.tag_id != id);
     save_tags_file(&tags_file)?;
-    save_session_marks_file(&marks_file)?;
-    crate::domain::session_list::invalidate_list_cache();
-    Ok(())
+    save_session_marks_file(&marks_file)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -232,18 +227,14 @@ pub async fn get_all_session_tags() -> Result<Vec<SessionTagItem>, String> {
 pub async fn assign_tag(session_id: String, tag_id: String) -> Result<(), String> {
     let mut file = load_session_marks_file()?;
     assign_tag_in_memory(&mut file.session_tags, &session_id, &tag_id);
-    save_session_marks_file(&file)?;
-    crate::domain::session_list::invalidate_list_cache();
-    Ok(())
+    save_session_marks_file(&file)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn remove_tag_from_session(session_id: String, tag_id: String) -> Result<(), String> {
     let mut file = load_session_marks_file()?;
     file.session_tags.retain(|item| !(item.session_id == session_id && item.tag_id == tag_id));
-    save_session_marks_file(&file)?;
-    crate::domain::session_list::invalidate_list_cache();
-    Ok(())
+    save_session_marks_file(&file)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -254,9 +245,7 @@ pub async fn move_session_tag(session_id: String, from_tag_id: Option<String>, t
     }
     file.session_tags.retain(|item| !(item.session_id == session_id && item.tag_id == to_tag_id));
     file.session_tags.push(SessionTagItem { session_id, tag_id: to_tag_id, position, assigned_at: Utc::now().to_rfc3339() });
-    save_session_marks_file(&file)?;
-    crate::domain::session_list::invalidate_list_cache();
-    Ok(())
+    save_session_marks_file(&file)
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
@@ -267,7 +256,5 @@ pub async fn reorder_tags(tag_ids: Vec<String>) -> Result<(), String> {
             tag.sort_order = index as i64;
         }
     }
-    save_tags_file(&file)?;
-    crate::domain::session_list::invalidate_list_cache();
-    Ok(())
+    save_tags_file(&file)
 }

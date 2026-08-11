@@ -44,7 +44,7 @@ impl SourceFilter {
         match self {
             Self::All => "1=1",
             Self::LabelsOnly => "m.source_type = 'label'",
-            Self::ContentOnly => "m.source_type IN ('user', 'assistant', 'thinking', 'tool_result')",
+            Self::ContentOnly => "m.source_type IN ('user', 'assistant', 'thinking')",
         }
     }
 }

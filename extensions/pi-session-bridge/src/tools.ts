@@ -1,149 +1,99 @@
 /**
- * LLM-callable retrieval tools for Pi Session Manager.
+ * Tools — LLM-callable tools registered via pi.registerTool().
  *
- * The bridge orchestrates bounded PSM reads; it never owns a second search
- * index or downloads the full session catalog on the default retrieval path.
+ * session_search:  Full-text search across indexed sessions.
+ * session_context: Fetch dialogue context from a specific session.
+ * session_recall:  Search + retrieve surrounding context.
+ * session_tag:     Tag management via PSM JSON files.
  */
-import * as psm from "./psm-client.js";
-import { getSessionId, notifyPsmTagChange } from "./connection-manager.js";
-import type { SearchHit, SessionInfo, SessionWindowEntry, TagItem } from "./types.js";
 
-const SEARCH_HIT_CONTENT_CHARS = 1_000;
-const SEARCH_EXCERPT_CHARS = 240;
-const DEFAULT_CONTEXT_CHARS = 16_000;
-const MAX_CONTEXT_CHARS = 32_000;
+import * as psm from "./psm-client.js";
+import * as kanbanStore from "./kanban-store.js";
+import { getSessionId } from "./connection-manager.js";
+import { notifyPsmTagChange } from "./connection-manager.js";
+import type { FullTextSearchResponse, SessionEntry, SessionInfo, TagItem } from "./types.js";
+
+// ── Session cache (shared across tools) ───────────────
+
+let cachedSessions: SessionInfo[] | null = null;
+
+const MAX_RECALL_ENTRY_CHARS = 2_000;
 const MAX_RECALL_OUTPUT_CHARS = 12_000;
 
-function truncateText(text: string, maxChars: number, label = "truncated"): string {
+function truncateRecallText(text: string, maxChars: number, scope: "entry" | "output"): string {
   const normalized = text.trim();
   if (normalized.length <= maxChars) return normalized;
-  const marker = `\n… [${label}]`;
-  if (maxChars <= marker.length) return marker.slice(0, maxChars);
-  return `${normalized.slice(0, maxChars - marker.length)}${marker}`;
+  return `${normalized.slice(0, maxChars)}\n… [${scope} truncated: ${normalized.length - maxChars} characters omitted]`;
 }
 
-function findTag(name: string, tags: TagItem[]): TagItem | null {
-  const n = name.toLowerCase().trim();
-  return tags.find((tag) => tag.name.toLowerCase() === n)
-    || tags.find((tag) => tag.name.toLowerCase().includes(n))
-    || null;
-}
-
-async function resolveSessionId(sessionId: string): Promise<SessionInfo | null> {
-  const exact = await psm.getSessionById(sessionId);
-  if (exact) return exact;
-
-  // Compatibility for old 8-character IDs emitted by previous bridge builds.
-  // The lookup remains bounded and rejects ambiguous prefixes.
-  if (sessionId.length < 4) throw new Error("Session ID prefix is too short; provide the full session ID.");
-  const page = await psm.scanSessionsPaginated({
-    offset: 0,
-    limit: 20,
-    search_query: sessionId,
-    sort_by: "modified_desc",
-  });
-  const matches = page.sessions.filter((session) => session.id.startsWith(sessionId));
-  if (matches.length > 1) {
-    throw new Error(`Ambiguous session ID prefix ${sessionId}; ${matches.length} sessions match. Use a full session ID.`);
+async function getSessions(): Promise<SessionInfo[]> {
+  if (cachedSessions) return cachedSessions;
+  try {
+    cachedSessions = await psm.scanSessions();
+  } catch {
+    cachedSessions = [];
   }
-  return matches[0] || null;
+  return cachedSessions!;
 }
 
-function renderWindowEntry(entry: SessionWindowEntry, marker = "  "): string {
-  const tool = entry.toolName ? ` (${entry.toolName}${entry.isError ? ", error" : ""})` : "";
-  const truncation = entry.truncated ? " [truncated]" : "";
-  return `${marker}${entry.role}${tool}: ${entry.text || "(no text)"}${truncation}`;
+async function getEntriesByPath(sessionPath: string): Promise<SessionEntry[]> {
+  const entries = await psm.getSessionEntries(sessionPath);
+  return entries.filter(
+    (e) => e.type === "message" && (e.message?.role === "user" || e.message?.role === "assistant"),
+  );
 }
 
-async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let cursor = 0;
-  async function worker() {
-    while (cursor < items.length) {
-      const index = cursor++;
-      results[index] = await fn(items[index], index);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
-  return results;
+async function getEntriesForSession(sessionId: string): Promise<SessionEntry[]> {
+  const sessions = await getSessions();
+  const session = sessions.find((s) => s.id === sessionId || s.id.startsWith(sessionId));
+  if (!session?.path) return [];
+  return getEntriesByPath(session.path);
 }
 
-export const sessionListTool = {
-  name: "session_list",
-  label: "Session List",
-  description: "List sessions through PSM's paginated catalog. Use for discovery/filtering; this never returns the full catalog by default.",
-  parameters: {
-    type: "object" as const,
-    properties: {
-      query: { type: "string", description: "Optional lightweight session metadata search." },
-      projectPath: { type: "string", description: "Optional exact project/cwd filter." },
-      tag: { type: "string", description: "Optional tag name filter." },
-      source: { type: "string", description: "Optional session source slug." },
-      sortBy: {
-        type: "string",
-        enum: ["modified_desc", "modified_asc", "created_desc", "created_asc", "name_asc", "name_desc"],
-        description: "Sort order. Defaults to modified_desc.",
-      },
-      offset: { type: "number", minimum: 0, description: "Result offset. Defaults to 0." },
-      limit: { type: "number", minimum: 1, maximum: 50, description: "Page size. Defaults to 20." },
-    },
-  },
-  async execute(_toolCallId: string, params: Record<string, unknown>) {
-    try {
-      await psm.ensureBridgeCapabilities(["paginated_sessions"]);
-      const tagName = String(params.tag || "").trim();
-      let filterTagIds: string[] | undefined;
-      if (tagName) {
-        await psm.ensureBridgeCapabilities(["tag_api"]);
-        const tag = findTag(tagName, await psm.getAllTags());
-        if (!tag) return { content: [{ type: "text", text: `Tag not found: ${tagName}` }], isError: true };
-        filterTagIds = [tag.id];
-      }
-
-      const result = await psm.scanSessionsPaginated({
-        offset: Math.max(0, Number(params.offset) || 0),
-        limit: Math.min(Math.max(Number(params.limit) || 20, 1), 50),
-        ...(String(params.query || "").trim() ? { search_query: String(params.query).trim() } : {}),
-        ...(String(params.projectPath || "").trim() ? { project_filter: String(params.projectPath).trim() } : {}),
-        ...(filterTagIds ? { filter_tag_ids: filterTagIds } : {}),
-        ...(String(params.source || "").trim() ? { source_filter_slugs: [String(params.source).trim()] } : {}),
-        sort_by: String(params.sortBy || "modified_desc"),
-      });
-
-      const lines = [
-        `Sessions ${result.offset + 1}-${result.offset + result.sessions.length} of ${result.total}${result.has_more ? " (more available)" : ""}`,
-        "",
-        ...result.sessions.map((session, index) => [
-          `${index + 1}. ${session.name || session.id.slice(0, 8)}`,
-          `   sessionId: ${session.id}`,
-          `   sessionPath: ${session.path}`,
-          `   project: ${session.cwd}`,
-          `   modified: ${session.modified} · messages: ${session.message_count}`,
-        ].join("\n")),
-      ];
-      return { content: [{ type: "text", text: lines.join("\n") }] };
-    } catch (error) {
-      return { content: [{ type: "text", text: `Session list failed: ${error}` }], isError: true };
-    }
-  },
-};
+// ── Tool: session_search ──────────────────────────────
 
 export const sessionSearchTool = {
   name: "session_search",
   label: "Session Search",
-  description: "Search indexed Pi sessions and return bounded evidence with full session IDs/paths. Use for historical recall; skip for self-contained current-session tasks.",
+  description:
+    "Search indexed Pi sessions and return matching excerpts plus session IDs. Use when the user refers to past sessions or historical context is materially needed; skip for self-contained current-session tasks.",
   parameters: {
     type: "object" as const,
     properties: {
-      query: { type: "string", description: "Search query." },
-      roleFilter: { type: "string", enum: ["all", "user", "assistant"], description: "Role filter. Defaults to all." },
-      matchMode: { type: "string", enum: ["any", "all", "phrase", "smart"], description: "Match mode. Defaults to any; smart is opt-in until relevance benchmarks justify changing the default." },
-      pageSize: { type: "number", minimum: 1, maximum: 20, description: "Top-K hits. Defaults to 8." },
-      sortOrder: { type: "string", enum: ["relevance", "newest", "oldest"], description: "Sort order. Defaults to relevance." },
-      includeTools: { type: "boolean", description: "Include indexed tool-result evidence. Defaults to true." },
-      from: { type: "string", description: "Optional RFC3339 start time." },
-      to: { type: "string", description: "Optional RFC3339 end time." },
-      projectPath: { type: "string", description: "Optional exact session cwd/project path." },
+      query: { type: "string", description: "Search query to run against indexed sessions." },
+      roleFilter: {
+        type: "string",
+        enum: ["all", "user", "assistant"],
+        description: "Optional role filter. Defaults to all.",
+      },
+      matchMode: {
+        type: "string",
+        enum: ["any", "all", "phrase"],
+        description: "Match mode. Defaults to any.",
+      },
+      pageSize: {
+        type: "number",
+        minimum: 1,
+        maximum: 20,
+        description: "Max hits to return. Defaults to 8.",
+      },
+      sortOrder: {
+        type: "string",
+        enum: ["relevance", "newest", "oldest"],
+        description: "Sort order. Defaults to relevance.",
+      },
+      from: {
+        type: "string",
+        description: "Optional start time, RFC3339 format, e.g. 2026-05-01T00:00:00Z.",
+      },
+      to: {
+        type: "string",
+        description: "Optional end time, RFC3339 format, e.g. 2026-05-31T23:59:59Z.",
+      },
+      projectPath: {
+        type: "string",
+        description: "Optional project path filter. Matches session cwd exactly (path), e.g. /Users/me/projects/demo.",
+      },
     },
     required: ["query"],
   },
@@ -152,11 +102,10 @@ export const sessionSearchTool = {
     if (!query) return { content: [{ type: "text", text: "query is required." }], isError: true };
 
     try {
-      await psm.ensureBridgeCapabilities(["bounded_search_content", "tool_result_search"]);
-      const from = String(params.from || "").trim();
-      const to = String(params.to || "").trim();
-      const projectPath = String(params.projectPath || params.project_path || "").trim();
-      const includeTools = params.includeTools !== false;
+      const fromRaw = String(params.from || "").trim();
+      const toRaw = String(params.to || "").trim();
+      const projectPathRaw = String((params as Record<string, unknown>).projectPath || params.project_path || "").trim();
+
       const fts = await psm.fullTextSearch({
         query,
         role_filter: String(params.roleFilter || "all"),
@@ -164,111 +113,111 @@ export const sessionSearchTool = {
         page_size: Math.min(Math.max(Number(params.pageSize) || 8, 1), 20),
         sort_order: String(params.sortOrder || "relevance"),
         source_filter: "content_only",
-        max_content_chars: SEARCH_HIT_CONTENT_CHARS,
-        ...(from ? { from } : {}),
-        ...(to ? { to } : {}),
-        ...(projectPath ? { project_path: projectPath } : {}),
+        ...(fromRaw ? { from: fromRaw } : {}),
+        ...(toRaw ? { to: toRaw } : {}),
+        ...(projectPathRaw ? { project_path: projectPathRaw } : {}),
       });
 
-      const hits = (fts.hits || []).filter((hit) =>
-        hit.source_type === "user" || hit.source_type === "assistant" || (includeTools && hit.source_type === "tool_result"),
+      const hits = (fts.hits || []).filter(
+        (h) => h.source_type === "user" || h.source_type === "assistant",
       );
-      if (hits.length === 0) return { content: [{ type: "text", text: `No matching messages found for: ${query}` }] };
+
+      if (hits.length === 0) {
+        return { content: [{ type: "text", text: `No matching messages found for: ${query}` }] };
+      }
 
       const lines = [
         `Session search results for: ${query}`,
-        `Found ${hits.length} bounded hit(s)${fts.has_more ? " (more available)" : ""}`,
+        `Found ${hits.length} hit(s)${fts.has_more ? " (truncated)" : ""}`,
         "",
-        ...hits.map((hit, index) => {
-          const label = hit.session_name || hit.session_id.slice(0, 8);
-          const excerpt = truncateText(hit.content.replace(/\s+/g, " "), SEARCH_EXCERPT_CHARS, "excerpt truncated");
-          return [
-            `${index + 1}. ${label} [${hit.session_id.slice(0, 8)}]`,
-            `   sessionId: ${hit.session_id}`,
-            `   sessionPath: ${hit.session_path}`,
-            `   entryId: ${hit.entry_id} · source: ${hit.source_type}`,
-            `   ${excerpt}`,
-          ].join("\n");
+        ...hits.map((hit, i) => {
+          const shortId = hit.session_id.slice(0, 8);
+          const label = hit.session_name || shortId;
+          const excerpt = hit.content.replace(/\s+/g, " ").trim().slice(0, 200);
+          const ellipsis = hit.content.length > 200 ? "..." : "";
+          return `${i + 1}. ${label} [${shortId}]\n   ${excerpt}${ellipsis}`;
         }),
       ];
+
       return { content: [{ type: "text", text: lines.join("\n") }] };
-    } catch (error) {
-      return { content: [{ type: "text", text: `Search failed: ${error}` }], isError: true };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Search failed: ${err}` }], isError: true };
     }
   },
 };
+
+// ── Tool: session_context ─────────────────────────────
 
 export const sessionContextTool = {
   name: "session_context",
   label: "Session Context",
-  description: "Return a bounded tail or anchored context window from one known session. Full session materialization is not used for Pi JSONL sessions.",
+  description:
+    "Return the most recent message tail from one known session. This is not anchored to a search hit; use session_recall when context must surround matching messages.",
   parameters: {
     type: "object" as const,
     properties: {
-      sessionId: { type: "string", description: "Full session ID from session_search/session_list. Legacy unique prefixes are accepted." },
+      sessionId: { type: "string", description: "Session ID from search results." },
       sessionPath: { type: "string", description: "Full session path." },
-      anchorEntryId: { type: "string", description: "Optional entry ID to anchor the window." },
-      before: { type: "number", minimum: 0, maximum: 20, description: "Entries before anchor; contributes to tail size without an anchor. Default 4." },
-      after: { type: "number", minimum: 0, maximum: 20, description: "Entries after anchor; contributes to tail size without an anchor. Default 4." },
-      includeTools: { type: "boolean", description: "Include toolResult entries. Defaults to false." },
-      maxChars: { type: "number", minimum: 512, maximum: 32000, description: "Maximum text budget. Defaults to 16000." },
+      before: { type: "number", description: "Contributes to the tail size; total returned is before + after + 1. Default: 4." },
+      after: { type: "number", description: "Contributes to the tail size; total returned is before + after + 1. Default: 4." },
     },
   },
   async execute(_toolCallId: string, params: Record<string, unknown>) {
-    const sessionId = String(params.sessionId || "").trim();
-    let sessionPath = String(params.sessionPath || "").trim();
-    if (!sessionId && !sessionPath) return { content: [{ type: "text", text: "sessionId or sessionPath required." }], isError: true };
+    const sid = String(params.sessionId || "");
+    const spath = String(params.sessionPath || "");
+
+    if (!sid && !spath) {
+      return { content: [{ type: "text", text: "sessionId or sessionPath required." }], isError: true };
+    }
 
     try {
-      await psm.ensureBridgeCapabilities(["entry_window", "session_lookup"]);
-      if (!sessionPath && sessionId) {
-        const session = await resolveSessionId(sessionId);
-        if (!session) return { content: [{ type: "text", text: `Session not found: ${sessionId}` }], isError: true };
-        sessionPath = session.path;
+      let entries: SessionEntry[] = [];
+      if (sid) entries = await getEntriesForSession(sid);
+      if (entries.length === 0 && spath) entries = await getEntriesByPath(spath);
+
+      if (entries.length === 0) {
+        return { content: [{ type: "text", text: "No dialogue entries found." }] };
       }
+
       const before = Math.min(Math.max(Number(params.before) || 4, 0), 20);
       const after = Math.min(Math.max(Number(params.after) || 4, 0), 20);
-      const maxChars = Math.min(Math.max(Number(params.maxChars) || DEFAULT_CONTEXT_CHARS, 512), MAX_CONTEXT_CHARS);
-      const anchorEntryId = String(params.anchorEntryId || "").trim();
-      const window = await psm.getSessionEntryWindow({
-        path: sessionPath,
-        ...(anchorEntryId ? { anchorEntryId } : {}),
-        before,
-        after,
-        includeTools: params.includeTools === true,
-        maxChars,
-      });
-
-      if (anchorEntryId && !window.anchorFound) {
-        return { content: [{ type: "text", text: `Anchor is no longer available in this session: ${anchorEntryId}` }], isError: true };
-      }
-      if (window.entries.length === 0) return { content: [{ type: "text", text: "No matching context entries found." }] };
+      const start = Math.max(entries.length - (before + after + 1), 0);
+      const window = entries.slice(start);
 
       const lines = [
-        `Session context${window.stale ? " [session changed while reading]" : ""}${window.truncated ? " [bounded]" : ""}`,
-        `sessionPath: ${window.sessionPath}`,
-        anchorEntryId ? `anchorEntryId: ${anchorEntryId}` : "tail window",
+        `Session context (${entries.length} entries)`,
         "",
-        ...window.entries.map((entry) => renderWindowEntry(entry, entry.id === anchorEntryId ? "->" : "  ")),
+        ...window.map((entry, i) => {
+          const role = entry.message?.role || "unknown";
+          const content = (entry.message?.content || [])
+            .filter((b) => b?.type === "text" && b.text)
+            .map((b) => b.text!.trim())
+            .join("\n");
+          return `[${start + i + 1}] ${role}: ${content || "(no text)"}`;
+        }),
       ];
-      return { content: [{ type: "text", text: truncateText(lines.join("\n"), maxChars + 2_000, "context output truncated") }] };
-    } catch (error) {
-      return { content: [{ type: "text", text: `Failed: ${error}` }], isError: true };
+
+      return { content: [{ type: "text", text: lines.join("\n\n") }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Failed: ${err}` }], isError: true };
     }
   },
 };
 
+// ── Tool: session_recall ──────────────────────────────
+
 export const sessionRecallTool = {
   name: "session_recall",
   label: "Session Recall",
-  description: "Search past sessions and retrieve bounded anchored windows. Uses FTS hit paths directly and never scans the full session catalog.",
+  description:
+    "Search past sessions and return small dialogue windows around matching messages. Use when excerpts alone are insufficient; prefer session_search when only hits or session IDs are needed.",
   parameters: {
     type: "object" as const,
     properties: {
       query: { type: "string", description: "Search query." },
-      maxResults: { type: "number", minimum: 1, maximum: 5, description: "Max recall windows. Default 3." },
-      before: { type: "number", minimum: 0, maximum: 10, description: "Entries before hit. Default 2." },
-      after: { type: "number", minimum: 0, maximum: 10, description: "Entries after hit. Default 2." },
+      maxResults: { type: "number", description: "Max recall windows. Default: 3." },
+      before: { type: "number", description: "Entries before hit. Default: 2." },
+      after: { type: "number", description: "Entries after hit. Default: 2." },
     },
     required: ["query"],
   },
@@ -277,103 +226,145 @@ export const sessionRecallTool = {
     if (!query) return { content: [{ type: "text", text: "query is required." }], isError: true };
 
     try {
-      await psm.ensureBridgeCapabilities(["bounded_search_content", "tool_result_search", "entry_window"]);
       const maxResults = Math.max(1, Math.min(Number(params.maxResults) || 3, 5));
-      const before = Math.min(Math.max(Number(params.before) || 2, 0), 10);
-      const after = Math.min(Math.max(Number(params.after) || 2, 0), 10);
       const fts = await psm.fullTextSearch({
         query,
         page_size: maxResults * 3,
-        source_filter: "content_only",
-        max_content_chars: SEARCH_HIT_CONTENT_CHARS,
       });
-      const hits = (fts.hits || []).filter((hit) => ["user", "assistant", "tool_result"].includes(hit.source_type)).slice(0, maxResults);
-      if (hits.length === 0) return { content: [{ type: "text", text: `No matching context found for: ${query}` }] };
 
-      const windowBudget = Math.max(2_000, Math.floor(MAX_RECALL_OUTPUT_CHARS / maxResults));
-      const sections = await mapWithConcurrency<SearchHit, string>(hits, 2, async (hit, index) => {
-        const matched = truncateText(hit.content.replace(/\s+/g, " "), SEARCH_EXCERPT_CHARS, "match truncated");
-        const window = await psm.getSessionEntryWindow({
-          path: hit.session_path,
-          anchorEntryId: hit.entry_id,
-          before,
-          after,
-          includeTools: true,
-          maxChars: windowBudget,
-        });
-        const header = [
-          `${index + 1}. ${hit.session_name || hit.session_id.slice(0, 8)}`,
-          `sessionId: ${hit.session_id}`,
-          `sessionPath: ${hit.session_path}`,
-          `entryId: ${hit.entry_id} · source: ${hit.source_type}`,
-          `matched: ${matched}`,
-        ];
-        if (!window.anchorFound) return [...header, "context: [stale anchor — no unrelated window returned]"].join("\n");
-        const context = window.entries.map((entry) => renderWindowEntry(entry, entry.id === hit.entry_id ? "->" : "  ")).join("\n");
-        return [...header, `context${window.stale ? " [session changed while reading]" : ""}:`, context].join("\n");
-      });
+      const hits = (fts.hits || [])
+        .filter((h) => h.source_type === "user" || h.source_type === "assistant")
+        .slice(0, maxResults);
+
+      if (hits.length === 0) {
+        return { content: [{ type: "text", text: `No matching dialogue for: ${query}` }] };
+      }
+
+      const before = Math.min(Math.max(Number(params.before) || 2, 0), 10);
+      const after = Math.min(Math.max(Number(params.after) || 2, 0), 10);
+      const sessions = await getSessions();
+      const pathToSession = new Map(sessions.map((s) => [s.path, s]));
+      const sections: string[] = [];
+
+      for (let i = 0; i < hits.length; i++) {
+        const hit = hits[i];
+        const matchedText = hit.content.replace(/\s+/g, " ").trim().slice(0, 200);
+        let context = "";
+
+        try {
+          const session = pathToSession.get(hit.session_path);
+          const entryPath = session?.path || hit.session_path;
+          if (entryPath) {
+            const entries = await getEntriesByPath(entryPath);
+            const idx = entries.findIndex((e) => e.id === hit.entry_id);
+            if (idx >= 0) {
+              const start = Math.max(0, idx - before);
+              const end = Math.min(entries.length, idx + after + 1);
+              context = entries
+                .slice(start, end)
+                .map((e, j) => {
+                  const role = e.message?.role || "unknown";
+                  const text = truncateRecallText(
+                    (e.message?.content || [])
+                      .filter((b) => b?.type === "text" && b.text)
+                      .map((b) => b.text!.trim())
+                      .join("\n"),
+                    MAX_RECALL_ENTRY_CHARS,
+                    "entry",
+                  );
+                  const marker = idx === start + j ? "->" : "  ";
+                  return `${marker} ${role}: ${text || "(no text)"}`;
+                })
+                .join("\n");
+            }
+          }
+        } catch { /* skip */ }
+
+        sections.push(
+          `${i + 1}. ${hit.session_name || hit.session_id.slice(0, 8)}\nmatched: ${matchedText}${context ? "\n\n" + context : ""}`,
+        );
+      }
 
       const output = [`Session recall for: ${query}`, "", ...sections].join("\n\n");
-      return { content: [{ type: "text", text: truncateText(output, MAX_RECALL_OUTPUT_CHARS, "recall output truncated") }] };
-    } catch (error) {
-      return { content: [{ type: "text", text: `Recall failed: ${error}` }], isError: true };
+      return {
+        content: [{ type: "text", text: truncateRecallText(output, MAX_RECALL_OUTPUT_CHARS, "output") }],
+      };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Recall failed: ${err}` }], isError: true };
     }
   },
 };
 
+// ── Tool: session_tag ─────────────────────────────────
+
+function findTag(name: string, tags: TagItem[]): TagItem | null {
+  const n = name.toLowerCase().trim();
+  return tags.find((t) => t.name.toLowerCase() === n)
+    || tags.find((t) => t.name.toLowerCase().includes(n)) || null;
+}
+
 export const sessionTagTool = {
   name: "session_tag",
   label: "Session Tag Manager",
-  description: "Inspect or change tags on the current session through PSM's tag API. set/remove mutate metadata only when explicitly requested.",
+  description:
+    "Inspect or change tags on the current session. list is read-only. set/remove mutate session metadata and should be used only when the user explicitly requests a tag change; set creates the named tag if no existing tag matches.",
   parameters: {
     type: "object" as const,
     properties: {
-      action: { type: "string", enum: ["list", "set", "remove"], description: "Action: list, set, or remove." },
-      tag: { type: "string", description: "Tag name for set/remove." },
+      action: { type: "string", enum: ["list", "set", "remove"], description: "Action: list, set, or remove" },
+      tag: { type: "string", description: "Tag name for set/remove actions." },
     },
     required: ["action"],
   },
   async execute(_toolCallId: string, params: Record<string, unknown>) {
-    try {
-      await psm.ensureBridgeCapabilities(["tag_api"]);
-      const sessionId = getSessionId();
-      const [allTags, allSessionTags] = await Promise.all([psm.getAllTags(), psm.getAllSessionTags()]);
-      const assignedIds = new Set(allSessionTags.filter((item) => item.session_id === sessionId).map((item) => item.tag_id));
-      const currentTags = allTags.filter((tag) => assignedIds.has(tag.id));
+    const sid = getSessionId();
+    const allTags = await kanbanStore.getAllTags();
+    const allSessionTags = await kanbanStore.getAllSessionTags();
+    const assignedIds = new Set(allSessionTags.filter((st) => st.session_id === sid).map((st) => st.tag_id));
+    const currentTags = allTags.filter((t) => assignedIds.has(t.id));
 
-      if (params.action === "list") {
-        const lines = [
-          `Session Tags (ID: ${sessionId})`,
-          `Active: ${currentTags.length > 0 ? currentTags.map((tag) => tag.name).join(", ") : "none"}`,
-          "",
-          "Available:",
-          ...allTags.map((tag) => `  ${assignedIds.has(tag.id) ? "[x]" : "[ ]"} ${tag.name}`),
-        ];
-        return { content: [{ type: "text", text: lines.join("\n") }] };
-      }
-
-      const tagName = String(params.tag || "").trim();
-      if (!tagName) return { content: [{ type: "text", text: `tag is required for ${String(params.action)}.` }], isError: true };
-
-      if (params.action === "set") {
-        let target = findTag(tagName, allTags);
-        if (!target) target = await psm.createTag(tagName, "info");
-        if (!assignedIds.has(target.id)) await psm.assignTag(sessionId, target.id);
-        notifyPsmTagChange(sessionId, []);
-        return { content: [{ type: "text", text: `Tag set: ${target.name}` }] };
-      }
-
-      if (params.action === "remove") {
-        const target = findTag(tagName, allTags);
-        if (!target) return { content: [{ type: "text", text: `Tag not found: ${tagName}` }], isError: true };
-        if (assignedIds.has(target.id)) await psm.removeTagFromSession(sessionId, target.id);
-        notifyPsmTagChange(sessionId, []);
-        return { content: [{ type: "text", text: `Removed: ${target.name}` }] };
-      }
-
-      return { content: [{ type: "text", text: "Unknown action" }], isError: true };
-    } catch (error) {
-      return { content: [{ type: "text", text: `Tag operation failed: ${error}` }], isError: true };
+    if (params.action === "list") {
+      const lines = [
+        `Session Tags (ID: ${sid.slice(0, 8)}...)`,
+        `Active: ${currentTags.length > 0 ? currentTags.map((t) => t.name).join(", ") : "none"}`,
+        "", "Available:",
+        ...allTags.map((t) => `  ${assignedIds.has(t.id) ? "[x]" : "[ ]"} ${t.name}`),
+      ];
+      return { content: [{ type: "text", text: lines.join("\n") }] };
     }
+
+    if (params.action === "set") {
+      const tagName = String(params.tag || "").trim();
+      if (!tagName) return { content: [{ type: "text", text: "tag is required for set." }], isError: true };
+      let target = findTag(tagName, allTags);
+      if (!target) {
+        try { target = await kanbanStore.createTag(tagName, "info"); } catch (e) {
+          return { content: [{ type: "text", text: `Failed: ${e}` }], isError: true };
+        }
+      }
+      try {
+        await kanbanStore.moveSessionTag(sid, null, target.id, 0);
+        notifyPsmTagChange(sid, []);
+        return { content: [{ type: "text", text: `Tag set: ${target.name}` }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: `Failed: ${e}` }], isError: true };
+      }
+    }
+
+    if (params.action === "remove") {
+      const tagName = String(params.tag || "").trim();
+      if (!tagName) return { content: [{ type: "text", text: "tag is required for remove." }], isError: true };
+      const target = findTag(tagName, allTags);
+      if (!target) return { content: [{ type: "text", text: `Tag not found: ${tagName}` }], isError: true };
+      try {
+        await kanbanStore.removeTagFromSession(sid, target.id);
+        notifyPsmTagChange(sid, []);
+        return { content: [{ type: "text", text: `Removed: ${target.name}` }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: `Failed: ${e}` }], isError: true };
+      }
+    }
+
+    return { content: [{ type: "text", text: "Unknown action" }], isError: true };
   },
 };

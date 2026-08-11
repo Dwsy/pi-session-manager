@@ -2,20 +2,6 @@
 
 use super::*;
 
-fn truncate_search_content(text: &str, max_chars: usize) -> String {
-    if text.chars().count() <= max_chars {
-        return text.to_string();
-    }
-    const MARKER: &str = "… [truncated]";
-    let marker_chars = MARKER.chars().count();
-    if max_chars <= marker_chars {
-        return MARKER.chars().take(max_chars).collect();
-    }
-    let mut value: String = text.chars().take(max_chars - marker_chars).collect();
-    value.push_str(MARKER);
-    value
-}
-
 pub(super) const COMMANDS: &[&str] = &["search_sessions", "search_sessions_fts", "full_text_search"];
 
 pub(super) async fn dispatch(app_state: &Option<DispatchAppState>, command: &str, payload: &Value) -> DispatchResult {
@@ -53,13 +39,7 @@ pub(super) async fn dispatch(app_state: &Option<DispatchAppState>, command: &str
                     let source_filter = payload.get("source_filter").or_else(|| payload.get("sourceFilter")).and_then(|v| v.as_str()).map(String::from);
                     let from = payload.get("from").and_then(|v| v.as_str()).map(String::from);
                     let to = payload.get("to").and_then(|v| v.as_str()).map(String::from);
-                    let max_content_chars = payload.get("max_content_chars").or_else(|| payload.get("maxContentChars")).and_then(|v| v.as_u64()).map(|v| (v as usize).clamp(64, 16 * 1024));
-                    let mut result = crate::full_text_search(query, role_filter, glob_pattern, project_path, page, page_size, match_mode, sort_order, source_filter, from, to).await?;
-                    if let Some(max_chars) = max_content_chars {
-                        for hit in &mut result.hits {
-                            hit.content = truncate_search_content(&hit.content, max_chars);
-                        }
-                    }
+                    let result = crate::full_text_search(query, role_filter, glob_pattern, project_path, page, page_size, match_mode, sort_order, source_filter, from, to).await?;
                     Ok(to_val(result, "serialize result")?)
                 }
 
@@ -71,19 +51,4 @@ pub(super) async fn dispatch(app_state: &Option<DispatchAppState>, command: &str
         }
         .await,
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::truncate_search_content;
-
-    #[test]
-    fn search_content_cap_is_unicode_safe_and_explicit() {
-        let value = format!("{}tail", "你".repeat(100));
-        let truncated = truncate_search_content(&value, 64);
-
-        assert_eq!(truncated.chars().take(64).count(), 64);
-        assert!(truncated.ends_with("… [truncated]"));
-        assert!(!truncated.contains("tail"));
-    }
 }

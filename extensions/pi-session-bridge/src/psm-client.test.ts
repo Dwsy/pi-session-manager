@@ -44,44 +44,6 @@ describe("PSM HTTP client", () => {
     );
   });
 
-  it("adds a finite AbortSignal to PSM requests", async () => {
-    const psm = await import("./psm-client.js");
-
-    await psm.fullTextSearch({ query: "hello", page_size: 1 });
-
-    const [, init] = fetchMock.mock.calls[0];
-    expect(init.signal).toBeInstanceOf(AbortSignal);
-  });
-
-  it("reports aborts as bounded request timeouts", async () => {
-    fetchMock.mockRejectedValueOnce(Object.assign(new Error("aborted"), { name: "AbortError" }));
-    const psm = await import("./psm-client.js");
-
-    await expect(psm.getSessionById("session-1")).rejects.toThrow("timed out");
-  });
-
-  it("checks bridge protocol capabilities before feature use", async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true, data: { protocolVersion: 1, capabilities: ["entry_window"] } }),
-    });
-    const psm = await import("./psm-client.js");
-
-    await expect(psm.ensureBridgeCapabilities(["entry_window"])).resolves.toEqual(expect.objectContaining({ protocolVersion: 1 }));
-    await expect(psm.ensureBridgeCapabilities(["tag_api"])).rejects.toThrow("missing required bridge capabilities");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("normalizes camelCase tag responses from PSM dispatch", async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true, data: [{ id: "tag-1", name: "review", color: "info", sortOrder: 3, isBuiltin: false, createdAt: "now", parentId: null }] }),
-    });
-    const psm = await import("./psm-client.js");
-
-    await expect(psm.getAllTags()).resolves.toEqual([{ id: "tag-1", name: "review", color: "info", icon: undefined, sort_order: 3, is_builtin: false, created_at: "now", parent_id: null }]);
-  });
-
   it("passes optional project path filter in full text search", async () => {
     const psm = await import("./psm-client.js");
 

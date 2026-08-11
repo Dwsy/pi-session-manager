@@ -1,15 +1,15 @@
 use crate::types::SessionEntry;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::{OnceLock, RwLock};
 use tracing::info;
 
 use crate::{config, sqlite_cache};
 
-use super::session::{FileStats, SessionChunk, SessionEntryWindow, SessionWindowEntry};
+use super::session::{FileStats, SessionChunk};
 
 fn utf8_safe_cut(buf: &[u8], mut end: usize) -> usize {
     end = end.min(buf.len());
@@ -520,118 +520,6 @@ pub(super) async fn get_session_entries_impl(path: String) -> Result<Vec<Session
     Ok(result)
 }
 
-fn truncate_window_text(text: &str, max_chars: usize) -> (String, bool) {
-    if text.chars().count() <= max_chars {
-        return (text.to_string(), false);
-    }
-    (text.chars().take(max_chars).collect(), true)
-}
-
-fn to_window_entry(entry: &SessionEntry, include_tools: bool, max_chars: usize) -> Option<SessionWindowEntry> {
-    let message = entry.message.as_ref()?;
-    let allowed = message.role == "user" || message.role == "assistant" || (include_tools && message.role == "toolResult");
-    if !allowed {
-        return None;
-    }
-
-    let raw_text = message.content.iter().filter_map(|block| block.text.as_deref()).collect::<Vec<_>>().join("\n");
-    let (text, truncated) = truncate_window_text(raw_text.trim(), max_chars);
-    Some(SessionWindowEntry { id: entry.id.clone(), role: message.role.clone(), text, timestamp: entry.timestamp.to_rfc3339(), tool_name: message.tool_name.clone(), is_error: message.is_error, truncated })
-}
-
-fn collect_session_entry_window<I>(entries: I, anchor_entry_id: Option<&str>, before: usize, after: usize, include_tools: bool, max_chars: usize) -> (Vec<SessionWindowEntry>, bool, bool)
-where
-    I: IntoIterator<Item = SessionEntry>,
-{
-    let slot_count = before.saturating_add(after).saturating_add(1).max(1);
-    let per_entry_chars = (max_chars / slot_count).clamp(1, 4_000);
-    let mut truncated = false;
-
-    if anchor_entry_id.is_none() {
-        let mut tail = VecDeque::with_capacity(slot_count);
-        for entry in entries {
-            if let Some(window_entry) = to_window_entry(&entry, include_tools, per_entry_chars) {
-                truncated |= window_entry.truncated;
-                if tail.len() == slot_count {
-                    tail.pop_front();
-                }
-                tail.push_back(window_entry);
-            }
-        }
-        return (tail.into_iter().collect(), true, truncated);
-    }
-
-    let anchor = anchor_entry_id.expect("checked above");
-    let mut preceding = VecDeque::with_capacity(before);
-    let mut output = Vec::with_capacity(slot_count);
-    let mut anchor_found = false;
-    let mut following = 0usize;
-
-    for entry in entries {
-        if !anchor_found {
-            if entry.id == anchor {
-                anchor_found = true;
-                output.extend(preceding.drain(..));
-                if let Some(window_entry) = to_window_entry(&entry, include_tools, per_entry_chars) {
-                    truncated |= window_entry.truncated;
-                    output.push(window_entry);
-                }
-                if after == 0 {
-                    break;
-                }
-                continue;
-            }
-
-            if let Some(window_entry) = to_window_entry(&entry, include_tools, per_entry_chars) {
-                truncated |= window_entry.truncated;
-                if before > 0 {
-                    if preceding.len() == before {
-                        preceding.pop_front();
-                    }
-                    preceding.push_back(window_entry);
-                }
-            }
-            continue;
-        }
-
-        if let Some(window_entry) = to_window_entry(&entry, include_tools, per_entry_chars) {
-            truncated |= window_entry.truncated;
-            output.push(window_entry);
-            following += 1;
-            if following >= after {
-                break;
-            }
-        }
-    }
-
-    if !anchor_found {
-        output.clear();
-    }
-    (output, anchor_found, truncated)
-}
-
-pub(super) async fn get_session_entry_window_impl(path: String, anchor_entry_id: Option<String>, before: usize, after: usize, include_tools: bool, max_chars: usize) -> Result<SessionEntryWindow, String> {
-    let before_stats = get_file_stats_impl(path.clone()).await?;
-    let provider = detect_session_provider(Path::new(&path))?;
-
-    let (entries, anchor_found, truncated) = if let Some(transformed) = transformed_session_content(&path)? {
-        let parsed = transformed.lines().filter(|line| !line.trim().is_empty()).filter_map(parse_session_entry);
-        collect_session_entry_window(parsed, anchor_entry_id.as_deref(), before, after, include_tools, max_chars)
-    } else if matches!(provider, Some(crate::domain::casr_min::providers::ProviderKind::Pi)) {
-        let backing_path = crate::domain::session_bridge::backing_file_path(Path::new(&path));
-        let file = fs::File::open(&backing_path).map_err(|e| format!("Failed to open session file {}: {e}", backing_path.display()))?;
-        let reader = BufReader::with_capacity(256 * 1024, file);
-        let parsed = reader.lines().map_while(Result::ok).filter(|line| !line.trim().is_empty()).filter_map(|line| parse_session_entry(&line));
-        collect_session_entry_window(parsed, anchor_entry_id.as_deref(), before, after, include_tools, max_chars)
-    } else {
-        let parsed = crate::domain::session_bridge::parse_session_entries_from_path(Path::new(&path))?;
-        collect_session_entry_window(parsed, anchor_entry_id.as_deref(), before, after, include_tools, max_chars)
-    };
-
-    let after_stats = get_file_stats_impl(path.clone()).await?;
-    Ok(SessionEntryWindow { session_path: path, modified_at: after_stats.modified_at, anchor_entry_id, anchor_found, stale: before_stats.modified_at != after_stats.modified_at || before_stats.size != after_stats.size, truncated, entries })
-}
-
 /// Read the first line of a JSONL file (session metadata).
 fn read_first_jsonl_line(path: &str) -> Result<String, String> {
     let mut file = fs::File::open(path).map_err(|e| format!("Failed to open {path}: {e}"))?;
@@ -913,8 +801,8 @@ pub async fn fork_session_impl(source_path: String, target_name: Option<String>)
 #[cfg(test)]
 mod tests {
     use super::{
-        file_modified_ms, file_modified_ms_and_size, get_cached_session_labels, get_session_entry_window_impl, get_session_labels_impl, label_free_append_tail_fingerprint, read_session_file_chunk_impl, read_session_file_incremental_impl, read_session_file_incremental_offset_impl,
-        rename_session_impl_with_db_path, session_labels_cache, session_labels_tail_fingerprint, utf8_safe_cut, SessionLabelsCacheEntry,
+        file_modified_ms, file_modified_ms_and_size, get_cached_session_labels, get_session_labels_impl, label_free_append_tail_fingerprint, read_session_file_chunk_impl, read_session_file_incremental_impl, read_session_file_incremental_offset_impl, rename_session_impl_with_db_path,
+        session_labels_cache, session_labels_tail_fingerprint, utf8_safe_cut, SessionLabelsCacheEntry,
     };
     use std::collections::HashMap;
     use std::fs;
@@ -985,40 +873,6 @@ mod tests {
 
         let _ = fs::remove_file(&path);
         let _ = fs::remove_dir_all(&base_dir);
-    }
-
-    #[tokio::test]
-    async fn session_entry_window_is_anchored_and_bounded() {
-        let temp_dir = tempdir().expect("tempdir");
-        let path = temp_dir.path().join("session.jsonl");
-        let oversized = "x".repeat(4_000);
-        let content = format!(
-            "{{\"type\":\"session\",\"version\":3,\"id\":\"sess-1\",\"timestamp\":\"2026-04-09T10:00:00Z\",\"cwd\":\"/workspace\"}}\n{{\"type\":\"message\",\"id\":\"m1\",\"timestamp\":\"2026-04-09T10:01:00Z\",\"message\":{{\"role\":\"user\",\"content\":[{{\"type\":\"text\",\"text\":\"before\"}}]}}}}\n{{\"type\":\"message\",\"id\":\"m2\",\"timestamp\":\"2026-04-09T10:02:00Z\",\"message\":{{\"role\":\"assistant\",\"content\":[{{\"type\":\"text\",\"text\":\"{oversized}\"}}]}}}}\n{{\"type\":\"message\",\"id\":\"m3\",\"timestamp\":\"2026-04-09T10:03:00Z\",\"message\":{{\"role\":\"toolResult\",\"toolName\":\"bash\",\"isError\":true,\"content\":[{{\"type\":\"text\",\"text\":\"compiler error\"}}]}}}}\n{{\"type\":\"message\",\"id\":\"m4\",\"timestamp\":\"2026-04-09T10:04:00Z\",\"message\":{{\"role\":\"user\",\"content\":[{{\"type\":\"text\",\"text\":\"after\"}}]}}}}\n"
-        );
-        fs::write(&path, content).expect("write session");
-
-        let window = get_session_entry_window_impl(path.to_string_lossy().into_owned(), Some("m2".to_string()), 1, 1, true, 900).await.expect("window");
-        assert!(window.anchor_found);
-        assert!(!window.stale);
-        assert!(window.truncated);
-        assert_eq!(window.entries.iter().map(|entry| entry.id.as_str()).collect::<Vec<_>>(), vec!["m1", "m2", "m3"]);
-        assert_eq!(window.entries[2].tool_name.as_deref(), Some("bash"));
-        assert!(window.entries.iter().map(|entry| entry.text.chars().count()).sum::<usize>() <= 900);
-    }
-
-    #[tokio::test]
-    async fn session_entry_window_does_not_return_unrelated_context_for_missing_anchor() {
-        let temp_dir = tempdir().expect("tempdir");
-        let path = temp_dir.path().join("session.jsonl");
-        fs::write(
-            &path,
-            "{\"type\":\"session\",\"version\":3,\"id\":\"sess-1\",\"timestamp\":\"2026-04-09T10:00:00Z\",\"cwd\":\"/workspace\"}\n{\"type\":\"message\",\"id\":\"m1\",\"timestamp\":\"2026-04-09T10:01:00Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"}]}}\n",
-        )
-        .expect("write session");
-
-        let window = get_session_entry_window_impl(path.to_string_lossy().into_owned(), Some("missing".to_string()), 2, 2, false, 2_000).await.expect("window");
-        assert!(!window.anchor_found);
-        assert!(window.entries.is_empty());
     }
 
     #[tokio::test]

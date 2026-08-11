@@ -20,8 +20,7 @@ struct MessageEntryRow {
 }
 
 const INSERT_CHUNK_SIZE: usize = 32;
-const MESSAGE_INDEX_ROW_VERSION: &str = "4";
-const MAX_TOOL_RESULT_INDEX_CHARS: usize = 16 * 1024;
+const MESSAGE_INDEX_ROW_VERSION: &str = "3";
 const MESSAGE_INDEX_REBUILD_BATCH_SIZE: usize = 25;
 const MESSAGE_INDEX_REFRESH_MIN_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
 const MESSAGE_INDEX_REBUILD_TARGET_KEY: &str = "row_version_rebuild_target";
@@ -566,13 +565,6 @@ fn build_row_id(session_path: &str, entry_id: &str, source_type: &str) -> String
     format!("{session_path}::{entry_id}::{source_type}")
 }
 
-fn truncate_index_text(text: &str, max_chars: usize) -> String {
-    if text.chars().count() <= max_chars {
-        return text.to_string();
-    }
-    text.chars().take(max_chars).collect()
-}
-
 fn build_rows_from_session_entries(session_path: &str, entries: &[SessionEntry], include_thinking: bool) -> Vec<MessageEntryRow> {
     let mut rows = Vec::new();
     let mut message_roles_by_entry_id = HashMap::new();
@@ -582,9 +574,7 @@ fn build_rows_from_session_entries(session_path: &str, entries: &[SessionEntry],
         let Some(message) = entry.message.as_ref() else {
             continue;
         };
-        let is_dialogue = message.role == "user" || message.role == "assistant";
-        let is_tool_result = message.role == "toolResult";
-        if !is_dialogue && !is_tool_result {
+        if message.role != "user" && message.role != "assistant" {
             continue;
         }
 
@@ -592,55 +582,40 @@ fn build_rows_from_session_entries(session_path: &str, entries: &[SessionEntry],
         let entry_label = labels.get(&entry.id).map(|l| l.text.clone());
 
         let (visible_text, thinking_text) = extract_message_segments(message, include_thinking);
-        let visible_text = if is_tool_result { visible_text.map(|text| truncate_index_text(&text, MAX_TOOL_RESULT_INDEX_CHARS)) } else { visible_text };
         let timestamp = entry.timestamp.to_rfc3339();
-        let source_type = if is_tool_result { "tool_result" } else { message.role.as_str() };
 
-        // Include labels and compact tool metadata in the indexed text while
-        // keeping raw tool output bounded to avoid pathological FTS rows.
-        let tool_prefix = if is_tool_result {
-            let tool_name = message.tool_name.as_deref().unwrap_or("tool");
-            if message.is_error.unwrap_or(false) {
-                format!("[tool:{tool_name} error] ")
-            } else {
-                format!("[tool:{tool_name}] ")
-            }
-        } else {
-            String::new()
-        };
+        // Include label in search_text for FTS indexing
         let search_content = match (&visible_text, &entry_label) {
-            (Some(text), Some(label)) => format!("{tool_prefix}[{}] {}", label, text),
-            (None, Some(label)) => format!("{tool_prefix}[{}]", label),
-            (Some(text), None) => format!("{tool_prefix}{text}"),
-            (None, None) => tool_prefix,
+            (Some(text), Some(label)) => format!("[{}] {}", label, text),
+            (None, Some(label)) => format!("[{}]", label),
+            (Some(text), None) => text.clone(),
+            (None, None) => String::new(),
         };
 
         rows.push(MessageEntryRow {
-            row_id: build_row_id(session_path, &entry.id, source_type),
+            row_id: build_row_id(session_path, &entry.id, &message.role),
             entry_id: entry.id.clone(),
             session_path: session_path.to_string(),
             role: message.role.clone(),
-            source_type: source_type.to_string(),
+            source_type: message.role.clone(),
             content: visible_text.clone().unwrap_or_default(),
             search_text: crate::utils::normalize_search_text(&search_content),
             timestamp: timestamp.clone(),
             label: entry_label.clone(),
         });
 
-        if is_dialogue {
-            if let Some(content) = thinking_text {
-                rows.push(MessageEntryRow {
-                    row_id: build_row_id(session_path, &entry.id, "thinking"),
-                    entry_id: entry.id.clone(),
-                    session_path: session_path.to_string(),
-                    role: message.role.clone(),
-                    source_type: "thinking".to_string(),
-                    search_text: crate::utils::normalize_search_text(&content),
-                    content,
-                    timestamp,
-                    label: entry_label,
-                });
-            }
+        if let Some(content) = thinking_text {
+            rows.push(MessageEntryRow {
+                row_id: build_row_id(session_path, &entry.id, "thinking"),
+                entry_id: entry.id.clone(),
+                session_path: session_path.to_string(),
+                role: message.role.clone(),
+                source_type: "thinking".to_string(),
+                search_text: crate::utils::normalize_search_text(&content),
+                content,
+                timestamp,
+                label: entry_label,
+            });
         }
     }
 
@@ -1086,17 +1061,6 @@ mod tests {
         let rows = build_rows_from_session_entries("/tmp/session.jsonl", &[model_change_entry("mc1", "2026-04-09T10:01:00Z"), label_entry("l1", "2026-04-09T10:02:00Z", "mc1", Some("settings"))], false);
 
         assert!(rows.is_empty());
-    }
-
-    #[test]
-    fn row_builder_indexes_bounded_tool_results() {
-        let oversized = "x".repeat(MAX_TOOL_RESULT_INDEX_CHARS + 100);
-        let rows = build_rows_from_session_entries("/tmp/session.jsonl", &[message_entry("tool-1", "2026-04-09T10:01:00Z", "toolResult", &oversized)], false);
-
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].source_type, "tool_result");
-        assert_eq!(rows[0].role, "toolResult");
-        assert_eq!(rows[0].content.chars().count(), MAX_TOOL_RESULT_INDEX_CHARS);
     }
 
     #[test]

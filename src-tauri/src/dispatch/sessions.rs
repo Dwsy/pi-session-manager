@@ -3,7 +3,6 @@
 use super::*;
 
 pub(super) const COMMANDS: &[&str] = &[
-    "bridge_capabilities",
     "scan_sessions",
     "scan_sessions_paginated",
     "session_digest",
@@ -13,7 +12,6 @@ pub(super) const COMMANDS: &[&str] = &[
     "read_session_file_incremental_offset",
     "get_file_stats",
     "get_session_entries",
-    "get_session_entry_window",
     "get_session_labels",
     "detect_session_format",
     "list_supported_session_providers",
@@ -51,10 +49,6 @@ pub(super) async fn dispatch(app_state: &Option<DispatchAppState>, command: &str
     Some(
         async {
             match command {
-                "bridge_capabilities" => {
-                    let result = crate::bridge_capabilities().await;
-                    Ok(to_val(result, "serialize bridge capabilities")?)
-                }
                 "scan_sessions" => {
                     let result = crate::core::scanner::scan_sessions().await?;
                     Ok(to_val(result, "serialize result")?)
@@ -110,17 +104,6 @@ pub(super) async fn dispatch(app_state: &Option<DispatchAppState>, command: &str
                 "get_session_entries" => {
                     let path = extract(payload, "path")?;
                     let result = crate::get_session_entries(path).await?;
-                    Ok(to_val(result, "serialize result")?)
-                }
-                "get_session_entry_window" => {
-                    let path = extract_optional_string(payload, "path");
-                    let session_id = extract_optional_string(payload, "session_id").or_else(|| extract_optional_string(payload, "sessionId"));
-                    let anchor_entry_id = extract_optional_string(payload, "anchor_entry_id").or_else(|| extract_optional_string(payload, "anchorEntryId"));
-                    let before = payload.get("before").and_then(|value| value.as_u64()).map(|value| value as usize);
-                    let after = payload.get("after").and_then(|value| value.as_u64()).map(|value| value as usize);
-                    let include_tools = payload.get("include_tools").or_else(|| payload.get("includeTools")).and_then(|value| value.as_bool());
-                    let max_chars = payload.get("max_chars").or_else(|| payload.get("maxChars")).and_then(|value| value.as_u64()).map(|value| value as usize);
-                    let result = crate::get_session_entry_window(path, session_id, anchor_entry_id, before, after, include_tools, max_chars).await?;
                     Ok(to_val(result, "serialize result")?)
                 }
                 "get_session_labels" => {
