@@ -1,3 +1,6 @@
+// Bare i18next singleton: same instance as '@/i18n' without its init side effects.
+import i18n from "i18next";
+
 export function normalizeInline(value: unknown): string {
   return String(value ?? "")
     .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
@@ -11,7 +14,7 @@ export function truncate(value: string, limit: number): string {
 }
 
 export function formatNumber(value: number): string {
-  return new Intl.NumberFormat("zh-CN").format(value);
+  return new Intl.NumberFormat(i18n.language || undefined).format(value);
 }
 
 export function formatBytes(value: number): string {
@@ -26,14 +29,7 @@ export function formatBytes(value: number): string {
   return `${amount >= 10 || unit === 0 ? amount.toFixed(0) : amount.toFixed(1)} ${units[unit]}`;
 }
 
-export function formatTokens(value: number): string {
-  if (!Number.isFinite(value) || value === 0) return "0";
-  if (Math.abs(value) >= 1_000_000)
-    return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 1 : 2)}m`;
-  if (Math.abs(value) >= 1_000)
-    return `${(value / 1_000).toFixed(value >= 100_000 ? 0 : 1)}k`;
-  return String(Math.round(value));
-}
+export { formatTokens } from "@/utils/format";
 
 export function formatMoney(value: number): string {
   if (!Number.isFinite(value)) return "$0.00";
@@ -58,7 +54,7 @@ export function formatDuration(value: number): string {
 export function formatTimestamp(value: number | string | undefined): string {
   const timestamp = typeof value === "number" ? value : Date.parse(value ?? "");
   if (!Number.isFinite(timestamp)) return "—";
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(i18n.language || undefined, {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",

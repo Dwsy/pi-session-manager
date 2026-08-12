@@ -12,7 +12,6 @@ import {
   buildPath,
   buildSegmentPath,
   buildSessionBranchModel,
-  entryRelationLabel,
   filterTimelineToSegmentScope,
   nodePrimaryText,
   formatMoney,
@@ -27,6 +26,7 @@ import {
   type TimelineMode,
 } from "@/utils/session-branch";
 
+import { entryRelationKey } from "@/components/session-branch-map/entryRelation";
 import {
   loadSessionEntries,
   type TraceLoadProgress,
@@ -567,7 +567,7 @@ function TraceInspector({
         </div>
         <div>
           <dt>{t("components.traceInspector.relation", "Relation")}</dt>
-          <dd>{entryRelationLabel(node)}</dd>
+          <dd>{t(entryRelationKey(node))}</dd>
         </div>
         <div>
           <dt>{t("components.traceInspector.time", "Time")}</dt>
@@ -658,6 +658,7 @@ function TimelineRow({
   onSelect: () => void;
   onActivate: () => void;
 }) {
+  const { t } = useTranslation();
   const role = roleLabel(node);
   const model = node.actualModel ?? node.effectiveModel;
   const noteType =
@@ -716,7 +717,7 @@ function TimelineRow({
         </div>
         <p>{truncate(node.summary, 430)}</p>
         <small>
-          {entryRelationLabel(node)} · segment{" "}
+          {t(entryRelationKey(node))} · segment{" "}
           {formatNumber(node.segmentIndex + 1)}/
           {formatNumber(node.segment?.nodes.length ?? 1)}
           {model ? ` · ${model.label}` : ""}

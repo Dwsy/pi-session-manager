@@ -96,7 +96,7 @@ describe("AtlasDialog", () => {
     ).toBe(true);
     expect(
       screen
-        .getByTitle("聚焦当前选中记录 (F)")
+        .getByTitle("Focus selected entry (F)")
         .classList.contains("toolbar-button"),
     ).toBe(true);
   });

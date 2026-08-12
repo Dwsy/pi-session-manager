@@ -29,7 +29,6 @@ import {
 import {
   buildPath,
   buildSegmentPath,
-  entryRelationLabel,
   nodePrimaryText,
 } from "@/utils/session-branch";
 import {
@@ -40,6 +39,7 @@ import {
   truncate,
 } from "@/utils/session-branch";
 import { buildSegmentBranchColors } from "./branchColors";
+import { entryRelationKey } from "./entryRelation";
 import { useElementSize } from "./useElementSize";
 
 const GenericToolCall = lazy(
@@ -722,6 +722,7 @@ function MapTooltip({
   onTooltipEnter: () => void;
   onTooltipLeave: () => void;
 }): React.ReactElement {
+  const { t } = useTranslation();
   const tooltipEvents = {
     onPointerEnter: onTooltipEnter,
     onPointerLeave: onTooltipLeave,
@@ -747,17 +748,30 @@ function MapTooltip({
         className="map-tooltip global-map-tooltip"
         style={{ left, top, width: tooltipWidth }}
       >
-        <span>LINEAR SEGMENT · {segment.code}</span>
-        <strong>{segment.level === 0 ? "主干序列" : "分支序列"}</strong>
+        <span>
+          {t("components.branchMap.atlas.tooltip.linearSegment", "LINEAR SEGMENT · {{code}}", {
+            code: segment.code,
+          })}
+        </span>
+        <strong>
+          {segment.level === 0
+            ? t("components.branchMap.segment.mainLine", "Main line")
+            : t("components.branchMap.segment.branch", "Branch")}
+        </strong>
         <p>
           {truncate(segment.firstUserSummary || segment.start.summary, 150)}
         </p>
         <small>
-          {formatNumber(segment.nodes.length)} entries · branch level{" "}
-          {formatNumber(segment.level)} ·{" "}
+          {t("components.branchMap.atlas.tooltip.segmentMeta", "{{entries}} entries · branch level {{level}}", {
+            entries: formatNumber(segment.nodes.length),
+            level: formatNumber(segment.level),
+          })}{" "}
+          ·{" "}
           {segment.terminal
-            ? "terminal"
-            : `${segment.children.length} next branches`}
+            ? t("components.branchMap.atlas.tooltip.terminal", "terminal")
+            : t("components.branchMap.atlas.tooltip.nextBranches", "{{count}} next branches", {
+                count: segment.children.length,
+              })}
         </small>
       </div>
     );
@@ -771,14 +785,27 @@ function MapTooltip({
         className="map-tooltip global-map-tooltip"
         style={{ left, top, width: tooltipWidth }}
       >
-        <span>REAL FORK · {fork.code}</span>
+        <span>
+          {t("components.branchMap.atlas.tooltip.realFork", "REAL FORK · {{code}}", {
+            code: fork.code,
+          })}
+        </span>
         <strong>
-          从序列 #{formatNumber(fork.anchor.sequence)} 分出{" "}
-          {fork.children.length} 条线性分支
+          {t(
+            "components.branchMap.atlas.tooltip.forkSplit",
+            "{{count}} linear branches split from #{{sequence}}",
+            {
+              count: fork.children.length,
+              sequence: formatNumber(fork.anchor.sequence),
+            },
+          )}
         </strong>
         <p>{truncate(fork.anchor.summary, 150)}</p>
         <small>
-          {fork.anchor.id} · branch level {formatNumber(fork.level)}
+          {fork.anchor.id} ·{" "}
+          {t("components.branchMap.atlas.tooltip.branchLevel", "branch level {{level}}", {
+            level: formatNumber(fork.level),
+          })}
         </small>
       </div>
     );
@@ -795,8 +822,10 @@ function MapTooltip({
         <strong>{target.note.title}</strong>
         <p>{truncate(target.note.detail, 160)}</p>
         <small>
-          {target.node.segment?.code} · #{formatNumber(target.node.sequence)} ·
-          line {formatNumber(target.note.lineNo)}
+          {target.node.segment?.code} · #{formatNumber(target.node.sequence)} ·{" "}
+          {t("components.branchMap.atlas.lineNumber", "line {{line}}", {
+            line: formatNumber(target.note.lineNo),
+          })}
         </small>
         <TooltipActions
           output={target.note.detail}
@@ -851,8 +880,11 @@ function MapTooltip({
         <strong>{truncate(node.summary, 200)}</strong>
         <pre className="map-tooltip-body">{truncate(body, 2400)}</pre>
         <small>
-          {entryRelationLabel(node)} · level {formatNumber(node.branchLevel)} ·{" "}
-          {node.id}
+          {t(entryRelationKey(node))} ·{" "}
+          {t("components.branchMap.atlas.tooltip.level", "level {{level}}", {
+            level: formatNumber(node.branchLevel),
+          })}{" "}
+          · {node.id}
         </small>
         <TooltipActions
           output={body}
@@ -874,8 +906,11 @@ function MapTooltip({
       <strong>{truncate(node.summary, 150)}</strong>
       <p>{truncate(body, 280)}</p>
       <small>
-        sequence #{formatNumber(node.sequence)} · branch level{" "}
-        {formatNumber(node.branchLevel)} · {node.id}
+        {t("components.branchMap.atlas.tooltip.sequenceMeta", "sequence #{{sequence}} · branch level {{level}}", {
+          sequence: formatNumber(node.sequence),
+          level: formatNumber(node.branchLevel),
+        })}{" "}
+        · {node.id}
       </small>
     </div>
   );

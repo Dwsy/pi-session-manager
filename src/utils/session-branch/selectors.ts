@@ -362,10 +362,3 @@ export function lowestCommonAncestor(
   }
   return null;
 }
-
-export function entryRelationLabel(node: SessionNode): string {
-  if (node.relation === "branch-start") return "分支起点";
-  if (node.relation === "root") return "序列起点";
-  if (node.children.length > 1) return "分叉锚点";
-  return "线性续接";
-}

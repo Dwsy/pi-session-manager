@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import type {
   BranchFork,
   BranchSegment,
@@ -11,7 +12,6 @@ import {
   buildBranchReplayCheckpoints,
   buildPath,
   buildSegmentPath,
-  entryRelationLabel,
 } from "@/utils/session-branch";
 import {
   formatMoney,
@@ -38,6 +38,7 @@ import {
   fitMapViewToLayout,
   type MapView,
 } from "./GlobalMapCanvas";
+import { entryRelationKey } from "./entryRelation";
 import { GlobalMapToolbar } from "./GlobalMapToolbar";
 import { useAtlasReplay } from "./useAtlasReplay";
 
@@ -66,6 +67,7 @@ export function AtlasDialog({
   onActivateNode,
   onClose,
 }: AtlasDialogProps): React.ReactElement | null {
+  const { t } = useTranslation();
   const dialogRef = useRef<HTMLElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const mapShellRef = useRef<HTMLElement>(null);
@@ -247,13 +249,19 @@ export function AtlasDialog({
         >
           <div className="atlas-heading">
             <strong id="branch-atlas-title">
-              PI BRANCH ATLAS <span>分支地图</span>
+              <span>{t("components.branchMap.title", "BRANCH MAP")}</span>
             </strong>
             <small>
-              {formatNumber(model.nodes.length)} entries 被折叠为{" "}
-              {formatNumber(model.segments.length)} 条线性段 ·{" "}
-              {formatNumber(model.forks.length)} 个真实分叉 ·{" "}
-              {formatNumber(model.terminalSegments.length)} 个终点
+              {t(
+                "components.branchMap.atlas.summary",
+                "{{entries}} entries collapsed into {{segments}} linear segments · {{forks}} real forks · {{endings}} endings",
+                {
+                  entries: formatNumber(model.nodes.length),
+                  segments: formatNumber(model.segments.length),
+                  forks: formatNumber(model.forks.length),
+                  endings: formatNumber(model.terminalSegments.length),
+                },
+              )}
             </small>
           </div>
           <div className="atlas-header-actions">
@@ -261,26 +269,29 @@ export function AtlasDialog({
               type="button"
               className="toolbar-button"
               onClick={() => focus(selectedUid)}
-              title="聚焦当前选中记录 (F)"
+              title={t(
+                "components.branchMap.atlas.focusTitle",
+                "Focus selected entry (F)",
+              )}
             >
               <TargetIcon />
-              聚焦
+              {t("components.branchMap.atlas.focus", "Focus")}
             </button>
             <button
               type="button"
               className="toolbar-button"
               onClick={() => setView(fitView)}
-              title="适应全局 (0)"
+              title={t("components.branchMap.atlas.fitTitle", "Fit to view (0)")}
             >
               <ResetIcon />
-              全局
+              {t("components.branchMap.atlas.fit", "Fit")}
             </button>
             <button
               type="button"
               className="icon-button"
               onClick={() => adjustZoom(1 / 1.35)}
-              aria-label="缩小地图"
-              title="缩小"
+              aria-label={t("components.branchMap.atlas.zoomOut", "Zoom out")}
+              title={t("components.branchMap.atlas.zoomOut", "Zoom out")}
             >
               <ZoomOutIcon />
             </button>
@@ -288,8 +299,8 @@ export function AtlasDialog({
               type="button"
               className="icon-button"
               onClick={() => adjustZoom(1.35)}
-              aria-label="放大地图"
-              title="放大"
+              aria-label={t("components.branchMap.atlas.zoomIn", "Zoom in")}
+              title={t("components.branchMap.atlas.zoomIn", "Zoom in")}
             >
               <ZoomInIcon />
             </button>
@@ -297,8 +308,11 @@ export function AtlasDialog({
               type="button"
               className="icon-button"
               onClick={onClose}
-              aria-label="关闭分支地图"
-              title="关闭"
+              aria-label={t(
+                "components.branchMap.atlas.closeAtlas",
+                "Close branch atlas",
+              )}
+              title={t("common.close", "Close")}
             >
               <CloseIcon />
             </button>
@@ -311,13 +325,23 @@ export function AtlasDialog({
             settings={settings}
             onSettingsChange={onSettingsChange}
           />
-          <div className="atlas-replay-controls" role="group" aria-label="分支回放">
+          <div
+            className="atlas-replay-controls"
+            role="group"
+            aria-label={t(
+              "components.branchMap.atlas.replay.group",
+              "Branch replay",
+            )}
+          >
             <button
               type="button"
               className="icon-button"
               onClick={() => replay.step(-1)}
               disabled={!replay.index}
-              title="上一个回放节点"
+              title={t(
+                "components.branchMap.atlas.replay.previous",
+                "Previous replay node",
+              )}
             >
               <StepIcon style={{ transform: "scaleX(-1)" }} />
             </button>
@@ -326,7 +350,17 @@ export function AtlasDialog({
               className="icon-button"
               onClick={replay.playPause}
               disabled={!replayCheckpoints.length}
-              title={replay.playing ? "暂停回放 (Space)" : "播放回放 (Space)"}
+              title={
+                replay.playing
+                  ? t(
+                      "components.branchMap.atlas.replay.pause",
+                      "Pause replay (Space)",
+                    )
+                  : t(
+                      "components.branchMap.atlas.replay.play",
+                      "Play replay (Space)",
+                    )
+              }
             >
               {replay.playing ? <PauseIcon /> : <PlayIcon />}
             </button>
@@ -335,7 +369,10 @@ export function AtlasDialog({
               className="icon-button"
               onClick={() => replay.step(1)}
               disabled={replay.index >= replay.lastIndex}
-              title="下一个回放节点"
+              title={t(
+                "components.branchMap.atlas.replay.next",
+                "Next replay node",
+              )}
             >
               <StepIcon />
             </button>
@@ -345,7 +382,10 @@ export function AtlasDialog({
               max={replay.lastIndex}
               value={replay.index}
               onChange={(event) => replay.seek(Number(event.target.value))}
-              aria-label="回放进度"
+              aria-label={t(
+                "components.branchMap.atlas.replay.progress",
+                "Replay progress",
+              )}
             />
             <select
               className="replay-speed"
@@ -355,7 +395,10 @@ export function AtlasDialog({
                   Number(event.target.value) as typeof replay.speed,
                 )
               }
-              aria-label="回放速度"
+              aria-label={t(
+                "components.branchMap.atlas.replay.speed",
+                "Replay speed",
+              )}
             >
               {[1, 2, 4, 8, 16, 32, 64, 128].map((speed) => (
                 <option key={speed} value={speed}>
@@ -369,15 +412,22 @@ export function AtlasDialog({
             {replay.current?.fork && (
               <span className="replay-fork">
                 {replay.current.fork.code} ·{" "}
-                {replay.current.fork.children.length} routes
+                {t("components.branchMap.atlas.routes", "{{count}} routes", {
+                  count: replay.current.fork.children.length,
+                })}
               </span>
             )}
           </div>
           <div className="atlas-view-readout">
             <span>{Math.round(view.zoom * 100)}%</span>
-            <span>{scopeLabel(settings.scope)}</span>
+            <span>{t(scopeLabelKey(settings.scope))}</span>
             <span>
-              {settings.axis === "sequence" ? "路径序列轴" : "实际时间轴"}
+              {settings.axis === "sequence"
+                ? t(
+                    "components.branchMap.atlas.axisSequence",
+                    "Path sequence axis",
+                  )
+                : t("components.branchMap.atlas.axisTime", "Actual time axis")}
             </span>
           </div>
         </div>
@@ -402,47 +452,67 @@ export function AtlasDialog({
                 onActivateNode={onActivateNode}
               />
               <div className="atlas-instructions">
-                拖拽平移 · 滚轮缩放 · 单击检查 · 双击切换到该记录所在终点
+                {t(
+                  "components.branchMap.atlas.instructions",
+                  "Drag to pan · scroll to zoom · click to inspect · double-click to switch to that ending",
+                )}
               </div>
             </div>
             <div className="atlas-selection-hud branch-selection-hud branch-atlas-selection-dock">
               <div className="selection-identity">
                 <span>
-                  {selectedSegment?.code || "B?"} · #
+                  {selectedSegment?.code || "—"} · #
                   {formatNumber(selectedNode.sequence)} ·{" "}
-                  {entryRelationLabel(selectedNode)}
+                  {t(entryRelationKey(selectedNode))}
                 </span>
                 <strong>{truncate(selectedNode.summary, 165)}</strong>
                 <small>
-                  branch level {formatNumber(selectedNode.branchLevel)} ·
-                  segment {formatNumber(selectedNode.segmentIndex + 1)}/
-                  {formatNumber(selectedSegment?.nodes.length ?? 1)} · line{" "}
-                  {formatNumber(selectedNode.lineNo)}
+                  {t(
+                    "components.branchMap.atlas.selection.meta",
+                    "branch level {{level}} · segment {{position}}/{{total}} · line {{line}}",
+                    {
+                      level: formatNumber(selectedNode.branchLevel),
+                      position: formatNumber(selectedNode.segmentIndex + 1),
+                      total: formatNumber(selectedSegment?.nodes.length ?? 1),
+                      line: formatNumber(selectedNode.lineNo),
+                    },
+                  )}
                 </small>
               </div>
               <div className="selection-path-readout">
                 <span>
-                  <b>{formatNumber(selectedPath.length)}</b> path entries
+                  <b>{formatNumber(selectedPath.length)}</b>{" "}
+                  {t(
+                    "components.branchMap.atlas.selection.pathEntries",
+                    "path entries",
+                  )}
                 </span>
                 <span>
-                  <b>{formatNumber(selectedSegments.length)}</b> branch segments
+                  <b>{formatNumber(selectedSegments.length)}</b>{" "}
+                  {t(
+                    "components.branchMap.atlas.selection.branchSegments",
+                    "branch segments",
+                  )}
                 </span>
                 <span>
                   <b>
                     {formatNumber(Math.max(0, selectedSegments.length - 1))}
                   </b>{" "}
-                  forks crossed
+                  {t(
+                    "components.branchMap.atlas.selection.forksCrossed",
+                    "forks crossed",
+                  )}
                 </span>
               </div>
               <div className="selection-actions">
                 <button type="button" onClick={() => focus(selectedNode.uid)}>
-                  定位
+                  {t("components.branchMap.atlas.locate", "Locate")}
                 </button>
                 <button
                   type="button"
                   onClick={() => onActivateNode(selectedNode.uid)}
                 >
-                  设为活跃
+                  {t("components.branchMap.atlas.setActive", "Set active")}
                 </button>
               </div>
             </div>
@@ -460,7 +530,8 @@ export function AtlasDialog({
                 className={sidebarTab === "branches" ? "is-active" : ""}
                 onClick={() => setSidebarTab("branches")}
               >
-                分支段 <b>{formatNumber(model.segments.length)}</b>
+                {t("components.branchMap.atlas.tabs.branches", "Segments")}{" "}
+                <b>{formatNumber(model.segments.length)}</b>
                 <kbd>1</kbd>
               </button>
               <button
@@ -473,7 +544,8 @@ export function AtlasDialog({
                 className={sidebarTab === "forks" ? "is-active" : ""}
                 onClick={() => setSidebarTab("forks")}
               >
-                分叉 <b>{formatNumber(model.forks.length)}</b>
+                {t("components.branchMap.atlas.tabs.forks", "Forks")}{" "}
+                <b>{formatNumber(model.forks.length)}</b>
                 <kbd>2</kbd>
               </button>
               <button
@@ -486,7 +558,8 @@ export function AtlasDialog({
                 className={sidebarTab === "notes" ? "is-active" : ""}
                 onClick={() => setSidebarTab("notes")}
               >
-                注记 <b>{formatNumber(enabledNotes.length)}</b>
+                {t("components.branchMap.notes.summary", "Notes")}{" "}
+                <b>{formatNumber(enabledNotes.length)}</b>
                 <kbd>3</kbd>
               </button>
             </div>
@@ -542,27 +615,58 @@ function BranchSidebar({
   onFocus: (uid: string) => void;
   onActivate: (uid: string) => void;
 }): React.ReactElement {
+  const { t } = useTranslation();
   return (
     <div className="atlas-sidebar-scroll">
       <section className="atlas-side-section branch-reading-guide">
         <div className="side-section-head">
-          <strong>如何阅读</strong>
-          <span>fork-only hierarchy</span>
+          <strong>
+            {t("components.branchMap.atlas.guide.title", "How to read")}
+          </strong>
+          <span>
+            {t("components.branchMap.forkOnlyHierarchy", "fork-only hierarchy")}
+          </span>
         </div>
         <div className="reading-equation">
-          <span>连续 parentId</span>
+          <span>
+            {t(
+              "components.branchMap.atlas.guide.consecutiveParents",
+              "consecutive parentId",
+            )}
+          </span>
           <b>→</b>
-          <strong>同一条线性轨道</strong>
-          <span>一个 entry 有多个 children</span>
+          <strong>
+            {t(
+              "components.branchMap.atlas.guide.linearRail",
+              "one linear rail",
+            )}
+          </strong>
+          <span>
+            {t(
+              "components.branchMap.atlas.guide.multipleChildren",
+              "entry with multiple children",
+            )}
+          </span>
           <b>→</b>
-          <strong>生成子分支</strong>
+          <strong>
+            {t(
+              "components.branchMap.atlas.guide.childBranches",
+              "child branches",
+            )}
+          </strong>
         </div>
       </section>
 
       <section className="atlas-side-section">
         <div className="side-section-head">
-          <strong>终点分支</strong>
-          <span>{formatNumber(model.terminalSegments.length)} endings</span>
+          <strong>
+            {t("components.branchMap.atlas.endings.title", "Ending branches")}
+          </strong>
+          <span>
+            {t("components.branchMap.atlas.endings.count", "{{count}} endings", {
+              count: model.terminalSegments.length,
+            })}
+          </span>
         </div>
         <div className="atlas-branch-list">
           {model.terminalSegments.map((segment, index) => {
@@ -581,7 +685,11 @@ function BranchSidebar({
                   <strong>
                     {truncate(segment.lastUserSummary || leaf.summary, 86)}
                   </strong>
-                  {active ? <span>ACTIVE</span> : null}
+                  {active ? (
+                    <span>
+                      {t("components.branchMap.segment.active", "ACTIVE")}
+                    </span>
+                  ) : null}
                 </div>
                 <div className="branch-card-lineage">
                   {lineage.map((item, itemIndex) => (
@@ -597,22 +705,54 @@ function BranchSidebar({
                   ))}
                 </div>
                 <div className="branch-card-metrics">
-                  <span>#{formatNumber(leaf.sequence)} end</span>
-                  <span>{formatNumber(lineage.length)} segments</span>
-                  <span>{formatTokens(metrics.totalTokens)} tok</span>
+                  <span>
+                    {t(
+                      "components.branchMap.atlas.endings.endAt",
+                      "#{{sequence}} end",
+                      { sequence: formatNumber(leaf.sequence) },
+                    )}
+                  </span>
+                  <span>
+                    {t(
+                      "components.branchMap.atlas.endings.segments",
+                      "{{count}} segments",
+                      { count: lineage.length },
+                    )}
+                  </span>
+                  <span>
+                    {t(
+                      "components.branchMap.atlas.endings.tokens",
+                      "{{tokens}} tok",
+                      { tokens: formatTokens(metrics.totalTokens) },
+                    )}
+                  </span>
                   <span>{formatMoney(metrics.cost)}</span>
                   <span>
-                    {formatNumber(metrics.errors + metrics.aborted)} errors
+                    {t(
+                      "components.branchMap.atlas.endings.errors",
+                      "{{count}} errors",
+                      { count: metrics.errors + metrics.aborted },
+                    )}
                   </span>
                 </div>
                 <div className="branch-card-actions">
                   <button type="button" onClick={() => onFocus(leaf.uid)}>
-                    聚焦终点
+                    {t(
+                      "components.branchMap.atlas.endings.focusEnd",
+                      "Focus ending",
+                    )}
                   </button>
                   <button type="button" onClick={() => onActivate(leaf.uid)}>
                     {active
-                      ? `当前 L${activeTerminalIndex + 1}`
-                      : "切换到此分支"}
+                      ? t(
+                          "components.branchMap.atlas.endings.current",
+                          "Current L{{index}}",
+                          { index: activeTerminalIndex + 1 },
+                        )
+                      : t(
+                          "components.branchMap.atlas.endings.switchTo",
+                          "Switch to this branch",
+                        )}
                   </button>
                 </div>
               </article>
@@ -623,8 +763,18 @@ function BranchSidebar({
 
       <section className="atlas-side-section">
         <div className="side-section-head">
-          <strong>线性段索引</strong>
-          <span>消息在段内平级</span>
+          <strong>
+            {t(
+              "components.branchMap.atlas.segmentIndex.title",
+              "Linear segment index",
+            )}
+          </strong>
+          <span>
+            {t(
+              "components.branchMap.atlas.segmentIndex.subtitle",
+              "entries are flat within a segment",
+            )}
+          </span>
         </div>
         <div className="segment-index-list">
           {model.segments.map((segment) => (
@@ -650,6 +800,7 @@ function SegmentIndexCard({
   selected: boolean;
   onFocus: (uid: string) => void;
 }): React.ReactElement {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
@@ -664,13 +815,25 @@ function SegmentIndexCard({
           {truncate(segment.firstUserSummary || segment.start.summary, 84)}
         </strong>
         <small>
-          #{formatNumber(segment.start.sequence)}–#
-          {formatNumber(segment.end.sequence)} ·{" "}
-          {formatNumber(segment.nodes.length)} entries · level{" "}
-          {formatNumber(segment.level)}
+          {t(
+            "components.branchMap.atlas.segmentIndex.meta",
+            "#{{start}}–#{{end}} · {{entries}} entries · level {{level}}",
+            {
+              start: formatNumber(segment.start.sequence),
+              end: formatNumber(segment.end.sequence),
+              entries: formatNumber(segment.nodes.length),
+              level: formatNumber(segment.level),
+            },
+          )}
         </small>
       </span>
-      <em>{segment.terminal ? "END" : `${segment.children.length} WAY`}</em>
+      <em>
+        {segment.terminal
+          ? t("components.branchMap.segment.end", "END")
+          : t("components.branchMap.atlas.segmentIndex.ways", "{{count}} WAY", {
+              count: segment.children.length,
+            })}
+      </em>
     </button>
   );
 }
@@ -684,16 +847,21 @@ function ForkSidebar({
   onFocus: (uid: string) => void;
   onActivate: (uid: string) => void;
 }): React.ReactElement {
+  const { t } = useTranslation();
   return (
     <div className="atlas-sidebar-scroll">
       <section className="atlas-side-section fork-reading-guide">
         <div className="side-section-head">
-          <strong>真实分叉</strong>
+          <strong>
+            {t("components.branchMap.atlas.forks.title", "Real forks")}
+          </strong>
           <span>{formatNumber(model.forks.length)}</span>
         </div>
         <p>
-          只有某条记录拥有两个或更多直接后继时，Pi
-          才产生可视分支。下方每张卡片都对应一次真实的回退与改道。
+          {t(
+            "components.branchMap.atlas.forks.description",
+            "Pi only draws a visible branch when an entry has two or more direct successors. Each card below is an actual rewind and redirect.",
+          )}
         </p>
       </section>
       {model.forks.map((fork) => (
@@ -706,7 +874,10 @@ function ForkSidebar({
       ))}
       {!model.forks.length ? (
         <div className="atlas-empty">
-          这个会话没有发生分支切换：全部记录都属于一条线性序列。
+          {t(
+            "components.branchMap.atlas.forks.empty",
+            "This session never branched: every entry belongs to a single linear sequence.",
+          )}
         </div>
       ) : null}
     </div>
@@ -722,6 +893,7 @@ function ForkCard({
   onFocus: (uid: string) => void;
   onActivate: (uid: string) => void;
 }): React.ReactElement {
+  const { t } = useTranslation();
   return (
     <section className="atlas-side-section fork-analysis-card">
       <button
@@ -733,11 +905,22 @@ function ForkCard({
         <span>
           <strong>{truncate(fork.anchor.summary, 92)}</strong>
           <small>
-            {fork.segment.code} · anchor #{formatNumber(fork.anchor.sequence)} ·
-            line {formatNumber(fork.anchor.lineNo)}
+            {t(
+              "components.branchMap.atlas.forks.anchorMeta",
+              "{{code}} · anchor #{{sequence}} · line {{line}}",
+              {
+                code: fork.segment.code,
+                sequence: formatNumber(fork.anchor.sequence),
+                line: formatNumber(fork.anchor.lineNo),
+              },
+            )}
           </small>
         </span>
-        <em>{fork.children.length} routes</em>
+        <em>
+          {t("components.branchMap.atlas.routes", "{{count}} routes", {
+            count: fork.children.length,
+          })}
+        </em>
       </button>
       <div className="fork-route-list">
         {fork.children.map((segment, index) => {
@@ -754,15 +937,27 @@ function ForkCard({
                   )}
                 </strong>
                 <small>
-                  starts #{formatNumber(segment.start.sequence)} ·{" "}
-                  {formatNumber(segment.nodes.length)} linear entries ·{" "}
-                  {formatNumber(segment.descendantLeaves)} endings
+                  {t(
+                    "components.branchMap.atlas.forks.routeMeta",
+                    "starts #{{sequence}} · {{entries}} linear entries · {{endings}} endings",
+                    {
+                      sequence: formatNumber(segment.start.sequence),
+                      entries: formatNumber(segment.nodes.length),
+                      endings: formatNumber(segment.descendantLeaves),
+                    },
+                  )}
                 </small>
                 <span>
-                  {formatNumber(segment.metrics.user)} user ·{" "}
-                  {formatNumber(segment.metrics.toolResults)} tool ·{" "}
-                  {formatTokens(segment.metrics.totalTokens)} tok ·{" "}
-                  {formatNumber(segment.noteCount)} notes
+                  {t(
+                    "components.branchMap.atlas.forks.routeStats",
+                    "{{user}} user · {{tool}} tool · {{tokens}} tok · {{notes}} notes",
+                    {
+                      user: formatNumber(segment.metrics.user),
+                      tool: formatNumber(segment.metrics.toolResults),
+                      tokens: formatTokens(segment.metrics.totalTokens),
+                      notes: formatNumber(segment.noteCount),
+                    },
+                  )}
                 </span>
               </div>
               <div className="fork-route-actions">
@@ -770,13 +965,13 @@ function ForkCard({
                   type="button"
                   onClick={() => onFocus(segment.start.uid)}
                 >
-                  定位
+                  {t("components.branchMap.atlas.locate", "Locate")}
                 </button>
                 <button
                   type="button"
                   onClick={() => onActivate(destination.uid)}
                 >
-                  进入
+                  {t("components.branchMap.atlas.enter", "Enter")}
                 </button>
               </div>
             </article>
@@ -796,16 +991,26 @@ function NotesSidebar({
   enabledNotes: SemanticNote[];
   onNoteClick: (note: SemanticNote) => void;
 }): React.ReactElement {
+  const { t } = useTranslation();
   return (
     <div className="atlas-sidebar-scroll">
       <section className="atlas-side-section note-explainer">
         <div className="side-section-head">
-          <strong>语义注记</strong>
-          <span>独立覆盖层</span>
+          <strong>
+            {t("components.branchMap.notes.title", "Semantic notes")}
+          </strong>
+          <span>
+            {t(
+              "components.branchMap.atlas.notesPanel.overlay",
+              "independent overlay",
+            )}
+          </span>
         </div>
         <p>
-          Rename、Label、模型切换等事件附着在线性轨道上，不会被误读为父子层级。Label
-          会定位到它实际标注的 target entry。
+          {t(
+            "components.branchMap.atlas.notesPanel.description",
+            "Rename, label, and model-switch events attach to the linear rails and are never read as parent-child hierarchy. Labels point to the entry they actually annotate.",
+          )}
         </p>
       </section>
       {notesByType.map(([type, notes]) => (
@@ -814,7 +1019,7 @@ function NotesSidebar({
           key={type}
         >
           <div className="side-section-head">
-            <strong>{noteTypeLabel(type)}</strong>
+            <strong>{t(noteTypeLabelKey(type))}</strong>
             <span>{formatNumber(notes.length)}</span>
           </div>
           <div className="atlas-note-list">
@@ -830,8 +1035,12 @@ function NotesSidebar({
                   <strong>{note.title}</strong>
                   <small>{truncate(note.detail, 130)}</small>
                   <em>
-                    {formatTimestamp(note.timestampMs)} · line{" "}
-                    {formatNumber(note.lineNo)}
+                    {formatTimestamp(note.timestampMs)} ·{" "}
+                    {t(
+                      "components.branchMap.atlas.lineNumber",
+                      "line {{line}}",
+                      { line: formatNumber(note.lineNo) },
+                    )}
                   </em>
                 </span>
               </button>
@@ -840,7 +1049,12 @@ function NotesSidebar({
         </section>
       ))}
       {!enabledNotes.length ? (
-        <div className="atlas-empty">在“注记”菜单中启用事件类型。</div>
+        <div className="atlas-empty">
+          {t(
+            "components.branchMap.atlas.notesPanel.empty",
+            'Enable event types in the "Notes" menu.',
+          )}
+        </div>
       ) : null}
     </div>
   );
@@ -870,22 +1084,26 @@ function groupNotes(
     .map((type) => [type, grouped.get(type) ?? []]);
 }
 
-function noteTypeLabel(type: SemanticNote["type"]): string {
-  if (type === "user") return "用户输入";
-  if (type === "assistant_reply") return "AI 末条回复";
-  if (type === "rename") return "Rename / Session Info";
-  if (type === "label") return "Labels";
-  if (type === "model") return "Model Switches";
-  if (type === "thinking") return "Thinking Level";
-  if (type === "compaction") return "Compaction";
-  return "Errors / Aborted";
+function noteTypeLabelKey(type: SemanticNote["type"]): string {
+  if (type === "user") return "components.branchMap.noteTypes.user.label";
+  if (type === "assistant_reply")
+    return "components.branchMap.noteTypes.assistantReply.label";
+  if (type === "rename") return "components.branchMap.noteTypes.rename.label";
+  if (type === "label") return "components.branchMap.noteTypes.label.label";
+  if (type === "model") return "components.branchMap.noteTypes.model.label";
+  if (type === "thinking")
+    return "components.branchMap.noteTypes.thinking.label";
+  if (type === "compaction")
+    return "components.branchMap.noteTypes.compaction.label";
+  return "components.branchMap.noteTypes.error.label";
 }
 
-function scopeLabel(scope: GlobalMapSettings["scope"]): string {
-  if (scope === "user") return "用户消息事件";
-  if (scope === "structure") return "仅分支骨架";
-  if (scope === "conversation") return "对话事件";
-  return "全部 entry 事件";
+function scopeLabelKey(scope: GlobalMapSettings["scope"]): string {
+  if (scope === "user") return "components.branchMap.atlas.scope.user";
+  if (scope === "structure") return "components.branchMap.atlas.scope.structure";
+  if (scope === "conversation")
+    return "components.branchMap.atlas.scope.conversation";
+  return "components.branchMap.atlas.scope.all";
 }
 
 
