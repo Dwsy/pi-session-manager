@@ -247,9 +247,7 @@ export function useSessionScrollMarkers({
           (typeof entry.content === "string" ? entry.content : "") ||
           previewFallback;
         const summary = rawSummary.replace(/\s+/g, " " ).trim();
-        return summary.length > 80
-          ? `📦 ${summary.slice(0, 80)}…`
-          : `📦 ${summary}`;
+        return summary.length > 80 ? `${summary.slice(0, 80)}…` : summary;
       }
 
       const content = entry.message?.content || [];

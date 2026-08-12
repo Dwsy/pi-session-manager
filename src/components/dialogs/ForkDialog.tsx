@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Copy } from 'lucide-react'
 import type { SessionInfo } from '@/types'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { useEscapeToClose } from './useEscapeToClose'
 
 interface ForkDialogProps {
   session: SessionInfo
@@ -11,6 +12,7 @@ interface ForkDialogProps {
 }
 
 export default function ForkDialog({ session, onFork, onClose }: ForkDialogProps) {
+  useEscapeToClose(onClose)
   const { t } = useTranslation()
   const isMobile = useIsMobile()
   const [targetName, setTargetName] = useState('')

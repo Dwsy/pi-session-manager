@@ -3,7 +3,7 @@ export const session = {
   openInTerminal: 'Open in Terminal (iTerm2)',
   resume: 'Resume',
   copyResumeCommand: {
-    success: 'Resume command copied!',
+    success: 'Resume command copied',
     failed: 'Failed to copy resume command',
   },
   copyPath: 'Copy JSONL path',
@@ -119,6 +119,9 @@ export const session = {
     citationCount: '{{count}} snippets',
     unknownRole: 'context',
     noCitations: 'No citation snippets returned.',
+  },
+  contextMenu: {
+    ariaLabel: 'Session {{id}}',
   },
   list: {
     empty: 'No sessions found',

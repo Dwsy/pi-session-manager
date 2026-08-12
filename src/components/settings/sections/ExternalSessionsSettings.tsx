@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CheckCircle2, Circle, Cpu, Search, Sparkles } from "lucide-react";
+import { BarChart3, Bot, CheckCircle2, Circle, Cpu, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import SettingsCard from "@/components/settings/SettingsCard";
@@ -96,7 +96,7 @@ export default function ExternalSessionsSettings({
     {
       id: "agent-icon",
       kind: "toggle",
-      icon: <Sparkles />,
+      icon: <Bot />,
       title: t(
         "settings.externalSessions.showAgentIconInSessionBadge",
         "Show agent icon in SessionBadge",

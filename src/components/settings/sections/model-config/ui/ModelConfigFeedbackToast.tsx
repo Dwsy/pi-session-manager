@@ -1,4 +1,5 @@
 import { AlertCircle, CheckCircle2, Info, AlertTriangle, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { FeedbackTone } from "../types";
 
 export function ModelConfigFeedbackToast({
@@ -10,6 +11,7 @@ export function ModelConfigFeedbackToast({
   message: string;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const palette = {
     success:
       "border-success/30 bg-card text-success shadow-md",
@@ -40,7 +42,7 @@ export function ModelConfigFeedbackToast({
           type="button"
           onClick={onClose}
           className="shrink-0 rounded p-0.5 text-current/60 hover:bg-foreground/10 hover:text-current focus-ring"
-          aria-label="Close"
+          aria-label={t("common.close")}
         >
           <X className="h-3.5 w-3.5" />
         </button>

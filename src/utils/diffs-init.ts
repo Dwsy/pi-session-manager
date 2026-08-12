@@ -226,7 +226,7 @@ ${DIFFS_TAG_NAME} [data-separator-content] {
 }
 
 ${DIFFS_TAG_NAME} [data-expand-button] {
-  justify-content: center; flex-shrink: 0; cursor: pointer;
+  justify-content: center; flex-shrink: 0;
   width: 32px; height: 32px; opacity: 0.65;
 }
 

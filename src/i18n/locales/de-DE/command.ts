@@ -15,6 +15,16 @@ export const command = {
     session: 'Sitzungen',
     project: 'Projekte',
   },
+  roleFilter: {
+    all: 'Alle',
+    user: 'Benutzer',
+    assistant: 'KI',
+  },
+  sort: {
+    newest: 'Neueste',
+    oldest: 'Älteste',
+    score: 'Relevanz',
+  },
   shortcuts: {
     open: 'Befehlspalette öffnen',
     close: 'Schließen',

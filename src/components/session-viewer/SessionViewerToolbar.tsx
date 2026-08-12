@@ -239,22 +239,6 @@ export default function SessionViewerToolbar({
                   </button>
                 </>
               )}
-              <button
-                onClick={onScrollToTop}
-                className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
-                title={t("session.scrollToTop", "Scroll to top")}
-                aria-label={t("session.scrollToTop", "Scroll to top")}
-              >
-                <ArrowUp className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={onScrollToBottom}
-                className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
-                title={t("session.scrollToBottom", "Scroll to bottom")}
-                aria-label={t("session.scrollToBottom", "Scroll to bottom")}
-              >
-                <ArrowDown className="h-3.5 w-3.5" />
-              </button>
               {!previewMode && (
                 <>
                   {onRename && (

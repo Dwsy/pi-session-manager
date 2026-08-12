@@ -79,6 +79,11 @@ tasks/
 .ace-tool/
 build-output/
 
+# Test artifacts
+.playwright-cli/
+output/
+dashboard-top.png
+
 # Pi messenger/crew runtime files
 .pi/messenger/
 notepad/

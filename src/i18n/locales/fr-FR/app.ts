@@ -24,7 +24,7 @@ export const app = {
     deleteSessionPartial: "{{count}} sessions n'ont pas pu être supprimées. Consultez la console pour plus de détails.",
     renameSession: 'Échec du renommage de la session',
     exportFailed: "Échec de l'exportation",
-    exportSuccess: 'Exportation réussie !',
+    exportSuccess: 'Exportation réussie',
   },
   confirm: {
     deleteSession: 'Supprimer la session « {name} » ?',

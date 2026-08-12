@@ -88,7 +88,7 @@ export function ToolsTab({
             }}
             role="button"
             tabIndex={busy ? -1 : 0}
-            className={`focus-ring group relative flex items-start gap-4 rounded-md border border-border bg-card p-5 cursor-pointer hover:border-border hover:bg-muted ${
+            className={`focus-ring group relative flex items-start gap-4 rounded-md border border-border bg-card p-5 hover:border-border hover:bg-muted ${
               busy === "import-file" ? "opacity-60 pointer-events-none" : ""
             }`}
           >
@@ -126,7 +126,7 @@ export function ToolsTab({
             }}
             role="button"
             tabIndex={busy ? -1 : 0}
-            className="focus-ring group relative flex items-start gap-4 rounded-md border border-border bg-card p-5 cursor-pointer hover:border-border hover:bg-muted"
+            className="focus-ring group relative flex items-start gap-4 rounded-md border border-border bg-card p-5 hover:border-border hover:bg-muted"
           >
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground">
               <Upload className="h-6 w-6" />
@@ -158,7 +158,7 @@ export function ToolsTab({
             }}
             role="button"
             tabIndex={busy ? -1 : 0}
-            className="focus-ring group relative flex items-start gap-4 rounded-md border border-border bg-card p-5 cursor-pointer hover:border-border hover:bg-muted"
+            className="focus-ring group relative flex items-start gap-4 rounded-md border border-border bg-card p-5 hover:border-border hover:bg-muted"
           >
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground">
               <Copy className="h-6 w-6" />
@@ -190,7 +190,7 @@ export function ToolsTab({
             }}
             role="button"
             tabIndex={busy ? -1 : 0}
-            className="focus-ring group relative flex items-start gap-4 rounded-md border border-border bg-card p-5 cursor-pointer hover:border-border hover:bg-muted"
+            className="focus-ring group relative flex items-start gap-4 rounded-md border border-border bg-card p-5 hover:border-border hover:bg-muted"
           >
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center text-muted-foreground">
               <Download className="h-6 w-6" />

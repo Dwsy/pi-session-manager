@@ -44,7 +44,7 @@ export const tags = {
     dateRange: '日期范围',
     allTime: '全部时间',
     today: '今天',
-    last24h: '最近24小时',
+    last24h: '近 24 小时',
     last2Days: '最近2天',
     last7Days: '最近7天',
     last30Days: '最近30天',

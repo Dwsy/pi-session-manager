@@ -1,5 +1,6 @@
 export const common = {
   loading: '加载中...',
+  clear: '清除',
   cancel: '取消',
   save: '保存',
   delete: '删除',

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  Check,
   Coins,
   Cpu,
   Eye,
@@ -318,7 +319,7 @@ export function ConfigureTab({
                   setSelectedProvider(provider);
                   setConfigDetailTab("provider");
                 }}
-                className={`group flex items-center justify-between rounded-md px-2 py-1.5 text-left transition-all duration-150 cursor-pointer ${
+                className={`group flex items-center justify-between rounded-md px-2 py-1.5 text-left transition-all duration-150 ${
                   isSelected
                     ? "settings-accent-bg-soft settings-accent-ring border border-transparent text-foreground"
                     : "border border-transparent text-foreground/80 hover:bg-accent/10 hover:text-foreground"
@@ -448,7 +449,7 @@ export function ConfigureTab({
                   setSelectedModel(id);
                   setConfigDetailTab("model");
                 }}
-                className={`group flex items-center justify-between rounded-md px-2 py-1.5 text-left transition-all duration-150 cursor-pointer ${
+                className={`group flex items-center justify-between rounded-md px-2 py-1.5 text-left transition-all duration-150 ${
                   isSelected
                     ? "settings-accent-bg-soft settings-accent-ring border border-transparent text-foreground"
                     : "border border-transparent text-foreground/80 hover:bg-accent/10 hover:text-foreground"
@@ -786,7 +787,7 @@ export function ConfigureTab({
                       "Automatically include the standard Authorization header.",
                     )}
                   >
-                    <label className="flex items-center gap-2 cursor-pointer text-xs font-medium h-9 px-3 rounded-lg border border-border/60 bg-surface/50">
+                    <label className="flex items-center gap-2 text-xs font-medium h-9 px-3 rounded-lg border border-border/60 bg-surface/50">
                       <input
                         type="checkbox"
                         checked={Boolean(selectedProviderEntry.authHeader)}
@@ -924,7 +925,7 @@ export function ConfigureTab({
                               enabled
                                 ? "settings-accent-bg-soft settings-accent-ring border-transparent text-foreground"
                                 : "border-border/60 bg-background/45 text-muted-foreground hover:border-accent/40 hover:bg-surface/70 hover:text-foreground"
-                            } ${type === "text" ? "cursor-default opacity-80" : "cursor-pointer"}`}
+                            } ${type === "text" ? "opacity-80" : ""}`}
                           >
                             <input
                               type="checkbox"
@@ -949,7 +950,9 @@ export function ConfigureTab({
                                   : "border-border/70 bg-background/70"
                               }`}
                             >
-                              {enabled ? "✓" : ""}
+                              {enabled ? (
+                                <Check className="h-2.5 w-2.5" aria-hidden="true" />
+                              ) : null}
                             </span>
                             <span className="inline-flex items-center gap-1">
                               {type === "text" ? (
@@ -967,7 +970,7 @@ export function ConfigureTab({
 
                   <div className="flex flex-col justify-end">
                     <label
-                      className={`flex h-[46px] cursor-pointer items-center justify-between rounded-md border px-2.5 py-1.5 transition-colors ${
+                      className={`flex h-[46px] items-center justify-between rounded-md border px-2.5 py-1.5 transition-colors ${
                         selectedModelEntry.reasoning
                           ? "settings-accent-bg-soft settings-accent-ring border-transparent"
                           : "border-border/60 bg-background/45 hover:border-accent/40 hover:bg-surface/70"

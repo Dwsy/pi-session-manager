@@ -248,7 +248,7 @@ export function TestTab({
 
             <div className="space-y-3 pt-1">
               <details className="group">
-                <summary className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
+                <summary className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
                   <Terminal className="h-3.5 w-3.5" />
                   <span>cURL Command</span>
                 </summary>
@@ -257,7 +257,7 @@ export function TestTab({
                 </pre>
               </details>
               <details className="group">
-                <summary className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
+                <summary className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
                   <Terminal className="h-3.5 w-3.5" />
                   <span>Request Body</span>
                 </summary>
@@ -266,7 +266,7 @@ export function TestTab({
                 </pre>
               </details>
               <details open className="group">
-                <summary className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
+                <summary className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
                   <Terminal className="h-3.5 w-3.5" />
                   <span>Response Body</span>
                 </summary>

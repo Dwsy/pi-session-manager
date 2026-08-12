@@ -3,6 +3,7 @@ import { CheckCircle2, Circle, Play, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useEscapeToClose } from "./useEscapeToClose";
 import { AgentIcon } from "@/components/session-viewer/AgentIcon";
 import type {
   SessionConvertTarget,
@@ -30,6 +31,7 @@ export default function ResumeSessionDialog({
 }: ResumeSessionDialogProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
+  useEscapeToClose(onClose);
   const sourceLabel = useMemo(
     () => getSessionSourceTag(session.path) || t("session.convert.unknown"),
     [session.path, t],

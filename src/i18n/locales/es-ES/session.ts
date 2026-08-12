@@ -3,7 +3,7 @@ export const session = {
   openInTerminal: 'Abrir en Terminal (iTerm2)',
   resume: 'Reanudar',
   copyResumeCommand: {
-    success: '¡Comando de reanudación copiado!',
+    success: 'Comando de reanudación copiado',
     failed: 'Error al copiar el comando de reanudación',
   },
   scrollToTop: 'Ir al inicio',
@@ -59,6 +59,9 @@ export const session = {
     citationCount: '{{count}} snippets',
     unknownRole: 'context',
     noCitations: 'No citation snippets returned.',
+  },
+  contextMenu: {
+    ariaLabel: 'Sesión {{id}}',
   },
   list: {
     empty: 'No se encontraron sesiones',

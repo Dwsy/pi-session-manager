@@ -16,6 +16,7 @@ import {
   getSortLabel,
 } from './utils'
 import type { CommandPaletteMode } from './commandActions'
+import { getCachedSettings } from '@/utils/settingsApi'
 
 interface CommandFilterBarProps {
   mode: CommandPaletteMode
@@ -42,6 +43,10 @@ export default function CommandFilterBar({
 }: CommandFilterBarProps) {
   const { t } = useTranslation()
   const showAdvancedMessageFilters = supportsMessageFilters
+  const devModeEnabled = getCachedSettings().advanced.debugMode
+  const modeOptions: CommandPaletteMode[] = devModeEnabled
+    ? ['search', 'commands', 'dev']
+    : ['search', 'commands']
 
   const segmentBase =
     'inline-flex items-center gap-1.5 rounded-[5px] px-2.5 py-[3px] text-[11px] transition-colors select-none'
@@ -54,7 +59,7 @@ export default function CommandFilterBar({
   return (
     <div className="mt-4 flex flex-wrap items-center gap-3">
       <div className={segmentedGroup}>
-        {(['search', 'commands', 'dev'] as const).map((value) => {
+        {modeOptions.map((value) => {
           const isActive = mode === value
           const Icon = value === 'search' ? Search : value === 'commands' ? Command : Wrench
           return (
@@ -130,7 +135,7 @@ export default function CommandFilterBar({
                   )}
                   {value === 'user' && <User className="w-3 h-3" />}
                   {value === 'assistant' && <Bot className="w-3 h-3" />}
-                  <span>{getRoleFilterLabel(value)}</span>
+                  <span>{getRoleFilterLabel(t, value)}</span>
                 </button>
               ))}
             </div>
@@ -153,7 +158,7 @@ export default function CommandFilterBar({
                   )}
                   {sortValue === 'oldest' && <ArrowUpDown className="w-3 h-3" />}
                   {sortValue === 'score' && <Star className="w-3 h-3" />}
-                  <span>{getSortLabel(sortValue)}</span>
+                  <span>{getSortLabel(t, sortValue)}</span>
                 </button>
               ))}
             </div>

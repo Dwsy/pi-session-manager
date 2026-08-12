@@ -1,3 +1,7 @@
+// Read the language from the bare i18next singleton (same instance the app
+// configures) to avoid importing '@/i18n', whose module side effects break
+// tests that fully mock react-i18next.
+import i18n from 'i18next'
 import { splitPathSegments } from './path'
 
 export function formatBytes(bytes: number, decimals: number = 0): string {
@@ -25,24 +29,29 @@ export function formatDuration(seconds: number): string {
 
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
-  return `${text.slice(0, maxLength)}...`
+  return `${text.slice(0, maxLength)}…`
 }
 
+// Canonical compact number format for tokens and other large counts.
+// Single source of truth: 1 decimal, lowercase k, uppercase M/B.
 export function formatTokens(tokens: number): string {
-  if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(1)}M`
-  if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}K`
-  return tokens.toString()
+  if (!Number.isFinite(tokens) || tokens === 0) return '0'
+  const abs = Math.abs(tokens)
+  if (abs >= 1_000_000_000) return `${(tokens / 1_000_000_000).toFixed(1)}B`
+  if (abs >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`
+  if (abs >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`
+  return Math.round(tokens).toString()
 }
 
 export function formatDate(timestamp: string | Date): string {
   const date = new Date(timestamp)
   const now = new Date()
   const isToday = date.toDateString() === now.toDateString()
+  const locale = i18n.language || undefined
 
-  const timeStr = date.toLocaleTimeString('zh-CN', {
+  const timeStr = date.toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: false
   })
 
@@ -50,7 +59,7 @@ export function formatDate(timestamp: string | Date): string {
     return timeStr
   }
 
-  const dateStr = date.toLocaleDateString('zh-CN', {
+  const dateStr = date.toLocaleDateString(locale, {
     month: '2-digit',
     day: '2-digit'
   })

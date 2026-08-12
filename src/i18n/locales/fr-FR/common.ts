@@ -1,5 +1,6 @@
 export const common = {
   loading: 'Chargement...',
+  clear: 'Effacer',
   cancel: 'Annuler',
   save: 'Enregistrer',
   delete: 'Supprimer',

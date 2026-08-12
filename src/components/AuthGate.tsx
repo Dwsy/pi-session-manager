@@ -92,10 +92,10 @@ function AuthGate({ children }: AuthGateProps) {
 
   if (state === "checking") {
     return (
-      <div className="flex items-center justify-center h-screen-safe bg-zinc-950">
+      <div className="flex items-center justify-center h-screen-safe bg-background">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-6 h-6 text-zinc-500 animate-spin" />
-          <span className="text-sm text-zinc-500">
+          <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+          <span className="text-sm text-muted-foreground">
             {t("auth.connecting", "Connecting...")}
           </span>
         </div>
@@ -105,17 +105,17 @@ function AuthGate({ children }: AuthGateProps) {
 
   if (state === "needs-auth") {
     return (
-      <div className="flex items-center justify-center h-screen-safe bg-zinc-950 px-4">
+      <div className="flex items-center justify-center h-screen-safe bg-background px-4">
         <div className="w-full max-w-sm">
           {/* Logo / Icon */}
           <div className="flex flex-col items-center mb-8">
-            <div className="mb-4 flex h-10 w-10 items-center justify-center text-zinc-400">
-              <Shield className="w-7 h-7 text-zinc-300" />
+            <div className="mb-4 flex h-10 w-10 items-center justify-center text-muted-foreground">
+              <Shield className="w-7 h-7 text-foreground/80" />
             </div>
-            <h1 className="text-lg font-semibold text-zinc-100">
+            <h1 className="text-lg font-semibold text-foreground">
               Pi Session Manager
             </h1>
-            <p className="text-sm text-zinc-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {t("auth.description", "Enter your API token to continue")}
             </p>
           </div>
@@ -123,7 +123,7 @@ function AuthGate({ children }: AuthGateProps) {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-zinc-300">
+              <label className="text-sm font-medium text-foreground/90">
                 {t("auth.tokenLabel", "API Token")}
               </label>
               <div className="relative">
@@ -139,12 +139,12 @@ function AuthGate({ children }: AuthGateProps) {
                   autoComplete="off"
                   className={`
                     w-full px-3.5 py-2.5 pr-10 rounded-md text-sm
-                    bg-zinc-900 text-zinc-100 placeholder-zinc-600
+                    bg-card text-foreground placeholder:text-muted-foreground/60
                     border outline-none focus-ring
                     ${
                       error
-                        ? "border-red-500/60 focus:border-red-500"
-                        : "border-zinc-800 focus:border-zinc-600"
+                        ? "border-destructive/60 focus:border-destructive"
+                        : "border-border focus:border-ring/60"
                     }
                   `}
                 />
@@ -154,7 +154,7 @@ function AuthGate({ children }: AuthGateProps) {
                   aria-label={showToken
                     ? t("auth.hideToken", "Hide token")
                     : t("auth.showToken", "Show token")}
-                  className="focus-ring absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+                  className="focus-ring absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                   {showToken ? (
                     <EyeOff className="w-4 h-4" />
@@ -163,7 +163,7 @@ function AuthGate({ children }: AuthGateProps) {
                   )}
                 </button>
               </div>
-              {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
+              {error && <p className="text-xs text-destructive mt-1">{error}</p>}
             </div>
 
             <button
@@ -181,7 +181,7 @@ function AuthGate({ children }: AuthGateProps) {
           </form>
 
           {/* Hint */}
-          <p className="text-xs text-zinc-600 text-center mt-6 leading-relaxed">
+          <p className="text-xs text-muted-foreground/70 text-center mt-6 leading-relaxed">
             {t("auth.hint", "Token is shown in the server console on startup")}
           </p>
         </div>

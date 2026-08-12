@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Check, Copy } from 'lucide-react'
 import { useSessionView } from '@/contexts/SessionViewContext'
 import CodeBlock from '@/components/ui/CodeBlock'
 import ToolHeader from '@/components/tool-calls/ToolHeader'
@@ -74,15 +75,23 @@ export default function BashExecution({
         expandable={Boolean(command || output)}
         expanded={expanded}
         onToggle={() => toggleToolExpanded(entryId)}
-        ariaLabel={`Bash: ${statusLabel}`}
+        ariaLabel={t('components.toolCall.bashStatus', 'Bash: {{status}}', { status: statusLabel })}
         actions={
           <button
             type="button"
             onClick={() => void handleCopyCommand()}
             className="tool-copy-button bash-inline-copy-button"
-            aria-label={commandCopied ? 'Copied command' : 'Copy command'}
+            aria-label={
+              commandCopied
+                ? t('components.toolCall.commandCopied', 'Copied command')
+                : t('components.toolCall.copyCommand', 'Copy command')
+            }
           >
-            {commandCopied ? '✓' : '⧉'}
+            {commandCopied ? (
+              <Check className="h-3 w-3" aria-hidden="true" />
+            ) : (
+              <Copy className="h-3 w-3" aria-hidden="true" />
+            )}
           </button>
         }
       >

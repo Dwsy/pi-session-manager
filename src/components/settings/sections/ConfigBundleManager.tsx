@@ -402,7 +402,7 @@ export function ConfigBundleManager() {
             )}
             {lastImportResult.warnings.length > 0 && (
               <details className="text-sm">
-                <summary className="cursor-pointer text-amber-400 hover:text-amber-300">
+                <summary className="text-amber-400 hover:text-amber-300">
                   {t('settings.importExport.lastResult.warnings', { count: lastImportResult.warnings.length })}
                 </summary>
                 <ul className="mt-2 space-y-1 text-muted-foreground">

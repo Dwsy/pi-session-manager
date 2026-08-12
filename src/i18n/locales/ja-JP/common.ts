@@ -1,5 +1,6 @@
 export const common = {
   loading: '読み込み中...',
+  clear: 'クリア',
   cancel: 'キャンセル',
   save: '保存',
   delete: '削除',

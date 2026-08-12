@@ -62,7 +62,7 @@ describe('truncateText', () => {
   })
 
   it('truncates text and adds ellipsis', () => {
-    expect(truncateText('hello world', 5)).toBe('hello...')
+    expect(truncateText('hello world', 5)).toBe('hello…')
   })
 
   it('handles empty string', () => {
@@ -70,7 +70,7 @@ describe('truncateText', () => {
   })
 
   it('handles zero max length', () => {
-    expect(truncateText('hello', 0)).toBe('...')
+    expect(truncateText('hello', 0)).toBe('…')
   })
 
   it('handles exact length', () => {

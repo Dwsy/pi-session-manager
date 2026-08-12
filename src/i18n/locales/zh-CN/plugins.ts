@@ -126,7 +126,7 @@ export const plugins = {
         },
         showTopics: {
           title: '展示会话技术主题',
-          description: '展示检测到的会话讨论技术 and 概念主题',
+          description: '展示检测到的技术与概念主题',
         },
         showNextSteps: {
           title: '展示后续行动建议',

@@ -1,4 +1,4 @@
-import { MessageSquare, FolderOpen, FileText, Sparkles } from 'lucide-react'
+import { MessageSquare, FolderOpen, FileText, Lightbulb } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 export default function CommandHints() {
@@ -34,7 +34,7 @@ export default function CommandHints() {
   return (
     <div className="p-4">
       <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="w-4 h-4 text-blue-400" />
+        <Lightbulb className="w-4 h-4 text-muted-foreground" />
         <h3 className="text-sm font-medium text-foreground">
           {t('command.hints.title', 'Search tips')}
         </h3>

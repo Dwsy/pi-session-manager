@@ -3,6 +3,7 @@ import { FileText, FileCode, Database, Download, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getCachedSettings } from '@/utils/settingsApi'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { useEscapeToClose } from './useEscapeToClose'
 
 interface ExportDialogProps {
   session: SessionInfo
@@ -11,6 +12,7 @@ interface ExportDialogProps {
 }
 
 export default function ExportDialog({ session, onExport, onClose }: ExportDialogProps) {
+  useEscapeToClose(onClose)
   const { t } = useTranslation()
   const isMobile = useIsMobile()
   const defaultFormat = getCachedSettings().export?.defaultFormat || 'html'

@@ -8,7 +8,7 @@ import {
   Loader2,
   RefreshCw,
   Save,
-  Sparkles,
+  SlidersHorizontal,
   Upload,
 } from "lucide-react";
 import { MODEL_CONFIG_PATH } from "./types";
@@ -163,31 +163,31 @@ export default function ModelConfigCenter() {
         <div
           className={`flex-none rounded-lg border px-2.5 py-1.5 shadow-2xs transition-colors ${
             isDirty
-              ? "border-amber-500/45 bg-amber-500/10"
+              ? "border-warning/45 bg-warning/10"
               : "border-border/50 bg-card/30"
           }`}
         >
           <div className="flex min-h-8 flex-wrap items-center gap-2">
             <div className="flex min-w-0 items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 shrink-0 settings-accent-fg" />
+              <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 settings-accent-fg" />
               <h2 className="truncate text-sm font-semibold tracking-tight text-foreground">
-                {t("settings.modelConfigCenter.title", "模型配置中心")}
+                {t("settings.modelConfigCenter.title", "Model Config Center")}
               </h2>
               <span
                 className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${
                   isDirty
-                    ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                    : "border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-300"
+                    ? "border-warning/30 bg-warning/10 text-warning"
+                    : "border-success/30 bg-success/10 text-success"
                 }`}
               >
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${
-                    isDirty ? "bg-amber-500 animate-pulse" : "bg-green-500"
+                    isDirty ? "bg-warning" : "bg-success"
                   }`}
                 />
                 {isDirty
-                  ? t("settings.modelConfigCenter.status.dirty", "未保存")
-                  : t("settings.modelConfigCenter.status.saved", "已同步")}
+                  ? t("settings.modelConfigCenter.status.dirty", "Unsaved")
+                  : t("settings.modelConfigCenter.status.saved", "Synced")}
               </span>
             </div>
 
@@ -249,7 +249,7 @@ export default function ModelConfigCenter() {
                 ) : (
                   <RefreshCw className="h-3 w-3" />
                 )}
-                {t("settings.modelConfigCenter.actions.refresh", "刷新")}
+                {t("settings.modelConfigCenter.actions.refresh", "Refresh")}
               </button>
               <button
                 type="button"
@@ -257,7 +257,7 @@ export default function ModelConfigCenter() {
                 disabled={saving}
                 className={`inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[11px] font-semibold text-primary-foreground shadow-xs transition-colors active:scale-95 focus-ring disabled:opacity-60 ${
                   isDirty
-                    ? "bg-amber-600 hover:bg-amber-700"
+                    ? "bg-warning hover:bg-warning/90"
                     : "bg-primary hover:bg-primary/90"
                 }`}
               >
@@ -409,7 +409,7 @@ export default function ModelConfigCenter() {
         <ConfirmDialog
           dialog={confirmDialog}
           confirming={confirmingDialog}
-          cancelLabel={t("settings.modelConfigCenter.actions.cancel", "取消")}
+          cancelLabel={t("settings.modelConfigCenter.actions.cancel", "Cancel")}
           onCancel={() => {
             if (!confirmingDialog) {
               setConfirmDialog(null);

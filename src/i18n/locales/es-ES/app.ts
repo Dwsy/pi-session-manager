@@ -24,7 +24,7 @@ export const app = {
     deleteSessionPartial: '{{count}} sesiones no se pudieron eliminar. Revisa la consola para más detalles.',
     renameSession: 'Error al renombrar la sesión',
     exportFailed: 'Error en la exportación',
-    exportSuccess: '¡Exportación completada!',
+    exportSuccess: 'Exportación completada',
   },
   confirm: {
     deleteSession: '¿Eliminar la sesión "{name}"?',

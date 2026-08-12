@@ -15,6 +15,16 @@ export const command = {
     session: 'セッション',
     project: 'プロジェクト',
   },
+  roleFilter: {
+    all: 'すべて',
+    user: 'ユーザー',
+    assistant: 'AI',
+  },
+  sort: {
+    newest: '新しい順',
+    oldest: '古い順',
+    score: 'スコア',
+  },
   shortcuts: {
     open: 'コマンドパレットを開く',
     close: '閉じる',

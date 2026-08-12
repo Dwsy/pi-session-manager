@@ -224,7 +224,7 @@ export const settings = {
     debugModeHelp: 'Activar registro detallado',
     demoMode: 'Modo demo',
     demoModeHelp: 'Ver datos de demostración para explorar todas las funciones',
-    lightweightMode: 'Modo ligero',
+    lightweightMode: 'Minimizar a la bandeja al cerrar',
     lightweightModeDesc: 'Al activar, cerrar la ventana minimiza a la bandeja del sistema en lugar de salir. Menú de bandeja: Mostrar / Abrir web / Salir',
     clearCache: 'Limpiar caché',
     cacheCleared: 'Caché limpiada',
@@ -591,6 +591,18 @@ export const settings = {
           "versionRestoreFailed": "Failed to restore version: {{reason}}",
           "httpTestFailed": "HTTP test failed: {{reason}}"
       }
+  },
+  appBehavior: {
+    recapTitle: 'Retrospectivas del panel',
+    recapDescription: 'Una mirada atrás en formato de historia a una semana, un mes, un trimestre o un año — construida solo con estadísticas de sesión locales.',
+    recapAuto: 'Retrospectiva automática',
+    recapAutoDescription: 'Se abre una vez cuando un periodo se cierra — la semana pasada los lunes, el mes pasado en los primeros días del nuevo, además de ventanas a mitad y a final de año. Cerrarla cuenta como mostrada para ese ciclo.',
+    recapManual: 'Abrir una retrospectiva ahora',
+    recapManualDescription: 'Las vistas manuales nunca marcan un ciclo automático como mostrado. Las estadísticas se quedan en este dispositivo.',
+    openWeekRecap: 'Esta semana',
+    openMonthRecap: 'Este mes',
+    openQuarterRecap: 'Este trimestre',
+    openYearRecap: 'Este año',
   },
   error: {
     loadFailed: 'Error al cargar los ajustes',

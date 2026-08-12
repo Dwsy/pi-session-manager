@@ -66,7 +66,7 @@ export const command = {
     helperMatchedMessage: '已定位到匹配消息',
     helperSessionPreview: '正在预览该会话',
     roleUser: '用户',
-    roleAssistant: 'AI',
+    roleAssistant: '助手',
     roleMessage: '消息',
   },
   tabs: {
@@ -75,6 +75,16 @@ export const command = {
     message: '消息',
     session: '会话',
     project: '项目',
+  },
+  roleFilter: {
+    all: '全部',
+    user: '用户',
+    assistant: 'AI',
+  },
+  sort: {
+    newest: '最新',
+    oldest: '最早',
+    score: '相关度',
   },
   shortcuts: {
     open: '打开命令面板',

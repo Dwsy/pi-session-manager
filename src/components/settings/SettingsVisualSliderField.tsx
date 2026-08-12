@@ -78,7 +78,7 @@ export default function SettingsVisualSliderField({
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className={`absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 ${inputClassName}`}
+          className={`absolute inset-0 z-10 h-full w-full opacity-0 ${inputClassName}`}
         />
         <div
           className={`absolute pointer-events-none ${thumbClassName}`}

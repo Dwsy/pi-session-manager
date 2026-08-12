@@ -6,6 +6,7 @@ import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearch
 import type { FullTextSearchSourceFilter } from '@/types'
 import type { CommandPaletteMode } from './commandActions'
 import type { TabType } from './utils'
+import type { PluginRegistry } from '@/plugins/registry'
 
 interface CommandPaletteProps {
   context: SearchContext
@@ -38,7 +39,7 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
   const [selectedResult, setSelectedResult] = useState<SearchPluginResult | null>(null)
 
   // Store registry reference from CommandMenu for keyboard shortcut handling
-  const registryRef = useRef<any>(null)
+  const registryRef = useRef<PluginRegistry | null>(null)
 
   const enhancedContext = useMemo<SearchContext>(() => ({
     ...context,
@@ -180,24 +181,7 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
         if (!isCmdkInput) {
           e.preventDefault()
           handleNavigate()
-          return
         }
-      }
-
-      // Cmd+E → edit session
-      if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
-        e.preventDefault()
-        // Feature: open session in edit mode
-        // See: docs/issues/cmd-e-edit-mode.md
-        return
-      }
-
-      // Cmd+D → delete session
-      if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
-        e.preventDefault()
-        // Feature: show delete confirmation dialog
-        // See: docs/issues/cmd-d-delete-confirm.md
-        return
       }
     }
     window.addEventListener('keydown', handleActionKeys)
@@ -212,7 +196,7 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
       onClick={close}
     >
       <div
-        className={`w-full max-w-[1380px] h-[92vh] sm:h-[90vh] bg-background/98 border border-border/80 rounded-[20px] shadow-[0_24px_80px_rgba(15,23,42,0.18)] overflow-hidden motion-overlay-surface flex flex-col min-h-0 ${visible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-[0.985] opacity-0'}`}
+        className={`w-full max-w-4xl h-[80vh] sm:h-[70vh] bg-background/98 border border-border/80 rounded-xl shadow-[0_24px_80px_rgba(15,23,42,0.18)] overflow-hidden motion-overlay-surface flex flex-col min-h-0 ${visible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-[0.985] opacity-0'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <CommandMenu

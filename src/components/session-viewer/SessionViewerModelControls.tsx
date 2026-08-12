@@ -236,7 +236,7 @@ export default function SessionViewerModelControls({
                       </span>
                       {thinkingLevel === level && (
                         <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                          当前
+                          {t("session.modelControls.current", "Current")}
                         </span>
                       )}
                     </button>

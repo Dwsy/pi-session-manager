@@ -24,7 +24,7 @@ export const app = {
     deleteSessionPartial: '{{count}} 件のセッションを削除できませんでした。詳細はコンソールを確認してください。',
     renameSession: 'セッションの名前変更に失敗',
     exportFailed: 'エクスポートに失敗',
-    exportSuccess: 'エクスポート成功！',
+    exportSuccess: 'エクスポート成功',
   },
   confirm: {
     deleteSession: 'セッション「{name}」を削除しますか？',

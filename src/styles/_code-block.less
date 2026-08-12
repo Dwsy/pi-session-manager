@@ -2,11 +2,12 @@
 // ========== Code Block ==========
 // =====================================================
 
-// Code Block Wrapper
+// Code Block Wrapper — no fill: inherits the surrounding surface color,
+// delineated only by a neutral hairline border
 .code-block-wrapper {
   position: relative;
-  background: var(--bg-inset);
-  border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
+  background: transparent;
+  border: 1px solid rgb(var(--color-border) / 0.55);
   border-radius: 8px;
   margin: 16px 0;
   overflow: hidden;
@@ -183,7 +184,7 @@
 
 .code-block-content::-webkit-scrollbar-track,
 .code-block::-webkit-scrollbar-track {
-  background: var(--bg-inset);
+  background: transparent;
 }
 
 .code-block-content::-webkit-scrollbar-thumb,

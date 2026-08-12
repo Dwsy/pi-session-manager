@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AppWindow, CalendarRange, PanelTopClose, Sparkles } from "lucide-react";
+import { AppWindow, CalendarRange, PanelTopClose } from "lucide-react";
 
 import SettingsCard from "@/components/settings/SettingsCard";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
@@ -10,7 +10,15 @@ import {
   requestDashboardRecap,
   setDashboardRecapAutoEnabled,
 } from "@/components/dashboard/dashboardRecap";
+import type { RecapPeriodKind } from "@/components/dashboard/recap/recapTypes";
 import { invoke } from "@/transport";
+
+const RECAP_KINDS: { kind: RecapPeriodKind; key: string; fallback: string }[] = [
+  { kind: "week", key: "settings.appBehavior.openWeekRecap", fallback: "This week" },
+  { kind: "month", key: "settings.appBehavior.openMonthRecap", fallback: "This month" },
+  { kind: "quarter", key: "settings.appBehavior.openQuarterRecap", fallback: "This quarter" },
+  { kind: "year", key: "settings.appBehavior.openYearRecap", fallback: "This year" },
+];
 
 export default function AppBehaviorSettings(_: UpdateSettingsProps) {
   const { t } = useTranslation();
@@ -74,9 +82,9 @@ export default function AppBehaviorSettings(_: UpdateSettingsProps) {
         title={t("settings.appBehavior.recapTitle", "Dashboard recaps")}
         description={t(
           "settings.appBehavior.recapDescription",
-          "A local midyear and year-end recap built only from existing session statistics.",
+          "A story-style look back at a week, month, quarter, or year — built only from local session statistics.",
         )}
-        icon={<Sparkles className="h-4 w-4" />}
+        icon={<CalendarRange className="h-4 w-4" />}
         contentClassName="p-0"
       >
         <div className="divide-y divide-border/50">
@@ -85,10 +93,10 @@ export default function AppBehaviorSettings(_: UpdateSettingsProps) {
               <CalendarRange className="h-4 w-4" />
             </div>
             <SettingsToggleRow
-              title={t("settings.appBehavior.recapAuto", "Automatic seasonal recap")}
+              title={t("settings.appBehavior.recapAuto", "Automatic recap")}
               description={t(
                 "settings.appBehavior.recapAutoDescription",
-                "Show once from June 15 through July 31, and once from December 15 through January 31. Closing it counts as shown for that cycle.",
+                "Opens once when a period wraps up — last week on Mondays, last month in the first days of a new one, plus midyear and year-end windows. Closing it counts as shown for that cycle.",
               )}
               checked={recapAutoEnabled}
               onChange={handleRecapAutoChange}
@@ -110,20 +118,16 @@ export default function AppBehaviorSettings(_: UpdateSettingsProps) {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => requestDashboardRecap("midyear")}
-                className="focus-ring h-8 rounded border border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-muted/40"
-              >
-                {t("settings.appBehavior.openMidyearRecap", "Midyear recap")}
-              </button>
-              <button
-                type="button"
-                onClick={() => requestDashboardRecap("yearend")}
-                className="focus-ring h-8 rounded border border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-muted/40"
-              >
-                {t("settings.appBehavior.openYearendRecap", "Year-end recap")}
-              </button>
+              {RECAP_KINDS.map(({ kind, key, fallback }) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => requestDashboardRecap(kind)}
+                  className="focus-ring h-8 rounded border border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-muted/40"
+                >
+                  {t(key, fallback)}
+                </button>
+              ))}
             </div>
           </div>
         </div>

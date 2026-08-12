@@ -299,7 +299,6 @@ const REVIEW_CODE_VIEW_UNSAFE_CSS = `
     border-radius: 4px;
     background: transparent;
     color: rgb(var(--color-muted-foreground));
-    cursor: pointer;
   }
 
   [data-tool-review-collapse]:hover {

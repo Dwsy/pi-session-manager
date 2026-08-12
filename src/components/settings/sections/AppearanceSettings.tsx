@@ -3,7 +3,7 @@
  */
 
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { Check, ChevronDown, Search, X, Sparkles, Trash2, Loader2 } from 'lucide-react'
+import { Check, ChevronDown, Search, X, Palette, Trash2, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import SettingsCard from '@/components/settings/SettingsCard'
 import SettingsField from '@/components/settings/SettingsField'
@@ -273,6 +273,7 @@ function PickerDialog({
   placeholder: string
   children: React.ReactNode
 }) {
+  const { t } = useTranslation()
   return (
     <div
       className="fixed inset-0 z-[95] flex items-center justify-center bg-black/60 p-4"
@@ -297,7 +298,7 @@ function PickerDialog({
               type="button"
               onClick={onClose}
               className="inline-flex h-9 w-9 items-center justify-center rounded-full text-foreground/60 hover:bg-surface hover:text-foreground motion-color"
-              aria-label="Close"
+              aria-label={t('common.close')}
             >
               <X className="h-4 w-4" />
             </button>
@@ -607,8 +608,8 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
                     onClick={() => handleOpenStudio()}
                     className="flex shrink-0 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-medium text-accent hover:bg-accent/20 transition-colors"
                   >
-                    <Sparkles className="h-4 w-4" />
-                    Open Studio
+                    <Palette className="h-4 w-4" />
+                    {t('settings.themeStudio.open', 'Open Studio')}
                   </button>
                   {piThemes.includes(settings.appearance.customTheme) && (
                     <button

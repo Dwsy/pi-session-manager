@@ -3,6 +3,7 @@ import { ArrowRightLeft, Eye, FileOutput, RefreshCw, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { useEscapeToClose } from './useEscapeToClose'
 import type {
   SessionConvertTarget,
   SessionInfo,
@@ -35,6 +36,7 @@ export default function ConvertSessionDialog({
 }: ConvertSessionDialogProps) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
+  useEscapeToClose(onClose)
   const sourceLabel = useMemo(
     () => getSessionSourceTag(session.path) || t('session.convert.unknown'),
     [session.path, t]

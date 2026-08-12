@@ -161,12 +161,9 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background:
-    radial-gradient(circle at 20% 18%, rgba(var(--accent-rgb), 0.12) 0%, rgba(var(--accent-rgb), 0) 45%),
-    radial-gradient(circle at 80% 90%, rgba(var(--highlight-rgb), 0.12) 0%, rgba(var(--highlight-rgb), 0) 50%),
-    rgba(10, 12, 16, 0.58);
-  backdrop-filter: blur(7px) saturate(110%);
-  -webkit-backdrop-filter: blur(7px) saturate(110%);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   animation: subagent-fade-in var(--motion-duration-overlay) var(--motion-ease-enter);
   will-change: opacity;
 }

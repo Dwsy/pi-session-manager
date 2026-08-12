@@ -222,23 +222,6 @@
     color: rgb(var(--color-muted-foreground));
   }
 
-  // Glow Effects
-  .glow-blue {
-    box-shadow: 0 0 20px rgba(var(--info-rgb), 0.15);
-  }
-
-  .glow-green {
-    box-shadow: 0 0 20px rgba(var(--success-rgb), 0.15);
-  }
-
-  .glow-orange {
-    box-shadow: 0 0 20px rgba(var(--warning-rgb), 0.15);
-  }
-
-  .glow-red {
-    box-shadow: 0 0 20px rgba(var(--destructive-rgb), 0.15);
-  }
-
   // Inner Shadow
   .inner-shadow {
     box-shadow: inset 0 1px 2px rgba(var(--highlight-rgb), 0.05);
@@ -384,16 +367,16 @@
 
 // Highlights
 mark {
-  background-color: rgba(250, 204, 21, 0.2);
-  color: #facc15;
+  background-color: rgb(var(--color-warning) / 0.2);
+  color: rgb(var(--color-warning));
   border-radius: 0.125rem;
   padding: 0 0.125rem;
 }
 
 // FTS Snippet
 .fts-snippet b {
-  background-color: #fbbf24;
-  color: black;
+  background-color: rgb(var(--color-warning) / 0.85);
+  color: rgb(var(--color-background));
   padding: 0 2px;
   border-radius: 2px;
   font-weight: 600;

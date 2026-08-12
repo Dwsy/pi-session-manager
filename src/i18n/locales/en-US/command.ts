@@ -76,6 +76,16 @@ export const command = {
     session: 'Sessions',
     project: 'Projects',
   },
+  roleFilter: {
+    all: 'All',
+    user: 'User',
+    assistant: 'AI',
+  },
+  sort: {
+    newest: 'Newest',
+    oldest: 'Oldest',
+    score: 'Score',
+  },
   shortcuts: {
     open: 'Open command palette',
     close: 'Close',

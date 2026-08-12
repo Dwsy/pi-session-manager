@@ -25,7 +25,7 @@ export const app = {
     renameSession: 'Failed to rename session',
     forkSession: 'Failed to fork session',
     exportFailed: 'Export failed',
-    exportSuccess: 'Export successful!',
+    exportSuccess: 'Export successful',
   },
   confirm: {
     deleteSession: 'Delete session "{{name}}"?',

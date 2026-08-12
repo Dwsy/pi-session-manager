@@ -3,7 +3,7 @@ export const session = {
   openInTerminal: '在终端中打开 (iTerm2)',
   resume: '恢复',
   copyResumeCommand: {
-    success: '恢复命令已复制！',
+    success: '恢复命令已复制',
     failed: '复制恢复命令失败',
   },
   copyPath: '复制 JSONL 路径',
@@ -120,6 +120,9 @@ export const session = {
     unknownRole: '上下文',
     noCitations: '后端未返回引用片段。',
   },
+  contextMenu: {
+    ariaLabel: '会话 {{id}}',
+  },
   list: {
     empty: '未找到会话',
     loading: '加载会话中...',
@@ -219,7 +222,7 @@ export const session = {
     messages: '消息',
     messagesLabel: '消息',
     toolCalls: '工具调用',
-    tokens: '令牌',
+    tokens: 'Token',
     cost: '成本',
     user: '用户',
     assistant: '助手',

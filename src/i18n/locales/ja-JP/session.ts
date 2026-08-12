@@ -3,7 +3,7 @@ export const session = {
   openInTerminal: 'ターミナルで開く (iTerm2)',
   resume: '再開',
   copyResumeCommand: {
-    success: '再開コマンドをコピーしました！',
+    success: '再開コマンドをコピーしました',
     failed: '再開コマンドのコピーに失敗しました',
   },
   scrollToTop: '先頭へスクロール',
@@ -59,6 +59,9 @@ export const session = {
     citationCount: '{{count}} snippets',
     unknownRole: 'context',
     noCitations: 'No citation snippets returned.',
+  },
+  contextMenu: {
+    ariaLabel: 'セッション {{id}}',
   },
   list: {
     empty: 'セッションが見つかりません',

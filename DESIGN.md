@@ -316,9 +316,26 @@ The application supports **multiple primary views** that share the same sidebar 
 |------|-------------|------------|
 | **Session Tree** | Default view — hierarchical session display | Dark/light modes |
 | **Dashboard** | Stats, charts, activity overview (modal overlay) | Light theme |
+| **Browser (`/explorer`)** | Full-width project + session tables in the main pane | Dark/light modes |
 | **Kanban Board** | Session board organized by labels/status | Light theme |
 | **Favorites Panel** | Bookmarked sessions grid | Dark theme |
 | **Settings Modal** | Full-screen settings with categories | Light theme |
+
+### Main-Pane Browser (`components/explorer/`)
+```
+┌────────────────────────────────────────────────────────────────┐
+│ [Sessions 128] [Projects 12]  ⟨project chip ×⟩   128/900   [×] │
+│ search + filter chips                                          │
+├────────────────────────────────────────────────────────────────┤
+│ SESSION | «plugin columns» | TAGS | PROJECT | SRC | # | UPDATED │
+│ row ...                                              [actions] │
+└────────────────────────────────────────────────────────────────┘
+```
+- **Tabs**: segmented control on `bg-surface/60`, active tab uses `bg-secondary`
+- **Header**: 12px horizontal padding, filter bar reuses the sidebar `SearchFilterBar`
+- **Table**: `table-fixed`, 11px body text, 10px uppercase sticky header, rows 1px `border-border/20`
+- **Rows**: hover `bg-surface/60`, selected `bg-primary/8`, actions fade in on hover only
+- **Plugin columns**: contributed via `ctx.ui.registerSessionListColumn(...)`, fixed pixel widths
 
 ### Sidebar
 ```css
@@ -502,7 +519,6 @@ backdrop-filter: blur(8px);
   border: 1px solid rgba(border, 0.4);       /* border-border/40 */
   border-radius: 6px (rounded-md);
   padding: 10px (p-2.5);
-  cursor: pointer;
   motion-surface + motion-color;
 }
 .kanban-card.selected {
@@ -572,7 +588,7 @@ backdrop-filter: blur(8px);
 ```css
 .settings-nav-item {
   padding: 8px 12px; border-radius: 6px;
-  cursor: pointer; motion-color;
+  motion-color;
 }
 .settings-nav-item.active {
   bg: rgba(accent, 0.12);
@@ -643,6 +659,15 @@ All dialogs use:
 ---
 
 ## Component Patterns
+
+### Cursor Conventions (Desktop App)
+
+Native desktop convention (macOS-style), enforced globally in `_base.less`:
+
+- **Buttons, rows, cards, tabs, labels, `<summary>`** — arrow cursor (`default`). Never add `cursor-pointer` / `cursor: pointer` to controls; Tailwind preflight's `button { cursor: pointer }` is overridden globally. Dense pointer/arrow switching reads as flicker.
+- **Real hyperlinks** (`a[href]`, markdown links) — pointing hand (`pointer`).
+- **Text inputs / textarea / contenteditable** — text cursor (`auto`).
+- **Functional cursors stay**: `col-resize` (panel handles), `grab`/`grabbing` (drag), `zoom-in`/`zoom-out` (message zoom), `crosshair` (map overview), `not-allowed` (disabled).
 
 ### Tool Execution Cards
 ```

@@ -24,6 +24,33 @@
   @media (prefers-color-scheme: light) {
     :root:not(.theme-dark):not(.theme-light) { color-scheme: light; }
   }
+
+  // Desktop cursor conventions (native macOS-style):
+  // controls use the arrow cursor; only real hyperlinks get the pointing hand.
+  // This overrides Tailwind preflight's `button, [role="button"] { cursor: pointer }`,
+  // which caused constant arrow/hand flicker across the dense UI.
+  html,
+  body {
+    cursor: default;
+  }
+
+  button,
+  [role='button'],
+  label,
+  select,
+  summary {
+    cursor: default;
+  }
+
+  a[href] {
+    cursor: pointer;
+  }
+
+  input,
+  textarea,
+  [contenteditable]:not([contenteditable='false']) {
+    cursor: auto;
+  }
 }
 
 code,

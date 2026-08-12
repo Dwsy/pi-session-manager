@@ -3,7 +3,7 @@ export const session = {
   openInTerminal: 'Im Terminal öffnen (iTerm2)',
   resume: 'Fortsetzen',
   copyResumeCommand: {
-    success: 'Fortsetzungsbefehl kopiert!',
+    success: 'Fortsetzungsbefehl kopiert',
     failed: 'Fortsetzungsbefehl konnte nicht kopiert werden',
   },
   scrollToTop: 'Nach oben scrollen',
@@ -59,6 +59,9 @@ export const session = {
     citationCount: '{{count}} snippets',
     unknownRole: 'context',
     noCitations: 'No citation snippets returned.',
+  },
+  contextMenu: {
+    ariaLabel: 'Sitzung {{id}}',
   },
   list: {
     empty: 'Keine Sitzungen gefunden',

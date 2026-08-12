@@ -1,5 +1,6 @@
 export const common = {
   loading: 'Laden...',
+  clear: 'Leeren',
   cancel: 'Abbrechen',
   save: 'Speichern',
   delete: 'Löschen',

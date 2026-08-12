@@ -41,10 +41,13 @@ export function getTabLabel(t: ReturnType<typeof useTranslation>['t'], tab: { ke
   return t(`command.${tab.key}`)
 }
 
-export function getRoleFilterLabel(value: 'all' | 'user' | 'assistant') {
-  if (value === 'all') return 'All'
-  if (value === 'user') return 'User'
-  return 'AI'
+export function getRoleFilterLabel(
+  t: ReturnType<typeof useTranslation>['t'],
+  value: 'all' | 'user' | 'assistant',
+) {
+  if (value === 'all') return t('command.roleFilter.all', 'All')
+  if (value === 'user') return t('command.roleFilter.user', 'User')
+  return t('command.roleFilter.assistant', 'AI')
 }
 
 export function getSourceFilterLabel(
@@ -58,8 +61,11 @@ export function getSourceFilterLabel(
   return t('search.fullText.source.all', 'All')
 }
 
-export function getSortLabel(value: 'newest' | 'oldest' | 'score') {
-  if (value === 'newest') return 'Newest'
-  if (value === 'oldest') return 'Oldest'
-  return 'Score'
+export function getSortLabel(
+  t: ReturnType<typeof useTranslation>['t'],
+  value: 'newest' | 'oldest' | 'score',
+) {
+  if (value === 'newest') return t('command.sort.newest', 'Newest')
+  if (value === 'oldest') return t('command.sort.oldest', 'Oldest')
+  return t('command.sort.score', 'Score')
 }

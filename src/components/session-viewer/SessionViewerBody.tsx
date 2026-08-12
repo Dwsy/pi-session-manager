@@ -9,6 +9,8 @@ import type {
   SetStateAction,
 } from "react";
 
+import { CornerDownLeft } from "lucide-react";
+
 import SystemPromptDialog from "@/components/messages/SystemPromptDialog";
 import ChatInput from "@/components/pi-live/PiLiveChatInput";
 import type { SessionTreeRef } from "@/components/session-tree/SessionTree";
@@ -178,7 +180,7 @@ export default function SessionViewerBody({
 
         {session.parent_session_path && (
           <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border bg-secondary/30 flex items-center gap-1.5">
-            <span className="text-muted-foreground/60">↩️</span>
+            <CornerDownLeft className="h-3.5 w-3.5 text-muted-foreground/60" aria-hidden="true" />
             <span>{forkedFromLabel}:</span>
             <span className="truncate max-w-[200px]" title={session.parent_session_path}>
               {stripJsonlExt(getPathBasename(session.parent_session_path)) || session.parent_session_path}

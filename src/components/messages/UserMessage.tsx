@@ -2,7 +2,7 @@ import type { Content } from '@/types'
 import { useTranslation } from 'react-i18next'
 import MarkdownContent from '@/components/ui/MarkdownContent'
 import { formatDate } from '@/utils/format'
-import { Copy, Check, Maximize2, X, FileText, Eye } from 'lucide-react'
+import { Copy, Check, Maximize2, X, FileText, Eye, ChevronDown, ChevronUp } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import {
   memo,
@@ -11,25 +11,8 @@ import {
   useRef,
   useCallback,
   useEffect,
-  type MouseEvent as ReactMouseEvent,
 } from 'react'
 import { useClipboard } from '@/hooks/useClipboard'
-
-const MESSAGE_FULLSCREEN_INTERACTIVE_SELECTOR =
-  'button, a, input, textarea, select, option, [contenteditable]:not([contenteditable="false"]), [role="button"]'
-
-export function shouldIgnoreMessageFullscreenClick(
-  event: ReactMouseEvent<HTMLElement>,
-): boolean {
-  if (event.defaultPrevented) return true
-
-  const target = event.target
-  if (!(target instanceof Element)) return true
-  if (target.closest(MESSAGE_FULLSCREEN_INTERACTIVE_SELECTOR)) return true
-
-  const selection = window.getSelection?.()
-  return Boolean(selection && !selection.isCollapsed && selection.toString().trim())
-}
 
 interface UserMessageProps {
   id: string
@@ -44,6 +27,7 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
   const [copied, setCopied] = useState(false)
   const [showRaw, setShowRaw] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const { copyText } = useClipboard()
 
   const images = useMemo(
@@ -94,16 +78,18 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
     return () => observer.disconnect()
   }, [text])
 
+  const roleLabel = t('components.userMessage.you', 'You')
+
   return (
     <>
       <article
         className={`user-message ${className}`}
         id={`entry-${id}`}
-        aria-label="You"
+        aria-label={roleLabel}
       >
         <div className="user-message-header">
           <div className="user-message-meta">
-            <span className="user-message-role">You</span>
+            <span className="user-message-role">{roleLabel}</span>
             {timestamp && (
               <span className="user-message-timestamp">{formatDate(timestamp)}</span>
             )}
@@ -169,12 +155,7 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
           </div>
         </div>
 
-        <div
-          className="user-message-content"
-          onClick={(event) => {
-            if (!shouldIgnoreMessageFullscreenClick(event)) handleOpenModal()
-          }}
-        >
+        <div className="user-message-content">
           {images.length > 0 && (
             <div className="message-images">
               {images.map((img, idx) => (
@@ -198,7 +179,7 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
           {text.trim() && (
             <div
               ref={bodyRef}
-              className={`user-message-body-truncated ${isTruncated ? 'is-truncated' : ''}`}
+              className={`user-message-body-truncated ${isTruncated ? 'is-truncated' : ''} ${isExpanded ? 'is-expanded' : ''}`}
             >
               {showRaw ? (
                 <pre className="user-message-body-raw">{text}</pre>
@@ -206,6 +187,27 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
                 <MarkdownContent content={text} className="user-message-body" searchQuery={searchQuery} />
               )}
             </div>
+          )}
+
+          {(isTruncated || isExpanded) && (
+            <button
+              type="button"
+              className="user-message-expand-toggle"
+              onClick={() => setIsExpanded(prev => !prev)}
+              aria-expanded={isExpanded}
+            >
+              {isExpanded ? (
+                <>
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  {t('components.userMessage.showLess', 'Show less')}
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                  {t('components.userMessage.showMore', 'Show more')}
+                </>
+              )}
+            </button>
           )}
         </div>
       </article>
@@ -360,12 +362,7 @@ function UserMessageModal({ text, images, timestamp, searchQuery, initialShowRaw
             </button>
           </div>
         </div>
-        <div
-          className="user-message-modal-body"
-          onClick={(event) => {
-            if (!shouldIgnoreMessageFullscreenClick(event)) onClose()
-          }}
-        >
+        <div className="user-message-modal-body">
           {images.length > 0 && (
             <div className="message-images mb-4 flex flex-wrap gap-3">
               {images.map((img, idx) => (

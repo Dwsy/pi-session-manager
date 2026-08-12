@@ -29,7 +29,7 @@ export const search = {
     role: {
       all: '全部',
       user: '用户',
-      assistant: 'AI',
+      assistant: '助手',
     },
     source: {
       all: '全部',

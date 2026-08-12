@@ -24,7 +24,7 @@ export const app = {
     deleteSessionPartial: '{{count}} Sitzungen konnten nicht gelöscht werden. Details stehen in der Konsole.',
     renameSession: 'Sitzung konnte nicht umbenannt werden',
     exportFailed: 'Export fehlgeschlagen',
-    exportSuccess: 'Export erfolgreich!',
+    exportSuccess: 'Export erfolgreich',
   },
   confirm: {
     deleteSession: 'Sitzung „{name}" löschen?',

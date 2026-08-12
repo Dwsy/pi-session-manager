@@ -749,7 +749,7 @@ function ChatMessageView({
 
       {isAssistant && citations.length > 0 && (
         <details className="mt-1.5 rounded-lg border border-border/45 bg-background/35 px-2.5 py-2">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <summary className="flex list-none items-center justify-between gap-2 text-[11px] text-muted-foreground">
             <span>{t("session.sideChat.citations", "Citations")}</span>
             <span className="inline-flex items-center gap-1">
               {t("session.sideChat.citationCount", "{{count}} snippets", { count: citations.length })}

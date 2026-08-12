@@ -31,7 +31,7 @@ export const app = {
     renameSession: '重命名会话失败',
     forkSession: '复制会话失败',
     exportFailed: '导出失败',
-    exportSuccess: '导出成功！',
+    exportSuccess: '导出成功',
   },
   confirm: {
     deleteSession: '确定要删除会话「{{name}}」吗？',

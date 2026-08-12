@@ -1,4 +1,5 @@
 import { AlertCircle, CheckCircle2, Info, AlertTriangle, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { FeedbackTone } from "../types";
 
 export function StatusBanner({
@@ -10,6 +11,7 @@ export function StatusBanner({
   message: string;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const palette = {
     success: "border-success/30 bg-success/10 text-success",
     error: "border-destructive/30 bg-destructive/10 text-destructive",
@@ -35,7 +37,7 @@ export function StatusBanner({
       <button
         type="button"
         onClick={onClose}
-        aria-label="Close"
+        aria-label={t("common.close")}
         className="focus-ring rounded-md p-1 text-current/70 hover:bg-foreground/10 hover:text-current"
       >
         <X className="h-4 w-4" />

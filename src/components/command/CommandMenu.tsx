@@ -12,6 +12,7 @@ import type { SearchPluginResult, SearchContext } from "@/plugins/types";
 import { useSearchPlugins } from "@/hooks/useSearchPlugins";
 import { psmPluginHost, usePsmPluginCommands } from "@/plugins/runtime-host";
 import { getPathBasename } from "@/utils/path";
+import { getCachedSettings } from "@/utils/settingsApi";
 import { formatSourceFilterToken } from "@/utils/search";
 import type { MessageSearchPluginOptions } from "@/plugins/message/MessageSearchPlugin";
 import type { FullTextSearchSourceFilter } from "@/types";
@@ -24,6 +25,7 @@ import SessionPreviewPanel from "./SessionPreviewPanel";
 import type { CommandActionItem, CommandPaletteMode } from "./commandActions";
 import { useCommandSearch } from "./hooks/useCommandSearch";
 import { TABS, type TabType } from "./utils";
+import type { PluginRegistry } from "@/plugins/registry";
 
 interface CommandMenuProps {
   query: string;
@@ -40,7 +42,7 @@ interface CommandMenuProps {
   setFtsOptions: (options: MessageSearchPluginOptions) => void;
   selectedResult: SearchPluginResult | null;
   setSelectedResult: (result: SearchPluginResult | null) => void;
-  registryRef: React.MutableRefObject<any>;
+  registryRef: React.MutableRefObject<PluginRegistry | null>;
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
   mode: CommandPaletteMode;
@@ -273,7 +275,9 @@ export default memo(function CommandMenu({
       : t("command.placeholder", "Search sessions, projects, messages...");
 
   const cycleMode = useCallback((direction: 1 | -1 = 1) => {
-    const modes: CommandPaletteMode[] = ['search', 'commands', 'dev'];
+    const modes: CommandPaletteMode[] = getCachedSettings().advanced.debugMode
+      ? ['search', 'commands', 'dev']
+      : ['search', 'commands'];
     setMode((value) => {
       const index = modes.indexOf(value);
       return modes[(index + direction + modes.length) % modes.length];

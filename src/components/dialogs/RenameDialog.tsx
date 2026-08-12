@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Pencil } from 'lucide-react'
 import type { SessionInfo } from '@/types'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { useEscapeToClose } from './useEscapeToClose'
 
 interface RenameDialogProps {
   session: SessionInfo
@@ -14,6 +15,7 @@ export default function RenameDialog({ session, onRename, onClose }: RenameDialo
   const { t } = useTranslation()
   const isMobile = useIsMobile()
   const [newName, setNewName] = useState(session.name || '')
+  useEscapeToClose(onClose)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

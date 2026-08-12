@@ -3,7 +3,8 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Check, Copy, AlertCircle, Sparkles, Sliders, Code, X, Save } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Check, Copy, AlertCircle, Palette, Wand2, Sliders, Code, X, Save } from 'lucide-react'
 import {
   type PiThemeFile,
   getBuiltInBase46Themes,
@@ -24,40 +25,45 @@ interface ThemeStudioModalProps {
 }
 
 const COLOR_GROUPS: Array<{
-  label: string
-  keys: Array<{ key: string; name: string }>
+  labelKey: string
+  labelDefault: string
+  keys: Array<{ key: string; nameKey: string; nameDefault: string }>
 }> = [
   {
-    label: 'Base Surfaces',
+    labelKey: 'baseSurfaces',
+    labelDefault: 'Base Surfaces',
     keys: [
-      { key: 'background', name: 'Background' },
-      { key: 'panel', name: 'Panel / Card' },
-      { key: 'panelAlt', name: 'Secondary Surface' },
+      { key: 'background', nameKey: 'background', nameDefault: 'Background' },
+      { key: 'panel', nameKey: 'panel', nameDefault: 'Panel / Card' },
+      { key: 'panelAlt', nameKey: 'panelAlt', nameDefault: 'Secondary Surface' },
     ],
   },
   {
-    label: 'Typography & Contrast',
+    labelKey: 'typography',
+    labelDefault: 'Typography & Contrast',
     keys: [
-      { key: 'text', name: 'Primary Text' },
-      { key: 'muted', name: 'Muted / Comments' },
-      { key: 'dim', name: 'Dim / Subtitles' },
+      { key: 'text', nameKey: 'text', nameDefault: 'Primary Text' },
+      { key: 'muted', nameKey: 'muted', nameDefault: 'Muted / Comments' },
+      { key: 'dim', nameKey: 'dim', nameDefault: 'Dim / Subtitles' },
     ],
   },
   {
-    label: 'Brand & Accents',
+    labelKey: 'accents',
+    labelDefault: 'Brand & Accents',
     keys: [
-      { key: 'accent', name: 'Brand Accent' },
-      { key: 'border', name: 'Border Color' },
-      { key: 'selectedBg', name: 'Selection Background' },
+      { key: 'accent', nameKey: 'accent', nameDefault: 'Brand Accent' },
+      { key: 'border', nameKey: 'border', nameDefault: 'Border Color' },
+      { key: 'selectedBg', nameKey: 'selectedBg', nameDefault: 'Selection Background' },
     ],
   },
   {
-    label: 'Status & Badges',
+    labelKey: 'status',
+    labelDefault: 'Status & Badges',
     keys: [
-      { key: 'success', name: 'Success / Additions' },
-      { key: 'error', name: 'Error / Deletions' },
-      { key: 'warning', name: 'Warning' },
-      { key: 'purple', name: 'Custom Accent' },
+      { key: 'success', nameKey: 'success', nameDefault: 'Success / Additions' },
+      { key: 'error', nameKey: 'error', nameDefault: 'Error / Deletions' },
+      { key: 'warning', nameKey: 'warning', nameDefault: 'Warning' },
+      { key: 'purple', nameKey: 'purple', nameDefault: 'Custom Accent' },
     ],
   },
 ]
@@ -84,6 +90,7 @@ export default function ThemeStudioModal({
   initialThemeName,
   onThemeSaved,
 }: ThemeStudioModalProps) {
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<'palette' | 'ai'>('palette')
   const [baseSelection, setBaseSelection] = useState<string>('app-default')
   const [userThemes, setUserThemes] = useState<string[]>([])
@@ -157,7 +164,7 @@ export default function ThemeStudioModal({
 
   const handleSave = async () => {
     if (!themeNameInput.trim()) {
-      setSaveError('Please enter a theme name')
+      setSaveError(t('settings.themeStudio.nameRequired', 'Please enter a theme name'))
       return
     }
     setIsSaving(true)
@@ -168,7 +175,7 @@ export default function ThemeStudioModal({
       await onThemeSaved(cleanName)
       onClose()
     } catch (err: any) {
-      setSaveError(err.message || 'Failed to save theme')
+      setSaveError(err.message || t('settings.themeStudio.saveFailed', 'Failed to save theme'))
     } finally {
       setIsSaving(false)
     }
@@ -191,25 +198,25 @@ export default function ThemeStudioModal({
         <div className="flex items-center justify-between border-b border-border bg-background px-5 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-accent/20 text-accent">
-              <Sparkles className="h-5 w-5" />
+              <Palette className="h-5 w-5" />
             </div>
             <div>
-              <h2 id="theme-studio-title" className="text-lg font-semibold text-foreground">Theme Studio</h2>
-              <p className="text-xs text-muted-foreground">Customise palette variables or generate JSON with AI</p>
+              <h2 id="theme-studio-title" className="text-lg font-semibold text-foreground">{t('settings.themeStudio.title', 'Theme Studio')}</h2>
+              <p className="text-xs text-muted-foreground">{t('settings.themeStudio.subtitle', 'Customise palette variables or generate JSON with AI')}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
             {/* Base preset dropdown */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>Base Template:</span>
+              <span>{t('settings.themeStudio.baseTemplate', 'Base Template:')}</span>
               <select
                 value={baseSelection}
                 onChange={(e) => handleBaseSelectionChange(e.target.value)}
                 className="h-8 rounded-md border border-border bg-background px-2.5 text-xs text-foreground focus:border-accent focus:outline-none"
               >
-                <option value="app-default">App Default</option>
-                <optgroup label="Built-in Base46 Presets">
+                <option value="app-default">{t('settings.themeStudio.appDefault', 'App Default')}</option>
+                <optgroup label={t('settings.themeStudio.builtInPresets', 'Built-in Base46 Presets')}>
                   {builtInBase46List.map((t) => (
                     <option key={t.id} value={toBase46Selection(t.id)}>
                       {t.label} ({t.scheme})
@@ -217,7 +224,7 @@ export default function ThemeStudioModal({
                   ))}
                 </optgroup>
                 {userThemes.length > 0 && (
-                  <optgroup label="User Custom Themes">
+                  <optgroup label={t('settings.themeStudio.userThemes', 'User Custom Themes')}>
                     {userThemes.map((ut) => (
                       <option key={ut} value={ut}>
                         {ut}
@@ -230,6 +237,7 @@ export default function ThemeStudioModal({
 
             <button
               onClick={handleCancel}
+              aria-label={t('common.close', 'Close')}
               className="rounded-md p-1.5 text-muted-foreground hover:bg-surface-dark hover:text-foreground"
             >
               <X className="h-5 w-5" />
@@ -253,7 +261,7 @@ export default function ThemeStudioModal({
                 }`}
               >
                 <Sliders className="h-4 w-4" />
-                Palette Editor
+                {t('settings.themeStudio.paletteEditor', 'Palette Editor')}
               </button>
               <button
                 type="button"
@@ -265,7 +273,7 @@ export default function ThemeStudioModal({
                 }`}
               >
                 <Code className="h-4 w-4" />
-                AI Prompt & JSON
+                {t('settings.themeStudio.aiJsonTab', 'AI Prompt & JSON')}
               </button>
             </div>
 
@@ -274,25 +282,25 @@ export default function ThemeStudioModal({
               {activeTab === 'palette' ? (
                 <div className="space-y-6">
                   {COLOR_GROUPS.map((group) => (
-                    <div key={group.label} className="space-y-3">
+                    <div key={group.labelKey} className="space-y-3">
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        {group.label}
+                        {t(`settings.themeStudio.groups.${group.labelKey}`, group.labelDefault)}
                       </h4>
                       <div className="grid grid-cols-2 gap-3">
-                        {group.keys.map(({ key, name }) => {
+                        {group.keys.map(({ key, nameKey, nameDefault }) => {
                           const val = themeVars[key] || '#000000'
                           return (
                             <div
                               key={key}
                               className="flex items-center justify-between rounded-md border border-border/60 bg-background/50 p-2.5"
                             >
-                              <span className="text-xs font-medium text-foreground">{name}</span>
+                              <span className="text-xs font-medium text-foreground">{t(`settings.themeStudio.colors.${nameKey}`, nameDefault)}</span>
                               <div className="flex items-center gap-2">
                                 <input
                                   type="color"
                                   value={val.startsWith('#') ? val : '#000000'}
                                   onChange={(e) => handleColorChange(key, e.target.value)}
-                                  className="h-6 w-6 cursor-pointer rounded border-0 bg-transparent p-0"
+                                  className="h-6 w-6 rounded border-0 bg-transparent p-0"
                                 />
                                 <input
                                   type="text"
@@ -315,10 +323,10 @@ export default function ThemeStudioModal({
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
                         <h4 className="flex items-center gap-1.5 text-xs font-semibold text-accent">
-                          <Sparkles className="h-4 w-4" /> Generate Theme with AI
+                          <Wand2 className="h-4 w-4" /> {t('settings.themeStudio.generateWithAi', 'Generate Theme with AI')}
                         </h4>
                         <p className="text-xs text-muted-foreground">
-                          Copy this structured prompt to ChatGPT / Claude to design a custom theme, then paste the returned JSON below.
+                          {t('settings.themeStudio.aiHelp', 'Copy this structured prompt to ChatGPT / Claude to design a custom theme, then paste the returned JSON below.')}
                         </p>
                       </div>
                       <button
@@ -326,7 +334,9 @@ export default function ThemeStudioModal({
                         className="flex shrink-0 items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
                       >
                         {copiedPrompt ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        {copiedPrompt ? 'Copied Prompt' : 'Copy AI Prompt'}
+                        {copiedPrompt
+                          ? t('settings.themeStudio.copiedPrompt', 'Copied Prompt')
+                          : t('settings.themeStudio.copyPrompt', 'Copy AI Prompt')}
                       </button>
                     </div>
                   </div>
@@ -334,21 +344,21 @@ export default function ThemeStudioModal({
                   {/* JSON Editor */}
                   <div className="flex flex-1 flex-col space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold text-foreground">Paste or Edit Theme JSON</label>
+                      <label className="text-xs font-semibold text-foreground">{t('settings.themeStudio.jsonLabel', 'Paste or Edit Theme JSON')}</label>
                       {jsonValidation.valid ? (
                         <span className="flex items-center gap-1 text-xs text-success">
-                          <Check className="h-3.5 w-3.5" /> Valid JSON
+                          <Check className="h-3.5 w-3.5" /> {t('settings.themeStudio.validJson', 'Valid JSON')}
                         </span>
                       ) : (
                         <span className="flex items-center gap-1 text-xs text-destructive">
-                          <AlertCircle className="h-3.5 w-3.5" /> Syntax Error
+                          <AlertCircle className="h-3.5 w-3.5" /> {t('settings.themeStudio.syntaxError', 'Syntax Error')}
                         </span>
                       )}
                     </div>
                     <textarea
                       value={jsonText}
                       onChange={(e) => handleJsonTextChange(e.target.value)}
-                      placeholder="Paste JSON theme object here..."
+                      placeholder={t('settings.themeStudio.jsonPlaceholder', 'Paste JSON theme object here...')}
                       className="flex-1 font-mono text-xs rounded-md border border-border bg-background p-3 text-foreground focus:border-accent focus:outline-none"
                     />
                     {!jsonValidation.valid && (
@@ -363,7 +373,7 @@ export default function ThemeStudioModal({
           {/* Right Live Preview Panel */}
           <div className="col-span-5 flex flex-col bg-surface/30 p-6">
             <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Live Mockup Preview
+              {t('settings.themeStudio.livePreview', 'Live Mockup Preview')}
             </h3>
 
             <div className="flex-1 space-y-4 rounded-xl border border-border bg-background p-4 shadow-inner">
@@ -432,12 +442,12 @@ export default function ThemeStudioModal({
         {/* Footer Actions */}
         <div className="flex items-center justify-between border-t border-border bg-background px-5 py-4">
           <div className="flex items-center gap-3">
-            <label className="text-xs font-medium text-foreground">Save as Theme Name:</label>
+            <label className="text-xs font-medium text-foreground">{t('settings.themeStudio.saveAsLabel', 'Save as Theme Name:')}</label>
             <input
               type="text"
               value={themeNameInput}
               onChange={(e) => setThemeNameInput(e.target.value)}
-              placeholder="e.g. my-cool-theme"
+              placeholder={t('settings.themeStudio.namePlaceholder', 'e.g. my-cool-theme')}
               className="h-9 w-56 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:border-accent focus:outline-none"
             />
             {saveError && <span className="text-xs text-destructive">{saveError}</span>}
@@ -448,7 +458,7 @@ export default function ThemeStudioModal({
               onClick={handleCancel}
               className="rounded-md border border-border px-4 py-2 text-xs font-medium text-foreground hover:bg-surface-dark"
             >
-              Cancel
+              {t('common.cancel', 'Cancel')}
             </button>
             <button
               onClick={handleSave}
@@ -456,7 +466,9 @@ export default function ThemeStudioModal({
               className="flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              {isSaving ? 'Saving...' : 'Save & Apply Theme'}
+              {isSaving
+                ? t('settings.themeStudio.saving', 'Saving...')
+                : t('settings.themeStudio.saveApply', 'Save & Apply Theme')}
             </button>
           </div>
         </div>

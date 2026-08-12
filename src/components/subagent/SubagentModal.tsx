@@ -5,6 +5,7 @@ import { invoke } from '@/transport'
 import { X, Bot, Clock, Cpu, Wrench, AlertCircle, CheckCircle2, FileText, Eye, EyeOff, ChevronsUpDown } from 'lucide-react'
 import type { SubagentResult, SessionEntry } from '@/types'
 import { parseSessionEntries } from '@/utils/session'
+import { formatTokens } from '@/utils/format'
 import UserMessage from '@/components/messages/UserMessage'
 import AssistantMessage from '@/components/messages/AssistantMessage'
 import Compaction from '@/components/messages/Compaction'
@@ -25,15 +26,6 @@ function formatDuration(ms: number): string {
   return `${mins}m${secs}s`
 }
 
-function formatTokens(n: number): string {
-  if (n < 1000) return String(n)
-  if (n < 1000000) return `${(n / 1000).toFixed(1)}k`
-  return `${(n / 1000000).toFixed(2)}M`
-}
-
-function formatTurns(n: number): string {
-  return `${n} turn${n !== 1 ? 's' : ''}`
-}
 
 // Simple in-memory cache for subagent JSONL content
 const jsonlCache = new Map<string, SessionEntry[]>()
@@ -419,7 +411,10 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
                 {result.usage?.turns && (
                   <span className="subagent-meta-item">
                     <Bot size={13} />
-                    {formatTurns(result.usage.turns)}
+                    {t('components.subagent.turnsCount', {
+                      count: result.usage.turns,
+                      defaultValue: '{{count}} turns',
+                    })}
                   </span>
                 )}
               </>

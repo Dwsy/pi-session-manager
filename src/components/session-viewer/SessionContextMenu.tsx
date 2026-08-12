@@ -183,7 +183,7 @@ export default function SessionContextMenu({
     <div
       ref={menuRef}
       role="menu"
-      aria-label={`Session ${sessionId}`}
+      aria-label={t('session.contextMenu.ariaLabel', 'Session {{id}}', { id: sessionId })}
       className="session-context-menu fixed z-[9999]"
       style={{ left, top }}
       onKeyDown={(event) => {

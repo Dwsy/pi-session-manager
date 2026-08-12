@@ -13,12 +13,12 @@ export default function LanguageSettings({ settings, onUpdate }: LanguageSetting
   const { t, i18n } = useTranslation()
 
   const languages = [
-  { code: 'zh-CN', name: 'Simplified Chinese', flag: '🇨🇳' },
-    { code: 'en-US', name: 'English', flag: '🇺🇸' },
-    { code: 'ja-JP', name: 'Japanese', flag: '🇯🇵' },
-    { code: 'fr-FR', name: 'Français', flag: '🇫🇷' },
-    { code: 'de-DE', name: 'Deutsch', flag: '🇩🇪' },
-    { code: 'es-ES', name: 'Español', flag: '🇪🇸' },
+    { code: 'zh-CN', name: '简体中文' },
+    { code: 'en-US', name: 'English' },
+    { code: 'ja-JP', name: '日本語' },
+    { code: 'fr-FR', name: 'Français' },
+    { code: 'de-DE', name: 'Deutsch' },
+    { code: 'es-ES', name: 'Español' },
   ]
 
   const handleLanguageChange = (langCode: string) => {
@@ -38,9 +38,6 @@ export default function LanguageSettings({ settings, onUpdate }: LanguageSetting
           onChange={handleLanguageChange}
           name="language"
           getLabel={(langCode) => languageOptionsMap.get(langCode)?.name ?? langCode}
-          getPrefix={(langCode) => (
-            <span className="text-xl">{languageOptionsMap.get(langCode)?.flag ?? '🌐'}</span>
-          )}
           getSuffix={(_langCode, active) =>
             active ? <Check className="h-4 w-4 text-info ml-auto" /> : null
           }
