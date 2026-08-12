@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import DashboardCardShell from './DashboardCardShell'
 import type { SessionStats } from '@/types'
 import type { DashboardTimeGranularity } from './dashboardTimeRange'
+import { formatTokens } from '@/utils/format'
 
 interface DashboardRangeDetailProps {
   granularity: DashboardTimeGranularity
@@ -11,11 +12,7 @@ interface DashboardRangeDetailProps {
   rangeEnd: Date | null
 }
 
-function compact(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`
-  return value.toLocaleString()
-}
+const compact = formatTokens
 
 export default function DashboardRangeDetail({ granularity, stats, rangeStart, rangeEnd }: DashboardRangeDetailProps) {
   const { t, i18n } = useTranslation()

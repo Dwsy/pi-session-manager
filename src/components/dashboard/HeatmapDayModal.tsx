@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import type { HeatmapPoint, DayStats } from '@/types'
 import { getPathBasename } from '@/utils/path'
+import { formatTokens } from '@/utils/format'
 import { DelayedLoadingCenter } from '@/components/ui/DelayedLoading'
 import { useDelayedLoading } from '@/hooks/useDelayedLoading'
 import DashboardDialog from './DashboardDialog'
@@ -43,13 +44,7 @@ const TOKEN_TREND_CHART = {
   bottom: 42,
 }
 
-function formatCompactNumber(value: number): string {
-  const abs = Math.abs(value)
-  if (abs >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`
-  if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1)}M`
-  if (abs >= 1_000) return `${(value / 1_000).toFixed(abs >= 10_000 ? 0 : 1)}K`
-  return value.toString()
-}
+const formatCompactNumber = formatTokens
 
 function intensity(value: number, max: number): number {
   if (max <= 0 || value <= 0) return 0
@@ -437,8 +432,8 @@ export default function HeatmapDayModal({
                         <span className="font-semibold text-foreground">{formatCost(tokenDetails.total_cost)}</span>
                       </div>
                       <div className="col-span-2 flex items-center justify-between gap-3 border-t border-border/10 pt-1 text-muted-foreground">
-                        <span>{t('dashboard.heatmapModal.cacheRead', '缓存读')} {formatCompactNumber(tokenDetails.total_cache_read)}</span>
-                        <span>{t('dashboard.heatmapModal.cacheWrite', '缓存写')} {formatCompactNumber(tokenDetails.total_cache_write)}</span>
+                        <span>{t('dashboard.heatmapModal.cacheRead', 'Cache read')} {formatCompactNumber(tokenDetails.total_cache_read)}</span>
+                        <span>{t('dashboard.heatmapModal.cacheWrite', 'Cache write')} {formatCompactNumber(tokenDetails.total_cache_write)}</span>
                         <span>{t('dashboard.heatmapModal.avgTokens', 'Avg')} {formatCompactNumber(averageTrendTokens)}</span>
                       </div>
                     </div>
@@ -494,7 +489,6 @@ export default function HeatmapDayModal({
                           cx={x}
                           cy={y}
                           r="4"
-                          className="cursor-pointer"
                           fill="transparent"
                           onMouseEnter={() => setHoveredTrendDate(item.date)}
                           onMouseLeave={() => setHoveredTrendDate(null)}

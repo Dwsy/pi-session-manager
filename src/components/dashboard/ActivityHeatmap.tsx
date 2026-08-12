@@ -5,6 +5,7 @@ import DashboardCardShell from './DashboardCardShell'
 import HeatmapTooltip from './HeatmapTooltip'
 import type { HeatmapPoint } from '@/types'
 import type { DashboardTimeGranularity } from './dashboardTimeRange'
+import { formatTokens } from '@/utils/format'
 
 interface ActivityHeatmapProps {
   data: HeatmapPoint[]
@@ -92,7 +93,6 @@ export default function ActivityHeatmap({
       t('dashboard.activityLevels.high', 'High'),
       t('dashboard.activityLevels.veryHigh', 'Very high'),
     ][level]
-    const formatTokens = (value: number) => value >= 1_000_000 ? `${(value / 1_000_000).toFixed(1)}M` : value >= 1_000 ? `${(value / 1_000).toFixed(1)}k` : value.toLocaleString()
     const formatCost = (value: number) => value < 0.01 ? `$${value.toFixed(4)}` : `$${value.toFixed(value < 1 ? 3 : 2)}`
     const content = (
       <button

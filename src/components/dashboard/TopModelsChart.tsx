@@ -2,6 +2,7 @@ import { Coins, Cpu, Database, DollarSign } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import DashboardCardShell from './DashboardCardShell'
 import type { SessionStats } from '@/types'
+import { formatTokens } from '@/utils/format'
 
 interface TopModelsChartProps {
   stats: SessionStats
@@ -10,11 +11,7 @@ interface TopModelsChartProps {
   onModelClick?: (model: string) => void
 }
 
-function compact(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`
-  return value.toLocaleString()
-}
+const compact = formatTokens
 
 function money(value: number): string {
   if (value === 0) return '$0.00'

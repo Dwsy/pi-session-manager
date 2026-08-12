@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SessionInfo, SessionStats } from '@/types'
 import { getRuntimeStats } from '@/runtime-data/sessionSource'
+import { useRecapEasterEgg } from '@/hooks/useRecapEasterEgg'
 import DashboardRecapModal from './DashboardRecapModal'
 import { filterSessionsByPeriod } from './dashboardInsights'
 import {
   DASHBOARD_RECAP_EVENT,
   DASHBOARD_RECAP_SETTINGS_EVENT,
   getAutomaticDashboardRecap,
+  getEasterEggDashboardRecap,
   hasShownDashboardRecap,
   isDashboardRecapAutoEnabled,
   markDashboardRecapShown,
@@ -17,6 +19,12 @@ interface DashboardRecapControllerProps {
   sessions: SessionInfo[]
 }
 
+/**
+ * Owns the recap lifecycle: listens for open requests (settings buttons, the
+ * seasonal automatic window, the hidden keyboard triggers), scopes sessions
+ * to the requested period, fetches period stats, and hands everything to the
+ * modal. Mounted once in AppOverlays.
+ */
 export default function DashboardRecapController({ sessions }: DashboardRecapControllerProps) {
   const [request, setRequest] = useState<DashboardRecapRequest | null>(null)
   const [periodSessions, setPeriodSessions] = useState<SessionInfo[]>([])
@@ -26,13 +34,14 @@ export default function DashboardRecapController({ sessions }: DashboardRecapCon
   const openedAutomaticCycleRef = useRef<string | null>(null)
 
   const openRecap = useCallback(async (nextRequest: DashboardRecapRequest) => {
-    const matchingSessions = filterSessionsByPeriod(sessions, nextRequest.start, nextRequest.end)
+    const { start, end, cycleKey } = nextRequest.period
+    const matchingSessions = filterSessionsByPeriod(sessions, start, end)
     setRequest(nextRequest)
     setPeriodSessions(matchingSessions)
     setStats(null)
     setError(null)
     if (nextRequest.source === 'automatic') {
-      openedAutomaticCycleRef.current = nextRequest.cycleKey
+      openedAutomaticCycleRef.current = cycleKey
     }
     if (matchingSessions.length === 0) {
       setLoading(false)
@@ -40,8 +49,7 @@ export default function DashboardRecapController({ sessions }: DashboardRecapCon
     }
     setLoading(true)
     try {
-      const nextStats = await getRuntimeStats(matchingSessions)
-      setStats(nextStats)
+      setStats(await getRuntimeStats(matchingSessions))
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
@@ -53,16 +61,17 @@ export default function DashboardRecapController({ sessions }: DashboardRecapCon
     if (!sessions.length || !isDashboardRecapAutoEnabled() || request) return
     const automatic = getAutomaticDashboardRecap()
     if (!automatic) return
-    if (openedAutomaticCycleRef.current === automatic.cycleKey) return
-    if (hasShownDashboardRecap(automatic.cycleKey)) return
+    const { cycleKey } = automatic.period
+    if (openedAutomaticCycleRef.current === cycleKey) return
+    if (hasShownDashboardRecap(cycleKey)) return
     void openRecap(automatic)
   }, [openRecap, request, sessions.length])
 
   useEffect(() => {
     const handleRequest = (event: Event) => {
       const detail = (event as CustomEvent<DashboardRecapRequest>).detail
-      if (!detail) return
-      void openRecap({ ...detail, source: 'manual' })
+      if (!detail?.period) return
+      void openRecap(detail)
     }
     const handleSettings = () => checkAutomaticRecap()
     window.addEventListener(DASHBOARD_RECAP_EVENT, handleRequest as EventListener)
@@ -77,11 +86,23 @@ export default function DashboardRecapController({ sessions }: DashboardRecapCon
     checkAutomaticRecap()
   }, [checkAutomaticRecap])
 
+  useRecapEasterEgg({
+    onTrigger: useCallback(() => {
+      void openRecap(getEasterEggDashboardRecap())
+    }, [openRecap]),
+    // While a recap is open the stage owns the keyboard.
+    enabled: request === null,
+  })
+
   const handleClose = () => {
     if (request?.source === 'automatic') {
-      markDashboardRecapShown(request.cycleKey)
+      markDashboardRecapShown(request.period.cycleKey)
     }
     setRequest(null)
+  }
+
+  const handleRetry = () => {
+    if (request) void openRecap(request)
   }
 
   if (!request) return null
@@ -90,9 +111,11 @@ export default function DashboardRecapController({ sessions }: DashboardRecapCon
     <DashboardRecapModal
       request={request}
       sessions={periodSessions}
+      allSessions={sessions}
       stats={stats}
       loading={loading}
       error={error}
+      onRetry={handleRetry}
       onClose={handleClose}
     />
   )

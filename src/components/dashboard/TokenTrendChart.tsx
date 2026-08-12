@@ -6,6 +6,7 @@ import DashboardCardShell from './DashboardCardShell'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import type { SessionStats } from '@/types'
 import type { DashboardTimeGranularity } from './dashboardTimeRange'
+import { formatTokens } from '@/utils/format'
 
 interface TokenTrendChartProps {
   stats: SessionStats
@@ -68,13 +69,6 @@ export default function TokenTrendChart({
   const isSingleDay = granularity === 'day' || (granularity === undefined && dailyData.length === 1)
   const chartAnimationDuration = prefersReducedMotion ? 0 : 500
   const periodLabel = rangeLabel || t('dashboard.tokenStats.daysLabel', '{{count}} days', { count: dailyData.length })
-
-  const formatTokens = (count: number) => {
-    if (count === 0) return '0'
-    if (count < 1000) return count.toString()
-    if (count < 1000000) return `${(count / 1000).toFixed(1)}k`
-    return `${(count / 1000000).toFixed(2)}M`
-  }
 
   const formatCost = (cost: number) => {
     if (cost === 0) return '$0.00'

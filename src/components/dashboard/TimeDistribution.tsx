@@ -1,105 +1,34 @@
-import { Clock } from 'lucide-react'
+import { useMemo } from 'react'
+import { Clock, Star } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import DashboardCardShell from './DashboardCardShell'
 import type { SessionStats } from '@/types'
 
 interface TimeDistributionProps {
   stats: SessionStats
-  title?: string
-  type?: 'hourly' | 'daily' | 'weekly'
   onClick?: () => void
 }
 
-const HOUR_LABELS = [
-  '12a', '1a', '2a', '3a', '4a', '5a', '6a',
-  '7a', '8a', '9a', '10a', '11a', '12p',
-  '1p', '2p', '3p', '4p', '5p', '6p',
-  '7p', '8p', '9p', '10p', '11p',
-]
+export default function TimeDistribution({ stats, onClick }: TimeDistributionProps) {
+  const { t, i18n } = useTranslation()
 
-const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const hourLabels = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat(i18n.language, { hour: 'numeric' })
+    return Array.from({ length: 24 }, (_, hour) => formatter.format(new Date(2000, 0, 1, hour)))
+  }, [i18n.language])
 
-export default function TimeDistribution({
-  stats,
-  title = 'Active Hours',
-  type = 'hourly',
-  onClick,
-}: TimeDistributionProps) {
-  const { t } = useTranslation()
-  const renderHourly = () => {
-    // Only show hours with activity, max 8 items
-    const hourlyData = stats.time_distribution
-      .filter(p => p.message_count > 0)
-      .sort((a, b) => b.message_count - a.message_count)
-      .slice(0, 8)
-      .map(p => ({
-        hour: HOUR_LABELS[p.hour] || p.hour.toString(),
-        value: p.message_count,
-        isPeak: false,
-      }))
-
-    if (hourlyData.length === 0) {
-      return <div className="text-center text-muted-foreground py-4 text-xs">{t('components.dashboard.noActivityData')}</div>
-    }
-
-    const maxValue = Math.max(...hourlyData.map(d => d.value), 1)
-    // Mark top 3 as peak hours
-    hourlyData.forEach((item, index) => {
-      if (index < 3) item.isPeak = true
-    })
-
-    return (
-      <div className="space-y-1.5">
-        {hourlyData.map((item, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <div className="w-6 text-right text-[10px] text-muted-foreground font-medium flex items-center justify-end gap-0.5">
-              {item.isPeak && <span className="text-warning text-[8px]">★</span>}
-              {item.hour}
-            </div>
-            <div className="flex-1 h-4 bg-background/60 rounded overflow-hidden inner-shadow relative">
-              <div
-                className={`h-full rounded motion-width ${
-                  item.isPeak
-                    ? 'bg-warning'
-                    : 'bg-info'
-                }`}
-                style={{
-                  width: `${Math.min((item.value / maxValue) * 100, 100)}%`
-                }}
-              />
-            </div>
-            <div className="w-8 text-right text-[10px] text-foreground font-medium">{item.value.toLocaleString()}</div>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  const renderWeekly = () => {
-    const weeklyData = DAYS_OF_WEEK.map(day => ({
-      day,
-      value: stats.messages_by_day_of_week[day] || 0,
+  // Top 8 active hours, descending; first 3 flagged as peaks
+  const hourlyData = stats.time_distribution
+    .filter(p => p.message_count > 0)
+    .sort((a, b) => b.message_count - a.message_count)
+    .slice(0, 8)
+    .map((p, index) => ({
+      hour: hourLabels[p.hour] ?? p.hour.toString(),
+      value: p.message_count,
+      isPeak: index < 3,
     }))
 
-    const maxValue = Math.max(...weeklyData.map(d => d.value), 1)
-
-    return (
-      <div className="space-y-1.5">
-        {weeklyData.map((item, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <div className="w-6 text-right text-[10px] text-muted-foreground">{item.day}</div>
-            <div className="flex-1 h-4 bg-background/60 rounded overflow-hidden inner-shadow">
-              <div
-                className="h-full bg-success rounded motion-width"
-                style={{ width: `${Math.min((item.value / maxValue) * 100, 100)}%` }}
-              />
-            </div>
-            <div className="w-6 text-right text-[10px] text-foreground">{item.value}</div>
-          </div>
-        ))}
-      </div>
-    )
-  }
+  const maxValue = Math.max(...hourlyData.map(d => d.value), 1)
 
   const content = (
     <>
@@ -108,25 +37,45 @@ export default function TimeDistribution({
           <div className="p-1 rounded bg-warning/10">
             <Clock className="h-3 w-3 text-warning" />
           </div>
-          {title}
+          {t('dashboard.hourly.activeHours')}
         </h3>
       </div>
 
       <div className="text-[9px] text-muted-foreground mb-2 px-1">
-        {type === 'hourly' && 'Your most active hours of the day'}
-        {type === 'weekly' && 'Your most active days of the week'}
-        {type === 'daily' && 'Daily activity distribution'}
+        {t('dashboard.timeDistribution.hourlyHint')}
       </div>
 
-      {type === 'hourly' && renderHourly()}
-      {type === 'weekly' && renderWeekly()}
-      {type === 'daily' && <div className="text-center text-muted-foreground py-4 text-xs">{t('components.dashboard.dailyViewComingSoon')}</div>}
+      {hourlyData.length === 0 ? (
+        <div className="text-center text-muted-foreground py-4 text-xs">
+          {t('components.dashboard.noActivityData')}
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {hourlyData.map((item, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <div className="w-12 text-right text-[10px] text-muted-foreground font-medium flex items-center justify-end gap-0.5">
+                {item.isPeak && <Star className="h-2 w-2 text-warning" aria-hidden="true" />}
+                {item.hour}
+              </div>
+              <div className="flex-1 h-4 bg-background/60 rounded overflow-hidden inner-shadow relative">
+                <div
+                  className={`h-full rounded motion-width ${item.isPeak ? 'bg-warning' : 'bg-info'}`}
+                  style={{ width: `${Math.min((item.value / maxValue) * 100, 100)}%` }}
+                />
+              </div>
+              <div className="w-8 text-right text-[10px] text-foreground font-medium">
+                {item.value.toLocaleString(i18n.language)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   )
 
   return (
     <DashboardCardShell
-      className={`rounded-lg p-3 ${onClick ? 'cursor-pointer focus-within:ring-2 focus-within:ring-warning/30' : ''}`}
+      className={`rounded-lg p-3 ${onClick ? 'focus-within:ring-2 focus-within:ring-warning/30' : ''}`}
     >
       {onClick ? (
         <button type="button" onClick={onClick} className="w-full text-left">

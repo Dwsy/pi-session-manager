@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   X,
   Activity,
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 import type { SessionInfo, SessionStats } from "@/types";
 import { getPathBasename, hasPathSeparator, pathsEqual } from "@/utils/path";
+import { formatTokens as formatTokensCompact } from "@/utils/format";
 import { emptyDashboardStats } from "./dashboardTimeRange";
 import CompositionInput from "@/components/ui/CompositionInput";
 import { getRuntimeStats } from "@/runtime-data/sessionSource";
@@ -116,12 +118,9 @@ type SortField = "provider" | "sessions" | "messages" | "cost" | "tokens" | "inp
 type SortDirection = "asc" | "desc";
 
 function formatTokens(count: number): string {
+  // "-" keeps zero cells quiet in dense usage tables.
   if (count === 0) return "-";
-  if (count < 1_000) return count.toString();
-  if (count < 10_000) return `${(count / 1_000).toFixed(1)}k`;
-  if (count < 1_000_000) return `${Math.round(count / 1_000)}k`;
-  if (count < 10_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-  return `${Math.round(count / 1_000_000)}M`;
+  return formatTokensCompact(count);
 }
 
 export function formatNumber(n: number): string {
@@ -162,16 +161,13 @@ function sessionModels(session: SessionInfo): string[] {
   return Array.from(new Set(models.filter(Boolean)));
 }
 
-function getHourLabel(hour: number): string {
-  if (hour === 0) return "12a";
-  if (hour < 12) return `${hour}a`;
-  if (hour === 12) return "12p";
-  return `${hour - 12}p`;
+function getHourLabel(hour: number, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { hour: "numeric" }).format(new Date(2000, 0, 1, hour));
 }
 
 function getModalTitle(
   mode: DashboardInsightModalProps["mode"],
-  t: any,
+  t: TFunction,
   selectedModel?: string | null,
 ): string {
   switch (mode) {
@@ -927,7 +923,7 @@ export default function DashboardInsightModal({
           <MetricCard icon={Calendar} label={t("dashboard.insight.activeDays", "Active Days")} value={`${activityRhythm.activeDays}/${activityRhythm.coverageDays || 0}`} tone="text-info" />
           <MetricCard icon={Activity} label={t("dashboard.insight.currentStreak", "Current Streak")} value={`${activityRhythm.streak}d`} tone="text-success" />
           <MetricCard icon={Target} label={t("dashboard.insight.longestStreak", "Longest Streak")} value={`${activityRhythm.longestStreak}d`} tone="text-purple" />
-          <MetricCard icon={Clock} label={t("dashboard.insight.peakHour", "Peak Hour")} value={`${getHourLabel(activityRhythm.peakHour.hour)} · ${formatNumber(activityRhythm.peakHour.message_count)}`} tone="text-warning" />
+          <MetricCard icon={Clock} label={t("dashboard.insight.peakHour", "Peak Hour")} value={`${getHourLabel(activityRhythm.peakHour.hour, i18n.language)} · ${formatNumber(activityRhythm.peakHour.message_count)}`} tone="text-warning" />
         </div>
 
         <section className="rounded-md border border-border bg-muted/15 p-3.5">
@@ -935,15 +931,15 @@ export default function DashboardInsightModal({
           <div className="overflow-x-auto pb-1">
             <div className="grid h-36 min-w-[720px] items-end gap-1" style={{ gridTemplateColumns: "repeat(24, minmax(20px, 1fr))" }} role="img" aria-label={t("dashboard.insight.hourlyProfile", "24-hour activity profile")}>
               {activityRhythm.hours.map((point) => (
-                <div key={point.hour} className="flex h-full flex-col justify-end gap-1 text-center" title={`${getHourLabel(point.hour)} · ${point.message_count}`}>
+                <div key={point.hour} className="flex h-full flex-col justify-end gap-1 text-center" title={`${getHourLabel(point.hour, i18n.language)} · ${point.message_count}`}>
                   <span className="text-[8px] tabular-nums text-muted-foreground">{point.message_count || ""}</span>
                   <span className="mx-auto w-full max-w-5 rounded-t bg-warning/75" style={{ height: `${Math.max(point.message_count > 0 ? 6 : 2, (point.message_count / maxHour) * 92)}px` }} aria-hidden="true" />
-                  <span className="text-[8px] text-muted-foreground">{point.hour % 3 === 0 ? getHourLabel(point.hour) : ""}</span>
+                  <span className="text-[8px] text-muted-foreground">{point.hour % 3 === 0 ? getHourLabel(point.hour, i18n.language) : ""}</span>
                 </div>
               ))}
             </div>
           </div>
-          {activityRhythm.topHours.length ? <div className="mt-3 flex flex-wrap gap-1.5">{activityRhythm.topHours.map((point, index) => <span key={point.hour} className="rounded border border-border bg-background px-2 py-1 text-[9px] text-muted-foreground">#{index + 1} {getHourLabel(point.hour)} · {point.message_count}</span>)}</div> : null}
+          {activityRhythm.topHours.length ? <div className="mt-3 flex flex-wrap gap-1.5">{activityRhythm.topHours.map((point, index) => <span key={point.hour} className="rounded border border-border bg-background px-2 py-1 text-[9px] text-muted-foreground">#{index + 1} {getHourLabel(point.hour, i18n.language)} · {point.message_count}</span>)}</div> : null}
         </section>
 
         <section className="rounded-md border border-border bg-muted/15 p-3.5">

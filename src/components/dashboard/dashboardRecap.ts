@@ -1,22 +1,29 @@
-export type DashboardRecapKind = 'midyear' | 'yearend'
+import { getAutomaticRecapPeriod, getRecapPeriod } from './recap/recapPeriods'
+import type { RecapPeriod, RecapPeriodKind } from './recap/recapTypes'
+
+/**
+ * Window-level contract for opening dashboard recaps.
+ *
+ * Settings, the command palette, and the hidden easter egg all talk to the
+ * controller through these events, so none of them need a ref to it. Shown
+ * state lives in localStorage: an automatic recap opens once per cycle and
+ * closing it counts as seen; manual and easter-egg views never consume a
+ * cycle.
+ */
+
+export type DashboardRecapSource = 'manual' | 'automatic' | 'easterEgg'
 
 export interface DashboardRecapRequest {
-  kind: DashboardRecapKind
-  source: 'manual' | 'automatic'
-  cycleKey: string
-  start: Date
-  end: Date
-  year: number
+  period: RecapPeriod
+  source: DashboardRecapSource
 }
 
 export const DASHBOARD_RECAP_EVENT = 'psm-dashboard:recap'
 export const DASHBOARD_RECAP_SETTINGS_EVENT = 'psm-dashboard:recap-settings'
 export const DASHBOARD_RECAP_AUTO_KEY = 'psm-dashboard-recap:auto-enabled'
-const DASHBOARD_RECAP_STATE_KEY = 'psm-dashboard-recap:shown-v1'
-
-interface DashboardRecapState {
-  shownCycles: string[]
-}
+const DASHBOARD_RECAP_STATE_KEY = 'psm-dashboard-recap:shown-v2'
+/** Cycles are weekly at the fastest, so a year of history is plenty. */
+const MAX_REMEMBERED_CYCLES = 60
 
 export function isDashboardRecapAutoEnabled(): boolean {
   return localStorage.getItem(DASHBOARD_RECAP_AUTO_KEY) !== 'false'
@@ -27,78 +34,45 @@ export function setDashboardRecapAutoEnabled(enabled: boolean): void {
   window.dispatchEvent(new Event(DASHBOARD_RECAP_SETTINGS_EVENT))
 }
 
-function readState(): DashboardRecapState {
+function readShownCycles(): string[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(DASHBOARD_RECAP_STATE_KEY) || '{}')
-    return {
-      shownCycles: Array.isArray(parsed.shownCycles)
-        ? parsed.shownCycles.filter((value: unknown): value is string => typeof value === 'string')
-        : [],
-    }
+    return Array.isArray(parsed.shownCycles)
+      ? parsed.shownCycles.filter((value: unknown): value is string => typeof value === 'string')
+      : []
   } catch {
-    return { shownCycles: [] }
+    return []
   }
 }
 
 export function hasShownDashboardRecap(cycleKey: string): boolean {
-  return readState().shownCycles.includes(cycleKey)
+  return readShownCycles().includes(cycleKey)
 }
 
 export function markDashboardRecapShown(cycleKey: string): void {
-  const state = readState()
-  if (state.shownCycles.includes(cycleKey)) return
+  const cycles = readShownCycles()
+  if (cycles.includes(cycleKey)) return
   localStorage.setItem(
     DASHBOARD_RECAP_STATE_KEY,
-    JSON.stringify({ shownCycles: [...state.shownCycles, cycleKey].slice(-12) }),
+    JSON.stringify({ shownCycles: [...cycles, cycleKey].slice(-MAX_REMEMBERED_CYCLES) }),
   )
-}
-
-export function getDashboardRecapPeriod(kind: DashboardRecapKind, year: number): DashboardRecapRequest {
-  if (kind === 'midyear') {
-    return {
-      kind,
-      source: 'manual',
-      cycleKey: `midyear:${year}`,
-      start: new Date(year, 0, 1, 0, 0, 0, 0),
-      end: new Date(year, 5, 30, 23, 59, 59, 999),
-      year,
-    }
-  }
-  return {
-    kind,
-    source: 'manual',
-    cycleKey: `yearend:${year}`,
-    start: new Date(year, 0, 1, 0, 0, 0, 0),
-    end: new Date(year, 11, 31, 23, 59, 59, 999),
-    year,
-  }
 }
 
 export function getAutomaticDashboardRecap(now = new Date()): DashboardRecapRequest | null {
-  const year = now.getFullYear()
-  const month = now.getMonth()
-  const day = now.getDate()
-
-  if ((month === 5 && day >= 15) || month === 6) {
-    return { ...getDashboardRecapPeriod('midyear', year), source: 'automatic' }
-  }
-
-  if (month === 11 && day >= 15) {
-    return { ...getDashboardRecapPeriod('yearend', year), source: 'automatic' }
-  }
-
-  if (month === 0) {
-    return { ...getDashboardRecapPeriod('yearend', year - 1), source: 'automatic' }
-  }
-
-  return null
+  const period = getAutomaticRecapPeriod(now)
+  return period ? { period, source: 'automatic' } : null
 }
 
-export function requestDashboardRecap(kind: DashboardRecapKind): void {
-  const request = getDashboardRecapPeriod(kind, new Date().getFullYear())
-  window.dispatchEvent(
-    new CustomEvent<DashboardRecapRequest>(DASHBOARD_RECAP_EVENT, {
-      detail: request,
-    }),
-  )
+/**
+ * The period the hidden triggers open: whatever season the calendar is in,
+ * or the current month when no seasonal window applies.
+ */
+export function getEasterEggDashboardRecap(now = new Date()): DashboardRecapRequest {
+  const period = getAutomaticRecapPeriod(now) ?? getRecapPeriod('month', now)
+  return { period, source: 'easterEgg' }
+}
+
+export function requestDashboardRecap(kind: RecapPeriodKind, anchor = new Date()): void {
+  const request: DashboardRecapRequest = { period: getRecapPeriod(kind, anchor), source: 'manual' }
+  window.dispatchEvent(new CustomEvent<DashboardRecapRequest>(DASHBOARD_RECAP_EVENT, { detail: request }))
 }

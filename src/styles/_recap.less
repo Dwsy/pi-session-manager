@@ -1,0 +1,926 @@
+// =====================================================
+// ========== Dashboard Recap ==========
+// The stage sets `--recap-hue` from the story; every tint below is derived
+// from it and layered at low alpha over the existing surface tokens so text
+// colors stay theme-owned in both dark and light.
+//
+// The recap is a full-screen takeover: `.recap-backdrop` covers the window,
+// `.recap-shell` is the focusable dialog, and `.recap-stage` paints the
+// ambient field the scenes float on.
+// =====================================================
+
+// ---------- Full-screen shell ----------
+.recap-backdrop {
+  background: rgb(var(--color-background) / 0.92);
+  backdrop-filter: blur(20px);
+  animation: recap-backdrop-in var(--motion-duration-overlay) var(--motion-ease-enter) both;
+}
+
+.recap-shell {
+  padding: 14px 20px 16px;
+}
+
+@media (min-width: 640px) {
+  .recap-shell {
+    padding: 18px 40px 24px;
+  }
+}
+
+.recap-stage {
+  --recap-hue: 200;
+  --recap-accent: hsl(var(--recap-hue) 55% 68%);
+  --recap-accent-strong: hsl(var(--recap-hue) 70% 78%);
+  --recap-tint-weak: hsl(var(--recap-hue) 55% 68% / 0.07);
+  --recap-tint: hsl(var(--recap-hue) 55% 68% / 0.15);
+  --recap-tint-strong: hsl(var(--recap-hue) 55% 68% / 0.3);
+  --recap-quiet: rgb(var(--color-muted-foreground) / 0.2);
+  --recap-blob-alpha: 0.2;
+  --recap-content-width: 1180px;
+
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.theme-light .recap-stage {
+  --recap-accent: hsl(var(--recap-hue) 48% 40%);
+  --recap-accent-strong: hsl(var(--recap-hue) 55% 30%);
+  --recap-tint-weak: hsl(var(--recap-hue) 48% 40% / 0.06);
+  --recap-tint: hsl(var(--recap-hue) 48% 40% / 0.12);
+  --recap-tint-strong: hsl(var(--recap-hue) 48% 40% / 0.26);
+  --recap-quiet: rgb(var(--color-muted-foreground) / 0.24);
+  --recap-blob-alpha: 0.14;
+}
+
+// ---------- Ambient field ----------
+// Fixed rather than absolute so the blobs bleed past the shell padding and
+// the stage reads as the whole window instead of a large panel.
+.recap-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.recap-ambient__blob {
+  position: absolute;
+  width: 78vmax;
+  height: 78vmax;
+  border-radius: 50%;
+  filter: blur(60px);
+  will-change: transform;
+}
+
+.recap-ambient__blob--a {
+  top: -34vmax;
+  left: -18vmax;
+  background: radial-gradient(
+    circle,
+    hsl(var(--recap-hue) 70% 60% / var(--recap-blob-alpha)),
+    transparent 66%
+  );
+  animation: recap-drift-a 24s var(--motion-ease-standard) infinite alternate;
+}
+
+.recap-ambient__blob--b {
+  right: -26vmax;
+  bottom: -36vmax;
+  background: radial-gradient(
+    circle,
+    hsl(calc(var(--recap-hue) + 52) 66% 58% / calc(var(--recap-blob-alpha) * 0.8)),
+    transparent 66%
+  );
+  animation: recap-drift-b 20s var(--motion-ease-standard) infinite alternate;
+}
+
+// The tone decides where the light falls, so consecutive scenes never look
+// like the same still frame.
+.recap-stage[data-tone='bright'] .recap-ambient__blob--a {
+  top: -22vmax;
+  left: 12vmax;
+}
+
+.recap-stage[data-tone='warm'] .recap-ambient__blob--a {
+  top: auto;
+  bottom: -30vmax;
+  left: -24vmax;
+}
+
+.recap-stage[data-tone='deep'] .recap-ambient__blob--a {
+  top: auto;
+  bottom: -38vmax;
+  left: 8vmax;
+}
+
+.recap-ambient__blob {
+  transition: top var(--motion-duration-data) var(--motion-ease-standard),
+    bottom var(--motion-duration-data) var(--motion-ease-standard),
+    left var(--motion-duration-data) var(--motion-ease-standard);
+}
+
+.recap-ambient__grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.recap-ambient__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 100% at 50% 50%,
+    transparent 42%,
+    rgb(var(--color-background) / 0.55) 100%
+  );
+}
+
+// ---------- Progress ----------
+.recap-progress {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.recap-progress__segment {
+  display: flex;
+  height: 14px;
+  min-width: 8px;
+  flex: 1 1 0;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.recap-progress__track {
+  display: block;
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: rgb(var(--color-muted-foreground) / 0.2);
+  overflow: hidden;
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.recap-progress__segment:hover .recap-progress__track,
+.recap-progress__segment:focus-visible .recap-progress__track {
+  background: rgb(var(--color-muted-foreground) / 0.34);
+}
+
+.recap-progress__segment:focus-visible {
+  outline: 2px solid rgb(var(--color-ring) / 0.62);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+.recap-progress__fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: rgb(var(--color-muted-foreground) / 0.62);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.recap-progress__segment.is-current .recap-progress__fill {
+  background: var(--recap-accent);
+}
+
+// ---------- Chrome ----------
+.recap-stage__topbar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+// Hands window dragging back to the titlebar the takeover covers.
+.recap-stage__drag {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 24px;
+}
+
+.recap-stage__eyebrow {
+  color: rgb(var(--color-muted-foreground));
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.recap-stage__period {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.recap-stage__range {
+  color: rgb(var(--color-muted-foreground));
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.recap-stage__surface {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+.recap-stage__live {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.recap-stage__footer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 auto;
+  width: 100%;
+  max-width: var(--recap-content-width);
+}
+
+.recap-stage__actions button {
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    border-color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.recap-stage__actions.is-primary button {
+  border-color: var(--recap-accent);
+  background: var(--recap-tint);
+}
+
+.recap-stage__actions.is-primary button:hover:not(:disabled) {
+  background: var(--recap-tint-strong);
+}
+
+.recap-stage__counter {
+  margin-left: 4px;
+  color: rgb(var(--color-muted-foreground));
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.recap-stage__restart {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--recap-tint-strong);
+  border-radius: 4px;
+  background: var(--recap-tint-weak);
+  padding: 5px 10px;
+  color: rgb(var(--color-foreground));
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.recap-stage__restart:hover {
+  background: var(--recap-tint);
+  border-color: var(--recap-accent);
+}
+
+// ---------- Scene ----------
+.recap-scene-shell {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  outline: none;
+  animation: recap-scene-forward var(--motion-duration-overlay) var(--motion-ease-enter) both;
+}
+
+.recap-scene-shell--back {
+  animation-name: recap-scene-back;
+}
+
+.recap-scene-shell.is-still {
+  animation: none;
+}
+
+.recap-scene {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.recap-scene__content {
+  margin: 0 auto;
+  width: 100%;
+  max-width: var(--recap-content-width);
+}
+
+.recap-scene__content--split > .recap-scene__visual {
+  margin-top: 28px;
+}
+
+// Text left, visual right once there is room for both to breathe.
+@media (min-width: 1024px) {
+  .recap-scene__content--split {
+    display: grid;
+    align-items: center;
+    gap: 56px;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  }
+
+  .recap-scene__content--split > .recap-scene__visual {
+    margin-top: 0;
+  }
+}
+
+.recap-scene__eyebrow {
+  color: var(--recap-accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.recap-scene__title {
+  color: rgb(var(--color-foreground));
+  font-size: clamp(34px, 5.2vw, 68px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.recap-scene__body {
+  max-width: 52ch;
+  color: rgb(var(--color-muted-foreground));
+  font-size: clamp(15px, 1.35vw, 19px);
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.recap-scene__footnote {
+  color: rgb(var(--color-muted-foreground) / 0.85);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+// ---------- Metrics ----------
+.recap-metric {
+  border: 1px solid var(--recap-tint-strong);
+  border-radius: 10px;
+  background: var(--recap-tint-weak);
+  padding: 14px 18px;
+}
+
+.recap-metric__value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: rgb(var(--color-foreground));
+  font-size: clamp(32px, 4.6vw, 56px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.recap-scene__metrics--single .recap-metric {
+  max-width: 320px;
+}
+
+// Only when the scene view chose the centered variant; beside a visual the
+// tile stays left-aligned with the copy.
+.recap-scene__metrics--single.justify-items-center .recap-metric__value {
+  justify-content: center;
+}
+
+.recap-metric__unit {
+  color: rgb(var(--color-muted-foreground));
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.recap-metric__label {
+  margin-top: 6px;
+  color: rgb(var(--color-muted-foreground));
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+// ---------- Visual: overview + summary card ----------
+.recap-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.recap-overview__tiles {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.recap-tile {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border: 1px solid var(--recap-tint-strong);
+  border-radius: 12px;
+  background: linear-gradient(160deg, var(--recap-tint), transparent 70%),
+    rgb(var(--color-card) / 0.45);
+  padding: 16px 18px;
+}
+
+.recap-tile__icon {
+  display: flex;
+  height: 26px;
+  width: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--recap-tint);
+  color: var(--recap-accent);
+}
+
+.recap-tile__value {
+  display: block;
+  margin-top: 14px;
+  overflow: hidden;
+  color: rgb(var(--color-foreground));
+  font-size: clamp(28px, 3vw, 40px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.recap-tile__label {
+  display: block;
+  margin-top: 8px;
+  color: rgb(var(--color-muted-foreground));
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.recap-tile__hint {
+  display: block;
+  margin-top: 3px;
+  color: rgb(var(--color-muted-foreground) / 0.85);
+  font-size: 11px;
+}
+
+.recap-pulse {
+  display: flex;
+  height: 46px;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.recap-pulse__bar {
+  flex: 1 1 0;
+  min-width: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--recap-accent);
+}
+
+.recap-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border: 1px solid var(--recap-tint-strong);
+  border-radius: 16px;
+  background: rgb(var(--color-card) / 0.55);
+  padding: 22px;
+  box-shadow: 0 24px 60px -32px rgb(0 0 0 / 0.55);
+}
+
+.recap-summary-card__details {
+  display: grid;
+  gap: 12px 20px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+
+.recap-detail {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.recap-detail__icon {
+  display: flex;
+  height: 24px;
+  width: 24px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid rgb(var(--color-border));
+  color: rgb(var(--color-muted-foreground));
+}
+
+.recap-detail__label {
+  display: block;
+  color: rgb(var(--color-muted-foreground));
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.recap-detail__value {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: rgb(var(--color-foreground));
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.recap-detail__hint {
+  display: block;
+  color: rgb(var(--color-muted-foreground) / 0.85);
+  font-size: 11px;
+}
+
+.recap-summary-card__moments {
+  border-top: 1px solid rgb(var(--color-border) / 0.7);
+  padding-top: 16px;
+}
+
+.recap-summary-card__heading {
+  display: block;
+  color: rgb(var(--color-muted-foreground));
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.recap-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recap-chip {
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 999px;
+  background: rgb(var(--color-card) / 0.6);
+  padding: 4px 11px;
+  color: rgb(var(--color-foreground));
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.recap-chip--rare {
+  border-color: var(--recap-tint-strong);
+  background: var(--recap-tint-weak);
+}
+
+.recap-chip--legendary {
+  border-color: var(--recap-accent);
+  background: var(--recap-tint);
+}
+
+// ---------- Visual: streak ribbon ----------
+.recap-ribbon__cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+// Cells grow to fill a short ribbon and fall back to wrapping once a long
+// period no longer fits on one row.
+.recap-ribbon__cell {
+  flex: 1 1 13px;
+  min-width: 10px;
+  max-width: 26px;
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: var(--recap-quiet);
+}
+
+.recap-ribbon__cell.is-active {
+  background: var(--recap-accent);
+}
+
+.recap-ribbon__caption {
+  margin-top: 8px;
+  color: rgb(var(--color-muted-foreground));
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+// ---------- Visual: clock dial ----------
+.recap-dial__svg {
+  display: block;
+  width: min(340px, 100%);
+  height: auto;
+  margin: 0 auto;
+}
+
+.recap-dial__tick {
+  fill: rgb(var(--color-muted-foreground));
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.recap-dial__peak {
+  fill: rgb(var(--color-foreground));
+  font-size: 21px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+// Kept out of the svg so the type stays in css pixels at every dial size.
+.recap-dial__caption {
+  margin-top: 4px;
+  color: rgb(var(--color-muted-foreground));
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+// ---------- Visual: sparkline ----------
+.recap-spark {
+  position: relative;
+  width: 100%;
+  height: 120px;
+}
+
+.recap-spark__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.recap-spark__peak {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--recap-accent-strong);
+  box-shadow: 0 0 0 3px var(--recap-tint);
+  transform: translate(-50%, -50%);
+}
+
+// ---------- Visual: quote ----------
+.recap-quote {
+  border-left: 2px solid var(--recap-tint-strong);
+  padding: 4px 0 4px 16px;
+}
+
+.recap-quote__text {
+  margin: 0;
+  max-width: 62ch;
+  color: rgb(var(--color-foreground) / 0.92);
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: clamp(14px, 1.2vw, 17px);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.recap-quote__caption {
+  margin-top: 10px;
+  color: rgb(var(--color-muted-foreground));
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+// ---------- Visual: moments ----------
+.recap-moments {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
+.recap-moment {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 8px;
+  background: rgb(var(--color-card) / 0.5);
+  padding: 10px;
+}
+
+.recap-moment__icon {
+  display: flex;
+  height: 26px;
+  width: 26px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--recap-tint);
+  color: var(--recap-accent);
+}
+
+.recap-moment__title {
+  display: block;
+  color: rgb(var(--color-foreground));
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.recap-moment__detail {
+  display: block;
+  margin-top: 2px;
+  color: rgb(var(--color-muted-foreground));
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.recap-moment--rare {
+  border-color: var(--recap-tint-strong);
+  background: var(--recap-tint-weak);
+}
+
+.recap-moment--legendary {
+  border-color: var(--recap-accent);
+  background: var(--recap-tint);
+}
+
+.recap-moment--legendary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    hsl(var(--recap-hue) 70% 82% / 0.16) 50%,
+    transparent 62%
+  );
+  transform: translateX(-130%);
+  animation: recap-shimmer 5s var(--motion-ease-standard) infinite;
+}
+
+// ---------- Reveals ----------
+@keyframes recap-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes recap-drift-a {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(6vmax, 4vmax, 0) scale(1.12);
+  }
+}
+
+@keyframes recap-drift-b {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.08);
+  }
+  to {
+    transform: translate3d(-7vmax, -3vmax, 0) scale(1);
+  }
+}
+
+@keyframes recap-scene-forward {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes recap-scene-back {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes recap-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes recap-shimmer {
+  0%,
+  62% {
+    transform: translateX(-130%);
+  }
+  100% {
+    transform: translateX(130%);
+  }
+}
+
+.recap-reveal {
+  animation: recap-reveal var(--motion-duration-base) var(--motion-ease-enter) both;
+}
+
+// ---------- Narrow widths ----------
+@media (max-width: 640px) {
+  .recap-stage {
+    gap: 10px;
+  }
+
+  .recap-quote {
+    padding-left: 12px;
+  }
+
+  .recap-moments {
+    grid-template-columns: 1fr;
+  }
+
+  .recap-overview__tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .recap-summary-card {
+    padding: 16px;
+  }
+
+  .recap-summary-card__details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+// ---------- Reduced motion ----------
+@media (prefers-reduced-motion: reduce) {
+  .recap-backdrop,
+  .recap-scene-shell,
+  .recap-reveal,
+  .recap-ambient__blob,
+  .recap-moment--legendary::after {
+    animation: none !important;
+  }
+
+  .recap-moment--legendary::after {
+    display: none;
+  }
+
+  .recap-ambient__blob,
+  .recap-progress__track,
+  .recap-progress__fill,
+  .recap-stage__restart,
+  .recap-stage__actions button {
+    transition: none !important;
+  }
+}

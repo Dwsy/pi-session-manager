@@ -58,6 +58,7 @@ import {
   getRuntimeStats,
 } from "@/runtime-data/sessionSource";
 import { getPathBasename, hasPathSeparator, pathsEqual } from "@/utils/path";
+import { formatTokens } from "@/utils/format";
 import { buildSessionPreviewModalActions } from "@/utils/sessionPreviewActions";
 import type { TerminalType } from "@/components/settings/types";
 
@@ -88,11 +89,7 @@ function getProjectName(path: string): string {
   return getPathBasename(path);
 }
 
-function formatTokensForPulse(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
-  return value.toLocaleString();
-}
+const formatTokensForPulse = formatTokens;
 
 function formatCostForPulse(value: number): string {
   if (value < 0.01) return `$${value.toFixed(4)}`;
@@ -561,7 +558,7 @@ export default function Dashboard({
             <span>{formatCost(combinedCost)}</span>
             {subagentCost > 0 && (
               <div className="text-[10px] text-muted-foreground font-normal normal-case tracking-normal mt-0.5">
-                incl. {formatCost(subagentCost)} subagents
+                {t("dashboard.kpi.inclSubagents", "incl. {{cost}} subagents", { cost: formatCost(subagentCost) })}
               </div>
             )}
           </>
@@ -718,7 +715,6 @@ export default function Dashboard({
           {/* Time Distribution */}
           <TimeDistribution
             stats={displayStats}
-            type="hourly"
             onClick={openActivityRhythmInsight}
           />
         </div>
