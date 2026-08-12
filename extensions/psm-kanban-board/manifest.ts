@@ -18,6 +18,10 @@ export const manifest: PsmPluginManifest = {
           sidebarTitle: 'Kanban Sidebar',
           allProjects: 'All Projects',
           untagged: 'Unlabeled',
+          sessionColumn: {
+            title: 'Kanban',
+            openBoard: 'Show in Kanban board',
+          },
           dropSessionsHere: 'Drop sessions here',
           newSession: 'New Session',
           newSessionShort: 'New',
@@ -68,6 +72,10 @@ export const manifest: PsmPluginManifest = {
           sidebarTitle: '看板侧栏',
           allProjects: '所有项目',
           untagged: '未分类',
+          sessionColumn: {
+            title: '看板',
+            openBoard: '在看板中查看',
+          },
           dropSessionsHere: '拖放会话到这里',
           newSession: '新建会话',
           newSessionShort: '新建',

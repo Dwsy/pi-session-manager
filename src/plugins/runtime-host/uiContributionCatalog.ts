@@ -4,6 +4,7 @@ import type {
   PsmProjectListActionRegistration,
   PsmSessionContextMenuActionRegistration,
   PsmSessionListActionRegistration,
+  PsmSessionListColumnRegistration,
   PsmSessionMainViewRegistration,
   PsmSessionPanelRegistration,
   PsmSessionToolbarItemRegistration,
@@ -17,11 +18,14 @@ import type {
   PsmProjectListActionRuntimeRegistration,
   PsmSessionContextMenuActionRuntimeRegistration,
   PsmSessionListActionRuntimeRegistration,
+  PsmSessionListColumnRuntimeRegistration,
   PsmSessionMainViewRuntimeRegistration,
   PsmSessionPanelRuntimeRegistration,
   PsmSessionToolbarItemRuntimeRegistration,
   PsmSessionTreeViewRuntimeRegistration,
 } from './types'
+
+const DEFAULT_COLUMN_ORDER = 100
 
 export interface PsmUiContributionRegistrationResult {
   registered: boolean
@@ -53,6 +57,7 @@ export class PsmPluginUiContributionCatalog {
   private readonly appViews = new Map<string, PsmAppViewRuntimeRegistration>()
   private readonly appSidebarViews = new Map<string, PsmAppSidebarViewRuntimeRegistration>()
   private readonly sessionListActions = new Map<string, PsmSessionListActionRuntimeRegistration>()
+  private readonly sessionListColumns = new Map<string, PsmSessionListColumnRuntimeRegistration>()
   private readonly projectListActions = new Map<string, PsmProjectListActionRuntimeRegistration>()
   private readonly sessionContextMenuActions = new Map<string, PsmSessionContextMenuActionRuntimeRegistration>()
   private readonly sessionToolbarItems = new Map<string, PsmSessionToolbarItemRuntimeRegistration>()
@@ -85,6 +90,17 @@ export class PsmPluginUiContributionCatalog {
   ): PsmUiContributionRegistrationResult {
     if (this.sessionListActions.has(action.id)) return { registered: false }
     this.sessionListActions.set(action.id, { ...action, pluginId })
+    return { registered: true }
+  }
+
+  registerSessionListColumn(
+    pluginId: string,
+    column: PsmSessionListColumnRegistration,
+  ): PsmUiContributionRegistrationResult {
+    if (this.sessionListColumns.has(column.id)) {
+      return { registered: false, duplicateMessage: `Session list column already registered: ${column.id}` }
+    }
+    this.sessionListColumns.set(column.id, { ...column, pluginId, order: column.order ?? DEFAULT_COLUMN_ORDER })
     return { registered: true }
   }
 
@@ -162,6 +178,12 @@ export class PsmPluginUiContributionCatalog {
     return sortedValues(this.sessionListActions)
   }
 
+  listSessionListColumns(): PsmSessionListColumnRuntimeRegistration[] {
+    return sortedValues(this.sessionListColumns).sort(
+      (a, b) => (a.order ?? DEFAULT_COLUMN_ORDER) - (b.order ?? DEFAULT_COLUMN_ORDER),
+    )
+  }
+
   listProjectListActions(): PsmProjectListActionRuntimeRegistration[] {
     return sortedValues(this.projectListActions)
   }
@@ -192,6 +214,7 @@ export class PsmPluginUiContributionCatalog {
       appViews: this.listAppViews(),
       appSidebarViews: this.listAppSidebarViews(),
       sessionListActions: this.listSessionListActions(),
+      sessionListColumns: this.listSessionListColumns(),
       projectListActions: this.listProjectListActions(),
       sessionContextMenuActions: this.listSessionContextMenuActions(),
       toolbarItems: this.listSessionToolbarItems(),
@@ -212,6 +235,7 @@ export class PsmPluginUiContributionCatalog {
     removeOwned(this.appViews, pluginId)
     removeOwned(this.appSidebarViews, pluginId)
     removeOwned(this.sessionListActions, pluginId)
+    removeOwned(this.sessionListColumns, pluginId)
     removeOwned(this.projectListActions, pluginId)
     removeOwned(this.sessionContextMenuActions, pluginId)
     removeOwned(this.sessionToolbarItems, pluginId)
@@ -224,6 +248,7 @@ export class PsmPluginUiContributionCatalog {
     this.appViews.clear()
     this.appSidebarViews.clear()
     this.sessionListActions.clear()
+    this.sessionListColumns.clear()
     this.projectListActions.clear()
     this.sessionContextMenuActions.clear()
     this.sessionToolbarItems.clear()

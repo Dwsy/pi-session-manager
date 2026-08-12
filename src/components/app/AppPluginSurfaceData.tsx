@@ -32,6 +32,8 @@ export interface AppPluginSurfaceData {
   loading?: boolean;
   sourceOptions: Array<{ slug: string; label: string }>;
   onClearSelectedSession: () => void;
+  /** Opens a registered plugin app view by contribution id. */
+  onOpenAppView?: (viewId: string) => void;
 }
 
 const AppPluginSurfaceDataContext = createContext<AppPluginSurfaceData | null>(null);
@@ -58,4 +60,9 @@ export function useAppPluginSurfaceData() {
     throw new Error("App plugin surface data is not available");
   }
   return value;
+}
+
+/** Row-level contributions may render outside the provider; they must degrade instead of throwing. */
+export function useOptionalAppPluginSurfaceData() {
+  return useContext(AppPluginSurfaceDataContext);
 }

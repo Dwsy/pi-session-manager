@@ -1528,6 +1528,7 @@ describe('PsmPluginHost', () => {
       appViews: [expect.objectContaining({ id: 'healthy.app', pluginId: 'builtin.ui.healthy' })],
       appSidebarViews: [],
       sessionListActions: [],
+      sessionListColumns: [],
       projectListActions: [],
       sessionContextMenuActions: [],
       toolbarItems: [],

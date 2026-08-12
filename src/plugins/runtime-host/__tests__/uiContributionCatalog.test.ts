@@ -31,6 +31,26 @@ describe('PsmPluginUiContributionCatalog', () => {
     })
   })
 
+  it('orders session list columns by declared order and falls back to a default order', () => {
+    const catalog = new PsmPluginUiContributionCatalog()
+
+    catalog.registerSessionListColumn('plugin.a', { id: 'column.default', title: 'Default', render })
+    catalog.registerSessionListColumn('plugin.b', { id: 'column.last', title: 'Last', order: 500, render })
+    catalog.registerSessionListColumn('plugin.c', { id: 'column.first', title: 'First', order: 10, render })
+
+    expect(catalog.listSessionListColumns()).toMatchObject([
+      { id: 'column.first', order: 10 },
+      { id: 'column.default', order: 100 },
+      { id: 'column.last', order: 500 },
+    ])
+    expect(
+      catalog.registerSessionListColumn('plugin.d', { id: 'column.first', title: 'Duplicate', render }),
+    ).toEqual({
+      registered: false,
+      duplicateMessage: 'Session list column already registered: column.first',
+    })
+  })
+
   it('preserves warning and silent duplicate registration semantics', () => {
     const catalog = new PsmPluginUiContributionCatalog()
 
@@ -84,6 +104,11 @@ describe('PsmPluginUiContributionCatalog', () => {
       title: 'Session List',
       run: () => undefined,
     })
+    catalog.registerSessionListColumn(failedPlugin, {
+      id: 'failed.session-column',
+      title: 'Session Column',
+      render,
+    })
     catalog.registerProjectListAction(failedPlugin, {
       id: 'failed.project-list',
       title: 'Project List',
@@ -132,6 +157,7 @@ describe('PsmPluginUiContributionCatalog', () => {
       appViews: [expect.objectContaining({ id: 'healthy.app', pluginId: 'plugin.healthy' })],
       appSidebarViews: [],
       sessionListActions: [],
+      sessionListColumns: [],
       projectListActions: [],
       sessionContextMenuActions: [],
       toolbarItems: [],
@@ -146,6 +172,7 @@ describe('PsmPluginUiContributionCatalog', () => {
       appViews: [],
       appSidebarViews: [],
       sessionListActions: [],
+      sessionListColumns: [],
       projectListActions: [],
       sessionContextMenuActions: [],
       toolbarItems: [],

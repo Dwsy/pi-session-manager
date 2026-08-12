@@ -440,6 +440,24 @@ export interface PsmSessionListActionRegistration {
   render(props: PsmSessionListActionRenderProps): unknown;
 }
 
+export interface PsmSessionListColumnRenderProps {
+  session: PsmSessionReference;
+  /** Opens the session in the host session viewer. */
+  onOpenSession: () => void;
+}
+
+export interface PsmSessionListColumnRegistration {
+  id: string;
+  /** Column header label shown in host session tables. */
+  title: string;
+  /** Fixed column width in pixels. Defaults to a host-chosen width. */
+  width?: number;
+  align?: "left" | "center" | "right";
+  /** Lower values sort earlier among plugin columns. Defaults to 100. */
+  order?: number;
+  render(props: PsmSessionListColumnRenderProps): unknown;
+}
+
 export interface PsmProjectListActionRenderProps {
   project: {
     path: string;
@@ -474,6 +492,7 @@ export interface PsmPluginUiRegistry {
   registerAppView(view: PsmAppViewRegistration): void;
   registerAppSidebarView(view: PsmAppSidebarViewRegistration): void;
   registerSessionListAction(action: PsmSessionListActionRegistration): void;
+  registerSessionListColumn(column: PsmSessionListColumnRegistration): void;
   registerProjectListAction(action: PsmProjectListActionRegistration): void;
   registerSessionContextMenuAction(action: PsmSessionContextMenuActionRegistration): void;
   registerSessionToolbarItem(item: PsmSessionToolbarItemRegistration): void;

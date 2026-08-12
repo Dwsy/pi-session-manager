@@ -27,7 +27,7 @@ It exposes:
 | Validation | `validatePsmPluginManifest`, `assertPsmPluginManifest`, `validatePsmPackageManifest`, `assertPsmPackageManifest` |
 | Host context | `manifest`, `psm`, `permissions`, `settings`, `i18n`, `events`, `ui`, `registerCommand`, `registerTool` |
 | Capability client | `createPluginCapabilityClient(options)` |
-| UI contributions | app view, app sidebar view bound by `appViewId`, session toolbar item, session main view, session right panel, session tree view |
+| UI contributions | app view, app sidebar view bound by `appViewId`, session list action, session list column, project list action, session context menu action, session toolbar item, session main view, session right panel, session tree view |
 | Session viewer control | `PsmSessionUiRenderProps.viewer?.revealEntry(...)`, `viewer?.revealToolCall(...)` |
 | Settings/config | `manifest.configuration`, `ctx.settings.get(...)`, `ctx.settings.all()`, plugin-scoped JSON config |
 | I18n | `manifest.i18n`, `ctx.i18n.t(...)`, `ctx.i18n.language` |

@@ -75,7 +75,7 @@ the recommended plugin authoring path.
 | Plugin | Purpose | Permissions |
 | --- | --- | --- |
 | [psm-code-review](./psm-code-review/) | Session toolbar code-review surface for file, shell, and task operations extracted from session tool calls | `sessions:read` |
-| [psm-kanban-board](./psm-kanban-board/) | Provides an app-level board view plus a sidebar bound with `appViewId` through `ctx.ui.registerAppView(...)` / `ctx.ui.registerAppSidebarView(...)` | `sessions:read`, `tags:read`, `tags:write`, `config:read`, `config:write` |
+| [psm-kanban-board](./psm-kanban-board/) | Provides an app-level board view plus a sidebar bound with `appViewId` through `ctx.ui.registerAppView(...)` / `ctx.ui.registerAppSidebarView(...)`, and a board-status column in host session tables via `ctx.ui.registerSessionListColumn(...)` | `sessions:read`, `tags:read`, `tags:write`, `config:read`, `config:write` |
 | [psm-session-summary](./psm-session-summary/) | Generates session intelligence and writes `session.intelligence` plugin records | `sessions:read`, `records:read`, `records:write`, `model:invoke`, `agent:invoke` |
 | [psm-sidechat](./psm-sidechat/) | Session Q&A command/tool and toolbar panel example | `sessions:read`, `model:invoke`, `agent:invoke`, `records:read`, `records:write` |
 | [psm-semantic-search](./psm-semantic-search/) | Runs host-managed Pi Agent ReAct search over sessions with controlled PSM tools | `agent:invoke`, `sessions:read`, `search:read`, `model:invoke` |

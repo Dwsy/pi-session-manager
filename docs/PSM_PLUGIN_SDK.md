@@ -304,6 +304,7 @@ Use command and tool registrations for plugin behavior that should appear in the
 | --- | --- |
 | `ctx.ui.registerAppView(...)` | Add a first-class app view |
 | `ctx.ui.registerAppSidebarView(...)` | Add a sidebar companion for an app view |
+| `ctx.ui.registerSessionListColumn(...)` | Add a column to host session tables |
 | `ctx.ui.registerSessionToolbarItem(...)` | Add a session toolbar item |
 | `ctx.ui.registerSessionMainView(...)` | Add a main session view |
 | `ctx.ui.registerSessionPanel(...)` | Add a right-side session panel |
@@ -311,6 +312,35 @@ Use command and tool registrations for plugin behavior that should appear in the
 | `ctx.ui.registerToolRenderer(...)` | Customize tool-call rendering |
 
 App views can be bound to sidebars with `appViewId`. Tool renderers can match by exact name, regular expression, or predicate.
+
+### Session list columns
+
+`ctx.ui.registerSessionListColumn(...)` adds a column to host session tables, such as the
+main-view browser at `/explorer`. Use it to surface plugin state next to every session
+instead of hiding it behind a hover action.
+
+```ts
+export interface PsmSessionListColumnRenderProps {
+  session: PsmSessionReference
+  onOpenSession: () => void
+}
+
+export interface PsmSessionListColumnRegistration {
+  id: string
+  title: string
+  width?: number
+  align?: 'left' | 'center' | 'right'
+  order?: number
+  render(props: PsmSessionListColumnRenderProps): unknown
+}
+```
+
+Rules:
+
+- `order` sorts plugin columns against each other; it defaults to `100` and ties break by `id`.
+- `width` is a fixed pixel width. The host adds it to the table's minimum width, so keep it small.
+- Cells render once per visible row inside a virtualized table. Keep them cheap and side-effect free.
+- A cell that cannot resolve its data must render `null` rather than throw.
 
 ### Session viewer controller
 

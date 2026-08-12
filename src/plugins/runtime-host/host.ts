@@ -405,7 +405,7 @@ export class PsmPluginHost {
   private toolRenderers = new Map<string, PsmToolRendererRuntimeRegistration>()
   private readonly uiContributions = new PsmPluginUiContributionCatalog()
   private commandSnapshot: PsmPluginCommandRuntimeRegistration[] = []
-  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { ready: false, appViews: [], appSidebarViews: [], sessionListActions: [], projectListActions: [], sessionContextMenuActions: [], toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
+  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { ready: false, appViews: [], appSidebarViews: [], sessionListActions: [], sessionListColumns: [], projectListActions: [], sessionContextMenuActions: [], toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
   private listeners = new Set<() => void>()
   private activePlugins = new Map<string, ActivePlugin>()
   private statuses = new Map<string, PsmPluginStatus>()
@@ -825,6 +825,10 @@ export class PsmPluginHost {
         },
         registerSessionListAction: (action) => {
           this.uiContributions.registerSessionListAction(manifest.id, action)
+        },
+        registerSessionListColumn: (column) => {
+          const result = this.uiContributions.registerSessionListColumn(manifest.id, column)
+          if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
         },
         registerProjectListAction: (action) => {
           this.uiContributions.registerProjectListAction(manifest.id, action)

@@ -14,7 +14,13 @@ import {
   AppPluginSidebarState,
 } from '@/components/app/AppPluginSidebarShell'
 
+import KanbanSessionColumnCell from './KanbanSessionColumnCell'
 import { manifest } from './manifest'
+import {
+  KANBAN_SESSION_COLUMN_ID,
+  KANBAN_SIDEBAR_VIEW_ID,
+  KANBAN_VIEW_ID,
+} from './viewIds'
 import WorkspacePanel from './WorkspacePanel'
 import {
   createKanbanWorkspaceStore,
@@ -25,8 +31,6 @@ import {
 export { manifest }
 
 const KanbanBoard = lazy(() => import('./KanbanBoard'))
-const KANBAN_VIEW_ID = 'builtin.kanban-board.view'
-const KANBAN_SIDEBAR_VIEW_ID = 'builtin.kanban-board.sidebar'
 
 type KanbanViewData = AppPluginSurfaceData
 type KanbanSidebarData = Pick<
@@ -153,5 +157,13 @@ export default function activate(ctx: PsmPluginHostContext) {
       ...(props as PsmAppSidebarViewRenderProps<KanbanSidebarData>),
       workspaceStore,
     }),
+  })
+
+  ctx.ui.registerSessionListColumn({
+    id: KANBAN_SESSION_COLUMN_ID,
+    title: ctx.i18n.t('plugins.kanbanBoard.sessionColumn.title', 'Kanban'),
+    width: 180,
+    order: 10,
+    render: (props) => createElement(KanbanSessionColumnCell, props),
   })
 }

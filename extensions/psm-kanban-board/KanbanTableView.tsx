@@ -184,7 +184,7 @@ export default function KanbanTableView({
                   key={session.id}
                   ref={virtualRow ? virtualizer.measureElement : undefined}
                   data-index={virtualRow?.index}
-                  className={`group cursor-pointer border-b border-border/20 last:border-b-0 hover:bg-secondary/35 ${active || bulkSelected ? 'bg-primary/5' : ''}`}
+                  className={`group border-b border-border/20 last:border-b-0 hover:bg-secondary/35 ${active || bulkSelected ? 'bg-primary/5' : ''}`}
                   data-testid="kanban-table-row"
                   data-session-id={session.id}
                   tabIndex={0}
