@@ -48,6 +48,35 @@ interface SessionChangeNotifications {
   }>;
 }
 
+/** Lightweight DOM error toast, matching the clipboard feedback toast style. */
+function showErrorToast(message: string): void {
+  if (typeof document === "undefined") return;
+
+  const el = document.createElement("div");
+  el.textContent = message;
+  el.setAttribute("role", "alert");
+  el.style.cssText = `
+    position: fixed; bottom: 24px; right: 24px; z-index: 10000;
+    padding: 10px 18px; border-radius: 10px; color: #fff;
+    font-size: 13px; font-family: system-ui, -apple-system, sans-serif;
+    background: rgba(239,68,68,0.92);
+    backdrop-filter: blur(8px); box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    pointer-events: none; user-select: none;
+    opacity: 0; transform: translateY(8px) scale(0.96);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  `;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => {
+    el.style.opacity = "1";
+    el.style.transform = "translateY(0) scale(1)";
+  });
+  setTimeout(() => {
+    el.style.opacity = "0";
+    el.style.transform = "translateY(8px) scale(0.96)";
+    setTimeout(() => el.remove(), 250);
+  }, 3200);
+}
+
 function normalizeSessionName(session: Pick<SessionInfo, "name">): string {
   return (session.name || "").trim();
 }
@@ -394,7 +423,7 @@ export function useSessions(): UseSessionsReturn {
         const capability = getRuntimeSessionOperationCapability("delete");
         if (!capability.supported) {
           console.warn("Delete is not supported in this runtime mode");
-          alert(
+          showErrorToast(
             t("app.errors.deleteSession", {
               defaultValue: capability.fallbackMessage,
             }),
@@ -425,7 +454,7 @@ export function useSessions(): UseSessionsReturn {
 
         if (result.failed.length > 0) {
           console.error("Failed to delete some sessions:", result.failed);
-          alert(
+          showErrorToast(
             t("app.errors.deleteSessionPartial", {
               count: result.failed.length,
               defaultValue:
@@ -478,7 +507,7 @@ export function useSessions(): UseSessionsReturn {
       const capability = getRuntimeSessionOperationCapability("delete");
       if (!capability.supported) {
         console.warn("Delete is not supported in this runtime mode");
-        alert(
+        showErrorToast(
           t("app.errors.deleteSession", {
             defaultValue: capability.fallbackMessage,
           }),
@@ -510,7 +539,7 @@ export function useSessions(): UseSessionsReturn {
 
       if (result.failed.length > 0) {
         console.error("Failed to delete some sessions:", result.failed);
-        alert(
+        showErrorToast(
           t("app.errors.deleteSessionPartial", {
             count: result.failed.length,
             defaultValue:
@@ -529,7 +558,7 @@ export function useSessions(): UseSessionsReturn {
       setPendingDeleteSession(null);
     } catch (error) {
       console.error("Failed to delete session:", error);
-      alert(t("app.errors.deleteSession"));
+      showErrorToast(t("app.errors.deleteSession"));
     }
   }, [pendingDeleteSession, t]);
 
@@ -543,7 +572,7 @@ export function useSessions(): UseSessionsReturn {
         const capability = getRuntimeSessionOperationCapability("rename");
         if (!capability.supported) {
           console.warn("Rename is not supported in this runtime mode");
-          alert(
+          showErrorToast(
             t("app.errors.renameSession", {
               defaultValue: capability.fallbackMessage,
             }),
@@ -594,7 +623,7 @@ export function useSessions(): UseSessionsReturn {
         }
       } catch (error) {
         console.error("Failed to rename session:", error);
-        alert(t("app.errors.renameSession"));
+        showErrorToast(t("app.errors.renameSession"));
       }
     },
     [notifySessionRenamed, selectedSession, t],
@@ -609,7 +638,7 @@ export function useSessions(): UseSessionsReturn {
         const capability = getRuntimeSessionOperationCapability("fork");
         if (!capability.supported) {
           console.warn("Fork is not supported in this runtime mode");
-          alert(
+          showErrorToast(
             t("app.errors.forkSession", {
               defaultValue: capability.fallbackMessage,
             }),
@@ -634,7 +663,7 @@ export function useSessions(): UseSessionsReturn {
         return newSession;
       } catch (error) {
         console.error("Failed to fork session:", error);
-        alert(
+        showErrorToast(
           t("app.errors.forkSession", {
             defaultValue: "Failed to fork session",
           }),

@@ -30,6 +30,7 @@ function renderUseRouteSync(path: string, initialProps: Partial<HookProps> = {})
     setSelectedSession: vi.fn(),
     setViewMode: vi.fn(),
     setSelectedProject: vi.fn(),
+    setMainView: vi.fn(),
     setShowSettings: vi.fn(),
     setShowTerminal: vi.fn(),
     setShowFavorites: vi.fn(),
@@ -92,6 +93,30 @@ describe("useRouteSync", () => {
     await waitFor(() => {
       expect(spies.setActiveAppViewId).toHaveBeenCalledWith("app.board");
       expect(spies.setViewMode).toHaveBeenCalledWith("app");
+    });
+  });
+
+  it("activates the explorer main view from its feature route", async () => {
+    const { spies } = renderUseRouteSync("/explorer", {
+      selectedSession: null,
+      sessionsLoading: false,
+    });
+
+    await waitFor(() => {
+      expect(spies.setMainView).toHaveBeenCalledWith("explorer");
+      expect(spies.setViewMode).toHaveBeenCalledWith("list");
+      expect(spies.setSelectedProject).toHaveBeenCalledWith(null);
+    });
+  });
+
+  it("restores the dashboard main view from its feature route", async () => {
+    const { spies } = renderUseRouteSync("/dashboard", {
+      selectedSession: null,
+      sessionsLoading: false,
+    });
+
+    await waitFor(() => {
+      expect(spies.setMainView).toHaveBeenCalledWith("dashboard");
     });
   });
 

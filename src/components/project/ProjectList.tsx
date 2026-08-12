@@ -156,7 +156,7 @@ export default function ProjectList({
               key={project.dir}
               data-index={virtualRow.index}
               ref={projectsVirtualizer.measureElement}
-              className={`px-3 py-2 motion-surface motion-color border-b border-border/10 group select-none cursor-pointer ${isSelected ? "bg-info/10" : "hover:bg-background"}`}
+              className={`px-3 py-2 motion-surface motion-color border-b border-border/10 group select-none ${isSelected ? "bg-info/10" : "hover:bg-background"}`}
               style={{
                 position: "absolute",
                 top: 0,
@@ -202,11 +202,8 @@ export default function ProjectList({
                       {project.messageCount} {t("session.list.messages")}
                     </span>
                     {project.liveCount > 0 && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/10 text-green-500">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                        </span>
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-success/10 text-success">
+                        <span className="h-2 w-2 rounded-full bg-success animate-pulse flex-shrink-0" />
                         {project.liveCount}
                       </span>
                     )}

@@ -124,6 +124,7 @@ export default function SearchFilterBar({
         {searchQuery && (
           <button
             onClick={handleClear}
+            aria-label={t('search.clearAll', 'Clear search (Esc)')}
             className="p-0.5 rounded hover:bg-foreground/10 text-muted-foreground/50 hover:text-muted-foreground motion-color motion-press focus-ring"
           >
             <X className={`${compact ? 'h-2.5 w-2.5' : 'h-3 w-3'}`} />

@@ -17,6 +17,7 @@ export const ROUTES = {
 
   // Feature views
   DASHBOARD: '/dashboard',
+  EXPLORER: '/explorer',
   SETTINGS: '/settings',
   TERMINAL: '/terminal',
 } as const;
@@ -29,12 +30,13 @@ export type RouteKey = keyof typeof ROUTES;
 export type ParsedRoute =
   | { route: 'session'; sessionId: string }
   | { route: 'project'; projectPath: string | null }
-  | { route: 'feature'; feature: 'dashboard' | 'settings' | 'terminal' }
+  | { route: 'feature'; feature: 'dashboard' | 'explorer' | 'settings' | 'terminal' }
   | { route: 'app'; path: string }
   | { route: 'root' };
 
-const FEATURE_ROUTES: Record<string, 'dashboard' | 'settings' | 'terminal'> = {
+const FEATURE_ROUTES: Record<string, 'dashboard' | 'explorer' | 'settings' | 'terminal'> = {
   dashboard: 'dashboard',
+  explorer: 'explorer',
   settings: 'settings',
   terminal: 'terminal',
 };

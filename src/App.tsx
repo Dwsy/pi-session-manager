@@ -58,6 +58,7 @@ import { invoke, isTauri } from "./transport";
 import { getCachedSettings } from "./utils/settingsApi";
 import { getSessionSourceSlug } from "./utils/session";
 import { getPathBasename, pathsEqual } from "./utils/path";
+import { buildProjectUrl } from "./router/config";
 import {
   buildPiResumeCommand,
   buildOmpResumeCommand,
@@ -81,6 +82,7 @@ import { AppPluginSurfaceDataProvider } from "./components/app/AppPluginSurfaceD
 import AppOverlays from "./components/app/AppOverlays";
 import AppSessionListPane from "./components/app/AppSessionListPane";
 import AppProjectListPane from "./components/app/AppProjectListPane";
+import ExplorerPane from "./components/explorer/ExplorerPane";
 import AppPluginViewPane from "./components/app/AppPluginViewPane";
 import AppDashboardPane from "./components/app/AppDashboardPane";
 import AppSessionViewerPane from "./components/app/AppSessionViewerPane";
@@ -101,6 +103,11 @@ import {
   DEFAULT_SESSION_SORT_BY,
   DEFAULT_SESSION_SORT_ORDER,
 } from "./types/sessionSort";
+import {
+  persistMainView,
+  readStoredMainView,
+  type AppMainView,
+} from "./types/mainView";
 
 if (!(globalThis as Record<string, unknown>).__PSM_HOST_REACT__) {
   (globalThis as Record<string, unknown>).__PSM_HOST_REACT__ = ReactRuntime;
@@ -236,6 +243,12 @@ function App() {
     },
   );
   const [activeAppViewId, setActiveAppViewId] = useState<string | null>(null);
+  const [mainView, setMainView] = useState<AppMainView>(() =>
+    standaloneDatasetRuntime ? "dashboard" : readStoredMainView(),
+  );
+  useEffect(() => {
+    persistMainView(mainView);
+  }, [mainView]);
   const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
   const [sourceFilterSlugs, setSourceFilterSlugs] = useState<string[]>(() => {
     try {
@@ -388,6 +401,7 @@ function App() {
     viewMode: sidebarMode,
     setViewMode: setSidebarMode,
     setSelectedProject,
+    setMainView,
     setShowSettings,
     setShowTerminal,
     setActiveAppViewId,
@@ -534,6 +548,29 @@ function App() {
     },
     [navigateToProject, navigateToProjects, setSelectedSession],
   );
+
+  const explorerActive = mainView === "explorer" && !selectedSession;
+
+  const openExplorer = useCallback(() => {
+    setMainView("explorer");
+    setSelectedSession(null);
+    setActiveAppViewId(null);
+    setSidebarMode((mode) => (mode === "app" ? "list" : mode));
+    navigateToPath(selectedProject ? buildProjectUrl(selectedProject) : "/explorer");
+  }, [navigateToPath, selectedProject, setSelectedSession]);
+
+  const closeExplorer = useCallback(() => {
+    setMainView("dashboard");
+    navigateToPath(selectedProject ? buildProjectUrl(selectedProject) : "/");
+  }, [navigateToPath, selectedProject]);
+
+  const toggleExplorer = useCallback(() => {
+    if (explorerActive) {
+      closeExplorer();
+      return;
+    }
+    openExplorer();
+  }, [closeExplorer, explorerActive, openExplorer]);
 
   const buildResumeCommand = useCallback(
     (session: SessionInfo) => {
@@ -772,12 +809,16 @@ function App() {
         ? { "cmd+3": primaryAppViewShortcutHandler }
         : {}),
       ...appViewShortcuts,
+      "cmd+shift+l": toggleExplorer,
       "cmd+b": () => setSidebarVisible((prev) => !prev),
       "cmd+alt+b": () => {
         // Toggle right panel - handled by session viewer
         window.dispatchEvent(new CustomEvent("psm:toggle-right-panel"));
       },
-      "cmd+,": () => setShowSettings(true),
+      "cmd+,": () => {
+        if (showOnboarding) return;
+        setShowSettings(true);
+      },
       "cmd+`": toggleCurrentTerminalScope,
       "cmd+j": toggleCurrentTerminalScope,
       "cmd+shift+i": async () => {
@@ -835,6 +876,7 @@ function App() {
       convertResult,
       showRenameDialog,
       showForkDialog,
+      showOnboarding,
       showTerminal,
       terminalMaximized,
       selectedProject,
@@ -853,6 +895,7 @@ function App() {
       appViewShortcuts,
       primaryAppViewShortcutHandler,
       requestToolReview,
+      toggleExplorer,
     ],
   );
 
@@ -1164,6 +1207,7 @@ function App() {
       sourceOptions,
       getDescendantIds,
       onClearSelectedSession: () => setSelectedSession(null),
+      onOpenAppView: openPluginAppViewById,
       loading,
     }),
     [
@@ -1192,6 +1236,7 @@ function App() {
       sourceOptions,
       getDescendantIds,
       setSelectedSession,
+      openPluginAppViewById,
       loading,
     ],
   );
@@ -1321,6 +1366,21 @@ function App() {
       loading={loading}
       liveSessionIds={liveSessionIds}
       {...sessionPreviewHandlers}
+    />
+  );
+
+  const renderExplorer = () => (
+    <ExplorerPane
+      sessionListCommonProps={runtimeSessionListCommonProps}
+      sessions={filteredSessions}
+      totalSessionCount={sessions.length}
+      loading={loading}
+      selectedProject={selectedProject}
+      onSelectProject={handleSelectProject}
+      filterBar={
+        <AppDesktopSearchBar {...sharedSearchBarProps} sidebarMode="list" />
+      }
+      onClose={closeExplorer}
     />
   );
 
@@ -1491,6 +1551,7 @@ function App() {
   }
 
   const handleSidebarShowDashboard = () => {
+    setMainView("dashboard");
     setSidebarMode("list");
     setActiveAppViewId(null);
     setSelectedProject(null);
@@ -1500,36 +1561,42 @@ function App() {
     navigateToSessions();
   };
 
+  const sharedSearchBarProps = {
+    searchQuery: sidebarSearchQuery,
+    onSearchChange: setSidebarSearchQuery,
+    tags,
+    sessionTags,
+    filterTagIds,
+    onFilterChange: setFilterTagIds,
+    sourceOptions,
+    selectedSourceSlugs: sourceFilterSlugs,
+    onSourceFilterChange: setSourceFilterSlugs,
+    modelOptions,
+    selectedModel: modelFilter,
+    onModelFilterChange: setModelFilter,
+    dateRange,
+    onDateRangeChange: setDateRange,
+    onCreateTag: (name: string, color: string, parentId?: string) => {
+      void createTag(name, color, undefined, parentId);
+    },
+    getDescendantIds,
+    totalCount: sessions.length,
+    filteredCount: filteredSessions.length,
+    selectedProject,
+    sortBy: sessionSortBy,
+    sortOrder: sessionSortOrder,
+    onSortByChange: setSessionSortBy,
+    onSortOrderChange: setSessionSortOrder,
+  };
+
   const desktopSearchBar =
     sidebarMode === "app" ? null : (
       <AppDesktopSearchBar
-        searchQuery={sidebarSearchQuery}
-        onSearchChange={setSidebarSearchQuery}
-        tags={tags}
-        sessionTags={sessionTags}
-        filterTagIds={filterTagIds}
-        onFilterChange={setFilterTagIds}
-        sourceOptions={sourceOptions}
-        selectedSourceSlugs={sourceFilterSlugs}
-        onSourceFilterChange={setSourceFilterSlugs}
-        modelOptions={modelOptions}
-        selectedModel={modelFilter}
-        onModelFilterChange={setModelFilter}
-        dateRange={dateRange}
-        onDateRangeChange={setDateRange}
-        onCreateTag={(name, color, parentId) => {
-          void createTag(name, color, undefined, parentId);
-        }}
-        getDescendantIds={getDescendantIds}
-        totalCount={sessions.length}
-        filteredCount={filteredSessions.length}
+        {...sharedSearchBarProps}
         sidebarMode={sidebarMode}
-        selectedProject={selectedProject}
-        sortBy={sessionSortBy}
-        sortOrder={sessionSortOrder}
-        onSortByChange={setSessionSortBy}
-        onSortOrderChange={setSessionSortOrder}
         onSelectModeTrigger={triggerSelectionMode}
+        onToggleExplorer={standaloneDatasetRuntime ? undefined : toggleExplorer}
+        explorerActive={explorerActive}
       />
     );
 
@@ -1565,6 +1632,7 @@ function App() {
         selectedSession,
         sidebarMode,
         standaloneDatasetRuntime,
+        mainView,
         keepMainContent: Boolean(
           activeAppViewId
           && appViews.find((view) => view.id === activeAppViewId)?.mainContent === 'keep',
@@ -1572,6 +1640,7 @@ function App() {
         renderSessionViewer,
         renderAppView,
         renderStandaloneDatasetOverview,
+        renderExplorer: standaloneDatasetRuntime ? undefined : renderExplorer,
         renderDashboard,
       });
 
@@ -1608,9 +1677,7 @@ function App() {
     return (
       <div className="flex flex-col h-screen-safe bg-background text-foreground items-center justify-center">
         <div className="flex flex-col items-center gap-6" role="status" aria-live="polite">
-          {/* Logo with ambient glow */}
           <div className="relative">
-            <div className="absolute inset-0 rounded-full bg-accent/20 blur-xl animate-pulse" />
             <img
               src="/icon-128.png"
               alt="Pi Session Manager"

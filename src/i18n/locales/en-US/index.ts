@@ -2,9 +2,9 @@ import { common } from './common'
 import { app } from './app'
 import { session } from './session'
 import { project } from './project'
+import { explorer } from './explorer'
 import { search } from './search'
 import { exportModule } from './export'
-import { stats } from './stats'
 import { dashboard } from './dashboard'
 import { languageSwitcher } from './languageSwitcher'
 import { settings } from './settings'
@@ -25,9 +25,9 @@ export const enUS = {
   app,
   session,
   project,
+  explorer,
   search,
   export: exportModule,
-  stats,
   dashboard,
   languageSwitcher,
   settings,

@@ -10,6 +10,7 @@ import {
 } from '../router/config';
 import { getRuntimeSessionById } from '../runtime-data/sessionSource';
 import type { SessionInfo } from '../types';
+import type { AppMainView } from '../types/mainView';
 import type { AppSidebarViewMode } from './app/useSidebarSessions';
 import {
   beginRouteTransition,
@@ -27,6 +28,7 @@ interface RouteSyncOptions {
   viewMode: AppSidebarViewMode;
   setViewMode: (mode: AppSidebarViewMode) => void;
   setSelectedProject: (project: string | null) => void;
+  setMainView: (view: AppMainView) => void;
   setShowSettings: (show: boolean) => void;
   setShowTerminal: (show: boolean) => void;
   setActiveAppViewId: (viewId: string | null) => void;
@@ -53,6 +55,7 @@ export function useRouteSync({
   viewMode,
   setViewMode,
   setSelectedProject,
+  setMainView,
   setShowSettings,
   setShowTerminal,
   setActiveAppViewId,
@@ -169,8 +172,14 @@ export function useRouteSync({
 
         switch (parsedRoute.feature) {
           case 'dashboard':
-            // viewMode controls sidebar content only; main content always shows Dashboard
-            // when no session is selected (see renderDesktopMainContent)
+            // viewMode controls sidebar content only; main content shows the
+            // dashboard when no session is selected (see resolveDesktopMainContent)
+            setMainView('dashboard');
+            setViewMode('list');
+            setSelectedProject(null);
+            break;
+          case 'explorer':
+            setMainView('explorer');
             setViewMode('list');
             setSelectedProject(null);
             break;

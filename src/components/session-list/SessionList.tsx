@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { createPortal } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useTranslation } from "react-i18next";
 import type { SessionInfo, Tag } from "@/types";
 import {
   ArrowRightLeft,
   CheckSquare2,
+  MessageSquare,
   Search,
   Square,
   Tags,
@@ -20,7 +20,7 @@ import OpenInTerminalButton from "@/components/OpenInTerminalButton";
 import { SessionBadge } from "@/components/session-viewer/SessionBadge";
 import TagBadge from "@/components/tags/TagBadge";
 import TagPicker from "@/components/tags/TagPicker";
-import SessionContextMenu from "@/components/session-viewer/SessionContextMenu";
+import SessionRowContextMenu from "@/components/session-list/SessionRowContextMenu";
 import SessionPreviewModal from "@/components/session-preview/SessionPreviewModal";
 import { buildSessionPreviewModalActions } from "@/utils/sessionPreviewActions";
 import type { DeleteSessionRequestOptions } from "@/components/dialogs/deleteSessionTypes";
@@ -38,15 +38,9 @@ import {
 } from "@/utils/sessionDisplay";
 import type { TerminalType } from "@/components/settings/types";
 import { getPlatformDefaults } from "@/components/settings/types";
-import { invoke, isTauri } from "@/transport";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { isTextEntryTarget } from "@/hooks/useKeyboardShortcuts";
-import { useClipboard } from "@/hooks/useClipboard";
 import { useSettings } from "@/hooks/useSettings";
-import {
-  buildCopyResumeCommand,
-  openSessionInTerminalDirect,
-} from "@/utils/sessionResume";
 import { usePsmPluginSessionUi, PluginContributionBoundary, PluginContributionSlot } from '@/plugins/runtime-host';
 
 const ESTIMATED_ROW_HEIGHT = 122;
@@ -142,15 +136,12 @@ export default function SessionList({
   const { t } = useTranslation();
   const { getSessionSetting } = useSettings();
   const isMobile = useIsMobile();
-  const { copyText } = useClipboard();
   const showAgentIconInBadge =
     getSessionSetting("showAgentIconInSessionBadge") !== false;
   const showModelIconInBadge =
     getSessionSetting("showModelIconInSessionBadge") === true;
   const listContainerRef = useRef<HTMLDivElement>(null);
   const [columnCount, setColumnCount] = useState(1);
-  const [hoveredCard, setHoveredCard] = useState<{ session: SessionInfo; rect: DOMRect } | null>(null);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [tagPickerSessionId, setTagPickerSessionId] = useState<string | null>(
     null,
   );
@@ -238,18 +229,6 @@ export default function SessionList({
   useEffect(() => {
     selectedSessionsRef.current = selectedSessions;
   }, [selectedSessions]);
-
-  /* dismiss hover overlay on scroll/resize */
-  useEffect(() => {
-    if (!hoveredCard) return;
-    const dismiss = () => { clearTimeout(hoverTimerRef.current); setHoveredCard(null); };
-    window.addEventListener("scroll", dismiss, true);
-    window.addEventListener("resize", dismiss);
-    return () => {
-      window.removeEventListener("scroll", dismiss, true);
-      window.removeEventListener("resize", dismiss);
-    };
-  }, [hoveredCard]);
 
   const renderSessionPluginActions = useCallback((session: SessionInfo) => (
     sessionListActions.map((action) => (
@@ -778,7 +757,7 @@ export default function SessionList({
                 }}
               >
                 <div
-                  className="grid cursor-pointer px-2 py-1.5 gap-2.5"
+                  className="grid px-2 py-1.5 gap-2.5"
                   style={{
                     gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
                   }}
@@ -852,7 +831,7 @@ export default function SessionList({
                             sessionId: session.id,
                           });
                         }}
-                        className={`relative px-3 py-2.5 motion-surface motion-color group rounded-lg overflow-clip border select-none cursor-pointer ${
+                        className={`relative px-3 py-2.5 motion-surface motion-color group rounded-lg overflow-clip border select-none ${
                           isSelected
                             ? isSelectionMode
                               ? "border-primary/60 bg-primary/10 shadow-lg ring-1 ring-primary/30"
@@ -906,16 +885,10 @@ export default function SessionList({
                                   )}
                                   <h3
                                     className="font-medium text-[13px] sm:text-sm text-foreground leading-tight line-clamp-1 flex-1 min-w-0"
-                                    onMouseEnter={(e) => {
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      hoverTimerRef.current = setTimeout(() => {
-                                        setHoveredCard({ session, rect });
-                                      }, 1000);
-                                    }}
-                                    onMouseLeave={() => {
-                                      clearTimeout(hoverTimerRef.current);
-                                      setHoveredCard(null);
-                                    }}
+                                    title={getSessionListDisplayName(
+                                      session,
+                                      t("session.list.untitled"),
+                                    )}
                                   >
                                     {getSessionListDisplayName(
                                       session,
@@ -966,13 +939,6 @@ export default function SessionList({
 
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                            {liveSessionIds?.has(session.id) && (
-                              <span
-                                className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0"
-                                title="Live"
-                              />
-                            )}
-
                             {sourceTag && (
                               <SessionBadge
                                 label={sourceTag}
@@ -992,7 +958,13 @@ export default function SessionList({
                                   className="text-[9px] sm:text-[10px]"
                                 />
                               ))}
-                            <span className="px-1.5 py-0.5  text-[9px] sm:text-[10px] tabular-nums font-medium text-muted-foreground flex-shrink-0">
+                            <span
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] sm:text-[10px] tabular-nums font-medium text-muted-foreground flex-shrink-0"
+                              title={t("session.messageCount", {
+                                count: session.message_count,
+                              })}
+                            >
+                              <MessageSquare className="h-3 w-3 text-muted-foreground/60" />
                               {session.message_count}
                             </span>
 
@@ -1022,7 +994,7 @@ export default function SessionList({
                           </div>
 
                           <div
-                            className={`flex items-center gap-1 transition-all duration-200 ease-out ${isMobile ? "flex-shrink-0" : "w-0 opacity-0 group-hover:w-auto group-hover:opacity-100"}`}
+                            className={`flex items-center gap-1 transition-opacity duration-200 ease-out ${isMobile ? "flex-shrink-0" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"}`}
                           >
                             {pluginSessionActions}
                             {!isSelectionMode && onToggleTag && (
@@ -1089,7 +1061,7 @@ export default function SessionList({
                             {!isSelectionMode && onDeleteSession && (
                               <DeleteConfirmButton
                                 onDelete={() => {
-                                  onDeleteSession(session, undefined);
+                                  onDeleteSession(session, { skipPopover: true });
                                 }}
                                 size="sm"
                               />
@@ -1129,89 +1101,27 @@ export default function SessionList({
       )}
 
       {contextMenu && onToggleTag && contextMenuSession && (
-        <SessionContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          sessionId={contextMenu.sessionId}
+        <SessionRowContextMenu
+          session={contextMenuSession}
+          point={{ x: contextMenu.x, y: contextMenu.y }}
           tags={tags}
           sessionTagIds={contextMenuSessionTags.map((tag) => tag.id)}
-          onToggleTag={(tagId, assigned) =>
-            onToggleTag(contextMenu.sessionId, tagId, assigned)
-          }
-          onOpenTerminal={
-            onResumeSession
-              ? () => {
-                  void onResumeSession(contextMenuSession);
-                }
-              : isTauri()
-              ? () => {
-                  openSessionInTerminalDirect(contextMenuSession, {
-                    terminal,
-                    customCommand,
-                    piPath,
-                    resumeCommand,
-                  }).catch(console.error);
-                }
-              : undefined
-          }
-          onOpenBrowser={
-            isTauri()
-              ? () => {
-                  invoke("open_session_in_browser", {
-                    path: contextMenuSession.path,
-                  }).catch(console.error);
-                }
-              : undefined
-          }
-          onConvert={
-            onConvertSession
-              ? () => {
-                  onConvertSession(contextMenuSession);
-                }
-              : undefined
-          }
-          pluginActions={renderSessionContextActions(contextMenuSession)}
-          onCopyPath={() => {
-            void copyText(contextMenuSession.path).catch(console.error);
-          }}
-          onCopyResume={
-            onCopyResumeSession
-              ? async () => {
-                  await onCopyResumeSession(contextMenuSession);
-                }
-              : isTauri()
-              ? () => {
-                  void buildCopyResumeCommand(contextMenuSession, {
-                    piPath,
-                    resumeCommand,
-                  }).then((command) => copyText(command).catch(console.error));
-                }
-              : undefined
-          }
-          onFork={
-            onForkSession
-              ? () => {
-                  onForkSession(contextMenuSession);
-                }
-              : undefined
-          }
-          onRename={
-            onOpenPreviewRenameDialog
-              ? () => {
-                  onOpenPreviewRenameDialog(contextMenuSession);
-                }
-              : undefined
-          }
-          onDeleteDirect={
+          onToggleTag={onToggleTag}
+          onResumeSession={onResumeSession}
+          onCopyResumeSession={onCopyResumeSession}
+          onConvertSession={onConvertSession}
+          onForkSession={onForkSession}
+          onRenameSession={onOpenPreviewRenameDialog}
+          onDeleteSession={
             onDeleteSession
-              ? () => {
-                  onDeleteSession(
-                    contextMenuSession,
-                    { skipPopover: true },
-                  );
-                }
+              ? (session) => onDeleteSession(session, { skipPopover: true })
               : undefined
           }
+          terminal={terminal}
+          piPath={piPath}
+          customCommand={customCommand}
+          resumeCommand={resumeCommand}
+          pluginActions={renderSessionContextActions(contextMenuSession)}
           onClose={() => setContextMenu(null)}
         />
       )}
@@ -1263,34 +1173,6 @@ export default function SessionList({
         />
         );
       })()}
-
-      {/* ── Hover title overlay ── */}
-      {hoveredCard && createPortal(
-        <div
-          style={{
-            position: "fixed",
-            top: hoveredCard.rect.top - 4,
-            left: hoveredCard.rect.left - 1,
-            width: hoveredCard.rect.width + 2,
-            padding: "4px 10px",
-            zIndex: 50,
-            pointerEvents: "none",
-            borderRadius: "0.375rem",
-            background: "var(--surface, hsl(0 0% 100%))",
-            border: "1px solid var(--primary, hsl(217 91% 30% / 0.3))",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-            transition: "border-color 150ms ease, box-shadow 150ms ease",
-          }}
-        >
-          <h3 className="font-medium text-[13px] sm:text-sm text-foreground leading-snug" style={{ whiteSpace: "normal", wordBreak: "break-word" }}>
-            {getSessionListDisplayName(
-              hoveredCard.session,
-              t("session.list.untitled"),
-            )}
-          </h3>
-        </div>,
-        document.body,
-      )}
 
     </div>
   );
