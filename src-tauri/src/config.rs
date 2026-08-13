@@ -20,6 +20,14 @@ pub enum SessionSourceMode {
     Dataset,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum SessionRuntimeEnvironment {
+    #[default]
+    Local,
+    Wsl,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetRegistryEntry {
@@ -75,6 +83,12 @@ pub struct Config {
 
     #[serde(default)]
     pub session_source_mode: SessionSourceMode,
+
+    #[serde(default)]
+    pub session_runtime_environment: SessionRuntimeEnvironment,
+
+    #[serde(default)]
+    pub wsl_distribution: Option<String>,
 
     #[serde(default)]
     pub active_dataset_id: Option<String>,
@@ -155,6 +169,8 @@ impl Default for Config {
             external_sessions_include_in_stats: false,
             external_sessions_include_in_search: false,
             session_source_mode: SessionSourceMode::Local,
+            session_runtime_environment: SessionRuntimeEnvironment::Local,
+            wsl_distribution: None,
             active_dataset_id: None,
             active_dataset_ids: vec![],
             datasets: vec![],

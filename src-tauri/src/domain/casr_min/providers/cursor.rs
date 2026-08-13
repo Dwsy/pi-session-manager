@@ -34,6 +34,10 @@ pub fn session_roots() -> Vec<PathBuf> {
     find_db_files()
 }
 
+pub fn session_roots_for_home(home: &Path) -> Vec<PathBuf> {
+    find_db_files_in_config_dir(&home.join(".config").join("Cursor"))
+}
+
 pub fn matches_path(path: &Path) -> bool {
     is_db_path(path) || path.parent().is_some_and(|parent| parent.is_file() && parent.extension().and_then(|ext| ext.to_str()) == Some("vscdb"))
 }
@@ -120,6 +124,10 @@ fn find_db_files() -> Vec<PathBuf> {
     let Some(config_dir) = config_dir() else {
         return vec![];
     };
+    find_db_files_in_config_dir(&config_dir)
+}
+
+fn find_db_files_in_config_dir(config_dir: &Path) -> Vec<PathBuf> {
     let mut dbs = Vec::new();
     let global_db = config_dir.join("User/globalStorage/state.vscdb");
     if global_db.is_file() {

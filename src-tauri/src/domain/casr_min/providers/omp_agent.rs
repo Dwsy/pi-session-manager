@@ -25,7 +25,7 @@ pub fn looks_like_session_content(content: &str) -> bool {
 }
 
 pub fn build_target_path(target_session_id: &str, now: chrono::DateTime<chrono::Utc>) -> Result<PathBuf, String> {
-    let root = crate::paths::omp_agent_sessions_dir().map(|dir| dir.join("bridge")).map_err(|_| "cannot determine OMP sessions directory".to_string())?;
+    let root = crate::paths::current_session_home_dir().map(|home| home.join(".omp").join("agent").join("sessions").join("bridge")).map_err(|_| "cannot determine OMP sessions directory".to_string())?;
     let stamp = now.format("%Y-%m-%dT%H-%M-%S%.3f").to_string();
     let suffix = target_session_id.chars().filter(|c| c.is_ascii_hexdigit()).take(8).collect::<String>();
     Ok(root.join(format!("{stamp}_{suffix}.jsonl")))

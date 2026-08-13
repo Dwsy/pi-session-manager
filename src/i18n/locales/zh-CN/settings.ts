@@ -319,6 +319,14 @@ export const settings = {
   },
   dataSources: {
     localTitle: "本地会话目录",
+    runtimeTitle: "会话运行环境",
+    runtimeHelp: "选择本地会话使用 Windows 还是指定的 WSL 发行版。数据集模式与运行环境相互独立。",
+    runtimeLocal: "Windows（本地）",
+    runtimeWsl: "WSL",
+    wslDistribution: "WSL 发行版",
+    wslLoading: "正在检测 WSL 发行版...",
+    wslHelp: "~ 和各 Agent 默认会话路径会解析到该发行版的 Linux $HOME；终端恢复命令也会在同一发行版内执行。",
+    wslUnavailable: "未检测到 WSL 发行版。安装或启动一个 WSL 发行版后即可启用 WSL 模式。",
   },
   diagnostics: {
     maintenanceTitle: "维护",

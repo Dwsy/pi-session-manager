@@ -237,7 +237,7 @@ pub fn get_cached_sessions_for_list() -> Option<Vec<SessionInfo>> {
 }
 
 pub fn get_sessions_dir() -> Result<PathBuf, String> {
-    crate::paths::pi_agent_sessions_dir()
+    Ok(crate::paths::current_session_home_dir()?.join(".pi").join("agent").join("sessions"))
 }
 
 /// Returns all session directories: the default one plus any user-configured paths.
@@ -257,11 +257,18 @@ pub fn get_all_session_dirs(config: &Config) -> Vec<PathBuf> {
     }
 
     let mut dirs = vec![];
+    let runtime_home = match crate::paths::session_runtime_home_dir(config) {
+        Ok(home) => home,
+        Err(error) => {
+            tracing::warn!("Unable to resolve session runtime home: {error}");
+            return dirs;
+        }
+    };
 
     for source in crate::domain::session_bridge::SessionBridgeSource::ALL {
         if source == crate::domain::session_bridge::SessionBridgeSource::Pi {
             if config.include_default_pi_session_dir {
-                for root in source.session_roots() {
+                for root in source.session_roots_for_home(&runtime_home) {
                     if root.exists() && !dirs.iter().any(|existing| existing == &root) {
                         dirs.push(root);
                     }
@@ -275,7 +282,7 @@ pub fn get_all_session_dirs(config: &Config) -> Vec<PathBuf> {
             continue;
         }
 
-        for root in source.session_roots() {
+        for root in source.session_roots_for_home(&runtime_home) {
             if root.exists() && !dirs.iter().any(|existing| existing == &root) {
                 dirs.push(root);
             }
@@ -284,7 +291,7 @@ pub fn get_all_session_dirs(config: &Config) -> Vec<PathBuf> {
 
     // User-configured extra paths
     for p in &config.session_paths {
-        let expanded = expand_tilde(p);
+        let expanded = expand_tilde(p, config, &runtime_home);
         let path = PathBuf::from(&expanded);
         if path.is_absolute() && !dirs.iter().any(|d| d == &path) {
             dirs.push(path);
@@ -294,25 +301,28 @@ pub fn get_all_session_dirs(config: &Config) -> Vec<PathBuf> {
     dirs
 }
 
-/// Expand ~ to home directory
-fn expand_tilde(path: &str) -> String {
-    let Ok(home) = crate::paths::home_dir() else {
-        return path.to_string();
-    };
-
-    if path == "~" {
-        return home.to_string_lossy().to_string();
-    }
-
-    if let Some(rest) = path.strip_prefix("~/").or_else(|| path.strip_prefix("~\\")) {
-        let mut expanded = home;
+/// Expand ~ to the active runtime home directory.
+fn expand_tilde(path: &str, config: &Config, home: &Path) -> String {
+    let expanded = if path == "~" {
+        home.to_string_lossy().to_string()
+    } else if let Some(rest) = path.strip_prefix("~/").or_else(|| path.strip_prefix("~\\")) {
+        let mut expanded = home.to_path_buf();
         for part in rest.split(['/', '\\']).filter(|segment| !segment.is_empty()) {
             expanded = expanded.join(part);
         }
-        return expanded.to_string_lossy().to_string();
+        expanded.to_string_lossy().to_string()
+    } else {
+        path.to_string()
+    };
+
+    #[cfg(target_os = "windows")]
+    if config.session_runtime_environment == crate::config::SessionRuntimeEnvironment::Wsl && expanded.starts_with('/') {
+        if let Some(distro) = config.wsl_distribution.as_deref().map(str::trim).filter(|value| !value.is_empty()) {
+            return crate::paths::wsl_linux_path_to_unc(distro, &expanded).to_string_lossy().to_string();
+        }
     }
 
-    path.to_string()
+    expanded
 }
 
 pub async fn scan_sessions() -> Result<Vec<SessionInfo>, String> {

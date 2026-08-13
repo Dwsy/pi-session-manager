@@ -20,7 +20,9 @@ pub fn matches_path(path: &Path) -> bool {
 
 pub fn build_target_path(session: &CanonicalSession, target_session_id: &str) -> Result<PathBuf, String> {
     let workspace_slug = session.workspace.as_ref().map(|path| encode_workspace_slug(path)).unwrap_or_else(|| "-tmp".to_string());
-    Ok(home_dir().join(workspace_slug).join(format!("{target_session_id}.jsonl")))
+    let config = crate::config::Config::load().unwrap_or_default();
+    let root = if config.session_runtime_environment == crate::config::SessionRuntimeEnvironment::Wsl { crate::paths::session_runtime_home_dir(&config)?.join(".factory").join("sessions") } else { home_dir() };
+    Ok(root.join(workspace_slug).join(format!("{target_session_id}.jsonl")))
 }
 
 pub fn resume_command(session_id: &str) -> String {

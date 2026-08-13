@@ -129,11 +129,18 @@ fn inject_session_source_settings(settings: &mut Value) {
         crate::config::SessionSourceMode::Dataset => "dataset",
         crate::config::SessionSourceMode::Local => "local",
     };
+    let runtime_environment = match config.session_runtime_environment {
+        crate::config::SessionRuntimeEnvironment::Local => "local",
+        crate::config::SessionRuntimeEnvironment::Wsl => "wsl",
+    };
+    let wsl_distribution = config.wsl_distribution.clone().unwrap_or_default();
 
     let Some(root) = settings.as_object_mut() else {
         *settings = serde_json::json!({
             "session": {
                 "sourceMode": mode,
+                "runtimeEnvironment": runtime_environment,
+                "wslDistro": wsl_distribution,
                 "activeDatasetId": config.active_dataset_id,
             }
         });
@@ -146,6 +153,8 @@ fn inject_session_source_settings(settings: &mut Value) {
     }
     if let Some(session) = session_value.as_object_mut() {
         session.insert("sourceMode".to_string(), Value::String(mode.to_string()));
+        session.insert("runtimeEnvironment".to_string(), Value::String(runtime_environment.to_string()));
+        session.insert("wslDistro".to_string(), Value::String(wsl_distribution));
         session.insert("activeDatasetId".to_string(), config.active_dataset_id.clone().map(Value::String).unwrap_or(Value::Null));
         session.insert("activeDatasetIds".to_string(), Value::Array(config.effective_active_dataset_ids().into_iter().map(Value::String).collect()));
         session.insert("scanOtherAgentJsonl".to_string(), Value::Bool(config.scan_other_agent_jsonl));
@@ -161,6 +170,69 @@ fn inject_session_source_settings(settings: &mut Value) {
     if let Some(advanced) = advanced_value.as_object_mut() {
         advanced.insert("includeDefaultPiSessionDir".to_string(), Value::Bool(config.include_default_pi_session_dir));
     }
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn list_wsl_distributions() -> Result<Vec<String>, String> {
+    Ok(crate::paths::wsl_distribution_names())
+}
+
+pub async fn save_session_runtime_environment_core(environment: String, wsl_distribution: Option<String>) -> Result<bool, String> {
+    let normalized_environment = environment.trim().to_ascii_lowercase();
+    let runtime_environment = match normalized_environment.as_str() {
+        "local" => crate::config::SessionRuntimeEnvironment::Local,
+        "wsl" => crate::config::SessionRuntimeEnvironment::Wsl,
+        other => return Err(format!("Unsupported session runtime environment: {other}")),
+    };
+
+    let normalized_distribution = wsl_distribution.map(|value| value.trim().to_string()).filter(|value| !value.is_empty());
+    if runtime_environment == crate::config::SessionRuntimeEnvironment::Wsl {
+        #[cfg(not(target_os = "windows"))]
+        return Err("WSL runtime is only available on Windows".to_string());
+
+        #[cfg(target_os = "windows")]
+        {
+            let distro = normalized_distribution.as_deref().ok_or_else(|| "WSL runtime requires a selected distribution".to_string())?;
+            if !crate::paths::wsl_distribution_names().iter().any(|candidate| candidate == distro) {
+                return Err(format!("WSL distribution is not available: {distro}"));
+            }
+            crate::paths::wsl_home_dir(distro)?;
+        }
+    }
+
+    let mut config = crate::config::Config::load().unwrap_or_default();
+    let next_distribution = if runtime_environment == crate::config::SessionRuntimeEnvironment::Wsl { normalized_distribution } else { None };
+    if config.session_runtime_environment == runtime_environment && config.wsl_distribution == next_distribution {
+        return Ok(false);
+    }
+
+    config.session_runtime_environment = runtime_environment;
+    config.wsl_distribution = next_distribution;
+    crate::config::save_config(&config)?;
+
+    let conn = crate::data::sqlite::init_db_with_config(&config)?;
+    let _ = crate::data::sqlite::clear_all_cache(&conn)?;
+    crate::core::scanner::invalidate_cache();
+    Ok(true)
+}
+
+#[cfg(feature = "gui")]
+#[tauri::command]
+pub async fn save_session_runtime_environment(environment: String, wsl_distribution: Option<String>, app_handle: tauri::AppHandle) -> Result<(), String> {
+    if !save_session_runtime_environment_core(environment, wsl_distribution).await? {
+        return Ok(());
+    }
+
+    let watcher_state: tauri::State<'_, crate::file_watcher::FileWatcherState> = app_handle.state();
+    if let Err(error) = crate::file_watcher::restart_watcher_with_config(&watcher_state, app_handle.clone()) {
+        warn!("Failed to restart file watcher after session runtime change: {}", error);
+    }
+
+    if let Err(error) = refresh_sessions_after_settings_change(app_handle.clone()).await {
+        warn!("Failed to refresh sessions after session runtime change: {}", error);
+    }
+
+    Ok(())
 }
 
 /// Get configured session paths (extra paths beyond the default)

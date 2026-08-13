@@ -21,12 +21,15 @@ pub struct ConversionOutcome {
 }
 
 pub fn default_session_dirs(include_other_agents: bool) -> Vec<PathBuf> {
+    let Ok(runtime_home) = crate::paths::current_session_home_dir() else {
+        return Vec::new();
+    };
     let mut dirs = Vec::new();
     for provider in ProviderKind::ALL {
         if !include_other_agents && provider != ProviderKind::Pi {
             continue;
         }
-        for root in provider.session_roots() {
+        for root in provider.session_roots_for_home(&runtime_home) {
             if root.exists() && !dirs.iter().any(|existing| existing == &root) {
                 dirs.push(root);
             }

@@ -28,21 +28,21 @@ pub fn local_and_wsl_home_dirs() -> Vec<PathBuf> {
 }
 
 pub fn existing_home_relative_dirs(components: &[&str]) -> Vec<PathBuf> {
-    local_and_wsl_home_dirs()
-        .into_iter()
-        .map(|mut home| {
-            for component in components {
-                home.push(component);
-            }
-            home
-        })
-        .filter(|path| path.is_dir())
-        .fold(Vec::new(), |mut dirs, path| {
-            if !dirs.iter().any(|existing| existing == &path) {
-                dirs.push(path);
-            }
-            dirs
-        })
+    let Ok(mut path) = home_dir() else {
+        return Vec::new();
+    };
+    for component in components {
+        path.push(component);
+    }
+    path.is_dir().then_some(vec![path]).unwrap_or_default()
+}
+
+pub fn existing_relative_dir(home: &Path, components: &[&str]) -> Vec<PathBuf> {
+    let mut path = home.to_path_buf();
+    for component in components {
+        path.push(component);
+    }
+    path.is_dir().then_some(vec![path]).unwrap_or_default()
 }
 
 fn dedup_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
@@ -64,21 +64,23 @@ fn wsl_home_dirs() -> Vec<PathBuf> {
     Vec::new()
 }
 
-#[cfg(target_os = "windows")]
-fn wsl_distribution_names() -> Vec<String> {
-    static WSL_DISTRIBUTIONS: OnceLock<Vec<String>> = OnceLock::new();
-    WSL_DISTRIBUTIONS
-        .get_or_init(|| {
-            let Ok(output) = std::process::Command::new("wsl.exe").args(["-l", "-q"]).output() else {
-                return Vec::new();
-            };
-            if !output.status.success() {
-                return Vec::new();
-            }
+pub fn wsl_distribution_names() -> Vec<String> {
+    #[cfg(target_os = "windows")]
+    {
+        let Ok(output) = std::process::Command::new("wsl.exe").args(["-l", "-q"]).output() else {
+            return Vec::new();
+        };
+        if !output.status.success() {
+            return Vec::new();
+        }
 
-            decode_wsl_output(&output.stdout).lines().map(|line| line.trim_matches('\u{feff}').trim().trim_matches('\0').to_string()).filter(|line| !line.is_empty()).collect()
-        })
-        .clone()
+        return decode_wsl_output(&output.stdout).lines().map(|line| line.trim_matches('\u{feff}').trim().trim_matches('\0').to_string()).filter(|line| !line.is_empty()).collect();
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Vec::new()
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -94,6 +96,70 @@ fn decode_wsl_output(bytes: &[u8]) -> String {
 #[cfg(target_os = "windows")]
 fn wsl_unc_home_dirs(distro: &str) -> Vec<PathBuf> {
     [format!("\\\\wsl.localhost\\{}\\home", distro), format!("\\\\wsl$\\{}\\home", distro)].into_iter().filter_map(|home_root| std::fs::read_dir(home_root).ok()).flat_map(|entries| entries.flatten().map(|entry| entry.path()).collect::<Vec<_>>()).filter(|path| path.is_dir()).collect()
+}
+
+pub fn wsl_linux_path_to_unc(distro: &str, linux_path: &str) -> PathBuf {
+    wsl_linux_path_to_unc_host("wsl.localhost", distro, linux_path)
+}
+
+fn wsl_linux_path_to_unc_host(host: &str, distro: &str, linux_path: &str) -> PathBuf {
+    let relative = linux_path.trim().trim_start_matches('/').replace('/', "\\");
+    if relative.is_empty() {
+        PathBuf::from(format!("\\\\{host}\\{distro}\\"))
+    } else {
+        PathBuf::from(format!("\\\\{host}\\{distro}\\{relative}"))
+    }
+}
+
+pub fn wsl_unc_path_to_linux(distro: &str, path: &Path) -> Option<String> {
+    let normalized = path.to_string_lossy().replace('\\', "/");
+    for host in ["//wsl.localhost/", "//wsl$/"] {
+        let prefix = format!("{host}{distro}/");
+        if normalized.len() >= prefix.len() && normalized[..prefix.len()].eq_ignore_ascii_case(&prefix) {
+            return Some(format!("/{}", &normalized[prefix.len()..]));
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn wsl_linux_home(distro: &str) -> Result<String, String> {
+    let output = std::process::Command::new("wsl.exe").args(["-d", distro, "--", "sh", "-lc", "printf %s \"$HOME\""]).output().map_err(|error| format!("Failed to query WSL home for {distro}: {error}"))?;
+    if !output.status.success() {
+        return Err(format!("Failed to query WSL home for {distro}: exit status {}", output.status));
+    }
+    let home = decode_wsl_output(&output.stdout).trim_matches('\0').trim().to_string();
+    if !home.starts_with('/') {
+        return Err(format!("WSL distro {distro} returned an invalid HOME: {home}"));
+    }
+    Ok(home)
+}
+
+#[cfg(target_os = "windows")]
+pub fn wsl_home_dir(distro: &str) -> Result<PathBuf, String> {
+    let linux_home = wsl_linux_home(distro)?;
+    let candidates = [wsl_linux_path_to_unc_host("wsl.localhost", distro, &linux_home), wsl_linux_path_to_unc_host("wsl$", distro, &linux_home)];
+    candidates.into_iter().find(|path| path.is_dir()).ok_or_else(|| format!("Cannot access WSL home for distro {distro}: {linux_home}"))
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn wsl_home_dir(_distro: &str) -> Result<PathBuf, String> {
+    Err("WSL runtime is only available on Windows".to_string())
+}
+
+pub fn session_runtime_home_dir(config: &crate::config::Config) -> Result<PathBuf, String> {
+    match config.session_runtime_environment {
+        crate::config::SessionRuntimeEnvironment::Local => home_dir(),
+        crate::config::SessionRuntimeEnvironment::Wsl => {
+            let distro = config.wsl_distribution.as_deref().map(str::trim).filter(|value| !value.is_empty()).ok_or_else(|| "WSL runtime requires a selected distribution".to_string())?;
+            wsl_home_dir(distro)
+        }
+    }
+}
+
+pub fn current_session_home_dir() -> Result<PathBuf, String> {
+    let config = crate::config::Config::load().unwrap_or_default();
+    session_runtime_home_dir(&config)
 }
 
 /// Global lock for tests that mutate HOME/PPM_TEST_DB environment variables.
@@ -199,6 +265,21 @@ mod tests {
         let _home = TestHomeGuard::set(temp.path());
         let dirs = existing_home_relative_dirs(&[".codex", "sessions"]);
 
-        assert!(dirs.iter().any(|dir| dir == &sessions_dir));
+        assert_eq!(dirs, vec![sessions_dir]);
+    }
+
+    #[test]
+    fn wsl_linux_path_maps_to_localhost_unc() {
+        let path = wsl_linux_path_to_unc("Ubuntu", "/home/demo/.omp/agent/sessions/a.jsonl");
+        assert_eq!(path.to_string_lossy(), r"\\wsl.localhost\Ubuntu\home\demo\.omp\agent\sessions\a.jsonl");
+    }
+
+    #[test]
+    fn wsl_unc_path_maps_back_to_linux_for_both_hosts() {
+        let localhost = Path::new(r"\\wsl.localhost\Ubuntu\home\demo\.pi\agent\sessions\a.jsonl");
+        let legacy = Path::new(r"\\wsl$\Ubuntu\home\demo\.pi\agent\sessions\a.jsonl");
+
+        assert_eq!(wsl_unc_path_to_linux("Ubuntu", localhost).as_deref(), Some("/home/demo/.pi/agent/sessions/a.jsonl"));
+        assert_eq!(wsl_unc_path_to_linux("Ubuntu", legacy).as_deref(), Some("/home/demo/.pi/agent/sessions/a.jsonl"));
     }
 }

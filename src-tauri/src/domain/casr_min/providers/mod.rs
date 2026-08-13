@@ -86,25 +86,33 @@ impl ProviderKind {
     }
 
     pub fn session_roots(self) -> Vec<PathBuf> {
+        let config = crate::config::Config::load().unwrap_or_default();
+        let Ok(home) = crate::paths::session_runtime_home_dir(&config) else {
+            return Vec::new();
+        };
+        self.session_roots_for_home(&home)
+    }
+
+    pub fn session_roots_for_home(self, home: &Path) -> Vec<PathBuf> {
         match self {
-            Self::Pi => pi_agent::session_roots(),
-            Self::Omp => omp_agent::session_roots(),
-            Self::ClaudeCode => claude_code::session_roots(),
-            Self::Codex => codex::session_roots(),
-            Self::OpenCode => opencode::session_roots(),
-            Self::Gemini => gemini::session_roots(),
-            Self::Factory => factory::session_roots(),
-            Self::ClawdBot => clawdbot::session_roots(),
-            Self::Cursor => cursor::session_roots(),
-            Self::Antigravity => antigravity::session_roots(),
+            Self::Pi => crate::paths::existing_relative_dir(home, &[".pi", "agent", "sessions"]),
+            Self::Omp => crate::paths::existing_relative_dir(home, &[".omp", "agent", "sessions"]),
+            Self::ClaudeCode => crate::paths::existing_relative_dir(home, &[".claude", "projects"]),
+            Self::Codex => crate::paths::existing_relative_dir(home, &[".codex", "sessions"]),
+            Self::OpenCode => opencode::session_roots_for_home(home),
+            Self::Gemini => gemini::session_roots_for_home(home),
+            Self::Factory => crate::paths::existing_relative_dir(home, &[".factory", "sessions"]),
+            Self::ClawdBot => crate::paths::existing_relative_dir(home, &[".clawdbot", "sessions"]),
+            Self::Cursor => cursor::session_roots_for_home(home),
+            Self::Antigravity => antigravity::session_roots_for_home(home),
         }
     }
 
     pub fn matches_path(self, path: &Path) -> bool {
         let normalized = path.to_string_lossy().replace('\\', "/");
         match self {
-            Self::Pi => crate::paths::pi_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
-            Self::Omp => crate::paths::omp_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
+            Self::Pi => normalized.contains("/.pi/agent/sessions/"),
+            Self::Omp => normalized.contains("/.omp/agent/sessions/"),
             Self::ClaudeCode => normalized.contains("/.claude/projects/"),
             Self::Codex => normalized.contains("/.codex/sessions/"),
             Self::OpenCode => opencode::matches_path(path),
@@ -177,9 +185,16 @@ impl ProviderKind {
     }
 
     pub fn resume_command(self, target_session_id: &str, target_path: &Path) -> String {
+        let runtime_target_path = crate::config::Config::load()
+            .ok()
+            .filter(|config| config.session_runtime_environment == crate::config::SessionRuntimeEnvironment::Wsl)
+            .and_then(|config| config.wsl_distribution)
+            .and_then(|distro| crate::paths::wsl_unc_path_to_linux(&distro, target_path))
+            .map(PathBuf::from)
+            .unwrap_or_else(|| target_path.to_path_buf());
         match self {
-            Self::Pi => pi_agent::resume_command(target_path),
-            Self::Omp => omp_agent::resume_command(target_path),
+            Self::Pi => pi_agent::resume_command(&runtime_target_path),
+            Self::Omp => omp_agent::resume_command(&runtime_target_path),
             Self::ClaudeCode => claude_code::resume_command(target_session_id),
             Self::Codex => codex::resume_command(target_session_id),
             Self::OpenCode => opencode::resume_command(),
