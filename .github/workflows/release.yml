@@ -99,7 +99,7 @@ jobs:
           releaseBody: ""
           releaseDraft: true
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
-          args: ${{ matrix.tauri_args }}
+          args: ${{ runner.os == 'Windows' && (contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc')) && '--bundles nsis' || matrix.tauri_args }}
 
   build-cli:
     strategy:
