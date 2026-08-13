@@ -36,13 +36,11 @@
       }
     },
     "updater": {
-      "active": false,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQxRDRDREU0RkRFQjQxMUMKUldRY1Fldjk1TTNVUVdMM2xCQkVIYXQrQzN6aWlqZ21BUmFJbGFvc0plNXBJUWJrWStVR2o0TUUK",
       "endpoints": [
         "https://raw.githubusercontent.com/Dwsy/pi-session-manager/update-manifests/stable/latest.json",
         "https://cdn.jsdelivr.net/gh/Dwsy/pi-session-manager@update-manifests/stable/latest.json"
-      ],
-      "dialog": true
+      ]
     }
   }
 }

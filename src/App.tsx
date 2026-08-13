@@ -507,8 +507,12 @@ function App() {
       });
     }
   }, [deepLinkListenerReady, isInitialized, settingsLoading]);
-  const { updateInfo, closeUpdateNotice, openUpdateSettings } =
-    useUpdateChecker({ setShowSettings });
+  const {
+    notice: updateNotice,
+    closeNotice: closeUpdateNotice,
+    openUpdateSettings,
+    restartNow: restartForUpdate,
+  } = useUpdateChecker({ setShowSettings });
   useAppUiEffects({
     isMobile,
     showExportDialog,
@@ -1542,9 +1546,10 @@ function App() {
           renderOverlays={renderOverlays}
         />
         <UpdateNoticeToast
-          update={updateInfo}
-          onClose={closeUpdateNotice}
-          onOpenRelease={openUpdateSettings}
+          notice={updateNotice}
+          onDismiss={closeUpdateNotice}
+          onOpenUpdateSettings={openUpdateSettings}
+          onRestart={restartForUpdate}
         />
       </AppPluginSurfaceDataProvider>
     );
@@ -1778,9 +1783,10 @@ function App() {
           )}
         </div>
         <UpdateNoticeToast
-          update={updateInfo}
-          onClose={closeUpdateNotice}
-          onOpenRelease={openUpdateSettings}
+          notice={updateNotice}
+          onDismiss={closeUpdateNotice}
+          onOpenUpdateSettings={openUpdateSettings}
+          onRestart={restartForUpdate}
         />
       </div>
     </AppPluginSurfaceDataProvider>

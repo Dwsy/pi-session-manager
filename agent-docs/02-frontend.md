@@ -316,7 +316,7 @@ the guide does not suppress the initial scanning splash.
 | `useOnboardingGate` | First-launch guide visibility and first-scan tracking |
 | `useSidebarSessions` | Sidebar filtering, pagination, project summary, and list props |
 | `useTerminalScopes` | Terminal visibility, active scope, bounded scope cache, and pending commands |
-| `useUpdateChecker` | Desktop update checks and update-notice actions |
+| `useUpdateChecker` | Feeds settings into `updateService` and derives the update notice |
 
 ### Session Hooks
 
@@ -396,7 +396,8 @@ Key local boundaries:
 | `settings.ts` | Settings utilities |
 | `settingsApi.ts` | Settings API |
 | `toolCallDisplay.ts` | Tool call display |
-| `updateChecker.ts` | Update checking |
+| `updateChecker.ts` | Version comparison, manifest/GitHub release lookup, check-timestamp storage |
+| `updateService.ts` | Shared update store: scheduling, silent install, pending-restart latch |
 
 ## Styles (styles/)
 

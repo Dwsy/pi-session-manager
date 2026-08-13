@@ -15,21 +15,13 @@ vi.mock('@/transport', () => ({
 vi.mock('@/utils/appUpdater', () => ({
   checkAppUpdate: vi.fn(),
   downloadAndInstallAppUpdate: vi.fn(),
-}))
-
-vi.mock('@/utils/updateChecker', () => ({
-  dismissUpdateVersion: vi.fn(),
-  getDismissedUpdateVersion: vi.fn(),
-}))
-
-vi.mock('@/utils/updateChannel', () => ({
-  normalizeUpdateChannel: (channel: string) => channel === 'beta' ? 'beta' : 'stable',
+  restartApp: vi.fn(),
 }))
 
 import { useSettings } from '@/hooks/useSettings'
 import { isTauri, listen } from '@/transport'
 import { checkAppUpdate, downloadAndInstallAppUpdate } from '@/utils/appUpdater'
-import { getDismissedUpdateVersion } from '@/utils/updateChecker'
+import { resetUpdateService } from '@/utils/updateService'
 import { useUpdateChecker } from './useUpdateChecker'
 
 const update = {
@@ -45,6 +37,8 @@ const update = {
 
 describe('useUpdateChecker', () => {
   beforeEach(() => {
+    localStorage.clear()
+    resetUpdateService()
     vi.mocked(useSettings).mockReturnValue({
       settings: { update: { autoCheck: true, channel: 'stable' } },
       loading: false,
@@ -53,24 +47,49 @@ describe('useUpdateChecker', () => {
     vi.mocked(listen).mockResolvedValue(() => undefined)
     vi.mocked(checkAppUpdate).mockResolvedValue(update)
     vi.mocked(downloadAndInstallAppUpdate).mockResolvedValue()
-    vi.mocked(getDismissedUpdateVersion).mockReturnValue(null)
   })
 
   afterEach(() => {
+    resetUpdateService()
     vi.clearAllMocks()
   })
 
-  it('downloads an available desktop update and opens the Updates settings section', async () => {
+  it('installs a desktop update in the background and then asks for a restart', async () => {
+    const { result } = renderHook(() => useUpdateChecker({ setShowSettings: vi.fn() }))
+
+    await waitFor(() => {
+      expect(downloadAndInstallAppUpdate).toHaveBeenCalledWith('stable', expect.any(Function))
+    })
+
+    await waitFor(() => {
+      expect(result.current.notice).toEqual({
+        kind: 'ready',
+        channel: 'stable',
+        version: '0.7.4',
+      })
+    })
+  })
+
+  it('leaves the install to the user outside the desktop runtime', async () => {
+    vi.mocked(isTauri).mockReturnValue(false)
+
+    const { result } = renderHook(() => useUpdateChecker({ setShowSettings: vi.fn() }))
+
+    await waitFor(() => {
+      expect(result.current.notice).toEqual({ kind: 'available', update })
+    })
+    expect(downloadAndInstallAppUpdate).not.toHaveBeenCalled()
+  })
+
+  it('opens the Updates settings section from the notice', async () => {
     const setShowSettings = vi.fn()
     const navigate = vi.fn()
     window.addEventListener('psm-settings:navigate', navigate)
 
     const { result } = renderHook(() => useUpdateChecker({ setShowSettings }))
-
     await waitFor(() => {
-      expect(downloadAndInstallAppUpdate).toHaveBeenCalledWith('stable')
+      expect(result.current.notice).not.toBeNull()
     })
-    expect(result.current.updateInfo).toEqual(update)
 
     act(() => {
       result.current.openUpdateSettings()
@@ -82,6 +101,7 @@ describe('useUpdateChecker', () => {
       }))
     })
     expect(setShowSettings).toHaveBeenCalledWith(true)
+    expect(result.current.notice).toBeNull()
     window.removeEventListener('psm-settings:navigate', navigate)
   })
 })

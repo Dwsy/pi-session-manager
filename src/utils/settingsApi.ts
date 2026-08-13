@@ -79,7 +79,6 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
   const update = {
     ...defaultSettings.update,
     ...raw.update,
-    autoCheck: true,
   };
 
   // Migrate legacy sessionDir (string) → sessionDirs (string[])

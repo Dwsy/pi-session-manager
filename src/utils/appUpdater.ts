@@ -35,6 +35,7 @@ export async function checkAppUpdate(channelInput: UpdateChannel | string): Prom
 
   if (!isTauri()) {
     const result = await checkForUpdates(channel)
+    if (result.status === 'error') throw new Error(result.errorMessage)
     return result.status === 'update' ? result.update : null
   }
 
@@ -102,6 +103,13 @@ export async function downloadAndInstallAppUpdate(
   } finally {
     unlisten()
   }
+}
+
+export async function restartApp(): Promise<void> {
+  if (!isTauri()) {
+    throw new Error('Restart is only available in the desktop app')
+  }
+  await invoke('restart_app')
 }
 
 export function getFallbackCurrentVersion(): string {

@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSettings } from '@/hooks/useSettings'
-import { isTauri, listen } from '@/transport'
-import { checkAppUpdate, downloadAndInstallAppUpdate } from '@/utils/appUpdater'
-import {
-  dismissUpdateVersion,
-  getDismissedUpdateVersion,
-  type AvailableUpdateInfo,
-} from '@/utils/updateChecker'
+import { listen } from '@/transport'
+import { dismissUpdateVersion, getDismissedUpdateVersion } from '@/utils/updateChecker'
 import { normalizeUpdateChannel } from '@/utils/updateChannel'
+import {
+  configureUpdateService,
+  restartForUpdate,
+  runUpdateCheck,
+  useUpdateSnapshot,
+  type UpdateNotice,
+} from '@/utils/updateService'
 import { SETTINGS_NAVIGATE_EVENT } from '@/components/settings/navigation'
 
 export interface UseUpdateCheckerOptions {
@@ -15,79 +17,66 @@ export interface UseUpdateCheckerOptions {
 }
 
 interface UseUpdateCheckerResult {
-  updateInfo: AvailableUpdateInfo | null
-  closeUpdateNotice: () => void
+  notice: UpdateNotice | null
+  closeNotice: () => void
   openUpdateSettings: () => void
+  restartNow: () => void
   checkUpdate: () => void
+}
+
+function noticeKey(notice: UpdateNotice): string {
+  return notice.kind === 'available'
+    ? `${notice.update.channel}:${notice.update.latestVersion}`
+    : `${notice.channel}:${notice.version}`
 }
 
 export function useUpdateChecker(options?: UseUpdateCheckerOptions): UseUpdateCheckerResult {
   const { settings, loading } = useSettings()
-  const [updateInfo, setUpdateInfo] = useState<AvailableUpdateInfo | null>(null)
+  const { status } = useUpdateSnapshot()
+  const [snoozedKey, setSnoozedKey] = useState<string | null>(null)
   const setShowSettings = options?.setShowSettings
   const setShowSettingsRef = useRef(setShowSettings)
-  const autoInstallAttemptRef = useRef<string | null>(null)
+
   useEffect(() => {
     setShowSettingsRef.current = setShowSettings
   }, [setShowSettings])
 
+  const channel = normalizeUpdateChannel(settings.update.channel)
+  const autoCheck = settings.update.autoCheck !== false
+
   useEffect(() => {
     if (loading) return
+    configureUpdateService({ channel, autoCheck })
+  }, [loading, channel, autoCheck])
 
-    const channel = normalizeUpdateChannel(settings.update.channel)
-    if (!settings.update.autoCheck) {
-      return
-    }
-
-    let active = true
-    const run = async () => {
-      try {
-        // Must share the same path as Settings manual check:
-        // desktop uses Tauri installed version; browser falls back to frontend check.
-        const update = await checkAppUpdate(channel)
-        if (!active || !update) return
-
-        const dismissedVersion = getDismissedUpdateVersion(channel)
-        if (dismissedVersion !== update.latestVersion) {
-          setUpdateInfo(update)
-        }
-
-        if (!isTauri()) return
-        const updateKey = `${channel}:${update.latestVersion}`
-        if (autoInstallAttemptRef.current === updateKey) return
-        autoInstallAttemptRef.current = updateKey
-
-        try {
-          await downloadAndInstallAppUpdate(channel)
-        } catch {
-          // Keep the notice visible so the user can retry from Updates.
-        }
-      } catch {
-        // Startup auto-check is silent on network / updater failures.
+  const notice = useMemo<UpdateNotice | null>(() => {
+    if (status.kind === 'pending-restart') {
+      const candidate: UpdateNotice = {
+        kind: 'ready',
+        channel: status.channel,
+        version: status.version,
       }
+      return noticeKey(candidate) === snoozedKey ? null : candidate
     }
 
-    void run()
-    return () => {
-      active = false
+    if (status.kind !== 'available') return null
+    const candidate: UpdateNotice = { kind: 'available', update: status.update }
+    if (noticeKey(candidate) === snoozedKey) return null
+    if (getDismissedUpdateVersion(status.update.channel) === status.update.latestVersion) return null
+    return candidate
+  }, [status, snoozedKey])
+
+  const closeNotice = useCallback(() => {
+    if (!notice) return
+    // A staged build stays pending until restart, so only the reminder is hidden.
+    if (notice.kind === 'available') {
+      dismissUpdateVersion(notice.update.channel, notice.update.latestVersion)
     }
-  }, [loading, settings.update.autoCheck, settings.update.channel])
+    setSnoozedKey(noticeKey(notice))
+  }, [notice])
 
-  const closeUpdateNotice = useCallback(() => {
-    setUpdateInfo((previous) => {
-      if (previous) {
-        dismissUpdateVersion(previous.channel, previous.latestVersion)
-      }
-      return null
-    })
-  }, [])
-
-  // Shared helper to open settings and navigate to update section
   const openUpdateSection = useCallback(() => {
-    const currentSetShowSettings = setShowSettingsRef.current
-    if (currentSetShowSettings) {
-      currentSetShowSettings(true)
-    }
+    setShowSettingsRef.current?.(true)
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent(SETTINGS_NAVIGATE_EVENT, {
         detail: { section: 'updates' },
@@ -96,26 +85,28 @@ export function useUpdateChecker(options?: UseUpdateCheckerOptions): UseUpdateCh
   }, [])
 
   const openUpdateSettings = useCallback(() => {
-    const updateToOpen = updateInfo
-    if (!updateToOpen) return
-
-    // Dismiss the notice and close it
-    dismissUpdateVersion(updateToOpen.channel, updateToOpen.latestVersion)
-    setUpdateInfo(null)
-
+    if (notice) setSnoozedKey(noticeKey(notice))
     openUpdateSection()
-  }, [updateInfo, openUpdateSection])
+  }, [notice, openUpdateSection])
 
-  // Listen for native menu "Check for Updates" event from macOS app menu
+  const restartNow = useCallback(() => {
+    void restartForUpdate()
+  }, [])
+
+  const checkUpdate = useCallback(() => {
+    void runUpdateCheck({ manual: true })
+    openUpdateSection()
+  }, [openUpdateSection])
+
+  // Native macOS app menu "Check for Updates".
   useEffect(() => {
     let unlistenFn: (() => void) | undefined
-    
+
     listen<void>('menu-check-update', () => {
-      openUpdateSection()
+      checkUpdate()
     }).then((fn) => {
       unlistenFn = fn
     }).catch((err) => {
-      // Only ignore expected errors in non-Tauri environments
       const isNonTauri = !(window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
       if (!isNonTauri) {
         console.warn('Failed to listen for menu-check-update event:', err)
@@ -125,15 +116,13 @@ export function useUpdateChecker(options?: UseUpdateCheckerOptions): UseUpdateCh
     return () => {
       unlistenFn?.()
     }
-  }, [openUpdateSection])
-
-  // Manual check update from menu (exposed for external use)
-  const checkUpdate = openUpdateSection
+  }, [checkUpdate])
 
   return {
-    updateInfo,
-    closeUpdateNotice,
+    notice,
+    closeNotice,
     openUpdateSettings,
+    restartNow,
     checkUpdate,
   }
 }

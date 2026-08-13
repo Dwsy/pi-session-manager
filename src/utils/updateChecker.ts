@@ -12,7 +12,6 @@ import {
 
 const LAST_CHECK_AT_KEY = 'psm.update.lastCheckAt'
 const DISMISSED_VERSION_KEY = 'psm.update.dismissedVersion'
-const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
 interface GithubRelease {
   tag_name?: string
@@ -276,14 +275,6 @@ export function setLastUpdateCheckAt(channelInput: UpdateChannel | string = 'sta
   } catch {
     // Ignore localStorage errors.
   }
-}
-
-export function shouldRunDailyUpdateCheck(channelInput: UpdateChannel | string = 'stable', now: number = Date.now()): boolean {
-  const lastCheckAt = getLastUpdateCheckAt(channelInput)
-  if (!lastCheckAt) return true
-  const lastTime = new Date(lastCheckAt).getTime()
-  if (Number.isNaN(lastTime)) return true
-  return now - lastTime >= ONE_DAY_MS
 }
 
 export function getDismissedUpdateVersion(channelInput: UpdateChannel | string = 'stable'): string | null {
