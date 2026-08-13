@@ -12,6 +12,8 @@ pub(super) const COMMANDS: &[&str] = &[
     "start_dataset_import",
     "get_dataset_import_status",
     "save_session_source",
+    "list_wsl_distributions",
+    "save_session_runtime_environment",
     "save_session_scan_other_agents",
     "save_external_session_providers",
     "load_server_settings",
@@ -82,6 +84,16 @@ pub(super) async fn dispatch(app_state: &Option<DispatchAppState>, command: &str
                     let active_dataset_id = payload.get("active_dataset_id").or_else(|| payload.get("activeDatasetId")).and_then(|value| value.as_str()).map(ToString::to_string);
                     let active_dataset_ids = payload.get("active_dataset_ids").or_else(|| payload.get("activeDatasetIds")).and_then(|value| value.as_array()).map(|values| values.iter().filter_map(|value| value.as_str().map(ToString::to_string)).collect::<Vec<_>>());
                     crate::save_session_source_core(mode, active_dataset_id, active_dataset_ids).await?;
+                    Ok(Value::Null)
+                }
+                "list_wsl_distributions" => {
+                    let result = crate::list_wsl_distributions().await?;
+                    Ok(to_val(result, "serialize result")?)
+                }
+                "save_session_runtime_environment" => {
+                    let environment = payload.get("environment").and_then(|value| value.as_str()).unwrap_or("local").to_string();
+                    let wsl_distribution = payload.get("wslDistribution").or_else(|| payload.get("wsl_distribution")).and_then(|value| value.as_str()).map(ToString::to_string);
+                    crate::save_session_runtime_environment_core(environment, wsl_distribution).await?;
                     Ok(Value::Null)
                 }
                 "save_session_scan_other_agents" => {

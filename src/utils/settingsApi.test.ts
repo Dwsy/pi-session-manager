@@ -141,6 +141,55 @@ describe('saveAppSettings', () => {
     })
   })
 
+  it('syncs WSL runtime environment changes independently from dataset source mode', async () => {
+    const { saveAppSettings, getCachedSettings, loadAppSettings } = await import('./settingsApi')
+    const defaults = getCachedSettings()
+    const base: AppSettings = {
+      ...defaults,
+      advanced: { ...defaults.advanced, sessionDirs: ['~/.pi/agent/sessions'] },
+      session: {
+        ...defaults.session,
+        sourceMode: 'local',
+        runtimeEnvironment: 'local',
+        wslDistro: '',
+        activeDatasetId: '',
+        activeDatasetIds: [],
+        scanOtherAgentJsonl: false,
+        externalSessionProviders: [],
+      },
+    }
+
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'load_app_settings') {
+        return base
+      }
+      return undefined
+    })
+
+    await loadAppSettings()
+    invokeMock.mockClear()
+    saveSessionSourceMock.mockClear()
+
+    await saveAppSettings({
+      ...base,
+      session: {
+        ...base.session,
+        runtimeEnvironment: 'wsl',
+        wslDistro: 'Ubuntu',
+      },
+    })
+
+    expect(invokeMock.mock.calls.map((call) => call[0])).toEqual([
+      'save_app_settings',
+      'save_session_runtime_environment',
+    ])
+    expect(invokeMock).toHaveBeenCalledWith('save_session_runtime_environment', {
+      environment: 'wsl',
+      wslDistribution: 'Ubuntu',
+    })
+    expect(saveSessionSourceMock).not.toHaveBeenCalled()
+  })
+
   it('syncs only changed heavy settings fields', async () => {
     const { saveAppSettings, getCachedSettings, loadAppSettings } = await import('./settingsApi')
     const defaults = getCachedSettings()

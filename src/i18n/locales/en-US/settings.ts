@@ -324,6 +324,17 @@ export const settings = {
   },
   dataSources: {
     localTitle: "Local session directories",
+    runtimeTitle: "Session runtime",
+    runtimeHelp:
+      "Choose whether local sessions are resolved from Windows or from a selected WSL distribution. Dataset mode is separate.",
+    runtimeLocal: "Windows (Local)",
+    runtimeWsl: "WSL",
+    wslDistribution: "WSL distribution",
+    wslLoading: "Detecting WSL distributions...",
+    wslHelp:
+      "~ and default agent session paths resolve from this distribution's Linux $HOME. Terminal resume commands run inside the same distribution.",
+    wslUnavailable:
+      "No WSL distributions were detected. Install or start a WSL distribution to enable WSL mode.",
   },
   diagnostics: {
     maintenanceTitle: "Maintenance",

@@ -27,9 +27,42 @@ export interface OpenSessionInTerminalOverrides extends ResumeCommandOverrides {
  * Windows we emit cmd-compatible `cd /d "X" & pi ...` (`&` runs unconditionally
  * and is understood by both cmd and modern PowerShell).
  */
+function toWslLinuxPath(value: string, distro: string): string {
+  if (!value) return value;
+  const normalized = value.replace(/\\/g, "/");
+  const lower = normalized.toLowerCase();
+  for (const host of ["//wsl.localhost/", "//wsl$/"]) {
+    const prefix = `${host}${distro}/`;
+    if (lower.startsWith(prefix.toLowerCase())) {
+      return `/${normalized.slice(prefix.length)}`;
+    }
+  }
+  return normalized.startsWith("/") ? normalized : value;
+}
+
+function isWslRuntime(): boolean {
+  const settings = getCachedSettings();
+  return (
+    detectPlatform() === "windows" &&
+    settings.session?.runtimeEnvironment === "wsl"
+  );
+}
+
+function runtimePath(value: string): string {
+  const settings = getCachedSettings();
+  if (isWslRuntime() && settings.session?.wslDistro) {
+    return toWslLinuxPath(value, settings.session.wslDistro);
+  }
+  return value;
+}
+
 export function buildChangeDirAndRun(cwd: string, cmd: string): string {
   if (!cwd) return cmd;
+  const settings = getCachedSettings();
   if (detectPlatform() === "windows") {
+    if (settings.session?.runtimeEnvironment === "wsl") {
+      return `cd "${runtimePath(cwd)}" && ${cmd}`;
+    }
     // cmd.exe syntax; PowerShell also accepts `cd` (alias for Set-Location) and
     // `&` as a statement separator. `/d` lets cmd switch drives.
     return `cd /d "${cwd}" & ${cmd}`;
@@ -43,8 +76,8 @@ function applyResumeTemplate(
   piCommand: string,
 ): string {
   return template
-    .replace(/\{cwd\}/g, session.cwd || "")
-    .replace(/\{path\}/g, session.path)
+    .replace(/\{cwd\}/g, runtimePath(session.cwd || ""))
+    .replace(/\{path\}/g, runtimePath(session.path))
     .replace(/\{pi\}/g, piCommand);
 }
 
@@ -62,8 +95,8 @@ export function buildOmpResumeCommand(
   const ompCommand = "omp";
 
   if (!template.trim()) {
-    const baseCommand = `${ompCommand} --session "${session.path}"`;
-    return buildChangeDirAndRun(session.cwd || "", baseCommand);
+    const baseCommand = `${ompCommand} --session "${runtimePath(session.path)}"`;
+    return buildChangeDirAndRun(runtimePath(session.cwd || ""), baseCommand);
   }
 
   return applyResumeTemplate(template, session, ompCommand);
@@ -76,11 +109,13 @@ export function buildPiResumeCommand(
   const settings = getCachedSettings();
   const template =
     overrides.resumeCommand ?? settings.terminal?.resumeCommand ?? "";
-  const piCommand = overrides.piPath ?? settings.terminal?.piCommandPath ?? "pi";
+  const piCommand =
+    overrides.piPath ??
+    (isWslRuntime() ? "pi" : settings.terminal?.piCommandPath ?? "pi");
 
   if (!template.trim()) {
-    const baseCommand = `${piCommand} --session \"${session.path}\"`;
-    return buildChangeDirAndRun(session.cwd || "", baseCommand);
+    const baseCommand = `${piCommand} --session \"${runtimePath(session.path)}\"`;
+    return buildChangeDirAndRun(runtimePath(session.cwd || ""), baseCommand);
   }
 
   const hasPlaceholders =
@@ -92,8 +127,8 @@ export function buildPiResumeCommand(
     const sessionSuffix = session.id ? session.id.slice(0, 4) : "pi";
     const sessionName = `pi-${sessionSuffix}`;
     const nestedCommand = session.cwd
-      ? buildChangeDirAndRun(session.cwd, `${piCommand} --session \"${session.path}\"`)
-      : `${piCommand} --session \"${session.path}\"`;
+      ? buildChangeDirAndRun(runtimePath(session.cwd), `${piCommand} --session \"${runtimePath(session.path)}\"`)
+      : `${piCommand} --session \"${runtimePath(session.path)}\"`;
     return `${template.replace(/-s\\s+pi\\b/, `-s ${sessionName}`)} '${nestedCommand}'`;
   }
 
@@ -106,11 +141,13 @@ export function buildPiForkCommand(
   const settings = getCachedSettings();
   const template =
     overrides.resumeCommand ?? settings.terminal?.resumeCommand ?? "";
-  const piCommand = overrides.piPath ?? settings.terminal?.piCommandPath ?? "pi";
+  const piCommand =
+    overrides.piPath ??
+    (isWslRuntime() ? "pi" : settings.terminal?.piCommandPath ?? "pi");
 
   if (!template.trim()) {
-    const baseCommand = `${piCommand} --fork "${session.path}"`;
-    return buildChangeDirAndRun(session.cwd || "", baseCommand);
+    const baseCommand = `${piCommand} --fork "${runtimePath(session.path)}"`;
+    return buildChangeDirAndRun(runtimePath(session.cwd || ""), baseCommand);
   }
 
   const hasPlaceholders =
@@ -122,8 +159,8 @@ export function buildPiForkCommand(
     const sessionSuffix = session.id ? session.id.slice(0, 4) : "pi";
     const sessionName = `pi-${sessionSuffix}`;
     const nestedCommand = session.cwd
-      ? buildChangeDirAndRun(session.cwd, `${piCommand} --fork "${session.path}"`)
-      : `${piCommand} --fork "${session.path}"`;
+      ? buildChangeDirAndRun(runtimePath(session.cwd), `${piCommand} --fork "${runtimePath(session.path)}"`)
+      : `${piCommand} --fork "${runtimePath(session.path)}"`;
     return `${template.replace(/-s\\s+pi\b/, `-s ${sessionName}`)} '${nestedCommand}'`;
   }
 
@@ -206,7 +243,9 @@ export async function openSessionInTerminalDirect(
   const customCommand =
     settings.terminal?.customTerminalCommand || overrides.customCommand || "";
   const sourceSlug = getSessionSourceSlug(session.path);
-  const piPath = overrides.piPath ?? settings.terminal?.piCommandPath ?? "pi";
+  const piPath =
+    overrides.piPath ??
+    (isWslRuntime() ? "pi" : settings.terminal?.piCommandPath ?? "pi");
   const resumeCommand =
     overrides.resumeCommand ?? settings.terminal?.resumeCommand ?? "";
   const isOmpSession = sourceSlug === "omp";

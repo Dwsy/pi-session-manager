@@ -15,9 +15,12 @@ use tracing::{debug, warn};
 const PROVIDER_DETECTION_PROBE_BYTES: usize = 64 * 1024;
 
 pub fn default_session_dirs() -> Vec<PathBuf> {
+    let Ok(runtime_home) = crate::paths::current_session_home_dir() else {
+        return Vec::new();
+    };
     let mut dirs = Vec::new();
     for source in SessionBridgeSource::ALL {
-        for root in source.session_roots() {
+        for root in source.session_roots_for_home(&runtime_home) {
             if root.exists() && !dirs.iter().any(|existing| existing == &root) {
                 dirs.push(root);
             }

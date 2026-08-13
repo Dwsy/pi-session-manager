@@ -160,7 +160,7 @@ pub fn read_session_from_str(path: &Path, content: &str) -> Result<CanonicalSess
 }
 
 pub fn build_target_path(session: &CanonicalSession, target_session_id: &str) -> Result<PathBuf, String> {
-    let projects_dir = dirs::home_dir().map(|h| h.join(".claude").join("projects")).ok_or_else(|| "cannot determine Claude Code projects directory".to_string())?;
+    let projects_dir = crate::paths::current_session_home_dir()?.join(".claude").join("projects");
     let workspace_str = session.workspace.as_deref().unwrap_or(Path::new("/tmp"));
     let dir_key = project_dir_key(workspace_str);
     Ok(projects_dir.join(&dir_key).join(format!("{target_session_id}.jsonl")))

@@ -4,12 +4,17 @@ import type { SessionInfo } from "@/types";
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
+  platform: "macos" as "macos" | "windows" | "linux",
   settings: {
     terminal: {
       defaultTerminal: "terminal",
       customTerminalCommand: "",
       piCommandPath: "/custom/pi",
       resumeCommand: "",
+    },
+    session: {
+      runtimeEnvironment: "local" as "local" | "wsl",
+      wslDistro: "",
     },
   },
 }));
@@ -24,12 +29,13 @@ vi.mock("@/utils/settingsApi", () => ({
 }));
 
 vi.mock("@/components/settings/types", () => ({
-  detectPlatform: () => "macos",
+  detectPlatform: () => mocks.platform,
   getPlatformDefaults: () => ({ defaultTerminal: "terminal" }),
 }));
 
 import {
   buildOmpResumeCommand,
+  buildPiResumeCommand,
   openSessionInTerminalDirect,
 } from "./sessionResume";
 
@@ -42,6 +48,9 @@ const ompSession = {
 describe("OMP session resume", () => {
   beforeEach(() => {
     mocks.invoke.mockReset();
+    mocks.platform = "macos";
+    mocks.settings.session.runtimeEnvironment = "local";
+    mocks.settings.session.wslDistro = "";
   });
 
   it("always uses the omp binary instead of the configured Pi binary", () => {
@@ -65,5 +74,35 @@ describe("OMP session resume", () => {
       resumeCommand:
         'cd "/Users/demo/project" && omp --session "/Users/demo/.omp/agent/sessions/project/session.jsonl"',
     });
+  });
+
+  it("converts WSL UNC paths to Linux paths and uses Linux shell syntax", () => {
+    mocks.platform = "windows";
+    mocks.settings.session.runtimeEnvironment = "wsl";
+    mocks.settings.session.wslDistro = "Ubuntu";
+    const session = {
+      ...ompSession,
+      path: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\.omp\\agent\\sessions\\project\\session.jsonl",
+      cwd: "/home/demo/project",
+    } as SessionInfo;
+
+    expect(buildOmpResumeCommand(session)).toBe(
+      'cd "/home/demo/project" && omp --session "/home/demo/.omp/agent/sessions/project/session.jsonl"',
+    );
+  });
+
+  it("uses the Linux pi command in WSL instead of a Windows-configured Pi path", () => {
+    mocks.platform = "windows";
+    mocks.settings.session.runtimeEnvironment = "wsl";
+    mocks.settings.session.wslDistro = "Ubuntu";
+    const session = {
+      ...ompSession,
+      path: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\.pi\\agent\\sessions\\project\\session.jsonl",
+      cwd: "/home/demo/project",
+    } as SessionInfo;
+
+    expect(buildPiResumeCommand(session)).toBe(
+      'cd "/home/demo/project" && pi --session "/home/demo/.pi/agent/sessions/project/session.jsonl"',
+    );
   });
 });

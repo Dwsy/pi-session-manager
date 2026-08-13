@@ -53,25 +53,18 @@ impl SessionBridgeSource {
     }
 
     pub fn session_roots(self) -> Vec<PathBuf> {
-        match self {
-            Self::Pi => crate::paths::pi_agent_sessions_dir().ok().filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default(),
-            Self::Omp => crate::paths::omp_agent_sessions_dir().ok().filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default(),
-            Self::ClaudeCode => crate::domain::casr_min::providers::claude_code::session_roots(),
-            Self::Codex => crate::domain::casr_min::providers::codex::session_roots(),
-            Self::Gemini => crate::domain::casr_min::providers::gemini::session_roots(),
-            Self::Factory => crate::domain::casr_min::providers::factory::session_roots(),
-            Self::ClawdBot => crate::domain::casr_min::providers::clawdbot::session_roots(),
-            Self::OpenCode => crate::domain::casr_min::providers::opencode::session_roots(),
-            Self::Cursor => crate::domain::casr_min::providers::cursor::session_roots(),
-            Self::Antigravity => crate::domain::casr_min::providers::antigravity::session_roots(),
-        }
+        ProviderKind::from(self).session_roots()
+    }
+
+    pub fn session_roots_for_home(self, home: &Path) -> Vec<PathBuf> {
+        ProviderKind::from(self).session_roots_for_home(home)
     }
 
     pub fn matches_path(self, path: &Path) -> bool {
         let normalized = path.to_string_lossy().replace('\\', "/");
         match self {
-            Self::Pi => crate::paths::pi_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
-            Self::Omp => crate::paths::omp_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
+            Self::Pi => normalized.contains("/.pi/agent/sessions/"),
+            Self::Omp => normalized.contains("/.omp/agent/sessions/"),
             Self::ClaudeCode => normalized.contains("/.claude/projects/"),
             Self::Codex => normalized.contains("/.codex/sessions/"),
             Self::Gemini => crate::domain::casr_min::providers::gemini::is_session_file(path),
@@ -164,4 +157,25 @@ pub struct SessionBridgeConvertResult {
 
 pub(crate) fn map_read_result((provider, canonical): (ProviderKind, CanonicalSession)) -> (SessionBridgeSource, CanonicalSession) {
     (provider.into(), canonical)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn omp_matches_wsl_unc_session_path() {
+        let path = Path::new(r"\\wsl.localhost\Ubuntu\home\demo\.omp\agent\sessions\project\session.jsonl");
+        assert!(SessionBridgeSource::Omp.matches_path(path));
+        assert!(!SessionBridgeSource::Pi.matches_path(path));
+    }
+
+    #[test]
+    fn omp_roots_are_resolved_from_supplied_runtime_home() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let sessions = temp.path().join(".omp").join("agent").join("sessions");
+        std::fs::create_dir_all(&sessions).expect("create OMP sessions");
+
+        assert_eq!(SessionBridgeSource::Omp.session_roots_for_home(temp.path()), vec![sessions]);
+    }
 }

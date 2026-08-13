@@ -104,6 +104,8 @@ pub fn run() {
             start_dataset_import,
             get_dataset_import_status,
             save_session_source,
+            list_wsl_distributions,
+            save_session_runtime_environment,
             save_session_scan_other_agents,
             save_external_session_providers,
             load_server_settings,
@@ -255,7 +257,7 @@ mod tests {
         let handler_set = handlers.iter().copied().collect::<BTreeSet<_>>();
         let dispatch_set = crate::dispatch::capability_command_catalog().collect::<BTreeSet<_>>();
 
-        assert_eq!(handlers.len(), 174);
+        assert_eq!(handlers.len(), 176);
         assert_eq!(handler_set.len(), handlers.len());
 
         let dispatch_only = dispatch_set.difference(&handler_set).copied().collect::<Vec<_>>();

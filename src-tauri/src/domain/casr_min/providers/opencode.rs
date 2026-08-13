@@ -35,6 +35,10 @@ pub fn session_roots() -> Vec<PathBuf> {
     dedup_existing_dirs(candidate_data_dirs())
 }
 
+pub fn session_roots_for_home(home: &Path) -> Vec<PathBuf> {
+    dedup_existing_dirs(vec![home.join(DATA_DIRNAME), home.join(".local").join("share").join(XDG_DATA_DIRNAME)])
+}
+
 pub fn matches_path(path: &Path) -> bool {
     if path.file_name().and_then(|value| value.to_str()) == Some(DB_FILENAME) {
         return true;
@@ -162,7 +166,7 @@ fn candidate_data_dirs() -> Vec<PathBuf> {
 
     dirs.extend(cwd_ancestor_data_dirs());
 
-    for home in crate::paths::local_and_wsl_home_dirs() {
+    if let Ok(home) = crate::paths::home_dir() {
         dirs.push(home.join(DATA_DIRNAME));
         dirs.push(home.join(".local").join("share").join(XDG_DATA_DIRNAME));
     }
@@ -262,6 +266,11 @@ fn dedup_existing_dirs(paths: Vec<PathBuf>) -> Vec<PathBuf> {
 }
 
 fn choose_target_db_path(session: &CanonicalSession) -> Result<PathBuf, String> {
+    let config = crate::config::Config::load().unwrap_or_default();
+    if config.session_runtime_environment == crate::config::SessionRuntimeEnvironment::Wsl {
+        return Ok(crate::paths::session_runtime_home_dir(&config)?.join(".local").join("share").join(XDG_DATA_DIRNAME).join(DB_FILENAME));
+    }
+
     if let Some(env_db) = env_db_path() {
         return Ok(env_db);
     }

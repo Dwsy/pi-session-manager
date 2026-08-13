@@ -195,12 +195,13 @@ pub async fn detect_session_format(path: String) -> Result<String, String> {
 
 #[cfg_attr(feature = "gui", tauri::command)]
 pub async fn list_supported_session_providers() -> Result<Vec<SessionProviderInfo>, String> {
+    let runtime_home = crate::paths::current_session_home_dir()?;
     Ok(crate::domain::session_bridge::SessionBridgeSource::ALL
         .into_iter()
         .map(|source| {
-            // session_roots() only yields directories that actually exist, so a
-            // non-empty result means the agent has sessions on this machine.
-            let roots: Vec<String> = source.session_roots().into_iter().map(|root| root.to_string_lossy().to_string()).collect();
+            // session_roots_for_home() only yields directories that actually exist,
+            // so a non-empty result means the agent has sessions in this runtime.
+            let roots: Vec<String> = source.session_roots_for_home(&runtime_home).into_iter().map(|root| root.to_string_lossy().to_string()).collect();
             SessionProviderInfo { slug: source.slug().replace('_', "-"), display_name: source.display_name().to_string(), capabilities: SessionProviderCapabilities { can_scan: source.can_scan(), can_convert_target: source.can_convert_target() }, detected: !roots.is_empty(), roots }
         })
         .collect())

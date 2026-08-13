@@ -7,8 +7,17 @@ use sha2::{Digest, Sha256};
 use crate::domain::casr_min::model::{flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult};
 
 pub fn session_roots() -> Vec<PathBuf> {
-    gemini_tmp_dirs()
+    session_roots_from_tmp_dirs(gemini_tmp_dirs())
+}
+
+pub fn session_roots_for_home(home: &Path) -> Vec<PathBuf> {
+    session_roots_from_tmp_dirs(vec![home.join(".gemini").join("tmp")])
+}
+
+fn session_roots_from_tmp_dirs(tmp_dirs: Vec<PathBuf>) -> Vec<PathBuf> {
+    tmp_dirs
         .into_iter()
+        .filter(|tmp| tmp.is_dir())
         .flat_map(|tmp| {
             std::fs::read_dir(&tmp)
                 .into_iter()
@@ -49,7 +58,8 @@ pub fn session_filename(session_id: &str, now: &chrono::DateTime<chrono::Utc>) -
 }
 
 pub fn build_target_path(session: &CanonicalSession, target_session_id: &str, now: chrono::DateTime<chrono::Utc>) -> Result<PathBuf, String> {
-    let tmp_dir = tmp_dir().ok_or_else(|| "cannot determine Gemini tmp directory".to_string())?;
+    let config = crate::config::Config::load().unwrap_or_default();
+    let tmp_dir = if config.session_runtime_environment == crate::config::SessionRuntimeEnvironment::Wsl { crate::paths::session_runtime_home_dir(&config)?.join(".gemini").join("tmp") } else { tmp_dir().ok_or_else(|| "cannot determine Gemini tmp directory".to_string())? };
     let workspace_path = session.workspace.as_deref().unwrap_or(Path::new("/tmp"));
     let hash = session.metadata.get("project_hash").or_else(|| session.metadata.get("projectHash")).and_then(Value::as_str).map(ToString::to_string).unwrap_or_else(|| project_hash(workspace_path));
     let chats_dir = tmp_dir.join(hash).join("chats");
@@ -120,12 +130,7 @@ fn gemini_tmp_dirs() -> Vec<PathBuf> {
         return vec![tmp];
     }
 
-    crate::paths::local_and_wsl_home_dirs().into_iter().map(|home| home.join(".gemini").join("tmp")).filter(|path| path.is_dir()).fold(Vec::new(), |mut dirs, path| {
-        if !dirs.iter().any(|existing| existing == &path) {
-            dirs.push(path);
-        }
-        dirs
-    })
+    crate::paths::home_dir().ok().map(|home| home.join(".gemini").join("tmp")).filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default()
 }
 
 fn parse_root(path: &Path, root: &Value) -> Result<CanonicalSession, String> {

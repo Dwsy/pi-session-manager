@@ -522,6 +522,8 @@ fn main() {
             pi_session_manager::start_dataset_import,
             pi_session_manager::get_dataset_import_status,
             pi_session_manager::save_session_source,
+            pi_session_manager::list_wsl_distributions,
+            pi_session_manager::save_session_runtime_environment,
             pi_session_manager::save_session_scan_other_agents,
             pi_session_manager::save_external_session_providers,
             pi_session_manager::load_server_settings,

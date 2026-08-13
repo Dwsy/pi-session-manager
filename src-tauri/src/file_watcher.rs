@@ -10,7 +10,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tracing::{debug, error, info, warn};
 
 fn should_disable_watcher(config: &crate::config::Config) -> bool {
-    config.session_source_mode == crate::config::SessionSourceMode::Dataset
+    config.session_source_mode == crate::config::SessionSourceMode::Dataset || config.session_runtime_environment == crate::config::SessionRuntimeEnvironment::Wsl
 }
 
 /// File watcher state that can be managed by Tauri
@@ -125,7 +125,7 @@ pub fn start_watcher_for_all_dirs(app_handle: AppHandle) -> Result<FileWatcherSt
 
     let config = crate::config::load_config().unwrap_or_default();
     if should_disable_watcher(&config) {
-        debug!("File watcher disabled in dataset mode");
+        debug!("File watcher disabled for the current session source/runtime");
         return Ok(state);
     }
     let all_dirs = crate::core::scanner::get_all_session_dirs(&config);
@@ -139,7 +139,7 @@ pub fn start_watcher_for_all_dirs(app_handle: AppHandle) -> Result<FileWatcherSt
 pub fn restart_watcher_with_config(watcher_state: &FileWatcherState, app_handle: AppHandle) -> Result<(), String> {
     let config = crate::config::load_config().unwrap_or_default();
     if should_disable_watcher(&config) {
-        debug!("Skipping file watcher restart in dataset mode");
+        debug!("Skipping file watcher restart for the current session source/runtime");
         watcher_state.stop().ok();
         return Ok(());
     }

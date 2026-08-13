@@ -1,10 +1,13 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FolderOpen, Plus, X } from "lucide-react";
+import { FolderOpen, Monitor, Plus, X } from "lucide-react";
 
 import SettingsCard from "@/components/settings/SettingsCard";
 import SettingsInput from "@/components/settings/SettingsInput";
+import SettingsSelect from "@/components/settings/SettingsSelect";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
-import type { AppSettings } from "@/components/settings/types";
+import { detectPlatform, type AppSettings } from "@/components/settings/types";
+import { invoke } from "@/transport";
 import ExternalSessionsSettings from "./ExternalSessionsSettings";
 import SessionSettings from "./SessionSettings";
 
@@ -26,6 +29,9 @@ export default function DataSourcesSettings({
   mode = "all",
 }: DataSourcesSettingsProps) {
   const { t } = useTranslation();
+  const isWindows = detectPlatform() === "windows";
+  const [wslDistributions, setWslDistributions] = useState<string[]>([]);
+  const [loadingWslDistributions, setLoadingWslDistributions] = useState(false);
   const includeDefaultDir = settings.advanced.includeDefaultPiSessionDir !== false;
   const extraDirs = (settings.advanced.sessionDirs || []).filter(
     (dir: string) => dir !== DEFAULT_SESSION_DIR,
@@ -35,6 +41,37 @@ export default function DataSourcesSettings({
 
   const buildSessionDirs = (includeDefault: boolean, nextDirs: string[]) =>
     includeDefault ? [DEFAULT_SESSION_DIR, ...nextDirs] : nextDirs;
+
+  useEffect(() => {
+    if (!isWindows) return;
+
+    let cancelled = false;
+    setLoadingWslDistributions(true);
+    void invoke<string[]>("list_wsl_distributions")
+      .then((distributions) => {
+        if (!cancelled) setWslDistributions(distributions);
+      })
+      .catch((error) => {
+        console.warn("Failed to list WSL distributions:", error);
+        if (!cancelled) setWslDistributions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingWslDistributions(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isWindows]);
+
+  const setRuntimeEnvironment = (environment: "local" | "wsl") => {
+    if (environment === "wsl" && !settings.session.wslDistro) {
+      const firstDistro = wslDistributions[0];
+      if (!firstDistro) return;
+      onUpdate("session", "wslDistro", firstDistro);
+    }
+    onUpdate("session", "runtimeEnvironment", environment);
+  };
 
   const setExtraDirs = (nextDirs: string[]) => {
     onUpdate("advanced", "sessionDirs", buildSessionDirs(includeDefaultDir, nextDirs));
@@ -57,6 +94,69 @@ export default function DataSourcesSettings({
 
   return (
     <div className="space-y-6">
+      {isWindows && (mode === "all" || mode === "local-paths") && (
+        <SettingsCard
+          title={t("settings.dataSources.runtimeTitle", "Session runtime")}
+          description={t(
+            "settings.dataSources.runtimeHelp",
+            "Choose whether local sessions are resolved from Windows or from a selected WSL distribution. Dataset mode is separate.",
+          )}
+          icon={<Monitor className="h-4 w-4" />}
+          searchKey="session-runtime-environment"
+          contentClassName="p-4"
+        >
+          <div className="space-y-3">
+            <SettingsSelect
+              value={settings.session.runtimeEnvironment}
+              onChange={(event) => setRuntimeEnvironment(event.target.value as "local" | "wsl")}
+            >
+              <option value="local">
+                {t("settings.dataSources.runtimeLocal", "Windows (Local)")}
+              </option>
+              <option value="wsl" disabled={wslDistributions.length === 0}>
+                {t("settings.dataSources.runtimeWsl", "WSL")}
+              </option>
+            </SettingsSelect>
+
+            {settings.session.runtimeEnvironment === "wsl" && (
+              <div className="space-y-1.5">
+                <div className="text-xs font-medium text-muted-foreground">
+                  {t("settings.dataSources.wslDistribution", "WSL distribution")}
+                </div>
+                <SettingsSelect
+                  value={settings.session.wslDistro}
+                  disabled={loadingWslDistributions || wslDistributions.length === 0}
+                  onChange={(event) => onUpdate("session", "wslDistro", event.target.value)}
+                >
+                  {wslDistributions.map((distribution) => (
+                    <option key={distribution} value={distribution}>
+                      {distribution}
+                    </option>
+                  ))}
+                </SettingsSelect>
+                <p className="text-xs text-muted-foreground">
+                  {loadingWslDistributions
+                    ? t("settings.dataSources.wslLoading", "Detecting WSL distributions...")
+                    : t(
+                        "settings.dataSources.wslHelp",
+                        "~ and default agent session paths resolve from this distribution's Linux $HOME. Terminal resume commands run inside the same distribution.",
+                      )}
+                </p>
+              </div>
+            )}
+
+            {!loadingWslDistributions && wslDistributions.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                {t(
+                  "settings.dataSources.wslUnavailable",
+                  "No WSL distributions were detected. Install or start a WSL distribution to enable WSL mode.",
+                )}
+              </p>
+            )}
+          </div>
+        </SettingsCard>
+      )}
+
       {(mode === "all" || mode === "local-paths") && (
         <SettingsCard
           title={t("settings.dataSources.localTitle", "Local session directories")}

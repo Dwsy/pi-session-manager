@@ -10,7 +10,7 @@ pub fn session_roots() -> Vec<PathBuf> {
 }
 
 pub fn build_target_path(target_session_id: &str, now: DateTime<Utc>) -> Result<PathBuf, String> {
-    let sessions_dir = crate::paths::home_dir()?.join(".codex").join("sessions");
+    let sessions_dir = crate::paths::current_session_home_dir()?.join(".codex").join("sessions");
     let date_dir = now.format("%Y/%m/%d").to_string();
     let stamp = now.format("%Y-%m-%dT%H-%M-%S").to_string();
     Ok(sessions_dir.join(date_dir).join(format!("rollout-{stamp}-{target_session_id}.jsonl")))

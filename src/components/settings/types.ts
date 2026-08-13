@@ -117,6 +117,8 @@ export interface AppSettings {
     defaultViewMode: "list" | "directory" | "project";
     conversationModeEnabled: boolean;
     sourceMode: "local" | "dataset";
+    runtimeEnvironment: "local" | "wsl";
+    wslDistro: string;
     activeDatasetId: string;
     activeDatasetIds: string[];
     scanOtherAgentJsonl: boolean;
@@ -223,6 +225,8 @@ export const defaultSettings: AppSettings = {
     defaultViewMode: "project",
     conversationModeEnabled: true,
     sourceMode: "local",
+    runtimeEnvironment: "local",
+    wslDistro: "",
     activeDatasetId: "",
     activeDatasetIds: [],
     scanOtherAgentJsonl: false,

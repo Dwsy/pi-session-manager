@@ -9,7 +9,14 @@ use serde_json::{json, Map, Value};
 use crate::domain::casr_min::model::{parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall};
 
 pub fn session_roots() -> Vec<PathBuf> {
-    let base = base_root();
+    session_roots_from_base(base_root())
+}
+
+pub fn session_roots_for_home(home: &Path) -> Vec<PathBuf> {
+    session_roots_from_base(home.join(".gemini").join("antigravity-cli"))
+}
+
+fn session_roots_from_base(base: PathBuf) -> Vec<PathBuf> {
     if !base.is_dir() {
         return Vec::new();
     }

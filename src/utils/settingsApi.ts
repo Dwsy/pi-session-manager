@@ -17,6 +17,8 @@ interface BackendSyncState {
   extraPaths: string[];
   includeDefaultPiSessionDir: boolean;
   sourceMode: "local" | "dataset";
+  runtimeEnvironment: "local" | "wsl";
+  wslDistro: string;
   activeDatasetId: string;
   activeDatasetIds: string[];
   scanOtherAgentJsonl: boolean;
@@ -34,6 +36,8 @@ function buildBackendSyncState(settings: AppSettings): BackendSyncState {
     ),
     includeDefaultPiSessionDir: settings.advanced.includeDefaultPiSessionDir !== false,
     sourceMode: settings.session.sourceMode,
+    runtimeEnvironment: settings.session.runtimeEnvironment,
+    wslDistro: settings.session.wslDistro || "",
     activeDatasetId: settings.session.activeDatasetId || "",
     activeDatasetIds: settings.session.activeDatasetIds || [],
     scanOtherAgentJsonl: settings.session.scanOtherAgentJsonl !== false,
@@ -159,6 +163,10 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
     sourceMode: (rawSession?.sourceMode === "dataset" ? "dataset" : "local") as
       | "local"
       | "dataset",
+    runtimeEnvironment: (rawSession?.runtimeEnvironment === "wsl" ? "wsl" : "local") as
+      | "local"
+      | "wsl",
+    wslDistro: typeof rawSession?.wslDistro === "string" ? rawSession.wslDistro : "",
     activeDatasetId: activeDatasetIds[0] || "",
     activeDatasetIds,
     externalSessionProviders,
@@ -336,6 +344,22 @@ export async function saveAppSettings(settings: AppSettings): Promise<void> {
       });
     } catch (e) {
       console.warn("Failed to sync default Pi session directory setting:", e);
+      syncSucceeded = false;
+    }
+  }
+
+  if (
+    !previousBackendSyncState ||
+    previousBackendSyncState.runtimeEnvironment !== nextBackendSyncState.runtimeEnvironment ||
+    previousBackendSyncState.wslDistro !== nextBackendSyncState.wslDistro
+  ) {
+    try {
+      await invoke("save_session_runtime_environment", {
+        environment: nextBackendSyncState.runtimeEnvironment,
+        wslDistribution: nextBackendSyncState.wslDistro || null,
+      });
+    } catch (e) {
+      console.warn("Failed to sync session runtime environment:", e);
       syncSucceeded = false;
     }
   }

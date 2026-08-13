@@ -19,7 +19,9 @@ pub fn matches_path(path: &Path) -> bool {
 }
 
 pub fn build_target_path(target_session_id: &str) -> Result<PathBuf, String> {
-    Ok(home_dir().join(format!("{target_session_id}.jsonl")))
+    let config = crate::config::Config::load().unwrap_or_default();
+    let root = if config.session_runtime_environment == crate::config::SessionRuntimeEnvironment::Wsl { crate::paths::session_runtime_home_dir(&config)?.join(".clawdbot").join("sessions") } else { home_dir() };
+    Ok(root.join(format!("{target_session_id}.jsonl")))
 }
 
 pub fn resume_command(session_id: &str) -> String {

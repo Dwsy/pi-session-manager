@@ -93,6 +93,14 @@ pub async fn open_session_in_terminal_impl(path: String, cwd: String, terminal: 
     log::info!("[Terminal] Pi: {pi_cmd}");
     log::info!("[Terminal] Resume command: {resume_cmd:?}");
 
+    #[cfg(target_os = "windows")]
+    {
+        let config = crate::config::Config::load().unwrap_or_default();
+        if config.session_runtime_environment == crate::config::SessionRuntimeEnvironment::Wsl {
+            return open_session_in_wsl_terminal(&config, &path, &resolved_cwd, &pi_cmd, resume_cmd);
+        }
+    }
+
     let mut attempts: Vec<String> = Vec::new();
     let try_custom_first = requested_terminal != "auto" && !is_known_external_terminal(requested_terminal);
 
@@ -112,6 +120,45 @@ pub async fn open_session_in_terminal_impl(path: String, cwd: String, terminal: 
     }
 
     Err(format!("Failed to open external terminal. requested='{requested_terminal}', cwd='{}'. attempts: {}", resolved_cwd, attempts.join(" | ")))
+}
+
+#[cfg(target_os = "windows")]
+fn open_session_in_wsl_terminal(config: &crate::config::Config, path: &str, cwd: &str, pi_cmd: &str, resume_command: Option<&str>) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NEW_CONSOLE: u32 = 0x00000010;
+
+    let distro = config.wsl_distribution.as_deref().map(str::trim).filter(|value| !value.is_empty()).ok_or_else(|| "WSL runtime requires a selected distribution".to_string())?;
+
+    let linux_path = resolve_wsl_linux_path(distro, path).ok_or_else(|| format!("Cannot map session path into WSL distro {distro}: {path}"))?;
+    let linux_cwd = resolve_wsl_linux_path(distro, cwd).or_else(|| crate::paths::wsl_home_dir(distro).ok().and_then(|home| crate::paths::wsl_unc_path_to_linux(distro, &home))).unwrap_or_else(|| "/".to_string());
+    let command = build_resume_command(&linux_cwd, &linux_path, pi_cmd, resume_command);
+
+    log::info!("[Terminal][WSL] Distro: {distro}");
+    log::info!("[Terminal][WSL] CWD: {linux_cwd}");
+    log::info!("[Terminal][WSL] Path: {linux_path}");
+    log::info!("[Terminal][WSL] Command: {command}");
+
+    if command_exists("wt") {
+        Command::new("wt").arg("wsl.exe").arg("-d").arg(distro).arg("--cd").arg(&linux_cwd).arg("--").arg("sh").arg("-lc").arg(&command).spawn().map_err(|error| format!("Failed to launch WSL in Windows Terminal: {error}"))?;
+        return Ok(());
+    }
+
+    Command::new("wsl.exe").arg("-d").arg(distro).arg("--cd").arg(&linux_cwd).arg("--").arg("sh").arg("-lc").arg(&command).creation_flags(CREATE_NEW_CONSOLE).spawn().map_err(|error| format!("Failed to launch WSL terminal: {error}"))?;
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn resolve_wsl_linux_path(distro: &str, value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Some(path) = crate::paths::wsl_unc_path_to_linux(distro, Path::new(trimmed)) {
+        return Some(path);
+    }
+    let normalized = trimmed.replace('\\', "/");
+    normalized.starts_with('/').then_some(normalized)
 }
 
 pub async fn open_url_in_system_impl(url: String) -> Result<(), String> {
