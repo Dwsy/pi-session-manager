@@ -271,7 +271,10 @@ impl Provider for Gemini {
         let tmp_dir = Self::tmp_dir().ok_or_else(|| anyhow::anyhow!("cannot determine Gemini tmp directory"))?;
 
         // Use workspace hash for project directory, or a fallback hash.
-        let workspace_path = session.workspace.as_deref().unwrap_or(std::path::Path::new("/tmp"));
+        // Missing workspace falls back to the invoking cwd (never /tmp) so the
+        // session lands in the project bucket the user will resume from.
+        let workspace_buf = crate::model::effective_workspace(session);
+        let workspace_path = workspace_buf.as_path();
         let hash = session.metadata.get("project_hash").or_else(|| session.metadata.get("projectHash")).and_then(serde_json::Value::as_str).map(ToString::to_string).unwrap_or_else(|| project_hash(workspace_path));
         let chats_dir = tmp_dir.join(&hash).join("chats");
         let filename = session_filename(&target_session_id, &now);
@@ -326,7 +329,7 @@ impl Provider for Gemini {
             "Gemini session written"
         );
 
-        Ok(WrittenSession { paths: vec![outcome.target_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: outcome.backup_path })
+        Ok(WrittenSession { paths: vec![outcome.target_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: outcome.backup_path, warnings: Vec::new() })
     }
 
     fn resume_command(&self, session_id: &str) -> String {

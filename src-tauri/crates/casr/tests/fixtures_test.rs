@@ -9,6 +9,7 @@ use casr::model::{CanonicalSession, MessageRole};
 use casr::providers::Provider;
 use casr::providers::aider::Aider;
 use casr::providers::amp::Amp;
+use casr::providers::antigravity::Antigravity;
 use casr::providers::chatgpt::ChatGpt;
 use casr::providers::claude_code::ClaudeCode;
 use casr::providers::clawdbot::ClawdBot;
@@ -17,6 +18,7 @@ use casr::providers::codex::Codex;
 use casr::providers::cursor::Cursor;
 use casr::providers::factory::Factory;
 use casr::providers::gemini::Gemini;
+use casr::providers::grok::Grok;
 use casr::providers::openclaw::OpenClaw;
 use casr::providers::opencode::OpenCode;
 use casr::providers::pi_agent::PiAgent;
@@ -245,6 +247,115 @@ fn fixture_gmi_gemini_role() {
     let session = Gemini.read_session(&path).expect("gmi_gemini_role should parse");
     let expected = load_expected("gmi_gemini_role");
     assert_session_matches(&session, &expected, "gmi_gemini_role");
+}
+
+// ---------------------------------------------------------------------------
+// Grok Build (grk) fixtures
+// ---------------------------------------------------------------------------
+
+#[test]
+fn fixture_grok_simple() {
+    let path = fixtures_dir().join("grok/sessions/%2Fdata%2Fprojects%2Fdemo/019f75d0-aaaa-7bbb-8ccc-b0a1b2c3d4e5/updates.jsonl");
+    let session = Grok.read_session(&path).expect("grok_simple should parse");
+    let expected = load_expected("grok_simple");
+    assert_session_matches(&session, &expected, "grok_simple");
+
+    // Chunk coalescing: both user_message_chunk fragments landed in one message.
+    assert_eq!(session.messages[0].content, "Run the shell command: echo hi . Then reply with exactly: done");
+    // Thought chunk is a separate reasoning-authored assistant message.
+    assert_eq!(session.messages[1].author.as_deref(), Some("reasoning"));
+    // tool_call + tool_call_update merged into the same assistant message,
+    // without breaking agent_message_chunk coalescing around them.
+    let tool_msg = &session.messages[2];
+    assert_eq!(tool_msg.content, "Running the command now. done");
+    assert_eq!(tool_msg.tool_calls.len(), 1);
+    assert_eq!(tool_msg.tool_calls[0].id.as_deref(), Some("call_1"));
+    assert_eq!(tool_msg.tool_calls[0].name, "Run echo hi");
+    assert_eq!(tool_msg.tool_results.len(), 1);
+    assert_eq!(tool_msg.tool_results[0].content, "hi\n");
+    assert!(!tool_msg.tool_results[0].is_error);
+
+    // Resume command uses the documented flag.
+    assert_eq!(Grok.resume_command(&session.session_id), "grok --resume 019f75d0-aaaa-7bbb-8ccc-b0a1b2c3d4e5");
+
+    // The generated title is surfaced as the provider-native session name.
+    assert_eq!(casr::model::native_name_from_metadata(&session.metadata).as_deref(), Some("Echo hi probe session"));
+}
+
+#[test]
+fn fixture_grok_tools_real() {
+    let path = fixtures_dir().join("grok/sessions/%2Fdata%2Fprojects%2Fdemo/019fcac9-2222-7333-8444-555566667777/updates.jsonl");
+    let session = Grok.read_session(&path).expect("grok_tools_real should parse");
+    let expected = load_expected("grok_tools_real");
+    assert_session_matches(&session, &expected, "grok_tools_real");
+
+    // Verbatim 0.2.118 shapes: the thought chunk splits from the message
+    // chunk (same promptId, different kind)…
+    assert_eq!(session.messages[1].author.as_deref(), Some("reasoning"));
+    assert_eq!(session.messages[1].content, "The user wants a summary of README.md.");
+    // …and the post-tool agent_message_chunk continues the SAME assistant
+    // message because the promptId marker is unchanged.
+    let tool_msg = &session.messages[2];
+    assert_eq!(tool_msg.content, "Reading README.md now. It's a demo project with a short README.");
+    assert_eq!(tool_msg.tool_calls.len(), 1);
+    // The status-null enrichment update replaced the internal tool name with
+    // the human-readable title and the variant-tagged rawInput.
+    assert_eq!(tool_msg.tool_calls[0].name, "Read `/data/projects/demo/README.md`");
+    assert_eq!(tool_msg.tool_calls[0].arguments["variant"], "ReadFile");
+    assert_eq!(tool_msg.tool_results.len(), 1);
+    assert_eq!(tool_msg.tool_results[0].content, "1→# Demo\n\nA demo project.\n");
+    assert!(!tool_msg.tool_results[0].is_error);
+
+    // The second prompt (promptIndex 1) and its reply (new promptId) are
+    // separate messages — the boundary markers break coalescing.
+    assert_eq!(session.messages[3].content, "thanks");
+    assert_eq!(session.messages[4].content, "You're welcome.");
+}
+
+// ---------------------------------------------------------------------------
+// Antigravity (agy) fixtures
+// ---------------------------------------------------------------------------
+
+#[test]
+fn fixture_agy_simple() {
+    let path = fixtures_dir().join("antigravity/antigravity-cli/conversations/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.db");
+    let session = Antigravity.read_session(&path).expect("agy_simple should parse");
+    let expected = load_expected("agy_simple");
+    assert_session_matches(&session, &expected, "agy_simple");
+
+    // Extra: the resume command must pin the mandated model and use --conversation.
+    let resume = Antigravity.resume_command(&session.session_id);
+    assert_eq!(resume, "agy --conversation aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee --model \"Gemini 3.1 Pro (High)\"");
+
+    // Extra: the tool-only planner step extracted its tool call.
+    assert!(session.messages.iter().any(|m| m.tool_calls.iter().any(|tc| tc.name == "view_file")), "agy_simple should surface the view_file tool call");
+}
+
+/// Disambiguation: a legacy gmi `tmp/.../chats/session-*.json` sibling under the
+/// SAME `~/.gemini`-equivalent parent must NOT be enumerated by the agy provider.
+#[test]
+fn fixture_agy_does_not_list_legacy_gmi_sessions() {
+    let gemini_home = fixtures_dir().join("antigravity");
+    // SAFETY: env mutation in a test; casr fixture tests use HOME overrides.
+    unsafe {
+        std::env::set_var("GEMINI_HOME", &gemini_home);
+    }
+
+    let sessions = Antigravity.list_sessions().expect("agy list_sessions returns Some");
+    let ids: Vec<String> = sessions.into_iter().map(|(id, _)| id).collect();
+
+    assert!(ids.contains(&"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee".to_string()), "agy should list its own conversation uuid: {ids:?}");
+    assert!(!ids.iter().any(|id| id.contains("gmi-legacy")), "agy must NOT list the legacy gmi session: {ids:?}");
+
+    // And the gmi provider must NOT list the agy conversation uuid.
+    let gmi_sessions = Gemini.list_sessions().expect("gmi list_sessions returns Some");
+    let gmi_ids: Vec<String> = gmi_sessions.into_iter().map(|(id, _)| id).collect();
+    assert!(gmi_ids.contains(&"gmi-legacy-001".to_string()), "gmi should list its own legacy session: {gmi_ids:?}");
+    assert!(!gmi_ids.iter().any(|id| id.contains("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")), "gmi must NOT list the agy conversation uuid: {gmi_ids:?}");
+
+    unsafe {
+        std::env::remove_var("GEMINI_HOME");
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,16 @@
+{
+  "fixture_id": "agy_simple",
+  "provider_slug": "antigravity",
+  "session_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+  "workspace": null,
+  "title": "Read data.txt and run echo HELLO_FROM_AGY",
+  "message_count": 5,
+  "roles": ["User", "Assistant", "Assistant", "Assistant", "Assistant"],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": "Gemini 3.1 Pro (High)",
+  "has_tool_calls": true,
+  "has_tool_results": false,
+  "known_lossy_fields": ["tool_results"],
+  "notes": "Antigravity (agy) conversation read from brain/<uuid>/.system_generated/logs/transcript.jsonl. Housekeeping SYSTEM steps (CONVERSATION_HISTORY, EPHEMERAL_MESSAGE) are dropped. The USER_REQUEST envelope is unwrapped for the title/content. A tool-only PLANNER_RESPONSE surfaces via its tool_calls plus thinking fallback. model_name is pinned to the mandated agy model."
+}

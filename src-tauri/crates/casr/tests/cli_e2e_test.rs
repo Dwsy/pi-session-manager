@@ -39,6 +39,7 @@ fn casr_cmd(tmp: &TempDir) -> Command {
         .env("FACTORY_HOME", tmp.path().join("factory"))
         .env("OPENCLAW_HOME", tmp.path().join("openclaw"))
         .env("PI_AGENT_HOME", tmp.path().join("pi-agent"))
+        .env("GROK_HOME", tmp.path().join("grok"))
         .env("XDG_CONFIG_HOME", tmp.path().join("xdg-config"))
         .env("XDG_DATA_HOME", tmp.path().join("xdg-data"))
         // Suppress colored output in tests.
@@ -209,6 +210,10 @@ fn cli_list_shows_full_session_id_and_last_active_for_current_project_scope() {
     let tmp = TempDir::new().unwrap();
     let workspace = tmp.path().join("workspace");
     fs::create_dir_all(&workspace).expect("create workspace");
+    // The fixture's recorded workspace has to match what the CLI sees as its cwd.
+    // On macOS the temp dir is handed out as `/var/...` but resolves to
+    // `/private/var/...`, so without canonicalizing the two never line up.
+    let workspace = workspace.canonicalize().expect("canonicalize workspace");
     let workspace_str = workspace.to_string_lossy().to_string();
     let session_id = setup_cc_fixture_custom(&tmp, "cc_simple", Some(&workspace_str), Some("366bd160-20b3-4e69-b0be-5a559ef5ffec"));
 
@@ -690,7 +695,16 @@ fn cli_resume_cc_to_opencode_works_and_is_discoverable() {
     let opencode_db = tmp.path().join("opencode/opencode.db");
     assert!(opencode_db.exists(), "OpenCode DB should exist after CC→OpenCode conversion");
 
-    casr_cmd(&tmp).args(["--json", "info", opencode_session_id]).assert().success();
+    // The converted OpenCode session now carries a STABLE id derived from the
+    // source session (the #14 fix), so it shares the source CC session's id and
+    // exists under both providers. A bare lookup is therefore ambiguous...
+    casr_cmd(&tmp).args(["--json", "info", opencode_session_id]).assert().failure();
+
+    // ...and `--source` resolves it to the OpenCode copy specifically.
+    let info = casr_cmd(&tmp).args(["--json", "info", opencode_session_id, "--source", "opc"]).output().expect("info --source should run");
+    assert!(info.status.success(), "info --source opc should succeed");
+    let info_json: serde_json::Value = serde_json::from_slice(&info.stdout).expect("info --json should parse");
+    assert_eq!(info_json["provider"].as_str().unwrap(), "opencode", "--source opc must resolve to the OpenCode session, not the CC source");
 }
 
 #[test]

@@ -103,6 +103,18 @@ pub struct ToolResult {
 // Helpers — ported/adapted from CASS connectors/mod.rs
 // ---------------------------------------------------------------------------
 
+/// Resolve the workspace a writer should stamp into the target session.
+///
+/// Prefers the session's recorded workspace. When the source session recorded
+/// none, falls back to the directory casr was invoked from — NEVER `/tmp`.
+/// Cwd-keyed providers (e.g. Claude Code buckets sessions under a path-encoded
+/// project directory and `claude --resume` only finds sessions whose bucket
+/// matches the *current* cwd) would otherwise write the session somewhere the
+/// user will never resume from.
+pub fn effective_workspace(session: &CanonicalSession) -> std::path::PathBuf {
+    session.workspace.clone().unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")))
+}
+
 /// Flatten heterogeneous content representations into a single string.
 ///
 /// Handles all content shapes encountered across providers:
@@ -250,6 +262,97 @@ pub fn truncate_title(text: &str, max_len: usize) -> String {
         }
         format!("{}...", &first_line[..end])
     }
+}
+
+/// Metadata key under which a provider stores its native, user-facing session
+/// name — the harness-specific display title a human would recognize.
+///
+/// Examples: Claude Code's `/rename` custom title (or its auto-generated
+/// `ai-title` fallback), an Amp thread title. Providers with no such concept
+/// simply omit the key, which reads back as `None`.
+pub const NATIVE_NAME_META_KEY: &str = "native_name";
+
+/// Extract the provider-native session name from session metadata, if present.
+///
+/// Returns `None` when the key is absent, non-string, or blank so that callers
+/// render an empty column / `null` field for providers without the concept.
+#[must_use]
+pub fn native_name_from_metadata(metadata: &serde_json::Value) -> Option<String> {
+    metadata.get(NATIVE_NAME_META_KEY).and_then(serde_json::Value::as_str).map(str::trim).filter(|s| !s.is_empty()).map(str::to_string)
+}
+
+/// A compact, human-readable snapshot of one conversation turn.
+///
+/// Used by `casr info --peek` to show the tail of a transcript so a human can
+/// recognize a session by its most recent turns.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TranscriptTurn {
+    /// Zero-based index of this message within the full session.
+    pub idx: usize,
+    /// Human-facing role label (e.g. `"User"`, `"Assistant"`, `"Tool"`).
+    pub role: String,
+    /// Single-line, length-bounded snippet of the turn's content.
+    pub snippet: String,
+}
+
+/// Human-facing label for a message role.
+#[must_use]
+pub fn role_label(role: &MessageRole) -> String {
+    match role {
+        MessageRole::User => "User".to_string(),
+        MessageRole::Assistant => "Assistant".to_string(),
+        MessageRole::Tool => "Tool".to_string(),
+        MessageRole::System => "System".to_string(),
+        MessageRole::Other(other) => {
+            if other.is_empty() {
+                "Other".to_string()
+            } else {
+                other.clone()
+            }
+        }
+    }
+}
+
+/// Build a single-line, length-bounded snippet describing a message.
+///
+/// Whitespace (including newlines) is collapsed to single spaces. When a
+/// message carries no text (e.g. a pure tool-call or tool-result turn), a
+/// synthetic marker is used so the turn is still recognizable. The result is
+/// truncated to at most `max_len` characters, appending `…` when clipped.
+#[must_use]
+pub fn message_snippet(message: &CanonicalMessage, max_len: usize) -> String {
+    let mut text: String = message.content.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    if text.is_empty() {
+        if !message.tool_calls.is_empty() {
+            let names: Vec<&str> = message.tool_calls.iter().map(|call| call.name.as_str()).collect();
+            text = format!("[tool call: {}]", names.join(", "));
+        } else if !message.tool_results.is_empty() {
+            text = "[tool result]".to_string();
+        }
+    }
+
+    if max_len == 0 || text.chars().count() <= max_len {
+        return text;
+    }
+
+    let keep = max_len.saturating_sub(1);
+    let truncated: String = text.chars().take(keep).collect();
+    format!("{truncated}…")
+}
+
+/// Extract the last `count` turns of a session as compact snapshots.
+///
+/// Preserves chronological order and returns fewer than `count` entries when
+/// the session is shorter than `count`. A `count` of `0` yields an empty tail.
+/// `max_len` bounds each snippet's length (see [`message_snippet`]).
+#[must_use]
+pub fn transcript_tail(messages: &[CanonicalMessage], count: usize, max_len: usize) -> Vec<TranscriptTurn> {
+    if count == 0 {
+        return Vec::new();
+    }
+    let start = messages.len().saturating_sub(count);
+    messages[start..].iter().map(|message| TranscriptTurn { idx: message.idx, role: role_label(&message.role), snippet: message_snippet(message, max_len) }).collect()
 }
 
 /// Map provider-specific role strings to canonical [`MessageRole`].
@@ -583,5 +686,112 @@ mod tests {
         let serialized = serde_json::to_string(&role).unwrap();
         let deserialized: MessageRole = serde_json::from_str(&serialized).unwrap();
         assert_eq!(role, deserialized);
+    }
+
+    // -----------------------------------------------------------------------
+    // native_name_from_metadata
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn native_name_present() {
+        let meta = json!({"native_name": "My Renamed Session", "source": "claude_code"});
+        assert_eq!(native_name_from_metadata(&meta).as_deref(), Some("My Renamed Session"));
+    }
+
+    #[test]
+    fn native_name_absent_is_none() {
+        let meta = json!({"source": "claude_code"});
+        assert!(native_name_from_metadata(&meta).is_none());
+    }
+
+    #[test]
+    fn native_name_blank_is_none() {
+        let meta = json!({"native_name": "   "});
+        assert!(native_name_from_metadata(&meta).is_none());
+    }
+
+    #[test]
+    fn native_name_non_string_is_none() {
+        let meta = json!({"native_name": 42});
+        assert!(native_name_from_metadata(&meta).is_none());
+        assert!(native_name_from_metadata(&json!(null)).is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // transcript_tail / message_snippet / role_label
+    // -----------------------------------------------------------------------
+
+    fn msg(idx: usize, role: MessageRole, content: &str) -> CanonicalMessage {
+        CanonicalMessage { idx, role, content: content.to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: json!(null) }
+    }
+
+    #[test]
+    fn transcript_tail_returns_last_turns_in_order() {
+        let messages = vec![msg(0, MessageRole::User, "first"), msg(1, MessageRole::Assistant, "second"), msg(2, MessageRole::User, "third"), msg(3, MessageRole::Assistant, "fourth"), msg(4, MessageRole::User, "fifth")];
+        let tail = transcript_tail(&messages, 3, 100);
+        assert_eq!(tail.len(), 3);
+        // Chronological order preserved (tail, not reversed).
+        assert_eq!(tail[0].idx, 2);
+        assert_eq!(tail[0].snippet, "third");
+        assert_eq!(tail[1].snippet, "fourth");
+        assert_eq!(tail[2].snippet, "fifth");
+        assert_eq!(tail[2].role, "User");
+    }
+
+    #[test]
+    fn transcript_tail_shorter_than_count_returns_all() {
+        let messages = vec![msg(0, MessageRole::User, "only one"), msg(1, MessageRole::Assistant, "and two")];
+        let tail = transcript_tail(&messages, 5, 100);
+        assert_eq!(tail.len(), 2);
+        assert_eq!(tail[0].snippet, "only one");
+        assert_eq!(tail[1].snippet, "and two");
+    }
+
+    #[test]
+    fn transcript_tail_zero_count_is_empty() {
+        let messages = vec![msg(0, MessageRole::User, "hello")];
+        assert!(transcript_tail(&messages, 0, 100).is_empty());
+    }
+
+    #[test]
+    fn transcript_tail_empty_session_is_empty() {
+        assert!(transcript_tail(&[], 3, 100).is_empty());
+    }
+
+    #[test]
+    fn message_snippet_collapses_whitespace() {
+        let m = msg(0, MessageRole::User, "line one\n\n  line two\tthree");
+        assert_eq!(message_snippet(&m, 100), "line one line two three");
+    }
+
+    #[test]
+    fn message_snippet_truncates_with_ellipsis() {
+        let m = msg(0, MessageRole::User, "abcdefghij");
+        let snippet = message_snippet(&m, 5);
+        assert_eq!(snippet, "abcd…");
+        assert_eq!(snippet.chars().count(), 5);
+    }
+
+    #[test]
+    fn message_snippet_falls_back_to_tool_call() {
+        let mut m = msg(0, MessageRole::Assistant, "");
+        m.tool_calls = vec![ToolCall { id: None, name: "Bash".to_string(), arguments: json!({}) }];
+        assert_eq!(message_snippet(&m, 100), "[tool call: Bash]");
+    }
+
+    #[test]
+    fn message_snippet_falls_back_to_tool_result() {
+        let mut m = msg(0, MessageRole::Tool, "");
+        m.tool_results = vec![ToolResult { call_id: None, content: "output".to_string(), is_error: false }];
+        assert_eq!(message_snippet(&m, 100), "[tool result]");
+    }
+
+    #[test]
+    fn role_label_maps_all_roles() {
+        assert_eq!(role_label(&MessageRole::User), "User");
+        assert_eq!(role_label(&MessageRole::Assistant), "Assistant");
+        assert_eq!(role_label(&MessageRole::Tool), "Tool");
+        assert_eq!(role_label(&MessageRole::System), "System");
+        assert_eq!(role_label(&MessageRole::Other("planner".to_string())), "planner");
     }
 }

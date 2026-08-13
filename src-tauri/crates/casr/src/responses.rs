@@ -38,6 +38,9 @@ pub struct ListItem {
     pub session_id: String,
     pub provider: String,
     pub title: Option<String>,
+    /// Provider-native session name (e.g. Claude Code `/rename` title, Amp
+    /// thread title). `null` for providers without such a concept.
+    pub native_name: Option<String>,
     pub messages: usize,
     pub workspace: Option<String>,
     pub started_at: Option<i64>,
@@ -69,6 +72,9 @@ pub struct InfoResponse {
     pub session_id: String,
     pub provider: String,
     pub title: Option<String>,
+    /// Provider-native session name (e.g. Claude Code `/rename` title, Amp
+    /// thread title). `null` for providers without such a concept.
+    pub native_name: Option<String>,
     pub workspace: Option<String>,
     pub messages: usize,
     pub started_at: Option<i64>,
@@ -83,6 +89,9 @@ pub struct InfoResponse {
     /// Repository name from filesystem git root (only when `--enrich-fs` is set).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repo_name: Option<String>,
+    /// Tail of the transcript (last few turns), present only with `--peek`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transcript_tail: Option<Vec<crate::model::TranscriptTurn>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -190,6 +199,7 @@ mod tests {
             session_id: "sid-1".to_string(),
             provider: "claude-code".to_string(),
             title: Some("Test".to_string()),
+            native_name: Some("Renamed Session".to_string()),
             messages: 10,
             workspace: Some("/data/projects/test".to_string()),
             started_at: Some(1_700_000_000_000),
@@ -213,6 +223,7 @@ mod tests {
         assert_eq!(first["schema_version"], 2);
         assert_eq!(first["session_id"], "sid-1");
         assert_eq!(first["provider"], "claude-code");
+        assert_eq!(first["native_name"], "Renamed Session");
         assert_eq!(first["messages"], 10);
         assert_eq!(first["workspace_name"], "test");
         assert_eq!(first["workspace_name_source"], "session_workspace_path");
@@ -229,6 +240,7 @@ mod tests {
             session_id: "sid-info".to_string(),
             provider: "codex".to_string(),
             title: None,
+            native_name: None,
             workspace: None,
             messages: 5,
             started_at: None,
@@ -239,12 +251,15 @@ mod tests {
             workspace_name: None,
             workspace_name_source: Some("none".to_string()),
             repo_name: None,
+            transcript_tail: None,
         };
         let json = serde_json::to_value(&info).unwrap();
         assert_eq!(json["schema_version"], 2);
         assert_eq!(json["session_id"], "sid-info");
         assert_eq!(json["provider"], "codex");
         assert!(json["title"].is_null());
+        assert!(json["native_name"].is_null());
+        assert!(!json.as_object().unwrap().contains_key("transcript_tail"), "transcript_tail must be omitted when not peeking");
         assert!(json["workspace"].is_null());
         assert_eq!(json["messages"], 5);
         assert_eq!(json["model_name"], "gpt-4");
@@ -316,6 +331,7 @@ mod tests {
             session_id: "sid".to_string(),
             provider: "test".to_string(),
             title: None,
+            native_name: None,
             messages: 0,
             workspace: None,
             started_at: None,
@@ -333,6 +349,7 @@ mod tests {
         };
         let json = serde_json::to_value(&item).unwrap();
         assert!(!json.as_object().unwrap().contains_key("repo_name"), "repo_name should be omitted from JSON when None");
+        assert!(json.as_object().unwrap().contains_key("native_name"), "native_name is always present (null when absent)");
     }
 
     #[test]
@@ -342,6 +359,7 @@ mod tests {
             session_id: "sid".to_string(),
             provider: "test".to_string(),
             title: None,
+            native_name: None,
             messages: 0,
             workspace: Some("/data/projects/my_repo".to_string()),
             started_at: None,
@@ -368,6 +386,7 @@ mod tests {
             session_id: "sid".to_string(),
             provider: "test".to_string(),
             title: None,
+            native_name: None,
             workspace: None,
             messages: 0,
             started_at: None,
@@ -378,6 +397,7 @@ mod tests {
             workspace_name: None,
             workspace_name_source: Some("none".to_string()),
             repo_name: None,
+            transcript_tail: None,
         };
         let json = serde_json::to_value(&info).unwrap();
         assert!(!json.as_object().unwrap().contains_key("repo_name"), "repo_name should be omitted from info JSON when None");

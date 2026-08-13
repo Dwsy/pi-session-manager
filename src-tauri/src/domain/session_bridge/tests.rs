@@ -792,6 +792,83 @@ fn cursor_virtual_session_path_reads_composer() {
     assert_eq!(backing_file_path(virtual_path), db_path);
 }
 
+/// Copy a fixture shipped with the vendored CASR crate into `dest`.
+///
+/// Reusing CASR's own fixtures keeps these cases honest: the formats for Kiro
+/// triplets, Grok session directories and ChatGPT exports are intricate enough
+/// that hand-written samples would drift from what the readers actually expect.
+fn copy_casr_fixture(relative: &str, dest: &Path) {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("crates/casr/tests/fixtures").join(relative);
+    std::fs::create_dir_all(dest.parent().expect("fixture destination parent")).expect("mkdir");
+    std::fs::copy(&source, dest).unwrap_or_else(|error| panic!("copy fixture {} -> {}: {error}", source.display(), dest.display()));
+}
+
+#[test]
+fn vendor_delegated_providers_are_detected_and_previewable() {
+    struct Case {
+        source: SessionBridgeSource,
+        /// `(fixture path under crates/casr/tests/fixtures, path under tempdir)`
+        files: &'static [(&'static str, &'static str)],
+        /// The file the scanner would hand to the reader.
+        session: &'static str,
+    }
+
+    let cases = [
+        Case { source: SessionBridgeSource::Aider, files: &[("aider/aider_simple.md", "workspace/.aider.chat.history.md")], session: "workspace/.aider.chat.history.md" },
+        Case { source: SessionBridgeSource::Amp, files: &[("amp/T-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.json", "amp/threads/T-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.json")], session: "amp/threads/T-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.json" },
+        Case { source: SessionBridgeSource::ChatGpt, files: &[("chatgpt/chatgpt_simple.json", "com.openai.chat/conversations-v2/chatgpt-conv-001.json")], session: "com.openai.chat/conversations-v2/chatgpt-conv-001.json" },
+        Case {
+            source: SessionBridgeSource::Cline,
+            files: &[("cline/tasks/1700001234567/api_conversation_history.json", "Code/User/globalStorage/saoudrizwan.claude-dev/tasks/1700001234567/api_conversation_history.json"), ("cline/state/taskHistory.json", "Code/User/globalStorage/saoudrizwan.claude-dev/state/taskHistory.json")],
+            session: "Code/User/globalStorage/saoudrizwan.claude-dev/tasks/1700001234567/api_conversation_history.json",
+        },
+        Case { source: SessionBridgeSource::OpenClaw, files: &[("openclaw/openclaw_simple.jsonl", ".openclaw/agents/openclaw/sessions/ocl-sess-001.jsonl")], session: ".openclaw/agents/openclaw/sessions/ocl-sess-001.jsonl" },
+        Case { source: SessionBridgeSource::Vibe, files: &[("vibe/messages.jsonl", ".vibe/logs/session/vibe-sess-001/messages.jsonl")], session: ".vibe/logs/session/vibe-sess-001/messages.jsonl" },
+        Case {
+            source: SessionBridgeSource::Kiro,
+            files: &[("kiro/0a5376f2-7e2f-4981-bcbc-67195586604a.jsonl", ".kiro/sessions/cli/0a5376f2-7e2f-4981-bcbc-67195586604a.jsonl"), ("kiro/0a5376f2-7e2f-4981-bcbc-67195586604a.json", ".kiro/sessions/cli/0a5376f2-7e2f-4981-bcbc-67195586604a.json")],
+            session: ".kiro/sessions/cli/0a5376f2-7e2f-4981-bcbc-67195586604a.jsonl",
+        },
+        Case {
+            source: SessionBridgeSource::Grok,
+            files: &[
+                ("grok/sessions/%2Fdata%2Fprojects%2Fdemo/019f75d0-aaaa-7bbb-8ccc-b0a1b2c3d4e5/updates.jsonl", ".grok/sessions/%2Fdata%2Fprojects%2Fdemo/019f75d0-aaaa-7bbb-8ccc-b0a1b2c3d4e5/updates.jsonl"),
+                ("grok/sessions/%2Fdata%2Fprojects%2Fdemo/019f75d0-aaaa-7bbb-8ccc-b0a1b2c3d4e5/summary.json", ".grok/sessions/%2Fdata%2Fprojects%2Fdemo/019f75d0-aaaa-7bbb-8ccc-b0a1b2c3d4e5/summary.json"),
+            ],
+            session: ".grok/sessions/%2Fdata%2Fprojects%2Fdemo/019f75d0-aaaa-7bbb-8ccc-b0a1b2c3d4e5/updates.jsonl",
+        },
+    ];
+
+    for case in cases {
+        let temp = tempfile::tempdir().expect("tempdir");
+        for (fixture, relative) in case.files {
+            copy_casr_fixture(fixture, &temp.path().join(relative));
+        }
+        let path = temp.path().join(case.session);
+        let name = case.source.display_name();
+
+        let (source, canonical) = read_canonical_session_from_path(&path).unwrap_or_else(|error| panic!("{name}: read failed: {error}"));
+        assert_eq!(source, case.source, "{name}: wrong provider attribution");
+        assert!(!canonical.messages.is_empty(), "{name}: no messages parsed");
+
+        let preview = preview_session_for_viewer(&path).unwrap_or_else(|error| panic!("{name}: preview failed: {error}"));
+        assert!(preview.lines().count() > 1, "{name}: preview has no entries");
+    }
+}
+
+#[test]
+fn every_provider_maps_to_a_distinct_slug_and_alias() {
+    let mut slugs = std::collections::HashSet::new();
+    for source in SessionBridgeSource::ALL {
+        assert!(slugs.insert(source.slug()), "duplicate slug {}", source.slug());
+        // Round-tripping through the alias parser is what the settings layer,
+        // the CLI and the HTTP API all rely on.
+        let parsed = SessionBridgeSource::parse_alias(source.slug()).unwrap_or_else(|error| panic!("{}: {error}", source.slug()));
+        assert_eq!(parsed, source, "alias round-trip changed provider for {}", source.slug());
+    }
+    assert_eq!(slugs.len(), SessionBridgeSource::ALL.len());
+}
+
 #[test]
 fn convert_rejects_scan_only_targets() {
     let temp = tempfile::tempdir().expect("tempdir");

@@ -435,7 +435,7 @@ casr -gmi <session-id>  # open in Gemini
 ```bash
 casr providers
 casr list --workspace "$(pwd)" --sort date --limit 20
-casr resume codex <session-id> --source claude
+casr cod resume <session-id> --source cc
 casr info <session-id> --json
 ```
 
@@ -465,7 +465,7 @@ download_skill_archive() {
       fi
     fi
   done
-  SKILL_ARCHIVE_STATUS="not-found (inline fallback)"
+  SKILL_ARCHIVE_STATUS="bundled inline skill"
   return 1
 }
 
@@ -525,6 +525,14 @@ configure_agent_skills() {
   fi
 }
 
+status_path() {
+  local path="$1"
+  case "$path" in
+    "$HOME"/*) printf '%s/%s' '~' "${path#"$HOME"/}" ;;
+    *) printf '%s' "$path" ;;
+  esac
+}
+
 install_wrapper_command() {
   local alias_name="$1"
   local target_name="$2"
@@ -547,13 +555,13 @@ install_wrapper_command() {
     local current_alias_path=""
     current_alias_path=$(command -v "$alias_name" 2>/dev/null || true)
     if [ "$current_alias_path" != "$wrapper_path" ]; then
-      printf -v "$status_var" '%s' "already exists on PATH (${current_alias_path})"
+      printf -v "$status_var" '%s' "already exists on PATH ($(status_path "$current_alias_path"))"
       return 0
     fi
   fi
 
   if [ -f "$wrapper_path" ] && ! grep -Fq "$marker" "$wrapper_path" 2>/dev/null; then
-    printf -v "$status_var" '%s' "skipped (existing unmanaged file at $wrapper_path)"
+    printf -v "$status_var" '%s' "preserved unmanaged ($(status_path "$wrapper_path"))"
     return 0
   fi
 
@@ -563,7 +571,7 @@ $marker
 exec "${target_path}" "\$@"
 EOF
   chmod 0755 "$wrapper_path"
-  printf -v "$status_var" '%s' "installed ($wrapper_path -> $target_name)"
+  printf -v "$status_var" '%s' "installed ($(status_path "$wrapper_path") -> $target_name)"
 }
 
 configure_provider_wrappers() {
@@ -1398,7 +1406,7 @@ summary_lines=(
   "Version:          $VERSION"
   "Install source:   $INSTALL_SOURCE"
   "Providers:        $PROV_LIST"
-  "Skill archive:    $SKILL_ARCHIVE_STATUS"
+  "Skill source:     $SKILL_ARCHIVE_STATUS"
   "Claude skill:     $CLAUDE_SKILL_STATUS"
   "Codex skill:      $CODEX_SKILL_STATUS"
   "Wrapper cc:       $CC_WRAPPER_STATUS"
@@ -1412,9 +1420,10 @@ summary_lines=(
   "  casr -cod <session-id>"
   "  casr -gmi <session-id>"
   ""
-  "Uninstall/revert:"
-  "  rm -f $DEST/$BINARY_NAME $DEST/cc $DEST/cod $DEST/gmi"
-  "  rm -rf \$HOME/.claude/skills/casr \$HOME/.codex/skills/casr"
+  "Managed paths:"
+  "  binary:   $(status_path "$DEST/$BINARY_NAME")"
+  "  wrappers: $(status_path "$DEST")/{cc,cod,gmi}"
+  "  skills:   ~/.claude/skills/casr and ~/.codex/skills/casr"
 )
 
 echo ""
@@ -1429,9 +1438,9 @@ if [ "$QUIET" -eq 0 ]; then
           echo ""
           continue
         fi
-        if [[ "$line" == "Get started:" ]] || [[ "$line" == "Uninstall/revert:" ]]; then
+        if [[ "$line" == "Get started:" ]] || [[ "$line" == "Managed paths:" ]]; then
           gum style --foreground 245 "$line"
-        elif [[ "$line" == "  casr "* ]] || [[ "$line" == "  rm "* ]]; then
+        elif [[ "$line" == "  casr "* ]]; then
           gum style --foreground 39 "$line"
         else
           gum style --foreground 245 "$line"

@@ -917,6 +917,22 @@ export function getSessionSourceTag(sessionPath: string): string | null {
       return 'Cursor'
     case 'antigravity':
       return 'Antigravity'
+    case 'aider':
+      return 'Aider'
+    case 'amp':
+      return 'Amp'
+    case 'chatgpt':
+      return 'ChatGPT'
+    case 'cline':
+      return 'Cline'
+    case 'openclaw':
+      return 'OpenClaw'
+    case 'vibe':
+      return 'Vibe'
+    case 'kiro':
+      return 'Kiro CLI'
+    case 'grok':
+      return 'Grok Build'
     default:
       return slug
   }
@@ -968,6 +984,16 @@ export function getSessionSourceSlug(sessionPath: string): string | null {
     return 'clawdbot'
   }
 
+  // Cline and Amp store sessions in an editor's globalStorage, which can be
+  // Cursor's — check them before the Cursor rule or they get misattributed.
+  if (normalized.includes('/saoudrizwan.claude-dev/tasks/')) {
+    return 'cline'
+  }
+
+  if (normalized.includes('/amp/threads/') || normalized.includes('/sourcegraph.amp/threads3/')) {
+    return 'amp'
+  }
+
   if (
     normalized.endsWith('/state.vscdb')
     || normalized.includes('/state.vscdb/')
@@ -975,6 +1001,32 @@ export function getSessionSourceSlug(sessionPath: string): string | null {
     || normalized.includes('/Cursor/User/workspaceStorage/')
   ) {
     return 'cursor'
+  }
+
+  if (normalized.includes('/com.openai.chat/')) {
+    return 'chatgpt'
+  }
+
+  if (normalized.endsWith('/.aider.chat.history.md')) {
+    return 'aider'
+  }
+
+  // Kiro and Grok live under `<home>/sessions/...`, where the generic fallback
+  // below would return the dotted home directory name instead of the slug.
+  if (normalized.includes('/.kiro/sessions/cli/')) {
+    return 'kiro'
+  }
+
+  if (normalized.includes('/.grok/sessions/')) {
+    return 'grok'
+  }
+
+  if (normalized.includes('/.openclaw/')) {
+    return 'openclaw'
+  }
+
+  if (normalized.includes('/.vibe/logs/session/')) {
+    return 'vibe'
   }
 
   const parts = normalized.split('/').filter(Boolean)

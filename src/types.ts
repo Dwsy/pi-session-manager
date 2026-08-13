@@ -187,7 +187,9 @@ export type SessionConvertTarget =
   | "amp"
   | "chatgpt"
   | "openclaw"
-  | "vibe";
+  | "vibe"
+  | "kiro"
+  | "grok";
 
 export interface SessionProviderCapabilities {
   canScan: boolean;

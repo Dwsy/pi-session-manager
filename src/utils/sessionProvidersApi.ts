@@ -1,6 +1,7 @@
 import { getRuntimeMode } from "@/runtime-data/runtimeMode";
 import { invoke } from "@/transport";
 import type { SessionConvertTarget, SessionProviderInfo } from "@/types";
+import { FALLBACK_SESSION_PROVIDERS, isSessionConvertTarget } from "@/utils/sessionProviderCatalog";
 
 interface RawSessionProviderInfo {
   slug?: string;
@@ -14,44 +15,10 @@ interface RawSessionProviderInfo {
   roots?: unknown;
 }
 
-/** Static provider table used when no backend is reachable (demo / dataset runtimes). */
-export const FALLBACK_SESSION_PROVIDERS: SessionProviderInfo[] = (
-  [
-    ["pi", "Pi", true],
-    ["omp", "OMP", true],
-    ["claude-code", "Claude Code", true],
-    ["codex", "Codex", true],
-    ["opencode", "OpenCode", true],
-    ["gemini", "Gemini CLI", true],
-    ["factory", "Factory", true],
-    ["clawdbot", "ClawdBot", true],
-    ["cursor", "Cursor", false],
-    ["antigravity", "Antigravity", false],
-  ] as const
-).map(([slug, displayName, canConvertTarget]) => ({
-  slug,
-  display_name: displayName,
-  capabilities: { canScan: true, canConvertTarget },
-  detected: false,
-  roots: [],
-}));
+export { FALLBACK_SESSION_PROVIDERS, isSessionConvertTarget } from "@/utils/sessionProviderCatalog";
 
 function normalizeProviderSlug(value: string): SessionConvertTarget | null {
-  switch (value) {
-    case "pi":
-    case "omp":
-    case "claude-code":
-    case "codex":
-    case "opencode":
-    case "gemini":
-    case "factory":
-    case "clawdbot":
-    case "cursor":
-    case "antigravity":
-      return value;
-    default:
-      return null;
-  }
+  return isSessionConvertTarget(value) ? value : null;
 }
 
 function normalizeRoots(value: unknown): string[] {

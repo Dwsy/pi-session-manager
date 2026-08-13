@@ -529,7 +529,7 @@ impl Provider for Cline {
             "Cline session written"
         );
 
-        Ok(WrittenSession { paths: vec![api_path, ui_path, metadata_path], session_id: target_task_id.clone(), resume_command: self.resume_command(&target_task_id), backup_path })
+        Ok(WrittenSession { paths: vec![api_path, ui_path, metadata_path], session_id: target_task_id.clone(), resume_command: self.resume_command(&target_task_id), backup_path, warnings: Vec::new() })
     }
 
     fn resume_command(&self, _session_id: &str) -> String {

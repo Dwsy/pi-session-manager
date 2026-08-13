@@ -61,14 +61,11 @@ pub fn is_session_allowed_in_search(path: &Path, config: &Config) -> bool {
 
 pub fn read_canonical_session_from_path(path: &Path) -> Result<(SessionBridgeSource, CanonicalSession), String> {
     let started_at = Instant::now();
-    // OMP shares the Pi-Agent JSONL format but CASR has no distinct OMP
-    // provider, so its sessions are read via the casr_min provider path (which
-    // attributes them to OMP) instead of the vendored CASR registry.
-    let should_try_vendor = SessionBridgeSource::ALL.into_iter().any(|source| source != SessionBridgeSource::Omp && source.matches_path(path));
+    let detected = detect_provider(Some(path), "");
 
-    if should_try_vendor {
+    if let Some(provider) = detected.filter(|provider| !provider.prefers_casr_min_reader()) {
         let vendor_started_at = Instant::now();
-        match super::vendor::read_canonical_session_from_path(path) {
+        match super::vendor::read_canonical_session_with_provider(provider, path) {
             Ok(result) => {
                 debug!("session_bridge read {} via vendor in {}ms (total={}ms)", path.display(), vendor_started_at.elapsed().as_millis(), started_at.elapsed().as_millis());
                 return Ok(result);
@@ -79,7 +76,7 @@ pub fn read_canonical_session_from_path(path: &Path) -> Result<(SessionBridgeSou
         }
     }
 
-    if let Some(provider) = detect_provider(Some(path), "") {
+    if let Some(provider) = detected {
         let provider_started_at = Instant::now();
         let result = provider.read_session(path).map(|canonical| (provider, canonical)).map(map_read_result);
         match &result {
@@ -165,12 +162,46 @@ pub fn backing_file_path(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
+/// Whether a discovered file could hold a session for any supported provider.
+///
+/// Most providers use JSONL, so that extension short-circuits. The rest store
+/// sessions in provider-specific containers (SQLite databases, JSON documents,
+/// a markdown transcript) that an extension check alone would discard. Both the
+/// initial scan and the file watcher gate on this, so they must not diverge.
+pub fn is_session_candidate_path(path: &Path) -> bool {
+    path.extension().is_some_and(|ext| ext == "jsonl")
+        || is_gemini_session_file(path)
+        || is_opencode_db_path(path)
+        || is_cursor_db_path(path)
+        || is_antigravity_session_file(path)
+        || is_aider_session_file(path)
+        || is_amp_session_file(path)
+        || is_chatgpt_session_file(path)
+        || is_cline_session_file(path)
+}
+
 pub fn is_gemini_session_file(path: &Path) -> bool {
     crate::domain::casr_min::providers::gemini::is_session_file(path)
 }
 
 pub fn is_antigravity_session_file(path: &Path) -> bool {
     crate::domain::casr_min::providers::antigravity::is_transcript_path(path)
+}
+
+pub fn is_aider_session_file(path: &Path) -> bool {
+    crate::domain::casr_min::providers::vendored::aider_matches_path(path)
+}
+
+pub fn is_amp_session_file(path: &Path) -> bool {
+    crate::domain::casr_min::providers::vendored::amp_matches_path(path)
+}
+
+pub fn is_chatgpt_session_file(path: &Path) -> bool {
+    crate::domain::casr_min::providers::vendored::chatgpt_matches_path(path)
+}
+
+pub fn is_cline_session_file(path: &Path) -> bool {
+    crate::domain::casr_min::providers::vendored::cline_matches_path(path)
 }
 
 pub fn is_opencode_db_path(path: &Path) -> bool {
@@ -193,8 +224,11 @@ pub fn convert_session_format(path: &Path, target: SessionBridgeSource, options:
     if !target.can_convert_target() {
         return Err(format!("Provider {} is scan/source only and cannot be used as a conversion target", target.display_name()));
     }
-    if !options.dry_run && !matches!(target, SessionBridgeSource::Pi | SessionBridgeSource::Omp) {
-        return super::vendor::convert_session_format(path, target, options.force);
+    // Pi and OMP are written by casr_min; everything else is written by the
+    // vendored CASR writer. Vendor-delegated providers have no casr_min writer
+    // at all, so even their dry runs must go through the vendor.
+    if !matches!(target, SessionBridgeSource::Pi | SessionBridgeSource::Omp) && (!options.dry_run || target.is_vendor_delegated()) {
+        return super::vendor::convert_session_format(path, target, options.force, options.dry_run);
     }
 
     let (source, canonical) = read_canonical_session_from_path(path)?;

@@ -6,6 +6,20 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Added
 
+- **Full CASR provider coverage** — session support grew from 10 to 18 providers, adding Aider, Amp, ChatGPT, Cline, OpenClaw, Vibe, Kiro CLI and Grok Build. All are scannable, browsable and usable as conversion sources and targets
+  - Upgraded the vendored CASR crate from 0.2.2 to upstream 0.3.0, which brings the official Antigravity, Kiro and Grok readers/writers, and replayed PSM's local fixes for Claude Code tool results, legacy Codex tool calls, and the current OpenCode SQLite schema
+  - Added `casr_min/providers/vendored.rs`, which owns path matching for the delegated providers and forwards reads to CASR instead of maintaining a second set of parsers
+  - Session discovery now recognizes non-JSONL session containers for Aider (markdown transcript), Amp and ChatGPT (JSON) and Cline (task directory)
+
+### Changed
+
+- Provider detection no longer lets CASR pick the reader by itself. PSM identifies the provider from the path and calls that reader explicitly, so a permissive JSONL parser can no longer claim a session that lives outside a known provider root
+- The scanner and the file watcher now share one `is_session_candidate_path` gate instead of two copies of the same extension checks
+
+### Fixed
+
+- Cursor and Antigravity were missing from the resume-target validator and the conversion dialog's i18n tables, so selecting them silently fell back to Pi
+
 - **OMP (oh-my-pi) session support** — the Pi fork's sessions (`~/.omp/agent/sessions`) are now scanned, parsed, and shown with their own source badge/icon alongside Pi and other external agents
   - Added `Omp` to the backend provider registry (`ProviderKind` / `SessionBridgeSource`) with `omp --session` resume and `~/.omp/...` session roots
   - Added `omp` binary to export command candidates

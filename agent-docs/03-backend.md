@@ -36,6 +36,14 @@ src-tauri/src/
 | `casr_min/` | minimal CASR integration |
 | Root | datasets, pi_session, delete, intel, parser, scanner, write_buffer |
 
+### Session providers
+
+18 providers: the 17 from the vendored CASR crate (`crates/casr`, upstream 0.3.0) plus PSM's own OMP. `ProviderKind` in `domain/casr_min/providers/mod.rs` is the single source of truth; `SessionBridgeSource` mirrors it, and the frontend mirror is `src/utils/sessionProviderCatalog.ts`.
+
+To add a provider, change `ProviderKind` (variant, `ALL`, `slug`, `display_name`, `parse_alias`, and the dispatch matches), then the frontend catalog. If its sessions are not `.jsonl`, also add a predicate to `is_session_candidate_path` in `session_bridge/api.rs` — the scanner and file watcher both gate on that one function.
+
+Reader ownership: CASR is the default, with PSM detecting the provider from the path and calling that reader explicitly. `ProviderKind::prefers_casr_min_reader` (OMP, Antigravity) and `is_vendor_delegated` (Aider, Amp, ChatGPT, Cline, OpenClaw, Vibe, Kiro, Grok) mark the exceptions. See [SESSION_CONVERSION_COMPATIBILITY.md](../docs/SESSION_CONVERSION_COMPATIBILITY.md) for the full table and rationale.
+
 ## Core
 
 `delete.rs` | `intel.rs` | `io_trace.rs` | `parser.rs` | `scanner.rs` | `write_buffer.rs`

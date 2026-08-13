@@ -1,0 +1,36 @@
+{
+  "session_id": "0a5376f2-7e2f-4981-bcbc-67195586604a",
+  "cwd": "/Users/tranquangdang21/Projects/jcode/.worktrees/feat-380-compaction-resistant-notepad",
+  "created_at": "2026-06-07T14:14:27.290365Z",
+  "updated_at": "2026-06-07T14:14:36.404077Z",
+  "title": "Research ONLY the repo at local path /tmp/feature-research/opencode (alias: opencode, GitHub: https://github.com/anomalyco/opencode). Known for: op...",
+  "parent_session_id": "98cb06e6-28da-4ba8-8ebe-be6bf16841c1",
+  "session_created_reason": "subagent",
+  "session_state": {
+    "version": "v1",
+    "conversation_metadata": {
+      "user_turn_metadatas": [],
+      "user_turn_start_request": null,
+      "last_request": null
+    },
+    "rts_model_state": {
+      "conversation_id": "0a5376f2-7e2f-4981-bcbc-67195586604a",
+      "model_info": null,
+      "context_usage_percentage": null
+    },
+    "permissions": {
+      "filesystem": {
+        "allowed_read_paths": [
+          "/Users/tranquangdang21/Projects/jcode/.worktrees/feat-380-compaction-resistant-notepad"
+        ],
+        "allowed_write_paths": [],
+        "denied_read_paths": [],
+        "denied_write_paths": []
+      },
+      "trusted_tools": [],
+      "denied_tools": [],
+      "allowed_commands": []
+    },
+    "agent_name": null
+  }
+}

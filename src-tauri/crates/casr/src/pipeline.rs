@@ -29,6 +29,28 @@ pub struct ConvertOptions {
     pub verbose: bool,
     pub enrich: bool,
     pub source_hint: Option<String>,
+    /// Cap the transferred history at roughly this many tokens (0 = unlimited).
+    /// Applied only to cross-provider conversions; mirrors the source agent's
+    /// live context rather than its full archive.
+    pub max_context_tokens: usize,
+    /// Truncate each tool result/observation to this many characters (0 = unlimited).
+    pub max_tool_output: usize,
+    /// Keep source-agent reasoning traces (dropped by default for cross-agent
+    /// handoffs since the target agent cannot use another agent's hidden reasoning).
+    pub keep_reasoning: bool,
+    /// Explicit workspace/project directory for the target session. Overrides
+    /// whatever the source session recorded (or failed to record). Cwd-keyed
+    /// providers (e.g. Claude Code) resolve sessions by matching the resume
+    /// command's cwd against the session's workspace bucket, so getting this
+    /// right is what makes `--resume` actually find the session.
+    pub workspace_override: Option<std::path::PathBuf>,
+}
+
+impl Default for ConvertOptions {
+    fn default() -> Self {
+        // No-op budgeting by default; the CLI layer supplies the smart caps.
+        ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None, max_context_tokens: 0, max_tool_output: 0, keep_reasoning: true, workspace_override: None }
+    }
 }
 
 /// Outcome of a successful (or dry-run) conversion.
@@ -62,6 +84,24 @@ impl ValidationResult {
     }
 }
 
+/// Make a user-supplied workspace path absolute.
+///
+/// Cwd-keyed providers (Claude Code) turn the workspace into a path-encoded
+/// bucket name and `--resume` only finds sessions whose bucket matches the
+/// invoking cwd — which is always absolute. A relative `--workspace ./foo`
+/// would therefore write a bucket nothing can match. Existing directories are
+/// canonicalized (resolving `..` and symlinks the same way a shell's cwd is);
+/// anything else is joined onto the current directory and returned as-is.
+pub fn absolutize_workspace(ws: &std::path::Path) -> std::path::PathBuf {
+    if let Ok(canonical) = std::fs::canonicalize(ws) {
+        return canonical;
+    }
+    if ws.is_absolute() {
+        return ws.to_path_buf();
+    }
+    std::env::current_dir().map_or_else(|_| ws.to_path_buf(), |cwd| cwd.join(ws))
+}
+
 /// Validate a canonical session for completeness and quality.
 ///
 /// Returns errors (fatal), warnings (non-fatal), and info notes.
@@ -83,7 +123,12 @@ pub fn validate_session(session: &CanonicalSession) -> ValidationResult {
 
     // WARNINGS — conversion continues.
     if session.workspace.is_none() {
-        result.warnings.push("Session has no workspace. Target agent may not know which project to work in.".to_string());
+        result.warnings.push(
+            "Session has no workspace. Target agent may not know which project to work in, \
+and cwd-keyed providers (e.g. Claude Code) will only find the session when resumed from \
+the directory stamped into it. Use --workspace <path> to set it explicitly."
+                .to_string(),
+        );
     }
 
     let has_timestamps = session.messages.iter().any(|m| m.timestamp.is_some());
@@ -275,6 +320,51 @@ but resume may fail until the CLI is installed.",
         let mut canonical = resolved.provider.read_session(&resolved.path)?;
         debug!(messages = canonical.messages.len(), session_id = canonical.session_id, "source session read");
 
+        // 3b. Resolve the target workspace BEFORE validation/write.
+        //
+        // Cwd-keyed providers (e.g. Claude Code) bucket sessions by a
+        // path-encoded workspace directory and `--resume` only finds sessions
+        // whose bucket matches the invoking cwd. Silently defaulting a missing
+        // workspace to `/tmp` (the old behavior) produced sessions that
+        // "converted fine" but could never be resumed from the real project
+        // directory (GH #20).
+        if let Some(ws) = &opts.workspace_override {
+            if !ws.is_dir() {
+                all_warnings.push(format!(
+                    "--workspace {} does not exist (or is not a directory). Using it anyway; \
+create it before resuming or the target CLI may not find the session.",
+                    ws.display()
+                ));
+            }
+            // Absolutize: cwd-keyed providers encode the workspace path into a
+            // bucket name and compare it against the resume command's
+            // *absolute* cwd, so a relative `--workspace ./foo` would write a
+            // `--foo` bucket that can never match and silently reproduce the
+            // very unfindable-session bug this flag exists to fix.
+            let ws = absolutize_workspace(ws);
+            debug!(workspace = %ws.display(), "workspace explicitly overridden via --workspace");
+            canonical.workspace = Some(ws);
+        } else if canonical.workspace.is_none() {
+            match std::env::current_dir() {
+                Ok(cwd) => {
+                    all_warnings.push(format!(
+                        "Session has no recorded workspace; defaulting to the current directory \
+{cwd_display}. The target CLI resolves sessions by cwd, so run the resume command FROM \
+{cwd_display} — or re-run with --workspace <path> to target the real project directory.",
+                        cwd_display = cwd.display()
+                    ));
+                    canonical.workspace = Some(cwd);
+                }
+                Err(err) => {
+                    all_warnings.push(format!(
+                        "Session has no recorded workspace and the current directory could not be \
+determined ({err}). Re-run with --workspace <path>; otherwise the target CLI may not find the \
+session unless your cwd matches the written workspace."
+                    ));
+                }
+            }
+        }
+
         // 4. Validate.
         let validation = validate_session(&canonical);
         all_warnings.extend(validation.warnings.clone());
@@ -309,10 +399,21 @@ but resume may fail until the CLI is installed.",
                 source_provider: resolved.provider.slug().to_string(),
                 target_provider: target_provider.slug().to_string(),
                 canonical_session: canonical.clone(),
-                written: Some(WrittenSession { paths: Vec::new(), session_id: canonical.session_id.clone(), resume_command: target_provider.resume_command(&canonical.session_id), backup_path: None }),
+                written: Some(WrittenSession { paths: Vec::new(), session_id: canonical.session_id.clone(), resume_command: target_provider.resume_command(&canonical.session_id), backup_path: None, warnings: Vec::new() }),
                 warnings: all_warnings,
             });
         }
+
+        // 7a2. Context budget (cross-provider only — same-provider short-circuited above).
+        //
+        // The Codex reader already collapses the on-disk archive to the live
+        // context (honoring compaction). This step keeps that context inside a
+        // target-friendly budget: drop the source agent's hidden reasoning,
+        // truncate oversized tool observations, then drop the oldest turns if
+        // still over the token cap — preserving the original task message and
+        // the most recent history, and never severing tool_use/tool_result pairs.
+        let budget_warnings = apply_context_budget(&mut canonical, opts.max_context_tokens, opts.max_tool_output, opts.keep_reasoning);
+        all_warnings.extend(budget_warnings);
 
         // 7b. Normalize tool-only messages with empty content.
         //
@@ -326,36 +427,45 @@ but resume may fail until the CLI is installed.",
         //
         // Fix: materialise the tool-call/result text into `content` on the
         // canonical message itself so that write ↔ readback is consistent.
-        for msg in &mut canonical.messages {
-            if !msg.content.trim().is_empty() {
-                continue;
-            }
-
-            let has_tool_calls = !msg.tool_calls.is_empty();
-            let has_tool_results = !msg.tool_results.is_empty();
-
-            if !has_tool_calls && !has_tool_results {
-                continue;
-            }
-
-            let mut parts: Vec<String> = Vec::new();
-
-            // Synthesize text for tool calls (matches Pi reader's format).
-            for tc in &msg.tool_calls {
-                parts.push(format!("[Tool: {}]", tc.name));
-            }
-
-            // Synthesize text for tool results.
-            for tr in &msg.tool_results {
-                if tr.is_error {
-                    parts.push(format!("[Tool Error] {}", tr.content));
-                } else {
-                    parts.push(format!("[Tool Output] {}", tr.content));
+        //
+        // This step is skipped for structured-tool targets (Claude Code), which
+        // round-trip `tool_use` / `tool_result` as native content blocks. Adding
+        // a synthesized text block there would corrupt the round-trip and cause
+        // the Anthropic API to reject the replayed history alongside the
+        // matching `tool_result`.
+        let target_preserves_tool_blocks = target_provider.slug() == "claude-code";
+        if !target_preserves_tool_blocks {
+            for msg in &mut canonical.messages {
+                if !msg.content.trim().is_empty() {
+                    continue;
                 }
-            }
 
-            if !parts.is_empty() {
-                msg.content = parts.join("\n");
+                let has_tool_calls = !msg.tool_calls.is_empty();
+                let has_tool_results = !msg.tool_results.is_empty();
+
+                if !has_tool_calls && !has_tool_results {
+                    continue;
+                }
+
+                let mut parts: Vec<String> = Vec::new();
+
+                // Synthesize text for tool calls (matches Pi reader's format).
+                for tc in &msg.tool_calls {
+                    parts.push(format!("[Tool: {}]", tc.name));
+                }
+
+                // Synthesize text for tool results.
+                for tr in &msg.tool_results {
+                    if tr.is_error {
+                        parts.push(format!("[Tool Error] {}", tr.content));
+                    } else {
+                        parts.push(format!("[Tool Output] {}", tr.content));
+                    }
+                }
+
+                if !parts.is_empty() {
+                    msg.content = parts.join("\n");
+                }
             }
         }
 
@@ -363,6 +473,9 @@ but resume may fail until the CLI is installed.",
         let write_opts = WriteOptions { force: opts.force };
         let written = target_provider.write_session(&canonical, &write_opts)?;
         info!(target_session_id = written.session_id, resume_command = written.resume_command, "session written");
+        // Surface any non-fatal writer warnings (e.g. the target session was
+        // written but could not be registered in the provider's resume index).
+        all_warnings.extend(written.warnings.iter().cloned());
 
         // 9. Read-back verification.
         if let Some(first_path) = written.paths.first() {
@@ -395,6 +508,135 @@ but resume may fail until the CLI is installed.",
 
         Ok(ConversionResult { source_provider: resolved.provider.slug().to_string(), target_provider: target_provider.slug().to_string(), canonical_session: canonical, written: Some(written), warnings: all_warnings })
     }
+}
+
+// ---------------------------------------------------------------------------
+// Context budget helpers
+// ---------------------------------------------------------------------------
+
+/// Rough token estimate (~4 chars/token) for one message, including tool I/O.
+fn estimate_message_tokens(m: &CanonicalMessage) -> usize {
+    let mut chars = m.content.len();
+    for tc in &m.tool_calls {
+        chars += tc.name.len() + tc.arguments.to_string().len();
+    }
+    for tr in &m.tool_results {
+        chars += tr.content.len();
+    }
+    chars / 4 + 1
+}
+
+/// Trim a string to ~`max` chars, keeping head and tail with an elision marker.
+/// Returns `None` if no truncation was needed.
+fn elide_middle(s: &str, max: usize) -> Option<String> {
+    if max == 0 {
+        return None;
+    }
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() <= max {
+        return None;
+    }
+    let head_len = max.saturating_mul(2) / 3;
+    let tail_len = max.saturating_sub(head_len);
+    let omitted = chars.len() - head_len - tail_len;
+    let head: String = chars[..head_len].iter().collect();
+    let tail: String = chars[chars.len() - tail_len..].iter().collect();
+    Some(format!("{head}\n…[casr: {omitted} chars elided]…\n{tail}"))
+}
+
+/// Remove `tool_use` blocks that lack a matching `tool_result` (and vice
+/// versa), then drop messages left with no content and no tool payloads.
+///
+/// The Anthropic API requires paired tool calls/results. After older turns are
+/// dropped by the token budget, previously-paired tool_use/tool_result entries
+/// can become orphaned; this function restores validity.
+fn repair_tool_pairing(session: &mut CanonicalSession) {
+    let result_ids: std::collections::HashSet<String> = session.messages.iter().flat_map(|m| m.tool_results.iter()).filter_map(|tr| tr.call_id.clone()).collect();
+    let call_ids: std::collections::HashSet<String> = session.messages.iter().flat_map(|m| m.tool_calls.iter()).filter_map(|tc| tc.id.clone()).collect();
+    for m in &mut session.messages {
+        m.tool_calls.retain(|tc| match tc.id.as_deref() {
+            Some(id) => result_ids.contains(id),
+            None => true,
+        });
+        m.tool_results.retain(|tr| match tr.call_id.as_deref() {
+            Some(id) => call_ids.contains(id),
+            None => true,
+        });
+    }
+    session.messages.retain(|m| !(m.content.trim().is_empty() && m.tool_calls.is_empty() && m.tool_results.is_empty()));
+}
+
+/// Fit a (cross-provider) session into a target-friendly context budget while
+/// preserving its meaning. Steps, in order:
+/// 1. Drop the source agent's hidden reasoning traces (another agent can't use them).
+/// 2. Truncate oversized tool observations.
+/// 3. Drop the oldest turns (excluding the first task message) if still over budget.
+/// 4. Repair orphaned tool_use/tool_result pairs that result from the dropping.
+///
+/// Returns human-readable notes about what was elided — never silent.
+fn apply_context_budget(canonical: &mut CanonicalSession, max_tokens: usize, max_tool_output: usize, keep_reasoning: bool) -> Vec<String> {
+    let mut warnings = Vec::new();
+
+    // 1. Drop source-agent reasoning traces (unusable by another agent).
+    if !keep_reasoning {
+        let before = canonical.messages.len();
+        canonical.messages.retain(|m| m.author.as_deref() != Some("reasoning"));
+        let dropped = before - canonical.messages.len();
+        if dropped > 0 {
+            warnings.push(format!("Dropped {dropped} source reasoning trace(s); pass --keep-reasoning to retain."));
+        }
+    }
+
+    // 2. Truncate oversized tool observations (the dominant byte source).
+    if max_tool_output > 0 {
+        let mut truncated = 0usize;
+        for m in &mut canonical.messages {
+            for tr in &mut m.tool_results {
+                if let Some(short) = elide_middle(&tr.content, max_tool_output) {
+                    tr.content = short;
+                    truncated += 1;
+                }
+            }
+        }
+        if truncated > 0 {
+            warnings.push(format!("Truncated {truncated} oversized tool result(s) to ~{max_tool_output} chars each."));
+        }
+    }
+
+    // 3. Enforce the token budget by dropping the oldest turns, pinning the
+    //    first (task) message and keeping the most recent history.
+    if max_tokens > 0 && canonical.messages.len() > 1 {
+        let total: usize = canonical.messages.iter().map(estimate_message_tokens).sum();
+        if total > max_tokens {
+            let pinned = estimate_message_tokens(&canonical.messages[0]);
+            let mut budget_left = max_tokens.saturating_sub(pinned);
+            let mut keep_from = canonical.messages.len();
+            for i in (1..canonical.messages.len()).rev() {
+                let t = estimate_message_tokens(&canonical.messages[i]);
+                if t > budget_left {
+                    break;
+                }
+                budget_left -= t;
+                keep_from = i;
+            }
+            if keep_from > 1 {
+                let dropped = keep_from - 1;
+                let tail = canonical.messages.split_off(keep_from);
+                canonical.messages.truncate(1);
+                canonical.messages.extend(tail);
+                warnings.push(format!(
+                    "Context budget (~{max_tokens} tokens) exceeded; dropped {dropped} older \
+turn(s) between the task and the most recent history."
+                ));
+            }
+        }
+    }
+
+    // 4. Re-pair tool calls/results and drop now-empty messages.
+    repair_tool_pairing(canonical);
+    reindex_messages(&mut canonical.messages);
+
+    warnings
 }
 
 /// Coarse role bucket used for read-back verification.
@@ -829,5 +1071,91 @@ mod tests {
 
         restore_backup(&outcome, "test").expect("restore should succeed without backup");
         assert!(!target.exists(), "target should be removed when no backup is available");
+    }
+
+    // -----------------------------------------------------------------------
+    // Context budget regression tests
+    // -----------------------------------------------------------------------
+
+    fn budget_msg(role: MessageRole, content: &str) -> CanonicalMessage {
+        CanonicalMessage { idx: 0, role, content: content.to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null }
+    }
+
+    fn budget_session(messages: Vec<CanonicalMessage>) -> CanonicalSession {
+        CanonicalSession { session_id: "s".into(), provider_slug: "codex".into(), workspace: None, title: None, started_at: None, ended_at: None, messages, metadata: serde_json::Value::Null, source_path: PathBuf::from("/tmp/x"), model_name: None }
+    }
+
+    #[test]
+    fn budget_elide_middle_only_truncates_long_strings() {
+        assert!(elide_middle("short", 100).is_none(), "no truncation needed");
+        let long = "x".repeat(1000);
+        let out = elide_middle(&long, 100).expect("should truncate");
+        assert!(out.chars().count() < 250, "output should be much shorter");
+        assert!(out.contains("elided"), "should contain elision marker");
+    }
+
+    #[test]
+    fn budget_drops_reasoning_and_truncates_tool_output() {
+        use crate::model::{ToolCall, ToolResult};
+
+        let mut reasoning = budget_msg(MessageRole::Assistant, "secret thoughts");
+        reasoning.author = Some("reasoning".into());
+
+        let mut call = budget_msg(MessageRole::Assistant, "run it");
+        call.tool_calls.push(ToolCall { id: Some("c1".into()), name: "Bash".into(), arguments: serde_json::json!({"cmd": "ls"}) });
+
+        let mut tool = budget_msg(MessageRole::Tool, "");
+        tool.tool_results.push(ToolResult { call_id: Some("c1".into()), content: "y".repeat(50_000), is_error: false });
+
+        let task = budget_msg(MessageRole::User, "task");
+        let mut s = budget_session(vec![task, call, tool, reasoning]);
+
+        let warns = apply_context_budget(&mut s, 0, 4000, false);
+
+        // Reasoning was dropped.
+        assert!(!s.messages.iter().any(|m| m.author.as_deref() == Some("reasoning")), "reasoning trace should be gone");
+
+        // Tool output was truncated.
+        let tr_content = &s.messages.iter().find(|m| !m.tool_results.is_empty()).expect("tool result message kept").tool_results[0].content;
+        assert!(tr_content.chars().count() < 5000, "tool output should be truncated");
+
+        // Warnings were emitted.
+        assert!(warns.iter().any(|w| w.contains("reasoning")), "should warn about dropped reasoning");
+        assert!(warns.iter().any(|w| w.contains("Truncated")), "should warn about truncated tool output");
+    }
+
+    #[test]
+    fn budget_token_cap_drops_oldest_keeps_task_and_recent() {
+        let mut msgs = vec![budget_msg(MessageRole::User, "the original task")];
+        for i in 0..50 {
+            let role = if i % 2 == 0 { MessageRole::Assistant } else { MessageRole::User };
+            msgs.push(budget_msg(role, &"word ".repeat(500)));
+        }
+        msgs.push(budget_msg(MessageRole::Assistant, "FINAL RECENT MESSAGE"));
+        let before = msgs.len();
+        let mut s = budget_session(msgs);
+
+        let warns = apply_context_budget(&mut s, 2000, 0, true);
+
+        assert!(s.messages.len() < before, "older turns should be dropped");
+        assert_eq!(s.messages.first().unwrap().content, "the original task", "first (task) message must be pinned");
+        assert_eq!(s.messages.last().unwrap().content, "FINAL RECENT MESSAGE", "most recent message must be retained");
+        assert!(warns.iter().any(|w| w.contains("Context budget")), "should emit context-budget warning");
+    }
+
+    #[test]
+    fn budget_repairs_orphaned_tool_use_after_dropping() {
+        use crate::model::ToolCall;
+
+        let mut call = budget_msg(MessageRole::Assistant, "");
+        call.tool_calls.push(ToolCall { id: Some("orphan".into()), name: "X".into(), arguments: serde_json::Value::Null });
+        // No matching tool_result — the tool call is already orphaned.
+        let mut s = budget_session(vec![budget_msg(MessageRole::User, "hi"), call]);
+
+        apply_context_budget(&mut s, 0, 0, true);
+
+        // Orphaned tool_use removed; now-empty assistant turn also dropped.
+        assert!(s.messages.iter().all(|m| m.tool_calls.is_empty()), "orphaned tool_use should be stripped");
+        assert_eq!(s.messages.len(), 1, "empty assistant turn should be dropped");
     }
 }

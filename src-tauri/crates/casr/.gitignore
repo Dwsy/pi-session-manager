@@ -81,3 +81,4 @@ gemini.mcp.json
 
 # One-off test shell scripts at repo root
 /test_*.sh
+/target-rel/

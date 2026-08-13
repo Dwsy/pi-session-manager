@@ -114,6 +114,30 @@
       "category": "synthetic",
       "intent": "Uses 'gemini' role type instead of 'model'. Tests normalize_role mapping."
     },
+    "agy_simple": {
+      "provider": "antigravity",
+      "format": "sqlite+jsonl",
+      "path": "antigravity/antigravity-cli/conversations/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.db",
+      "expected": "expected/agy_simple.json",
+      "category": "synthetic",
+      "intent": "Antigravity (agy) conversation. uuid==db filename stem; content read from sibling brain/<uuid>/.system_generated/logs/transcript.jsonl. Tests housekeeping-step drop, USER_REQUEST unwrap, tool-call extraction, model pin, and gmi disambiguation."
+    },
+    "grok_simple": {
+      "provider": "grok",
+      "format": "jsonl",
+      "path": "grok/sessions/%2Fdata%2Fprojects%2Fdemo/019f75d0-aaaa-7bbb-8ccc-b0a1b2c3d4e5/updates.jsonl",
+      "expected": "expected/grok_simple.json",
+      "category": "synthetic",
+      "intent": "Grok Build (grok CLI) session: ACP session-update stream in updates.jsonl + summary.json metadata under sessions/<percent-encoded-cwd>/<uuid>/. Envelope and user_message_chunk/hook_execution/retry_state shapes captured from a real grok 0.2.103 session (sanitized); assistant/tool shapes since confirmed verbatim against real 0.2.118 sessions (see grok_tools_real). Tests chunk coalescing, tool_call+tool_call_update merge, unknown-kind tolerance, and summary-driven title/model/workspace."
+    },
+    "grok_tools_real": {
+      "provider": "grok",
+      "format": "jsonl",
+      "path": "grok/sessions/%2Fdata%2Fprojects%2Fdemo/019fcac9-2222-7333-8444-555566667777/updates.jsonl",
+      "expected": "expected/grok_tools_real.json",
+      "category": "real_world_sanitized",
+      "intent": "Grok Build session with line shapes structurally verbatim from a real grok 0.2.118 session: promptId-marked agent chunks, tool_call with x.ai/tool meta, two-phase tool_call_update (enrichment then completion with typed rawOutput), and skipped _x.ai extension kinds (task_backgrounded/task_completed/turn_completed/session_recap). Locks down the empirically confirmed assistant/tool shapes that grok_simple previously only modeled from the ACP spec."
+    },
     "cline_simple": {
       "provider": "cline",
       "format": "json",

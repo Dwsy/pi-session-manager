@@ -1,6 +1,6 @@
 [package]
 name = "cross_agent_session_resumer"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2024"
 description = "Cross Agent Session Resumer — resume AI coding sessions across providers (CLI binary: casr)"
 license-file = "LICENSE"
@@ -36,7 +36,7 @@ serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 serde_json = "1"
 thiserror = "2"
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "v7"] }
 walkdir = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
@@ -52,3 +52,10 @@ tempfile = "3"
 
 [build-dependencies]
 vergen-gix = { version = "9", features = ["build", "cargo", "rustc"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

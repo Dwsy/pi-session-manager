@@ -168,13 +168,7 @@ fn process_events_with_merge(rx: Receiver<DebounceEventResult>, app_handle: AppH
                 Ok(events) => {
                     for event in &events {
                         for path in &event.paths {
-                            let is_jsonl = path.extension().map(|ext| ext == "jsonl").unwrap_or(false);
-                            let is_gemini_json = crate::domain::session_bridge::is_gemini_session_file(path);
-                            let is_opencode_db = crate::domain::session_bridge::is_opencode_db_path(path);
-                            let is_cursor_db = crate::domain::session_bridge::is_cursor_db_path(path);
-                            let is_antigravity_jsonl = crate::domain::session_bridge::is_antigravity_session_file(path);
-
-                            if is_jsonl || is_opencode_db || is_gemini_json || is_cursor_db || is_antigravity_jsonl {
+                            if crate::domain::session_bridge::is_session_candidate_path(path) {
                                 // Skip non-pi-session files: subagent artifacts and
                                 // gateway transcripts use different JSONL formats.
                                 // Aligned with should_skip_dir in core/scanner.rs.

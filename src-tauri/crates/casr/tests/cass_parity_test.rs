@@ -185,8 +185,10 @@ mod cc_parity {
         assert_eq!(s.messages[1].tool_calls[0].name, "Read");
         assert_eq!(s.messages[1].tool_calls[0].id.as_deref(), Some("tool-read-1"));
 
-        // msg[2]: user with tool_result.
-        assert_eq!(s.messages[2].role, MessageRole::User);
+        // msg[2]: tool_result-only entry. Claude Code stores these under a `user`
+        // envelope, but PSM classifies them as Tool so downstream viewers and
+        // writers keep them out of the user turn stream.
+        assert_eq!(s.messages[2].role, MessageRole::Tool);
         assert_eq!(s.messages[2].tool_results.len(), 1);
         assert_eq!(s.messages[2].tool_results[0].call_id.as_deref(), Some("tool-read-1"));
 
@@ -196,8 +198,8 @@ mod cc_parity {
         assert_eq!(s.messages[3].tool_calls.len(), 1);
         assert_eq!(s.messages[3].tool_calls[0].name, "Edit");
 
-        // msg[4]: user with tool_result.
-        assert_eq!(s.messages[4].role, MessageRole::User);
+        // msg[4]: tool_result-only entry, same PSM reclassification as msg[2].
+        assert_eq!(s.messages[4].role, MessageRole::Tool);
         assert_eq!(s.messages[4].tool_results.len(), 1);
         assert_eq!(s.messages[4].tool_results[0].call_id.as_deref(), Some("tool-edit-1"));
 

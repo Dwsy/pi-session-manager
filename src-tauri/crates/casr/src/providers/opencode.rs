@@ -594,13 +594,38 @@ impl Provider for OpenCode {
         Self::read_session_by_id(&conn, path, &session_id)
     }
 
-    fn write_session(&self, session: &CanonicalSession, _opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
+    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
         let db_path = Self::choose_target_db_path(session)?;
         let mut conn = Self::open_db_rw(&db_path)?;
         Self::ensure_schema(&conn)?;
 
         let has_count_trigger = Self::trigger_exists(&conn, "update_session_message_count_on_insert");
-        let target_session_id = uuid::Uuid::new_v4().to_string();
+
+        // Derive a STABLE target id from the source session so re-converting the
+        // same session targets the same row (matching the clawdbot/cursor/pi_agent
+        // idiom). This makes `--force` meaningful: without a stable id every run
+        // would silently create an orphaned duplicate row, and with a colliding id
+        // the INSERT would otherwise fail on the PRIMARY KEY. Fall back to a random
+        // UUID only when the source has no id.
+        let target_session_id = if session.session_id.is_empty() { uuid::Uuid::new_v4().to_string() } else { session.session_id.clone() };
+
+        // Honor `--force`: if the target session already exists, either overwrite
+        // it (delete-then-insert; `ON DELETE CASCADE` clears messages/files) or
+        // return a clean conflict error, matching the cursor provider's behavior.
+        if Self::session_exists(&conn, &target_session_id) {
+            if opts.force {
+                // `ensure_schema` already enabled `PRAGMA foreign_keys = ON` on
+                // this connection, so deleting the session cascades to messages
+                // and files. Delete dependents explicitly too, in case the live
+                // DB predates the FK constraint or has the pragma disabled.
+                let _ = conn.execute("DELETE FROM files WHERE session_id = ?1", rusqlite::params![target_session_id]);
+                let _ = conn.execute("DELETE FROM messages WHERE session_id = ?1", rusqlite::params![target_session_id]);
+                conn.execute("DELETE FROM sessions WHERE id = ?1", rusqlite::params![target_session_id]).context("failed to delete existing OpenCode session for --force overwrite")?;
+            } else {
+                return Err(crate::error::CasrError::SessionConflict { session_id: target_session_id, existing_path: db_path }.into());
+            }
+        }
+
         let now = chrono::Utc::now().timestamp_millis();
         let created_at = session.started_at.unwrap_or(now);
         let updated_at = session.ended_at.unwrap_or(now);
@@ -651,7 +676,7 @@ impl Provider for OpenCode {
             "OpenCode session written"
         );
 
-        Ok(WrittenSession { paths: vec![virtual_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: None })
+        Ok(WrittenSession { paths: vec![virtual_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: None, warnings: Vec::new() })
     }
 
     fn resume_command(&self, _session_id: &str) -> String {
@@ -992,7 +1017,57 @@ mod tests {
         assert_eq!(readback.messages[1].role, MessageRole::Assistant);
         assert_eq!(readback.messages[1].content, source.messages[1].content);
         assert_eq!(readback.workspace.as_deref(), Some(workspace.as_path()));
-        assert_ne!(readback.session_id, source.session_id);
+        // The target id is now derived stably from the source session id so that
+        // re-conversion is idempotent and `--force` can overwrite in place.
+        assert_eq!(readback.session_id, source.session_id);
+    }
+
+    /// Regression for #14: writing the same OpenCode session twice must fail
+    /// without `--force` (clean SessionConflict, not a raw SQLite duplicate-key
+    /// error) and succeed with `--force`, overwriting the existing row in place
+    /// rather than orphaning a duplicate.
+    #[test]
+    fn write_twice_with_force_overwrites_in_place() {
+        let _lock = OPENCODE_ENV.lock().expect("mutex lock");
+        let tmp = tempfile::tempdir().expect("tmpdir");
+        let workspace = tmp.path().join("workspace");
+        std::fs::create_dir_all(&workspace).expect("workspace dir");
+        let _cwd = CwdGuard::change_to(&workspace);
+
+        let source = sample_session(&workspace);
+
+        // First write succeeds.
+        let first = OpenCode.write_session(&source, &WriteOptions { force: false }).expect("first write should succeed");
+        let db_path = first.paths[0].parent().expect("db parent").to_path_buf();
+
+        // Second write WITHOUT force must be a clean conflict, not a panic or a
+        // raw "failed to insert OpenCode session" error.
+        let conflict = OpenCode.write_session(&source, &WriteOptions { force: false }).expect_err("second write without --force should conflict");
+        match conflict.downcast_ref::<crate::error::CasrError>() {
+            Some(crate::error::CasrError::SessionConflict { session_id, .. }) => {
+                assert_eq!(session_id, &source.session_id);
+            }
+            other => panic!("expected SessionConflict, got {other:?}"),
+        }
+
+        // Second write WITH force succeeds and overwrites in place.
+        let second = OpenCode.write_session(&source, &WriteOptions { force: true }).expect("force write should succeed");
+
+        // Same stable target id both times.
+        assert_eq!(first.session_id, second.session_id);
+        assert_eq!(second.session_id, source.session_id);
+
+        // Exactly one session row and no orphaned/duplicated message rows.
+        let conn = OpenCode::open_db(&db_path).expect("open db");
+        let session_count: i64 = conn.query_row("SELECT COUNT(*) FROM sessions", [], |r| r.get(0)).expect("count sessions");
+        assert_eq!(session_count, 1, "force must overwrite, not duplicate");
+
+        let message_count: i64 = conn.query_row("SELECT COUNT(*) FROM messages", [], |r| r.get(0)).expect("count messages");
+        assert_eq!(message_count, source.messages.len() as i64, "messages from the prior write must be replaced, not accumulated");
+
+        // The overwritten session still reads back cleanly.
+        let readback = OpenCode.read_session(&second.paths[0]).expect("readback after force overwrite");
+        assert_eq!(readback.messages.len(), source.messages.len());
     }
 
     #[test]
@@ -1018,12 +1093,16 @@ mod tests {
         std::fs::create_dir_all(&workspace).expect("workspace dir");
         let _cwd = CwdGuard::change_to(&workspace);
 
+        // Distinct source ids so both land as separate root sessions in one DB
+        // (target ids are now derived stably from the source session id).
         let mut first = sample_session(&workspace);
+        first.session_id = "older-source".to_string();
         first.title = Some("Older Session".to_string());
         first.started_at = Some(1_700_000_000_000);
         let _first_written = OpenCode.write_session(&first, &WriteOptions { force: false }).expect("first write");
 
         let mut second = sample_session(&workspace);
+        second.session_id = "newer-source".to_string();
         second.title = Some("Newer Session".to_string());
         second.started_at = Some(1_800_000_000_000);
         let second_written = OpenCode.write_session(&second, &WriteOptions { force: false }).expect("second write");
@@ -1426,13 +1505,15 @@ mod tests {
         std::fs::create_dir_all(&workspace).expect("workspace dir");
         let _cwd = CwdGuard::change_to(&workspace);
 
-        // Write two distinct sessions
+        // Write two distinct sessions (distinct source ids → distinct rows)
         let mut first = sample_session(&workspace);
+        first.session_id = "first-source".to_string();
         first.title = Some("First Session".to_string());
         first.started_at = Some(1_700_000_000_000);
         let first_written = OpenCode.write_session(&first, &WriteOptions { force: false }).expect("first write");
 
         let mut second = sample_session(&workspace);
+        second.session_id = "second-source".to_string();
         second.title = Some("Second Session".to_string());
         second.started_at = Some(1_800_000_000_000);
         let second_written = OpenCode.write_session(&second, &WriteOptions { force: false }).expect("second write");

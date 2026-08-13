@@ -1,0 +1,22 @@
+{
+  "fixture_id": "grok_tools_real",
+  "provider_slug": "grok",
+  "session_id": "019fcac9-2222-7333-8444-555566667777",
+  "workspace": "/data/projects/demo",
+  "title": "Demo README Summary Session",
+  "message_count": 5,
+  "roles": [
+    "User",
+    "Assistant",
+    "Assistant",
+    "User",
+    "Assistant"
+  ],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": "grok-4.5",
+  "has_tool_calls": true,
+  "has_tool_results": true,
+  "known_lossy_fields": [],
+  "notes": "Grok Build session whose line shapes are structurally verbatim from a real grok 0.2.118 session (content sanitized): agent chunks carry params._meta promptId/updateType/chunkId, tool_call carries title=<internal tool name> + rawInput + _meta['x.ai/tool'], tool_call_update arrives as a status-null enrichment (human title, rawInput.variant) followed by a completed update with content blocks + typed rawOutput, and the _x.ai extension kinds task_backgrounded/task_completed/turn_completed/session_recap are skipped tolerantly. Exercises promptId-boundary chunk coalescing (thought vs message split, post-tool text continuing the same assistant message) and title enrichment of the merged tool call."
+}

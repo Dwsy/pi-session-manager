@@ -1,0 +1,6 @@
+/model
+/model set-current-as-default
+/tools trust-all
+create work tree từ master cho 2 issues\n  https://github.com/quangdang46/jcode/issues/380\n  https://github.com/quangdang46/jcode/issues/388 và
+/effort
+/exit

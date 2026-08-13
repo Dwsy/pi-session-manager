@@ -146,7 +146,7 @@ impl Provider for MockProvider {
         match state.write_outcome.clone() {
             Some(WriteOutcome::Success(written)) => Ok(written),
             Some(WriteOutcome::Error(message)) => Err(anyhow::anyhow!(message)),
-            None => Ok(WrittenSession { paths: vec![PathBuf::from(format!("/tmp/{}/mock-output.json", self.slug))], session_id: format!("{}-target-session", self.alias), resume_command: self.resume_command(&format!("{}-target-session", self.alias)), backup_path: None }),
+            None => Ok(WrittenSession { paths: vec![PathBuf::from(format!("/tmp/{}/mock-output.json", self.slug))], session_id: format!("{}-target-session", self.alias), resume_command: self.resume_command(&format!("{}-target-session", self.alias)), backup_path: None, warnings: Vec::new() }),
         }
     }
 
@@ -180,7 +180,7 @@ fn valid_session_with_id(session_id: &str) -> CanonicalSession {
 }
 
 fn options(dry_run: bool, source_hint: Option<String>) -> ConvertOptions {
-    ConvertOptions { dry_run, force: false, verbose: false, enrich: false, source_hint }
+    ConvertOptions { dry_run, force: false, verbose: false, enrich: false, source_hint, ..Default::default() }
 }
 
 #[test]
@@ -194,7 +194,7 @@ fn pipeline_convert_happy_path_writes_and_verifies() {
 
     src.set_owned_session("sid-a", source_path.clone());
     src.set_read_session(source_path, session.clone());
-    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-sid-a".to_string(), resume_command: "tgt --resume target-sid-a".to_string(), backup_path: None });
+    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-sid-a".to_string(), resume_command: "tgt --resume target-sid-a".to_string(), backup_path: None, warnings: Vec::new() });
     dst.set_read_session(written_path, session.clone());
 
     let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(src.clone()), Box::new(dst.clone())]) };
@@ -207,6 +207,65 @@ fn pipeline_convert_happy_path_writes_and_verifies() {
     assert!(result.warnings.is_empty(), "happy path should not warn");
     assert_eq!(dst.write_calls(), 1, "target write should run once");
     assert_eq!(dst.last_written().expect("target should capture written session").session_id, "sid-a");
+}
+
+/// GH #20 regression: a source session with no recorded workspace must fall
+/// back to the invoking cwd (never /tmp) and warn loudly about the cwd-keyed
+/// resume requirement.
+#[test]
+fn pipeline_no_workspace_falls_back_to_cwd_with_loud_warning() {
+    let src = MockProvider::new("Mock Source", "mock-source", "src", vec![PathBuf::from("/tmp/src-root")]);
+    let dst = MockProvider::new("Mock Target", "mock-target", "tgt", vec![PathBuf::from("/tmp/tgt-root")]);
+
+    let source_path = PathBuf::from("/tmp/src-root/session-nw.json");
+    let mut session = valid_session_with_id("sid-nw");
+    session.workspace = None;
+
+    src.set_owned_session("sid-nw", source_path.clone());
+    src.set_read_session(source_path, session);
+
+    let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(src.clone()), Box::new(dst.clone())]) };
+
+    let result = pipeline.convert("tgt", "sid-nw", options(true, None)).expect("dry-run convert should succeed");
+
+    let cwd = std::env::current_dir().expect("cwd");
+    assert_eq!(result.canonical_session.workspace.as_deref(), Some(cwd.as_path()), "missing workspace must fall back to the invoking cwd, not /tmp");
+    let warning = result.warnings.iter().find(|w| w.contains("no recorded workspace")).expect("fallback must produce a loud warning");
+    assert!(warning.contains(&cwd.display().to_string()), "warning must name the fallback directory: {warning}");
+    assert!(warning.contains("--workspace"), "warning must point at the --workspace escape hatch: {warning}");
+}
+
+/// GH #20: `--workspace` must override whatever the source session recorded,
+/// and the overridden workspace must be what the writer receives.
+#[test]
+fn pipeline_workspace_override_wins_over_recorded_workspace() {
+    let src = MockProvider::new("Mock Source", "mock-source", "src", vec![PathBuf::from("/tmp/src-root")]);
+    let dst = MockProvider::new("Mock Target", "mock-target", "tgt", vec![PathBuf::from("/tmp/tgt-root")]);
+
+    let override_dir = tempfile::TempDir::new().expect("tempdir");
+    // The pipeline canonicalizes the override, and on macOS the temp dir is
+    // handed out as `/var/...` while resolving to `/private/var/...`.
+    let override_path = override_dir.path().canonicalize().expect("canonicalize override dir");
+    let source_path = PathBuf::from("/tmp/src-root/session-ov.json");
+    let written_path = PathBuf::from("/tmp/tgt-root/session-ov-out.json");
+    let session = valid_session_with_id("sid-ov"); // workspace: /tmp/mock-workspace
+
+    src.set_owned_session("sid-ov", source_path.clone());
+    src.set_read_session(source_path, session.clone());
+    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-sid-ov".to_string(), resume_command: "tgt --resume target-sid-ov".to_string(), backup_path: None, warnings: Vec::new() });
+    let mut readback = session.clone();
+    readback.workspace = Some(override_path.clone());
+    dst.set_read_session(written_path, readback);
+
+    let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(src.clone()), Box::new(dst.clone())]) };
+
+    let mut opts = options(false, None);
+    opts.workspace_override = Some(override_dir.path().to_path_buf());
+
+    let result = pipeline.convert("tgt", "sid-ov", opts).expect("convert with workspace override should succeed");
+
+    assert_eq!(dst.last_written().expect("target should capture written session").workspace.as_deref(), Some(override_path.as_path()), "writer must receive the overridden workspace");
+    assert!(!result.warnings.iter().any(|w| w.contains("no recorded workspace")), "explicit override must not trigger the fallback warning");
 }
 
 #[test]
@@ -254,7 +313,7 @@ fn pipeline_warns_when_target_cli_missing_but_write_succeeds() {
     let written_path = PathBuf::from("/tmp/dst-root/out-target-cli-missing.json");
     src.set_owned_session("sid-target-cli-missing", source_path.clone());
     src.set_read_session(source_path, valid_session_with_id("sid-target-cli-missing"));
-    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "sid-target-cli-missing-out".to_string(), resume_command: "tgt --resume sid-target-cli-missing-out".to_string(), backup_path: None });
+    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "sid-target-cli-missing-out".to_string(), resume_command: "tgt --resume sid-target-cli-missing-out".to_string(), backup_path: None, warnings: Vec::new() });
     dst.set_read_session(written_path, valid_session_with_id("sid-target-cli-missing"));
 
     let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(src), Box::new(dst)]) };
@@ -315,7 +374,7 @@ fn pipeline_source_hint_alias_narrows_resolution() {
     src_b.set_read_session(path_b, valid_session_with_id("from-b"));
 
     let written_path = PathBuf::from("/tmp/dst/out.json");
-    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-id".to_string(), resume_command: "tgt --resume target-id".to_string(), backup_path: None });
+    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-id".to_string(), resume_command: "tgt --resume target-id".to_string(), backup_path: None, warnings: Vec::new() });
     dst.set_read_session(written_path, valid_session_with_id("from-a"));
 
     let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(src_a), Box::new(src_b), Box::new(dst.clone())]) };
@@ -340,7 +399,7 @@ fn pipeline_source_hint_path_bypasses_discovery() {
     src.set_read_session(direct_path.clone(), valid_session_with_id("direct-session"));
 
     let written_path = dst_root.join("out.json");
-    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-direct".to_string(), resume_command: "tgt --resume target-direct".to_string(), backup_path: None });
+    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-direct".to_string(), resume_command: "tgt --resume target-direct".to_string(), backup_path: None, warnings: Vec::new() });
     dst.set_read_session(written_path, valid_session_with_id("direct-session"));
 
     let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(src), Box::new(dst.clone())]) };
@@ -382,7 +441,7 @@ fn pipeline_readback_mismatch_fails_and_removes_unverified_output() {
     let written_path = dst_root.join("out-mismatch.json");
     src.set_owned_session("sid-readback-mismatch", source_path.clone());
     src.set_read_session(source_path, valid_session_with_id("sid-readback-mismatch"));
-    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-mismatch".to_string(), resume_command: "tgt --resume target-mismatch".to_string(), backup_path: None });
+    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-mismatch".to_string(), resume_command: "tgt --resume target-mismatch".to_string(), backup_path: None, warnings: Vec::new() });
 
     fs::write(&written_path, "unverified-output").expect("seed unverified output");
 
@@ -417,7 +476,7 @@ fn pipeline_readback_content_mismatch_fails_and_removes_unverified_output() {
     let written_path = dst_root.join("out-content-mismatch.json");
     src.set_owned_session("sid-readback-content-mismatch", source_path.clone());
     src.set_read_session(source_path, valid_session_with_id("sid-readback-content-mismatch"));
-    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-content-mismatch".to_string(), resume_command: "tgt --resume target-content-mismatch".to_string(), backup_path: None });
+    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-content-mismatch".to_string(), resume_command: "tgt --resume target-content-mismatch".to_string(), backup_path: None, warnings: Vec::new() });
 
     fs::write(&written_path, "unverified-output").expect("seed unverified output");
 
@@ -453,7 +512,7 @@ fn pipeline_readback_error_restores_backup_and_returns_verify_failed() {
     let backup_path = dst_root.join("out-readback-error.json.bak");
     src.set_owned_session("sid-readback-error", source_path.clone());
     src.set_read_session(source_path, valid_session_with_id("sid-readback-error"));
-    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-readback-error".to_string(), resume_command: "tgt --resume target-readback-error".to_string(), backup_path: Some(backup_path.clone()) });
+    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-readback-error".to_string(), resume_command: "tgt --resume target-readback-error".to_string(), backup_path: Some(backup_path.clone()), warnings: Vec::new() });
     dst.set_read_error(written_path.clone(), "cannot parse written file");
 
     fs::write(&written_path, "broken-target-content").expect("seed broken target");
@@ -583,7 +642,7 @@ fn pipeline_real_cc_to_codex_happy_path() {
 
     let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(ClaudeCode), Box::new(Codex)]) };
 
-    let result = pipeline.convert("cod", &cc_sid, ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None }).expect("real CC→Codex pipeline should succeed");
+    let result = pipeline.convert("cod", &cc_sid, ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None, ..Default::default() }).expect("real CC→Codex pipeline should succeed");
 
     assert_eq!(result.source_provider, "claude-code");
     assert_eq!(result.target_provider, "codex");
@@ -605,7 +664,7 @@ fn pipeline_real_cc_to_gemini_happy_path() {
 
     let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(ClaudeCode), Box::new(Gemini)]) };
 
-    let result = pipeline.convert("gmi", &cc_sid, ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None }).expect("real CC→Gemini pipeline should succeed");
+    let result = pipeline.convert("gmi", &cc_sid, ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None, ..Default::default() }).expect("real CC→Gemini pipeline should succeed");
 
     assert_eq!(result.source_provider, "claude-code");
     assert_eq!(result.target_provider, "gemini");
@@ -624,7 +683,7 @@ fn pipeline_real_dry_run_skips_write() {
 
     let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(ClaudeCode), Box::new(Codex)]) };
 
-    let result = pipeline.convert("cod", &cc_sid, ConvertOptions { dry_run: true, force: false, verbose: false, enrich: false, source_hint: None }).expect("real dry-run should succeed");
+    let result = pipeline.convert("cod", &cc_sid, ConvertOptions { dry_run: true, force: false, verbose: false, enrich: false, source_hint: None, ..Default::default() }).expect("real dry-run should succeed");
 
     assert!(result.written.is_none(), "dry-run should not write");
     // No Codex session files should exist.
@@ -642,7 +701,7 @@ fn pipeline_real_same_provider_short_circuit() {
 
     let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(ClaudeCode)]) };
 
-    let result = pipeline.convert("cc", &cc_sid, ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None }).expect("real same-provider should short-circuit");
+    let result = pipeline.convert("cc", &cc_sid, ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None, ..Default::default() }).expect("real same-provider should short-circuit");
 
     assert!(result.warnings.iter().any(|w| w.contains("Source and target provider are the same")), "expected same-provider warning; got {:?}", result.warnings);
 }
@@ -661,7 +720,7 @@ fn pipeline_real_source_hint_narrows_resolution() {
 
     let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(ClaudeCode), Box::new(Codex), Box::new(Gemini)]) };
 
-    let result = pipeline.convert("gmi", &cc_sid, ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: Some("cc".to_string()) }).expect("source hint 'cc' should resolve to ClaudeCode");
+    let result = pipeline.convert("gmi", &cc_sid, ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: Some("cc".to_string()), ..Default::default() }).expect("source hint 'cc' should resolve to ClaudeCode");
 
     assert_eq!(result.source_provider, "claude-code");
     assert_eq!(result.target_provider, "gemini");
@@ -678,7 +737,7 @@ fn pipeline_real_session_not_found() {
 
     let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(ClaudeCode), Box::new(Codex)]) };
 
-    let err = pipeline.convert("cod", "nonexistent-session-id", ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None }).expect_err("real not-found should error");
+    let err = pipeline.convert("cod", "nonexistent-session-id", ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None, ..Default::default() }).expect_err("real not-found should error");
 
     assert!(matches!(err.downcast_ref::<CasrError>(), Some(CasrError::SessionNotFound { .. })));
 }
@@ -687,7 +746,7 @@ fn pipeline_real_session_not_found() {
 fn pipeline_real_unknown_target_alias() {
     let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(ClaudeCode)]) };
 
-    let err = pipeline.convert("nonexistent-alias", "any-session", ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None }).expect_err("unknown alias should error");
+    let err = pipeline.convert("nonexistent-alias", "any-session", ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None, ..Default::default() }).expect_err("unknown alias should error");
 
     assert!(matches!(err.downcast_ref::<CasrError>(), Some(CasrError::UnknownProviderAlias { .. })));
 }
@@ -756,7 +815,7 @@ fn pipeline_emits_trace_events_for_detection_read_write_verify() {
 
     let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(ClaudeCode), Box::new(Codex)]) };
 
-    pipeline.convert("cod", &cc_sid, ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None }).expect("conversion should succeed");
+    pipeline.convert("cod", &cc_sid, ConvertOptions { dry_run: false, force: false, verbose: false, enrich: false, source_hint: None, ..Default::default() }).expect("conversion should succeed");
 
     let events = collector.snapshot();
 
@@ -766,4 +825,35 @@ fn pipeline_emits_trace_events_for_detection_read_write_verify() {
     assert!(events.iter().any(|e| e.level == tracing::Level::DEBUG && event_has_message(e, "Claude Code session parsed")), "missing source read DEBUG event; got {events:#?}");
     assert!(events.iter().any(|e| e.level == tracing::Level::INFO && event_has_message(e, "atomic write complete")), "missing atomic write INFO event; got {events:#?}");
     assert!(events.iter().any(|e| e.level == tracing::Level::DEBUG && event_has_message(e, "Codex session parsed")), "missing read-back verify DEBUG event; got {events:#?}");
+}
+
+/// A relative `--workspace` must be made absolute before it reaches the
+/// writers: Claude Code encodes the workspace into a bucket name and matches it
+/// against the resume command's absolute cwd, so a relative path would write a
+/// bucket nothing can ever match — the same unfindable-session failure the flag
+/// exists to fix (GH #20 follow-up).
+#[test]
+fn pipeline_relative_workspace_override_is_absolutized() {
+    let src = MockProvider::new("Mock Source", "mock-source", "src", vec![PathBuf::from("/tmp/src-root")]);
+    let dst = MockProvider::new("Mock Target", "mock-target", "tgt", vec![PathBuf::from("/tmp/tgt-root")]);
+
+    let source_path = PathBuf::from("/tmp/src-root/session-rel.json");
+    let written_path = PathBuf::from("/tmp/tgt-root/session-rel-out.json");
+    let session = valid_session_with_id("sid-rel");
+
+    src.set_owned_session("sid-rel", source_path.clone());
+    src.set_read_session(source_path, session.clone());
+    dst.set_write_success(WrittenSession { paths: vec![written_path.clone()], session_id: "target-sid-rel".to_string(), resume_command: "tgt --resume target-sid-rel".to_string(), backup_path: None, warnings: Vec::new() });
+    dst.set_read_session(written_path, session.clone());
+
+    let pipeline = ConversionPipeline { registry: ProviderRegistry::new(vec![Box::new(src.clone()), Box::new(dst.clone())]) };
+
+    let mut opts = options(false, None);
+    opts.workspace_override = Some(PathBuf::from("."));
+
+    pipeline.convert("tgt", "sid-rel", opts).expect("convert with relative workspace override should succeed");
+
+    let written_workspace = dst.last_written().expect("target should capture written session").workspace.expect("workspace must be stamped");
+    assert!(written_workspace.is_absolute(), "relative --workspace must be absolutized, got {}", written_workspace.display());
+    assert_eq!(written_workspace, std::fs::canonicalize(".").expect("canonicalize cwd"), "`.` must resolve to the invoking directory");
 }

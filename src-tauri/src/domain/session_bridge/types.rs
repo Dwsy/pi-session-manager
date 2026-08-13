@@ -17,94 +17,55 @@ pub enum SessionBridgeSource {
     ClawdBot,
     Cursor,
     Antigravity,
+    Aider,
+    Amp,
+    ChatGpt,
+    Cline,
+    OpenClaw,
+    Vibe,
+    Kiro,
+    Grok,
 }
 
 impl SessionBridgeSource {
-    pub const ALL: [Self; 10] = [Self::Pi, Self::Omp, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot, Self::Cursor, Self::Antigravity];
+    pub const ALL: [Self; 18] = [Self::Pi, Self::Omp, Self::ClaudeCode, Self::Codex, Self::OpenCode, Self::Gemini, Self::Factory, Self::ClawdBot, Self::Cursor, Self::Antigravity, Self::Aider, Self::Amp, Self::ChatGpt, Self::Cline, Self::OpenClaw, Self::Vibe, Self::Kiro, Self::Grok];
 
     pub fn slug(self) -> &'static str {
-        match self {
-            Self::Pi => "pi",
-            Self::Omp => "omp",
-            Self::ClaudeCode => "claude_code",
-            Self::Codex => "codex",
-            Self::OpenCode => "opencode",
-            Self::Gemini => "gemini",
-            Self::Factory => "factory",
-            Self::ClawdBot => "clawdbot",
-            Self::Cursor => "cursor",
-            Self::Antigravity => "antigravity",
-        }
+        ProviderKind::from(self).slug()
     }
 
     pub fn display_name(self) -> &'static str {
-        match self {
-            Self::Pi => "Pi",
-            Self::Omp => "OMP",
-            Self::ClaudeCode => "Claude Code",
-            Self::Codex => "Codex",
-            Self::OpenCode => "OpenCode",
-            Self::Gemini => "Gemini CLI",
-            Self::Factory => "Factory",
-            Self::ClawdBot => "ClawdBot",
-            Self::Cursor => "Cursor",
-            Self::Antigravity => "Antigravity",
-        }
+        ProviderKind::from(self).display_name()
     }
 
     pub fn session_roots(self) -> Vec<PathBuf> {
         match self {
             Self::Pi => crate::paths::pi_agent_sessions_dir().ok().filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default(),
             Self::Omp => crate::paths::omp_agent_sessions_dir().ok().filter(|path| path.is_dir()).map(|path| vec![path]).unwrap_or_default(),
-            Self::ClaudeCode => crate::domain::casr_min::providers::claude_code::session_roots(),
-            Self::Codex => crate::domain::casr_min::providers::codex::session_roots(),
-            Self::Gemini => crate::domain::casr_min::providers::gemini::session_roots(),
-            Self::Factory => crate::domain::casr_min::providers::factory::session_roots(),
-            Self::ClawdBot => crate::domain::casr_min::providers::clawdbot::session_roots(),
-            Self::OpenCode => crate::domain::casr_min::providers::opencode::session_roots(),
-            Self::Cursor => crate::domain::casr_min::providers::cursor::session_roots(),
-            Self::Antigravity => crate::domain::casr_min::providers::antigravity::session_roots(),
+            other => ProviderKind::from(other).session_roots(),
         }
     }
 
     pub fn matches_path(self, path: &Path) -> bool {
-        let normalized = path.to_string_lossy().replace('\\', "/");
-        match self {
-            Self::Pi => crate::paths::pi_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
-            Self::Omp => crate::paths::omp_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
-            Self::ClaudeCode => normalized.contains("/.claude/projects/"),
-            Self::Codex => normalized.contains("/.codex/sessions/"),
-            Self::Gemini => crate::domain::casr_min::providers::gemini::is_session_file(path),
-            Self::Factory => normalized.contains("/.factory/sessions/") && path.extension().and_then(|ext| ext.to_str()) == Some("jsonl"),
-            Self::ClawdBot => normalized.contains("/.clawdbot/sessions/") && path.extension().and_then(|ext| ext.to_str()) == Some("jsonl"),
-            Self::OpenCode => path.file_name().and_then(|value| value.to_str()) == Some("opencode.db") || normalized.contains("/.opencode/") || normalized.contains("/opencode.db/"),
-            Self::Cursor => crate::domain::casr_min::providers::cursor::matches_path(path),
-            Self::Antigravity => crate::domain::casr_min::providers::antigravity::matches_path(path),
-        }
+        ProviderKind::from(self).matches_path(path)
     }
 
     pub fn parse_alias(value: &str) -> Result<Self, String> {
-        match value.trim().replace('_', "-").to_ascii_lowercase().as_str() {
-            "pi" => Ok(Self::Pi),
-            "omp" | "oh-my-pi" => Ok(Self::Omp),
-            "claude-code" | "claudecode" | "cc" => Ok(Self::ClaudeCode),
-            "codex" | "cod" => Ok(Self::Codex),
-            "opencode" | "oc" => Ok(Self::OpenCode),
-            "gemini" | "gemini-cli" | "gmi" => Ok(Self::Gemini),
-            "factory" | "fac" => Ok(Self::Factory),
-            "clawdbot" | "clawd-bot" | "cb" => Ok(Self::ClawdBot),
-            "cursor" | "cur" => Ok(Self::Cursor),
-            "antigravity" | "agy" => Ok(Self::Antigravity),
-            other => Err(format!("Unsupported session provider alias: {other}")),
-        }
+        ProviderKind::parse_alias(value).map(Self::from).map_err(|_| format!("Unsupported session provider alias: {value}"))
     }
 
     pub fn can_scan(self) -> bool {
-        true
+        ProviderKind::from(self).can_scan()
     }
 
     pub fn can_convert_target(self) -> bool {
-        !matches!(self, Self::Cursor | Self::Antigravity)
+        ProviderKind::from(self).can_convert_target()
+    }
+
+    /// Whether conversion to this provider is performed entirely by the
+    /// vendored CASR writer, including dry runs.
+    pub fn is_vendor_delegated(self) -> bool {
+        ProviderKind::from(self).is_vendor_delegated()
     }
 }
 
@@ -121,6 +82,14 @@ impl From<SessionBridgeSource> for ProviderKind {
             SessionBridgeSource::ClawdBot => ProviderKind::ClawdBot,
             SessionBridgeSource::Cursor => ProviderKind::Cursor,
             SessionBridgeSource::Antigravity => ProviderKind::Antigravity,
+            SessionBridgeSource::Aider => ProviderKind::Aider,
+            SessionBridgeSource::Amp => ProviderKind::Amp,
+            SessionBridgeSource::ChatGpt => ProviderKind::ChatGpt,
+            SessionBridgeSource::Cline => ProviderKind::Cline,
+            SessionBridgeSource::OpenClaw => ProviderKind::OpenClaw,
+            SessionBridgeSource::Vibe => ProviderKind::Vibe,
+            SessionBridgeSource::Kiro => ProviderKind::Kiro,
+            SessionBridgeSource::Grok => ProviderKind::Grok,
         }
     }
 }
@@ -138,6 +107,14 @@ impl From<ProviderKind> for SessionBridgeSource {
             ProviderKind::ClawdBot => SessionBridgeSource::ClawdBot,
             ProviderKind::Cursor => SessionBridgeSource::Cursor,
             ProviderKind::Antigravity => SessionBridgeSource::Antigravity,
+            ProviderKind::Aider => SessionBridgeSource::Aider,
+            ProviderKind::Amp => SessionBridgeSource::Amp,
+            ProviderKind::ChatGpt => SessionBridgeSource::ChatGpt,
+            ProviderKind::Cline => SessionBridgeSource::Cline,
+            ProviderKind::OpenClaw => SessionBridgeSource::OpenClaw,
+            ProviderKind::Vibe => SessionBridgeSource::Vibe,
+            ProviderKind::Kiro => SessionBridgeSource::Kiro,
+            ProviderKind::Grok => SessionBridgeSource::Grok,
         }
     }
 }

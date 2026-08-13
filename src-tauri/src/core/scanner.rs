@@ -373,15 +373,12 @@ pub(crate) fn collect_session_files(all_dirs: &[PathBuf]) -> Vec<PathBuf> {
     }
 
     fn extend_candidate(path: &Path, files: &mut Vec<PathBuf>) {
-        let is_jsonl = path.extension().map(|ext| ext == "jsonl").unwrap_or(false);
-        let is_gemini_json = crate::domain::session_bridge::is_gemini_session_file(path);
-        let is_opencode_db = crate::domain::session_bridge::is_opencode_db_path(path);
-        let is_cursor_db = crate::domain::session_bridge::is_cursor_db_path(path);
-        let is_antigravity_jsonl = crate::domain::session_bridge::is_antigravity_session_file(path);
-
-        if !is_jsonl && !is_opencode_db && !is_gemini_json && !is_cursor_db && !is_antigravity_jsonl {
+        if !crate::domain::session_bridge::is_session_candidate_path(path) {
             return;
         }
+
+        let is_opencode_db = crate::domain::session_bridge::is_opencode_db_path(path);
+        let is_cursor_db = crate::domain::session_bridge::is_cursor_db_path(path);
 
         if is_opencode_db {
             let paths = crate::domain::session_bridge::expand_opencode_session_paths(path);

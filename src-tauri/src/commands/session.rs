@@ -287,4 +287,18 @@ mod tests {
         assert!(!claude_code.detected, "claude-code should not be detected without its sessions dir");
         assert!(claude_code.roots.is_empty());
     }
+
+    #[tokio::test]
+    async fn list_supported_session_providers_exposes_every_provider_in_kebab_case() {
+        let providers = list_supported_session_providers().await.expect("providers");
+        assert_eq!(providers.len(), crate::domain::session_bridge::SessionBridgeSource::ALL.len());
+
+        for provider in &providers {
+            // The frontend catalog keys on kebab-case slugs and silently drops
+            // anything it does not recognize, so an underscore here would make
+            // the provider invisible in the UI with no error anywhere.
+            assert!(!provider.slug.contains('_'), "slug must be kebab-case for the frontend catalog: {}", provider.slug);
+            assert!(!provider.display_name.is_empty(), "{} has no display name", provider.slug);
+        }
+    }
 }

@@ -497,7 +497,7 @@ impl Provider for Cursor {
         );
         let virtual_path = Self::virtual_session_path(&global_db, &target_composer_id);
 
-        Ok(WrittenSession { paths: vec![virtual_path], session_id: target_composer_id.clone(), resume_command: self.resume_command(&target_composer_id), backup_path: None })
+        Ok(WrittenSession { paths: vec![virtual_path], session_id: target_composer_id.clone(), resume_command: self.resume_command(&target_composer_id), backup_path: None, warnings: Vec::new() })
     }
 
     fn resume_command(&self, _session_id: &str) -> String {

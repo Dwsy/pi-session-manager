@@ -431,6 +431,12 @@ impl Provider for Amp {
 
         let created = thread_obj.get("created").and_then(|v| v.as_i64());
         let title = thread_obj.get("title").and_then(|v| v.as_str()).map(|s| truncate_title(s, 100));
+        // Amp thread titles are user-facing native names (distinct from the
+        // first-user-message fallback derived below).
+        let native_name = title.as_ref().and_then(|t| {
+            let trimmed = t.trim();
+            if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+        });
 
         let workspace = Self::extract_workspace(&thread);
 
@@ -478,7 +484,14 @@ impl Provider for Amp {
             "read Amp thread"
         );
 
-        Ok(CanonicalSession { session_id, provider_slug: "amp".to_string(), workspace, title, started_at, ended_at, messages, metadata: thread.clone(), source_path: path.to_path_buf(), model_name: None })
+        // Surface the native thread title under the canonical metadata key so
+        // `casr list`/`info` can render it in the provider-neutral Name column.
+        let mut metadata = thread.clone();
+        if let (Some(name), Some(obj)) = (native_name, metadata.as_object_mut()) {
+            obj.insert(crate::model::NATIVE_NAME_META_KEY.to_string(), serde_json::Value::String(name));
+        }
+
+        Ok(CanonicalSession { session_id, provider_slug: "amp".to_string(), workspace, title, started_at, ended_at, messages, metadata, source_path: path.to_path_buf(), model_name: None })
     }
 
     fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
@@ -493,7 +506,7 @@ impl Provider for Amp {
         let target_path = threads_root.join(format!("{thread_id}.json"));
         let outcome = crate::pipeline::atomic_write(&target_path, &bytes, opts.force, self.slug())?;
 
-        Ok(WrittenSession { paths: vec![outcome.target_path.clone()], session_id: thread_id.clone(), resume_command: self.resume_command(&thread_id), backup_path: outcome.backup_path })
+        Ok(WrittenSession { paths: vec![outcome.target_path.clone()], session_id: thread_id.clone(), resume_command: self.resume_command(&thread_id), backup_path: outcome.backup_path, warnings: Vec::new() })
     }
 
     fn resume_command(&self, session_id: &str) -> String {

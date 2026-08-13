@@ -1,0 +1,22 @@
+{
+  "fixture_id": "grok_simple",
+  "provider_slug": "grok",
+  "session_id": "019f75d0-aaaa-7bbb-8ccc-b0a1b2c3d4e5",
+  "workspace": "/data/projects/demo",
+  "title": "Echo hi probe session",
+  "message_count": 5,
+  "roles": [
+    "User",
+    "Assistant",
+    "Assistant",
+    "User",
+    "Assistant"
+  ],
+  "started_at_present": true,
+  "ended_at_present": true,
+  "model_name": "grok-build",
+  "has_tool_calls": true,
+  "has_tool_results": true,
+  "known_lossy_fields": [],
+  "notes": "Grok Build session read from sessions/<percent-encoded-cwd>/<uuid>/updates.jsonl with summary.json metadata. Envelope + user_message_chunk + hook_execution + retry_state lines are structurally verbatim from a real grok 0.2.103 session (content sanitized); agent_message_chunk / agent_thought_chunk / tool_call / tool_call_update lines follow the public ACP schema and have since been confirmed against real grok 0.2.118 sessions (see grok_tools_real for the verbatim 0.2.118 shapes). Tests chunk coalescing, thought-vs-message separation, tool_call + tool_call_update merge into one assistant message, and tolerant skipping of hook_execution / retry_state / plan / unknown kinds."
+}

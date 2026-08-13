@@ -86,6 +86,7 @@ claude --resume <new-session-id>
 |---|---|---|---|---|
 | Claude Code | `cc` | Yes | Yes | `claude --resume <session-id>` |
 | Codex | `cod` | Yes | Yes | `codex resume <session-id>` |
+| Antigravity | `agy` | Yes | No | `agy --conversation <uuid> --model "Gemini 3.1 Pro (High)"` |
 | Gemini CLI | `gmi` | Yes | Yes | `gemini --resume <session-id>` |
 | Cursor | `cur` | Yes | Yes | `cursor .` |
 | Cline | `cln` | Yes | Yes | `code .` |
@@ -98,10 +99,13 @@ claude --resume <new-session-id>
 | Factory | `fac` | Yes | Yes | `factory --resume <session-id>` |
 | OpenClaw | `ocl` | Yes | Yes | `openclaw --resume <session-id>` |
 | Pi-Agent | `pi` | Yes | Yes | `pi --session <path-to-session.jsonl>` |
+| Kiro CLI | `kr` | Yes | Yes | `kiro-cli --resume-id <session-id>` |
+| Grok Build | `grk` | Yes | Yes | `grok --resume <session-id>` |
 
 Notes:
 - Initial core focus is Claude Code, Codex, and Gemini CLI.
 - Additional providers are implemented through the same `Provider` trait model.
+- Grok Build (xAI's official `grok` CLI) is read and write: casr synthesizes the native session tree (`updates.jsonl` + `summary.json`), which was round-trip verified against a live `grok --resume` (the CLI lists, exports, and resumes casr-written sessions with full conversation context).
 
 ## Installation
 
@@ -387,7 +391,7 @@ Common examples:
 `casr` supports two equivalent resume styles:
 
 - Canonical subcommand form: `casr <target> resume <session-id>`
-- Shorthand form: `casr -cc <session-id>`, `casr -cod <session-id>`, `casr -gmi <session-id>`
+- Shorthand form: `casr -cc <session-id>`, `casr -cod <session-id>`, `casr -agy <session-id>`, `casr -gmi <session-id>`
 
 Shorthand flags are rewritten internally before clap parsing, so logging, JSON output, and error handling stay identical across both forms.
 
@@ -677,6 +681,14 @@ casr cc resume <session-id> --source ~/.codex/sessions/2026/02/06/rollout-1.json
 - Provider internal format changes can require reader/writer updates.
 - Some workspace extraction paths are heuristic-based (especially when source format lacks explicit workspace).
 - Resume acceptance depends on external provider behavior and may vary by provider version.
+
+## Editor / Terminal Integrations
+
+Community-built shortcuts that wrap `casr` for one-keystroke session forking:
+
+- **iTerm2 (macOS)** — [pirate/iterm-agent-fork](https://github.com/pirate/iterm-agent-fork): native iTerm hotkey to fork the active session into a different coding agent via `casr`.
+
+These are external projects, not maintained here. If you've built a similar integration and want it linked here, file an issue with the URL — see the [Contributions](#about-contributions) policy below.
 
 ## FAQ
 

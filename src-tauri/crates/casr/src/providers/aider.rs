@@ -457,7 +457,7 @@ impl Provider for Aider {
 
         let virtual_path = Self::virtual_session_path(&outcome.target_path, &target_session_id);
 
-        Ok(WrittenSession { paths: vec![virtual_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: outcome.backup_path })
+        Ok(WrittenSession { paths: vec![virtual_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: outcome.backup_path, warnings: Vec::new() })
     }
 
     fn resume_command(&self, _session_id: &str) -> String {

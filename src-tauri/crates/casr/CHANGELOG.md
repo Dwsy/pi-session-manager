@@ -10,6 +10,11 @@ Versions correspond to [GitHub Releases](https://github.com/Dicklesworthstone/cr
 
 > Commits on `main` since the v0.1.1 tag (`be1ce19`, 2026-03-03). No GitHub Release yet.
 
+### New Providers
+
+- **Grok Build writer (read + write complete)**: `write_session` for the `grok` provider now synthesizes a native session tree — `updates.jsonl` (the authoritative ACP update log) plus `summary.json` — under a fresh UUIDv7 in `$GROK_HOME/sessions/<percent-encoded-cwd>/`, so any provider's session can be resumed *in* Grok Build ([#19](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/19)). Round-trip verified against a live `grok --resume` (grok 0.2.118): the CLI lists (`grok sessions list`), renders (`grok export`), and resumes (`grok -p … -r <id>`) casr-written sessions with full restored conversation context. The reader's previously spec-derived `agent_message_chunk`/`agent_thought_chunk`/`tool_call`/`tool_call_update` shapes are now confirmed verbatim against real 0.2.118 sessions (new `grok_tools_real` fixture), and chunk coalescing is prompt-marker aware (`promptId`/`promptIndex` changes break message boundaries).
+- **Grok Build (read-only)**: new `grok` provider (alias `grk`) for xAI's official `grok` CLI ([#19](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/19)). Reads the ACP session-update stream (`updates.jsonl`) plus `summary.json` metadata under `$GROK_HOME/sessions/<percent-encoded-cwd>/<session-uuid>/`, coalescing streamed message/thought chunks and merging `tool_call`/`tool_call_update` events; unknown update kinds are skipped tolerantly.
+
 ### Structured Responses and Workspace Enrichment
 
 - **Responses module with typed JSON envelope**: new `responses` module emitting versioned, typed JSON structs for CLI output, preventing schema drift between versions ([`435fd0a`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/435fd0a7ba2ca841831b0b881db9772cea538f0b), [`4b99a2f`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/4b99a2f53634b99748b1609063a69646038187cc)). Addresses proposals [#6](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/6) and [#8](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/8).

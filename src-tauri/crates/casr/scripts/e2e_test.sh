@@ -449,6 +449,21 @@ setup_gemini_fixture() {
     echo "$session_id"
 }
 
+# Stage an Antigravity (agy) conversation under the shared GEMINI_HOME.
+# agy and gmi share the ~/.gemini parent: agy lives under antigravity-cli/.
+# Copies the conversations/<uuid>.db + brain/<uuid>/.../transcript.jsonl tree
+# from the fixture corpus. Echoes the conversation uuid (== session id).
+setup_agy_fixture() {
+    local uuid="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    local src="$FIXTURES_DIR/antigravity/antigravity-cli"
+    local dst="$GEMINI_HOME/antigravity-cli"
+
+    mkdir -p "$dst/conversations" "$dst/brain"
+    cp "$src/conversations/${uuid}.db" "$dst/conversations/${uuid}.db"
+    cp -R "$src/brain/${uuid}" "$dst/brain/${uuid}"
+    echo "$uuid"
+}
+
 reset_env() {
     rm -rf "$CLAUDE_HOME" "$CODEX_HOME" "$GEMINI_HOME" "$CURSOR_HOME" \
         "$CLINE_HOME" "$AIDER_HOME" "$AMP_HOME" "$OPENCODE_HOME" \
@@ -519,6 +534,7 @@ assert_stdout_contains "providers lists Vibe" "Vibe"
 assert_stdout_contains "providers lists Factory" "Factory"
 assert_stdout_contains "providers lists OpenClaw" "OpenClaw"
 assert_stdout_contains "providers lists Pi-Agent" "Pi-Agent"
+assert_stdout_contains "providers lists Antigravity" "Antigravity CLI"
 
 log "TEST: Providers --json"
 run_casr "providers json" --json providers
@@ -808,6 +824,33 @@ reset_env
 gmi_sid=$(setup_gemini_fixture "gmi_simple")
 run_casr "resume gmi->cod" resume cod "$gmi_sid"
 assert_exit_ok "Gemini→Codex write succeeds"
+
+# ===========================================================================
+# TEST: Resume — Antigravity (agy) → CC  [agy is a read/resume-only SOURCE]
+# ===========================================================================
+
+log "TEST: Resume Antigravity → CC"
+reset_env
+agy_sid=$(setup_agy_fixture)
+# agy and gmi share GEMINI_HOME; --source agy disambiguates from the gmi reader.
+run_casr "resume agy->cc" --json resume cc "$agy_sid" --source agy
+assert_exit_ok "Antigravity→CC write succeeds"
+assert_json_field "agy→cc source is antigravity" ".source_provider" "antigravity"
+assert_json_field "agy→cc target is claude-code" ".target_provider" "claude-code"
+
+# An agy conversation reports the mandated model and the antigravity provider.
+log "TEST: Antigravity info reports provider + pinned model"
+run_casr "info agy" --json info "$agy_sid" --source agy
+assert_exit_ok "info agy conversation succeeds"
+assert_json_field "agy info provider is antigravity" ".provider" "antigravity"
+assert_json_field "agy info model pinned" ".model_name" "Gemini 3.1 Pro (High)"
+
+# agy is read/resume-only: it must NOT accept being a conversion TARGET.
+log "TEST: Antigravity rejected as conversion target"
+reset_env
+cc_sid=$(setup_cc_fixture "cc_simple")
+EXPECT_FAIL=1 run_casr "resume cc->agy refused" resume agy "$cc_sid" || true
+assert_exit_fail "CC→Antigravity write is refused (agy is read/resume-only)"
 
 # ===========================================================================
 # TEST: Resume — CC → ChatGPT

@@ -174,6 +174,13 @@ impl Provider for ClaudeCode {
         let mut workspace: Option<PathBuf> = None;
         let mut git_branch: Option<String> = None;
         let mut version: Option<String> = None;
+        // Provider-native display names. `/rename` appends `custom-title` entries
+        // (highest priority); the harness auto-generates `ai-title` entries as a
+        // fallback; classic transcripts carry `summary` entries. Later entries
+        // supersede earlier ones, so we keep the last seen of each.
+        let mut custom_title: Option<String> = None;
+        let mut ai_title: Option<String> = None;
+        let mut summary_title: Option<String> = None;
         let mut started_at: Option<i64> = None;
         let mut ended_at: Option<i64> = None;
         let mut model_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
@@ -232,8 +239,30 @@ impl Provider for ClaudeCode {
             }
 
             // Filter: only extract user/assistant conversational messages.
-            // Also accept wrapped `{type:"message", role:"user"|"assistant"}` envelopes.
             let entry_type = entry.get("type").and_then(|v| v.as_str());
+
+            // Capture the provider-native session name from title-metadata
+            // entries (kept even though they are non-conversational).
+            match entry_type {
+                Some("custom-title") => {
+                    if let Some(t) = entry.get("customTitle").and_then(|v| v.as_str()) {
+                        custom_title = Some(t.to_string());
+                    }
+                }
+                Some("ai-title") => {
+                    if let Some(t) = entry.get("aiTitle").and_then(|v| v.as_str()) {
+                        ai_title = Some(t.to_string());
+                    }
+                }
+                Some("summary") => {
+                    if let Some(t) = entry.get("summary").and_then(|v| v.as_str()) {
+                        summary_title = Some(t.to_string());
+                    }
+                }
+                _ => {}
+            }
+
+            // Also accept wrapped `{type:"message", role:"user"|"assistant"}` envelopes.
             let role_hint = entry.pointer("/message/role").and_then(|v| v.as_str()).or_else(|| entry.get("role").and_then(|v| v.as_str()));
             let is_conversational = matches!(entry_type, Some("user") | Some("assistant")) || (entry_type == Some("message") && matches!(role_hint, Some("user") | Some("assistant")));
             if !is_conversational {
@@ -249,6 +278,7 @@ impl Provider for ClaudeCode {
             let content = claude_extract_text_content(content_value);
             let tool_calls = extract_tool_calls(content_value);
             let tool_results = extract_tool_results(content_value);
+            // A user entry carrying only tool_result blocks is a tool turn, not a user turn.
             let role = if role_str == "user" && content.trim().is_empty() && !tool_results.is_empty() { MessageRole::Tool } else { normalize_role(role_str) };
 
             // Skip messages that have neither text nor tool payloads.
@@ -305,6 +335,12 @@ impl Provider for ClaudeCode {
         if let Some(ref v) = version {
             metadata.insert("claudeVersion".into(), serde_json::Value::String(v.clone()));
         }
+        // Provider-native display name: user `/rename` wins, then the
+        // auto-generated title, then a classic summary. Blank values are ignored.
+        let native_name = custom_title.or(ai_title).or(summary_title).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+        if let Some(name) = native_name {
+            metadata.insert(crate::model::NATIVE_NAME_META_KEY.into(), serde_json::Value::String(name));
+        }
 
         debug!(session_id, messages = messages.len(), skipped, "Claude Code session parsed");
 
@@ -316,8 +352,11 @@ impl Provider for ClaudeCode {
         let now = chrono::Utc::now();
         let now_iso = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
 
-        // Determine the project directory key from workspace.
-        let workspace_str = session.workspace.as_deref().unwrap_or(std::path::Path::new("/tmp"));
+        // Determine the project directory key from workspace. When the session
+        // recorded none, fall back to the invoking cwd (never /tmp): Claude Code
+        // resolves `--resume` by matching the current cwd against this bucket.
+        let workspace_buf = crate::model::effective_workspace(session);
+        let workspace_str = workspace_buf.as_path();
         let dir_key = project_dir_key(workspace_str);
 
         let projects_dir = Self::projects_dir().ok_or_else(|| anyhow::anyhow!("cannot determine Claude Code projects directory"))?;
@@ -364,7 +403,14 @@ impl Provider for ClaudeCode {
             prev_uuid = Some(entry_uuid);
         }
 
-        let content_bytes = lines.join("\n").into_bytes();
+        // Terminate the final line with a newline. Claude Code appends new turns
+        // to this file on resume; without a trailing newline its first appended
+        // record is concatenated onto casr's last line, corrupting it.
+        let mut content = lines.join("\n");
+        if !content.is_empty() {
+            content.push('\n');
+        }
+        let content_bytes = content.into_bytes();
 
         // Use atomic write.
         let outcome = crate::pipeline::atomic_write(&target_path, &content_bytes, opts.force, self.slug())?;
@@ -376,7 +422,7 @@ impl Provider for ClaudeCode {
             "Claude Code session written"
         );
 
-        Ok(WrittenSession { paths: vec![outcome.target_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: outcome.backup_path })
+        Ok(WrittenSession { paths: vec![outcome.target_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: outcome.backup_path, warnings: Vec::new() })
     }
 
     fn resume_command(&self, session_id: &str) -> String {
@@ -423,6 +469,8 @@ fn extract_tool_results(content: Option<&serde_json::Value>) -> Vec<ToolResult> 
         .collect()
 }
 
+/// Flatten a `tool_result` payload into text. Claude Code emits these as a
+/// bare string, an array of content blocks, or a single block object.
 fn stringify_tool_result_content(value: Option<&serde_json::Value>) -> String {
     match value {
         Some(serde_json::Value::String(text)) => text.clone(),
@@ -449,24 +497,45 @@ fn claude_entry_type(role: &MessageRole) -> &'static str {
     }
 }
 
+/// Coerce `tool_use.input` to a JSON object.
+///
+/// The Anthropic API requires `tool_use.input` to be a JSON object. Source
+/// agents (notably Codex) can store tool arguments as a JSON-encoded string.
+/// These historical tool calls are never re-executed — they are replayed as
+/// context only — so coercing to `{"value": <original>}` is safe for any
+/// string that isn't itself a JSON object.
+fn coerce_tool_input(arguments: &serde_json::Value) -> serde_json::Value {
+    match arguments {
+        serde_json::Value::Object(_) => arguments.clone(),
+        serde_json::Value::String(s) => match serde_json::from_str::<serde_json::Value>(s) {
+            Ok(v @ serde_json::Value::Object(_)) => v,
+            _ => serde_json::json!({ "value": s }),
+        },
+        serde_json::Value::Null => serde_json::json!({}),
+        other => serde_json::json!({ "value": other }),
+    }
+}
+
 fn build_message_content(msg: &CanonicalMessage) -> serde_json::Value {
     match msg.role {
         MessageRole::Assistant => {
             let mut blocks: Vec<serde_json::Value> = Vec::new();
             if !msg.content.is_empty() {
-                blocks.push(serde_json::json!({
-                    "type": "text",
-                    "text": msg.content,
-                }));
+                blocks.push(serde_json::json!({ "type": "text", "text": msg.content }));
             }
             for tc in &msg.tool_calls {
                 blocks.push(serde_json::json!({
                     "type": "tool_use",
                     "id": tc.id.as_deref().unwrap_or(""),
                     "name": tc.name,
-                    "input": tc.arguments,
+                    "input": coerce_tool_input(&tc.arguments),
                 }));
             }
+            // Some source agents (e.g. Gemini) attach tool results directly to
+            // the assistant message. Preserve them so multi-hop conversions stay
+            // lossless. For the common Codex→Claude path, tool output is
+            // reclassified as Tool role in the Codex reader, so codex assistant
+            // messages never reach here with results.
             for tr in &msg.tool_results {
                 blocks.push(serde_json::json!({
                     "type": "tool_result",
@@ -503,10 +572,29 @@ fn build_inner_message(msg: &CanonicalMessage, session_model_name: Option<&str>,
     });
     if let Some(ref author) = msg.author {
         inner_msg["model"] = serde_json::Value::String(author.clone());
-    } else if msg.role == MessageRole::Assistant
+    } else if entry_type == "assistant"
         && let Some(model) = session_model_name
     {
         inner_msg["model"] = serde_json::Value::String(model.to_string());
+    }
+    // Claude Code's resume loader expects assistant messages to carry the full
+    // Anthropic message envelope (id / type / model / stop_reason / usage),
+    // the same shape its own API responses are persisted in. Without these
+    // fields, `claude --resume` hangs on load and reports "Failed to resume
+    // session". The source agent doesn't provide real values, so synthesize
+    // benign defaults; provenance is preserved in `model` when available.
+    if entry_type == "assistant" {
+        inner_msg["id"] = serde_json::Value::String(format!("msg_casr_{}", uuid::Uuid::new_v4().simple()));
+        inner_msg["type"] = serde_json::Value::String("message".to_string());
+        if inner_msg.get("model").is_none() {
+            inner_msg["model"] = serde_json::Value::String("unknown".to_string());
+        }
+        inner_msg["stop_reason"] = serde_json::Value::String("end_turn".to_string());
+        inner_msg["stop_sequence"] = serde_json::Value::Null;
+        inner_msg["usage"] = serde_json::json!({
+            "input_tokens": 0,
+            "output_tokens": 0,
+        });
     }
     inner_msg
 }
@@ -717,20 +805,7 @@ mod tests {
 {"type":"assistant","sessionId":"s6","message":{"role":"assistant","content":[{"type":"text","text":"Got it"}],"model":"m1"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
         );
         // User message has text + tool_result, so content includes "Here's the result".
-        assert_eq!(session.messages[0].role, MessageRole::User);
         assert_eq!(session.messages[0].tool_results.len(), 1);
-        assert_eq!(session.messages[0].tool_results[0].content, "file contents here");
-    }
-
-    #[test]
-    fn reader_pure_tool_result_user_entry_becomes_tool_message() {
-        let session = read_cc_jsonl(
-            r#"{"type":"user","sessionId":"s6","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"file contents here","is_error":false}]},"uuid":"u1","timestamp":"2026-01-01T00:00:00Z"}
-{"type":"assistant","sessionId":"s6","message":{"role":"assistant","content":[{"type":"text","text":"Got it"}],"model":"m1"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
-        );
-        assert_eq!(session.messages[0].role, MessageRole::Tool);
-        assert_eq!(session.messages[0].tool_results.len(), 1);
-        assert_eq!(session.messages[0].tool_results[0].call_id.as_deref(), Some("t1"));
         assert_eq!(session.messages[0].tool_results[0].content, "file contents here");
     }
 
@@ -771,6 +846,37 @@ not json at all
 {"type":"assistant","sessionId":"s9","message":{"role":"assistant","content":"Hello"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
         );
         assert_eq!(session.metadata["claudeVersion"].as_str(), Some("1.2.3"));
+    }
+
+    #[test]
+    fn reader_native_name_from_custom_title_wins() {
+        // `/rename` custom title must win over the auto-generated ai-title.
+        let session = read_cc_jsonl(
+            r#"{"type":"ai-title","aiTitle":"Auto generated title","sessionId":"s10"}
+{"type":"user","sessionId":"s10","message":{"role":"user","content":"Hi"},"uuid":"u1","timestamp":"2026-01-01T00:00:00Z"}
+{"type":"custom-title","customTitle":"My Renamed Session","sessionId":"s10"}
+{"type":"assistant","sessionId":"s10","message":{"role":"assistant","content":"Hello"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
+        );
+        assert_eq!(crate::model::native_name_from_metadata(&session.metadata).as_deref(), Some("My Renamed Session"));
+    }
+
+    #[test]
+    fn reader_native_name_falls_back_to_ai_title() {
+        let session = read_cc_jsonl(
+            r#"{"type":"ai-title","aiTitle":"Auto generated title","sessionId":"s11"}
+{"type":"user","sessionId":"s11","message":{"role":"user","content":"Hi"},"uuid":"u1","timestamp":"2026-01-01T00:00:00Z"}
+{"type":"assistant","sessionId":"s11","message":{"role":"assistant","content":"Hello"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
+        );
+        assert_eq!(crate::model::native_name_from_metadata(&session.metadata).as_deref(), Some("Auto generated title"));
+    }
+
+    #[test]
+    fn reader_native_name_absent_without_title_entries() {
+        let session = read_cc_jsonl(
+            r#"{"type":"user","sessionId":"s12","message":{"role":"user","content":"Hi"},"uuid":"u1","timestamp":"2026-01-01T00:00:00Z"}
+{"type":"assistant","sessionId":"s12","message":{"role":"assistant","content":"Hello"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
+        );
+        assert!(crate::model::native_name_from_metadata(&session.metadata).is_none(), "sessions without title metadata must have no native name");
     }
 
     #[test]

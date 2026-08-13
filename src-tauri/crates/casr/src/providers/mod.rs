@@ -1,12 +1,13 @@
 //! Provider trait and concrete provider implementations.
 //!
-//! Each supported provider (Claude Code, Codex, Gemini CLI, Cursor, Cline,
-//! Aider, Amp, OpenCode, ChatGPT, ClawdBot, Vibe, Factory, OpenClaw,
-//! Pi-Agent) implements the [`Provider`] trait to read/write sessions in its
-//! native format.
+//! Each supported provider (Claude Code, Codex, Gemini CLI, Antigravity CLI,
+//! Cursor, Cline, Aider, Amp, OpenCode, ChatGPT, ClawdBot, Vibe, Factory,
+//! OpenClaw, Pi-Agent, Kiro, Grok Build) implements the [`Provider`] trait to
+//! read/write sessions in its native format.
 
 pub mod aider;
 pub mod amp;
+pub mod antigravity;
 pub mod chatgpt;
 pub mod claude_code;
 pub mod clawdbot;
@@ -15,6 +16,8 @@ pub mod codex;
 pub mod cursor;
 pub mod factory;
 pub mod gemini;
+pub mod grok;
+pub mod kiro;
 pub mod openclaw;
 pub mod opencode;
 pub mod pi_agent;
@@ -43,6 +46,10 @@ pub struct WrittenSession {
     pub resume_command: String,
     /// Path to the `.bak` backup, if an existing file was overwritten.
     pub backup_path: Option<PathBuf>,
+    /// Non-fatal warnings produced while writing (e.g. the target session was
+    /// written but could not be registered in the provider's resume index).
+    /// Surfaced to the user and merged into the conversion's warning list.
+    pub warnings: Vec<String>,
 }
 
 /// The core abstraction each provider implements.

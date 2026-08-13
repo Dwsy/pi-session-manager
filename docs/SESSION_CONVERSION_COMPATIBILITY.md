@@ -4,13 +4,51 @@ This document records the compatibility fixes made for external agent session fo
 
 ## Scope
 
-The fixes cover three external formats:
+The detailed fixes below cover three external formats:
 
 1. Codex session JSONL, usually stored under `~/.codex/sessions/`.
 2. Claude Code session JSONL, usually stored under `~/.claude/projects/`.
 3. OpenCode SQLite sessions, usually stored in `~/.local/share/opencode/opencode.db`.
 
-Both formats are normalized into PSM viewer-compatible entries before being rendered by the session viewer.
+All formats are normalized into PSM viewer-compatible entries before being rendered by the session viewer.
+
+## Supported Providers
+
+PSM supports 18 providers: the 17 shipped by the vendored [CASR](https://github.com/Dicklesworthstone/cross_agent_session_resumer) crate plus OMP, which is PSM-specific.
+
+| Provider | Slug | Alias | Reader | Conversion target |
+|---|---|---|---|---|
+| Pi | `pi` | `pi` | casr_min | Yes |
+| OMP | `omp` | `omp` | casr_min | Yes |
+| Claude Code | `claude_code` | `cc` | CASR | Yes |
+| Codex | `codex` | `cod` | CASR | Yes |
+| OpenCode | `opencode` | `opc` | CASR | Yes |
+| Gemini CLI | `gemini` | `gmi` | CASR | Yes |
+| Factory | `factory` | `fac` | CASR | Yes |
+| ClawdBot | `clawdbot` | `cwb` | CASR | Yes |
+| Cursor | `cursor` | `cur` | CASR | No (scan/source only) |
+| Antigravity | `antigravity` | `agy` | casr_min | No (scan/source only) |
+| Aider | `aider` | `aid` | CASR | Yes |
+| Amp | `amp` | `amp` | CASR | Yes |
+| ChatGPT | `chatgpt` | `gpt` | CASR | Yes |
+| Cline | `cline` | `cln` | CASR | Yes |
+| OpenClaw | `openclaw` | `ocl` | CASR | Yes |
+| Vibe | `vibe` | `vib` | CASR | Yes |
+| Kiro CLI | `kiro` | `kr` | CASR | Yes |
+| Grok Build | `grok` | `grk` | CASR | Yes |
+
+The provider list lives in `ProviderKind` (`src-tauri/src/domain/casr_min/providers/mod.rs`); `SessionBridgeSource` mirrors it one-to-one. The frontend counterpart is `SESSION_PROVIDER_TABLE` in `src/utils/sessionProviderCatalog.ts`, which is locked to the `SessionConvertTarget` union at compile time.
+
+### Reader ownership
+
+Two readers coexist. Which one runs is decided in `session_bridge::read_canonical_session_from_path`:
+
+- **CASR (vendored crate)** is the default. PSM detects the provider from the path first and then calls that provider's reader explicitly, rather than letting CASR resolve the provider itself. CASR's own `resolve_from_path` falls back to "whichever parser yields the most messages, ties broken by slug" for files outside a known provider root, which lets permissive JSONL readers claim another provider's session.
+- **casr_min** is authoritative for the providers listed by `ProviderKind::prefers_casr_min_reader`, and is the fallback whenever the CASR read fails:
+  - **OMP** shares Pi-Agent's on-disk format and CASR has no OMP provider, so CASR would attribute those sessions to Pi.
+  - **Antigravity** is discovered through `brain/<uuid>/.system_generated/logs/transcript.jsonl`, whereas CASR enters through `conversations/<uuid>.db` and falls back to the file stem for a transcript path — every session would end up named `transcript`.
+
+Eight providers (Aider, Amp, ChatGPT, Cline, OpenClaw, Vibe, Kiro, Grok) have no hand-written casr_min reader at all. `casr_min/providers/vendored.rs` owns their path matching — the scanner classifies files by path and cannot afford to build the CASR registry per file — and forwards reads to CASR. Conversions to these providers, including dry runs, are performed entirely by the CASR writer.
 
 ## Main Rendering Path
 
@@ -277,6 +315,7 @@ pnpm exec tsc --noEmit
 
 ## Known Boundaries
 
+- A dry-run conversion to a vendor-delegated provider reports no target path. CASR's pipeline stops before the writer, so the path does not exist yet; the resume command is still filled in from the session id.
 - Codex `token_count` events are still treated as non-conversational and are not currently attached to assistant usage stats in the viewer path.
 - Claude Code metadata records such as `summary`, `custom-title`, and `tag` are recognized as part of the upstream format but are not yet promoted to PSM viewer entries by the canonical conversion path.
 - The initial external-session viewer path still performs whole-file canonicalization before chunking the converted output. That is correct after these fixes, but large sessions may still need a future streaming conversion path for faster first paint.

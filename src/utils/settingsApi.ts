@@ -1,9 +1,9 @@
 import { invoke, isTauri } from "@/transport";
 import type { AppSettings } from "@/components/settings/types";
 import { defaultSettings } from "@/components/settings/types";
-import type { SessionConvertTarget } from "@/types";
 import { isStandaloneDatasetRuntime } from "@/browser-dataset";
 import { saveSessionSource } from "@/utils/datasetApi";
+import { isSessionConvertTarget } from "@/utils/sessionProviderCatalog";
 import { normalizeSubagentCompatibilitySettings } from "@/utils/subagentCompatibility";
 
 const CACHE_KEY = "pi-session-manager-settings";
@@ -171,17 +171,9 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
       rawSession?.showModelIconInSessionBadge === true,
     externalResumePromptEnabled:
       rawSession?.externalResumePromptEnabled !== false,
-    defaultExternalResumeTarget: (
-      rawSession?.defaultExternalResumeTarget === "omp" ||
-      rawSession?.defaultExternalResumeTarget === "claude-code" ||
-      rawSession?.defaultExternalResumeTarget === "codex" ||
-      rawSession?.defaultExternalResumeTarget === "opencode" ||
-      rawSession?.defaultExternalResumeTarget === "gemini" ||
-      rawSession?.defaultExternalResumeTarget === "factory" ||
-      rawSession?.defaultExternalResumeTarget === "clawdbot"
-        ? rawSession.defaultExternalResumeTarget
-        : "pi"
-    ) as SessionConvertTarget,
+    defaultExternalResumeTarget: isSessionConvertTarget(rawSession?.defaultExternalResumeTarget)
+      ? rawSession.defaultExternalResumeTarget
+      : "pi",
     scanOtherAgentJsonl:
       externalSessionProviders.length > 0
         ? true

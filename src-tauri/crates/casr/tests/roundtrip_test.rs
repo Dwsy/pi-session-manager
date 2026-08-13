@@ -35,6 +35,7 @@ use casr::providers::codex::Codex;
 use casr::providers::cursor::Cursor;
 use casr::providers::factory::Factory;
 use casr::providers::gemini::Gemini;
+use casr::providers::grok::Grok;
 use casr::providers::openclaw::OpenClaw;
 use casr::providers::opencode::OpenCode;
 use casr::providers::pi_agent::PiAgent;
@@ -59,6 +60,7 @@ static VIBE_ENV: test_env::EnvLock = test_env::EnvLock;
 static FACTORY_ENV: test_env::EnvLock = test_env::EnvLock;
 static OPENCLAW_ENV: test_env::EnvLock = test_env::EnvLock;
 static PIAGENT_ENV: test_env::EnvLock = test_env::EnvLock;
+static GROK_ENV: test_env::EnvLock = test_env::EnvLock;
 
 struct EnvGuard {
     key: &'static str,
@@ -1749,4 +1751,53 @@ fn roundtrip_piagent_to_factory() {
 #[test]
 fn roundtrip_piagent_to_openclaw() {
     cross_provider_roundtrip(&PiAgent, "PI_AGENT_HOME", &PIAGENT_ENV, &OpenClaw, "OPENCLAW_HOME", &OPENCLAW_ENV, "PiAgent→OpenClaw");
+}
+
+// ===========================================================================
+// Grok Build roundtrips (#19)
+// ===========================================================================
+
+/// Read the Grok fixture session (native ACP update stream).
+fn read_grok_fixture() -> CanonicalSession {
+    let path = fixtures_dir().join("grok/sessions/%2Fdata%2Fprojects%2Fdemo/019f75d0-aaaa-7bbb-8ccc-b0a1b2c3d4e5/updates.jsonl");
+    Grok.read_session(&path).unwrap_or_else(|e| panic!("Failed to read Grok fixture: {e}"))
+}
+
+#[test]
+fn roundtrip_cc_to_grok() {
+    let _lock = GROK_ENV.lock().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap();
+    let _env = EnvGuard::set("GROK_HOME", tmp.path());
+
+    let original = read_cc_fixture("cc_simple");
+    let written = Grok.write_session(&original, &WriteOptions { force: false }).expect("CC→Grok: write should succeed");
+
+    let readback = Grok.read_session(&written.paths[0]).expect("CC→Grok: read-back should succeed");
+
+    assert_roundtrip_fidelity(&original, &readback, "CC→Grok");
+    assert_new_session_id(&readback, "CC→Grok");
+}
+
+#[test]
+fn roundtrip_grok_to_cc() {
+    let _lock = CC_ENV.lock().unwrap();
+    let tmp = tempfile::TempDir::new().unwrap();
+    let _env = EnvGuard::set("CLAUDE_HOME", tmp.path());
+
+    let original = read_grok_fixture();
+    let written = ClaudeCode.write_session(&original, &WriteOptions { force: false }).expect("Grok→CC: write should succeed");
+
+    let readback = ClaudeCode.read_session(&written.paths[0]).expect("Grok→CC: read-back should succeed");
+
+    assert_roundtrip_fidelity(&original, &readback, "Grok→CC");
+}
+
+#[test]
+fn roundtrip_grok_to_codex() {
+    cross_provider_roundtrip(&Grok, "GROK_HOME", &GROK_ENV, &Codex, "CODEX_HOME", &CODEX_ENV, "Grok→Codex");
+}
+
+#[test]
+fn roundtrip_factory_to_grok() {
+    cross_provider_roundtrip(&Factory, "FACTORY_HOME", &FACTORY_ENV, &Grok, "GROK_HOME", &GROK_ENV, "Factory→Grok");
 }

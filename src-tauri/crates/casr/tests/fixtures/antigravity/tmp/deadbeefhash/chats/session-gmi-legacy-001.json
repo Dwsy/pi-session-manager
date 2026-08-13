@@ -1,0 +1,17 @@
+{
+  "sessionId": "gmi-legacy-001",
+  "startTime": "2026-01-14T16:00:00.000Z",
+  "lastUpdated": "2026-01-14T16:05:00.000Z",
+  "messages": [
+    {
+      "type": "user",
+      "content": "This is a LEGACY Gemini CLI (gmi) session that the agy provider must NOT list",
+      "timestamp": "2026-01-14T16:00:00.000Z"
+    },
+    {
+      "type": "model",
+      "content": "Acknowledged.",
+      "timestamp": "2026-01-14T16:00:30.000Z"
+    }
+  ]
+}

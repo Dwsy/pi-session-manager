@@ -20,10 +20,13 @@ use casr::discovery::ProviderRegistry;
 use casr::pipeline::{ConversionPipeline, ConvertOptions};
 use casr::responses::{self, ErrorEnvelope, InfoResponse, ListEnvelope, ListItem, ProviderInfo, ResumeSuccess};
 
+/// Maximum characters per turn snippet in `info --peek` output.
+const PEEK_SNIPPET_MAX_CHARS: usize = 200;
+
 /// Cross Agent Session Resumer — resume AI coding sessions across providers.
 ///
-/// Convert sessions between Claude Code, Codex, Gemini CLI, Cursor, Cline, Aider, Amp, OpenCode, and ChatGPT so you can
-/// pick up where you left off with a different agent.
+/// Convert sessions between Claude Code, Codex, Gemini CLI, Antigravity CLI, Cursor, Cline, Aider, Amp, OpenCode, and
+/// ChatGPT so you can pick up where you left off with a different agent.
 #[derive(Parser, Debug)]
 #[command(
     name = "casr",
@@ -52,7 +55,7 @@ struct Cli {
 enum Command {
     /// Convert and resume a session from another provider.
     Resume {
-        /// Target provider alias (cc, cod, gmi, cur, cln, aid, amp, opc, gpt).
+        /// Target provider alias (cc, cod, gmi, agy, cur, cln, aid, amp, opc, gpt).
         target: String,
         /// Session ID to convert.
         session_id: String,
@@ -72,6 +75,31 @@ enum Command {
         /// Add context messages to help the target agent understand the conversion.
         #[arg(long)]
         enrich: bool,
+
+        /// Cap the transferred history at roughly this many tokens (0 = unlimited).
+        /// Applies to cross-provider conversions; the oldest turns are dropped
+        /// first, pinning the original task and the most recent history.
+        #[arg(long, default_value = "200000")]
+        max_context_tokens: usize,
+
+        /// Truncate each tool result/observation to this many characters
+        /// (0 = unlimited). Tool output is usually the bulk of a long session.
+        #[arg(long, default_value = "4000")]
+        max_tool_output: usize,
+
+        /// Keep the source agent's reasoning traces (dropped by default for
+        /// cross-agent handoffs, since the target can't use another agent's
+        /// hidden reasoning).
+        #[arg(long)]
+        keep_reasoning: bool,
+
+        /// Workspace/project directory to stamp into the target session.
+        /// Overrides the source session's recorded workspace. Cwd-keyed
+        /// providers (e.g. Claude Code) only find the session when the resume
+        /// command runs from this directory. When the source session has no
+        /// workspace and this flag is absent, casr uses the current directory.
+        #[arg(long, value_name = "PATH")]
+        workspace: Option<std::path::PathBuf>,
     },
 
     /// List all discoverable sessions across installed providers.
@@ -105,6 +133,20 @@ enum Command {
         /// Enrich output with filesystem-derived data (e.g. repo_name from git root).
         #[arg(long)]
         enrich_fs: bool,
+
+        /// Disambiguate when the same session ID exists in multiple providers:
+        /// a provider alias/slug (e.g. `opc`, `cc`) or a direct session file path.
+        #[arg(long)]
+        source: Option<String>,
+
+        /// Append a Transcript Tail section showing the last few turns of the
+        /// session (the most recent turns help you recognize a session).
+        #[arg(long)]
+        peek: bool,
+
+        /// Number of trailing turns to show (implies `--peek`; default 5).
+        #[arg(long)]
+        peek_lines: Option<usize>,
     },
 
     /// List detected providers and their installation status.
@@ -146,6 +188,7 @@ fn init_tracing(cli: &Cli) {
 /// - `casr -cc <session-id> ...`
 /// - `casr -cod <session-id> ...`
 /// - `casr -gmi <session-id> ...`
+/// - `casr -agy <session-id> ...`
 ///
 /// Rewritten form:
 /// `casr [global-options] resume <target> <session-id> ...`
@@ -172,6 +215,7 @@ fn rewrite_shorthand_resume_args(args: Vec<OsString>) -> Vec<OsString> {
             "-cc" => Some("cc"),
             "-cod" => Some("cod"),
             "-gmi" => Some("gmi"),
+            "-agy" => Some("agy"),
             _ => None,
         };
 
@@ -208,9 +252,9 @@ fn main() -> ExitCode {
     init_tracing(&cli);
 
     let result = match cli.command {
-        Command::Resume { target, session_id, dry_run, force, source, enrich } => cmd_resume(&target, &session_id, dry_run, force, source, enrich, cli.json),
+        Command::Resume { target, session_id, dry_run, force, source, enrich, max_context_tokens, max_tool_output, keep_reasoning, workspace } => cmd_resume(&target, &session_id, dry_run, force, source, enrich, max_context_tokens, max_tool_output, keep_reasoning, workspace, cli.json),
         Command::List { provider, workspace, limit, sort, enrich_fs } => cmd_list(provider.as_deref(), workspace.as_deref(), limit, &sort, cli.json, enrich_fs),
-        Command::Info { session_id, enrich_fs } => cmd_info(&session_id, cli.json, enrich_fs),
+        Command::Info { session_id, enrich_fs, source, peek, peek_lines } => cmd_info(&session_id, cli.json, enrich_fs, source, peek, peek_lines),
         Command::Providers => cmd_providers(cli.json),
         Command::Completions { shell } => cmd_completions(&shell),
     };
@@ -252,11 +296,12 @@ fn error_type_name(e: &anyhow::Error) -> &'static str {
 // Command implementations
 // ---------------------------------------------------------------------------
 
-fn cmd_resume(target: &str, session_id: &str, dry_run: bool, force: bool, source: Option<String>, enrich: bool, json_mode: bool) -> anyhow::Result<()> {
+#[allow(clippy::too_many_arguments)]
+fn cmd_resume(target: &str, session_id: &str, dry_run: bool, force: bool, source: Option<String>, enrich: bool, max_context_tokens: usize, max_tool_output: usize, keep_reasoning: bool, workspace: Option<std::path::PathBuf>, json_mode: bool) -> anyhow::Result<()> {
     let registry = ProviderRegistry::default_registry();
     let pipeline = ConversionPipeline { registry };
 
-    let opts = ConvertOptions { dry_run, force, verbose: false, enrich, source_hint: source };
+    let opts = ConvertOptions { dry_run, force, verbose: false, enrich, source_hint: source, max_context_tokens, max_tool_output, keep_reasoning, workspace_override: workspace };
 
     let result = pipeline.convert(target, session_id, opts)?;
 
@@ -308,6 +353,7 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
         session_id: String,
         provider: String,
         title: Option<String>,
+        native_name: Option<String>,
         messages: usize,
         workspace: Option<PathBuf>,
         started_at: Option<i64>,
@@ -356,6 +402,7 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
                 session_id: self.session_id.clone(),
                 provider: self.provider.clone(),
                 title: self.title.clone(),
+                native_name: self.native_name.clone(),
                 messages: self.messages,
                 workspace: self.workspace.as_ref().map(|w| w.display().to_string()),
                 started_at: self.started_at,
@@ -427,6 +474,17 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
             out.push(ch);
         }
         out.chars().rev().collect()
+    }
+
+    /// Collapse a native name to a single line and clamp its display width.
+    fn truncate_display_name(name: &str, max_len: usize) -> String {
+        let collapsed: String = name.split_whitespace().collect::<Vec<_>>().join(" ");
+        if max_len == 0 || collapsed.chars().count() <= max_len {
+            return collapsed;
+        }
+        let keep = max_len.saturating_sub(1);
+        let truncated: String = collapsed.chars().take(keep).collect();
+        format!("{truncated}…")
     }
 
     fn codex_tool_uses_from_file(path: &Path) -> usize {
@@ -590,6 +648,8 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
             "factory" => "Factory",
             "openclaw" => "OpenClaw",
             "pi-agent" => "Pi-Agent",
+            "kiro" => "Kiro CLI",
+            "grok" => "Grok Build",
             _ => provider,
         }
     }
@@ -635,11 +695,13 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
     fn build_summary(provider_slug: &str, path: PathBuf, session: casr::model::CanonicalSession) -> SessionSummary {
         let last_active_at = session_activity_millis(&session, &path);
         let (file_size_bytes, unique_user_messages, avg_agent_response_chars, tool_uses) = session_metrics(provider_slug, &session, &path);
+        let native_name = casr::model::native_name_from_metadata(&session.metadata);
 
         SessionSummary {
             session_id: session.session_id,
             provider: provider_slug.to_string(),
             title: session.title,
+            native_name,
             messages: session.messages.len(),
             workspace: session.workspace,
             started_at: session.started_at,
@@ -943,6 +1005,7 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
                 .border_style(Style::parse("cyan").unwrap_or_default())
                 .with_column(Column::new("#").justify(JustifyMethod::Right).width(3))
                 .with_column(Column::new("Session ID").min_width(36))
+                .with_column(Column::new("Name").justify(JustifyMethod::Left).width(24))
                 .with_column(Column::new("Msgs").justify(JustifyMethod::Right).width(6))
                 .with_column(Column::new("Size KB").justify(JustifyMethod::Right).width(8))
                 .with_column(Column::new("Unique Users").justify(JustifyMethod::Right).width(12))
@@ -954,6 +1017,7 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
             for (idx, s) in provider_sessions.iter().enumerate() {
                 let rank = (idx + 1).to_string();
                 let session_id = s.session_id.as_str();
+                let native_name = s.native_name.as_deref().map(|name| truncate_display_name(name, 22)).unwrap_or_default();
                 let messages = s.messages.to_string();
                 let messages_cell_style = message_count_style(s.messages);
                 let size_kb = s.file_size_display();
@@ -966,6 +1030,7 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
                 table.add_row(Row::new(vec![
                     Cell::new(rank.as_str()),
                     Cell::new(session_id),
+                    Cell::new(native_name.as_str()),
                     Cell::new(messages.as_str()).style(messages_cell_style),
                     Cell::new(size_kb.as_str()),
                     Cell::new(unique_users.as_str()),
@@ -984,10 +1049,22 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
     Ok(())
 }
 
-fn cmd_info(session_id: &str, json_mode: bool, enrich_fs: bool) -> anyhow::Result<()> {
+fn cmd_info(session_id: &str, json_mode: bool, enrich_fs: bool, source: Option<String>, peek: bool, peek_lines: Option<usize>) -> anyhow::Result<()> {
     let registry = ProviderRegistry::default_registry();
-    let resolved = registry.resolve_session(session_id, None)?;
+    let source_hint = source.as_deref().map(casr::discovery::SourceHint::parse);
+    let resolved = registry.resolve_session(session_id, source_hint.as_ref())?;
     let session = resolved.provider.read_session(&resolved.path)?;
+
+    let native_name = casr::model::native_name_from_metadata(&session.metadata);
+    // The tail shows when `--peek` is passed OR `--peek-lines N` is given on its
+    // own (the latter implies `--peek`, as the help states); default to 5 turns.
+    const DEFAULT_PEEK_LINES: usize = 5;
+    let show_tail = peek || peek_lines.is_some();
+    // Snippet width: wider for JSON (machine-consumed), tighter for the terminal.
+    let transcript_tail = show_tail.then(|| {
+        let n = peek_lines.unwrap_or(DEFAULT_PEEK_LINES);
+        casr::model::transcript_tail(&session.messages, n, PEEK_SNIPPET_MAX_CHARS)
+    });
 
     if json_mode {
         let (workspace_name, workspace_name_source) = responses::workspace_name_from_path(session.workspace.as_ref());
@@ -997,6 +1074,7 @@ fn cmd_info(session_id: &str, json_mode: bool, enrich_fs: bool) -> anyhow::Resul
             session_id: session.session_id.clone(),
             provider: session.provider_slug.clone(),
             title: session.title.clone(),
+            native_name: native_name.clone(),
             workspace: session.workspace.as_ref().map(|w| w.display().to_string()),
             messages: session.messages.len(),
             started_at: session.started_at,
@@ -1007,12 +1085,16 @@ fn cmd_info(session_id: &str, json_mode: bool, enrich_fs: bool) -> anyhow::Resul
             workspace_name,
             workspace_name_source,
             repo_name,
+            transcript_tail,
         };
         println!("{}", serde_json::to_string_pretty(&response)?);
     } else {
         println!("{}\n", "Session Info".bold());
         println!("  {} {}", "ID:".dimmed(), session.session_id.cyan());
         println!("  {} {}", "Provider:".dimmed(), session.provider_slug);
+        if let Some(ref name) = native_name {
+            println!("  {} {name}", "Name:".dimmed());
+        }
         if let Some(ref title) = session.title {
             println!("  {} {title}", "Title:".dimmed());
         }
@@ -1029,6 +1111,16 @@ fn cmd_info(session_id: &str, json_mode: bool, enrich_fs: bool) -> anyhow::Resul
         let user_count = session.messages.iter().filter(|m| m.role == casr::model::MessageRole::User).count();
         let asst_count = session.messages.iter().filter(|m| m.role == casr::model::MessageRole::Assistant).count();
         println!("  {} {user_count} user, {asst_count} assistant", "Roles:".dimmed());
+
+        if let Some(ref tail) = transcript_tail {
+            println!("\n{}", format!("Transcript Tail (last {} turns)", tail.len()).bold());
+            if tail.is_empty() {
+                println!("  {}", "(no messages)".dimmed());
+            }
+            for turn in tail {
+                println!("  {} {}", format!("[{}]", turn.role).cyan(), turn.snippet);
+            }
+        }
     }
 
     Ok(())
