@@ -90,7 +90,7 @@ export default function DashboardRecapController({ sessions }: DashboardRecapCon
     onTrigger: useCallback(() => {
       void openRecap(getEasterEggDashboardRecap())
     }, [openRecap]),
-    // While a recap is open the stage owns the keyboard.
+    // Disable the hidden shortcut while the report dialog is open.
     enabled: request === null,
   })
 
@@ -111,7 +111,6 @@ export default function DashboardRecapController({ sessions }: DashboardRecapCon
     <DashboardRecapModal
       request={request}
       sessions={periodSessions}
-      allSessions={sessions}
       stats={stats}
       loading={loading}
       error={error}
