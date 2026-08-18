@@ -196,7 +196,7 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
       onClick={close}
     >
       <div
-        className={`w-full max-w-4xl h-[80vh] sm:h-[70vh] bg-background/98 border border-border/80 rounded-xl shadow-[0_24px_80px_rgba(15,23,42,0.18)] overflow-hidden motion-overlay-surface flex flex-col min-h-0 ${visible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-[0.985] opacity-0'}`}
+        className={`w-full max-w-[1380px] h-[80vh] sm:h-[70vh] bg-background/98 border border-border/80 rounded-xl shadow-[0_24px_80px_rgba(15,23,42,0.18)] overflow-hidden motion-overlay-surface flex flex-col min-h-0 ${visible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-[0.985] opacity-0'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <CommandMenu
