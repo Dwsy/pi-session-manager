@@ -79,7 +79,7 @@ the recommended plugin authoring path.
 | [psm-session-summary](./psm-session-summary/) | Generates session intelligence and writes `session.intelligence` plugin records | `sessions:read`, `records:read`, `records:write`, `model:invoke`, `agent:invoke` |
 | [psm-sidechat](./psm-sidechat/) | Session Q&A command/tool and toolbar panel example | `sessions:read`, `model:invoke`, `agent:invoke`, `records:read`, `records:write` |
 | [psm-semantic-search](./psm-semantic-search/) | Runs host-managed Pi Agent ReAct search over sessions with controlled PSM tools | `agent:invoke`, `sessions:read`, `search:read`, `model:invoke` |
-| [psm-trace](./psm-trace/) | Active branch path timeline with segment lineage, compaction-aware context, ending navigation, and error filtering | `sessions:read` |
+| [psm-trace](./psm-trace/) | Execution-trace workbench: Input/Model/Tools latency lanes, turn-grouped step list, and a per-step inspector (payload, result, observed tool signature, timing) | `sessions:read` |
 | [psm-generative-ui-renderer](./psm-generative-ui-renderer/) | Renders saved `show_widget` HTML through the restricted filesystem widget root | `fs:read` |
 | [psm-word-cloud](./psm-word-cloud/) | Demonstrates Cmd+K plugin commands plus global/project user-message word cloud app views from session-list preview fields | `config:read`, `config:write` |
 | [psm-agent-usage](./psm-agent-usage/) | Default-off app view for local AI agent subscription / quota status via host-managed credential reads and official usage endpoints | `usage:read`, `config:read`, `config:write` |

@@ -412,7 +412,7 @@ Key local boundaries:
 | `_tool-execution.less` | Tool execution styles |
 | `_subagent.less` | Subagent styles |
 | `_branch-atlas.less` | Branch Outline 与 Branch Map 样式 |
-| `_branch-atlas-timeline.less` | Active Path Timeline 样式 |
+| `_trace-workbench.less` | Trace 工作台样式（泳道条、步骤列表、检查器） |
 | `_scroll-markers.less` | Scroll marker styles |
 | `_cmdk.less` | Command palette styles |
 | `_search.less` | Search styles |

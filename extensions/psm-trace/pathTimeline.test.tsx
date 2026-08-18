@@ -57,8 +57,8 @@ function capabilityClient() {
   };
 }
 
-describe("psm-trace path timeline", () => {
-  it("renders the active ending path and activates branches through the viewer", async () => {
+describe("psm-trace workbench", () => {
+  it("renders the active path as trace steps and locates entries through the viewer", async () => {
     const navigateBranch = vi.fn();
     render(
       <TraceView
@@ -75,17 +75,17 @@ describe("psm-trace path timeline", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/ACTIVE PATH/)).not.toBeNull();
+      expect(screen.getByRole("group", { name: "Trace lens" })).not.toBeNull();
     });
     expect(screen.getAllByText("Branch A").length).toBeGreaterThan(0);
     expect(screen.queryByText("Branch B")).toBeNull();
-    expect(screen.getByLabelText("Selected path entry")).not.toBeNull();
+    expect(screen.getByLabelText("Step inspector")).not.toBeNull();
 
-    const rootRowText = screen
+    const rootRow = screen
       .getAllByText("Root prompt")
-      .find((element) => element.tagName === "P");
-    expect(rootRowText).toBeTruthy();
-    fireEvent.doubleClick(rootRowText!);
+      .find((element) => element.className.includes("psm-trace-row__title"));
+    expect(rootRow).toBeTruthy();
+    fireEvent.doubleClick(rootRow!);
     expect(navigateBranch).toHaveBeenCalledWith(
       "branch-b",
       "root",
@@ -101,9 +101,7 @@ describe("psm-trace path timeline", () => {
       viewer: { revealEntry: vi.fn(), revealToolCall: vi.fn() },
       onClose: vi.fn(),
     };
-    const { rerender } = render(
-      <TraceView {...props} activeEntryId="branch-a" />,
-    );
+    const { rerender } = render(<TraceView {...props} activeEntryId="branch-a" />);
 
     await screen.findAllByText("Branch A");
     rerender(<TraceView {...props} activeEntryId="branch-b" />);
@@ -114,7 +112,7 @@ describe("psm-trace path timeline", () => {
     });
   });
 
-  it("registers the timeline as the existing Trace main view", () => {
+  it("registers the workbench as the existing Trace main view", () => {
     const registerSessionToolbarItem = vi.fn();
     const registerSessionMainView = vi.fn();
     activate({

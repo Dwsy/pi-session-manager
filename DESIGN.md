@@ -964,7 +964,7 @@ All components support `env(safe-area-inset-*)` for mobile notches and keyboards
 | `src/styles/_mobile.less` | Mobile responsive overrides |
 | `src/styles/_scroll-markers.less` | Scroll behavior |
 | `src/styles/_branch-atlas.less` | Branch Outline 与 Branch Map 样式 |
-| `src/styles/_branch-atlas-timeline.less` | Active Path Timeline 样式 |
+| `src/styles/_trace-workbench.less` | Trace 工作台样式（泳道条、步骤列表、检查器） |
 | `src/styles/_subagent.less` | Subagent-specific animations |
 | `src/styles/_model-selector.less` | Model selector dropdown styles |
 | `src/styles/index.less` | Main entry point, imports all partials |

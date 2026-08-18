@@ -1,32 +1,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Copy, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Layers,
+  PanelRightClose,
+  PanelRightOpen,
+  Search,
+  Wrench,
+  X,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
-import GenericToolCall from "@/components/tool-calls/GenericToolCall";
-import { useClipboard } from "@/hooks/useClipboard";
+
 import type {
   PsmCapabilityClient,
   PsmSessionViewerController,
 } from "@pi-session-manager/plugin-sdk";
-
 import {
-  buildPath,
-  buildSegmentPath,
   buildSessionBranchModel,
-  filterTimelineToSegmentScope,
-  nodePrimaryText,
   formatMoney,
   formatNumber,
-  formatTimestamp,
   formatTokens,
   resolveBranchNavigation,
-  timelineNodes,
-  truncate,
   type SessionModel,
-  type SessionNode,
-  type TimelineMode,
 } from "@/utils/session-branch";
 
-import { entryRelationKey } from "@/components/session-branch-map/entryRelation";
+import TraceInspector, { type TraceInspectorTab } from "./TraceInspector";
+import TraceLanes from "./TraceLanes";
+import TraceStepList from "./TraceStepList";
+import {
+  buildTraceTimeline,
+  filterTraceSteps,
+  formatLatency,
+  formatPercent,
+  type TraceLane,
+  type TraceLens,
+  type TraceStats,
+} from "./traceModel";
 import {
   loadSessionEntries,
   type TraceLoadProgress,
@@ -41,33 +52,11 @@ interface TraceViewProps {
   onClose: () => void;
 }
 
-const ROW_HEIGHT = 88;
-const OVERSCAN = 7;
-const MODES: Array<{
-  value: TimelineMode;
-  label: string;
-  description: string;
-}> = [
-  {
-    value: "conversation",
-    label: "Conversation",
-    description: "User messages and assistant replies with content",
-  },
-  {
-    value: "context",
-    label: "Effective context",
-    description: "Reconstructed with Pi compaction semantics",
-  },
-  {
-    value: "full",
-    label: "Full path",
-    description: "Every entry on the active ending path",
-  },
-  {
-    value: "errors",
-    label: "Errors",
-    description: "Errors, aborts, and failed tool results",
-  },
+const LENSES: Array<{ value: TraceLens; icon: typeof Clock; fallback: string }> = [
+  { value: "duration", icon: Clock, fallback: "Duration" },
+  { value: "turns", icon: Layers, fallback: "Turns" },
+  { value: "calls", icon: Wrench, fallback: "Calls" },
+  { value: "errors", icon: AlertTriangle, fallback: "Errors" },
 ];
 
 export default function TraceView({
@@ -77,18 +66,13 @@ export default function TraceView({
   viewer,
   onClose,
 }: TraceViewProps) {
+  const { t } = useTranslation();
   const [model, setModel] = useState<SessionModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadProgress, setLoadProgress] = useState<TraceLoadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
-  const [mode, setMode] = useState<TimelineMode>("conversation");
-  const [scopeSegmentUid, setScopeSegmentUid] = useState<string | null>(null);
-  const [selectedUid, setSelectedUid] = useState("");
-  const [scrollTop, setScrollTop] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(480);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const loadedSessionPathRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -116,9 +100,7 @@ export default function TraceView({
       })
       .catch((loadError) => {
         if (!cancelled) {
-          setError(
-            loadError instanceof Error ? loadError.message : String(loadError),
-          );
+          setError(loadError instanceof Error ? loadError.message : String(loadError));
         }
       })
       .finally(() => {
@@ -132,91 +114,10 @@ export default function TraceView({
     };
   }, [activeEntryId, client, reloadNonce, session.name, session.path]);
 
-  const activeLeafUid = model
-    ? ((activeEntryId ? model.firstById.get(activeEntryId)?.uid : undefined) ??
-      model.defaultLeaf.uid)
-    : "";
-
-  useEffect(() => {
-    if (!model) return;
-    setSelectedUid((current) =>
-      current && model.uidMap.has(current) ? current : activeLeafUid,
-    );
-  }, [activeLeafUid, model]);
-
-  useEffect(() => {
-    const element = scrollRef.current;
-    if (!element || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(([entry]) => {
-      setViewportHeight(
-        entry?.contentRect.height || element.clientHeight || 480,
-      );
-    });
-    observer.observe(element);
-    setViewportHeight(element.clientHeight || 480);
-    return () => observer.disconnect();
-  }, [model]);
-
-  const branchPathSet = useMemo(
-    () =>
-      model
-        ? new Set(buildPath(model, activeLeafUid).map((node) => node.uid))
-        : new Set<string>(),
-    [activeLeafUid, model],
-  );
-
-  useEffect(() => {
-    if (!model || !selectedUid || branchPathSet.has(selectedUid)) return;
-    setSelectedUid(activeLeafUid);
-  }, [activeLeafUid, branchPathSet, model, selectedUid]);
-
-  const activateNode = useCallback(
-    (uid: string) => {
-      const node = model?.uidMap.get(uid);
-      if (!node) return;
-      const navigation = resolveBranchNavigation(model, node);
-      setSelectedUid(navigation.leafUid);
-      if (viewer?.navigateBranch) {
-        viewer.navigateBranch(navigation.leafId, navigation.targetId, {
-          align: "center",
-          highlight: true,
-        });
-      } else {
-        viewer?.revealEntry(navigation.targetId, {
-          align: "center",
-          highlight: true,
-        });
-      }
-    },
-    [model, viewer],
-  );
-
-  const stepEnding = useCallback(
-    (direction: -1 | 1) => {
-      if (!model || model.terminalSegments.length === 0) return;
-      const currentIndex = model.terminalSegments.findIndex(
-        (segment) => segment.leaf?.uid === activeLeafUid,
-      );
-      const base = currentIndex < 0 ? 0 : currentIndex;
-      const nextIndex =
-        (base + direction + model.terminalSegments.length) %
-        model.terminalSegments.length;
-      const leaf = model.terminalSegments[nextIndex]?.leaf;
-      if (!leaf) return;
-      setSelectedUid(leaf.uid);
-      if (viewer?.navigateBranch) {
-        viewer.navigateBranch(leaf.id, leaf.id, { align: "center" });
-      } else {
-        viewer?.revealEntry(leaf.id, { align: "center" });
-      }
-    },
-    [activeLeafUid, model, viewer],
-  );
-
   if (loading) {
     return (
-      <TimelineState
-        title="Building active path…"
+      <TraceState
+        title={t("components.trace.loading", "Building execution trace…")}
         detail={formatLoadProgress(loadProgress)}
         onClose={onClose}
       />
@@ -224,564 +125,314 @@ export default function TraceView({
   }
   if (error && !model) {
     return (
-      <TimelineState
-        title="Unable to load path timeline"
+      <TraceState
+        title={t("components.trace.loadFailed", "Unable to load the trace")}
         detail={error}
+        isError
         onRetry={() => setReloadNonce((value) => value + 1)}
         onClose={onClose}
       />
     );
   }
   if (!model) {
-    return <TimelineState title="No session entries" onClose={onClose} />;
+    return (
+      <TraceState title={t("components.trace.empty", "No session entries")} onClose={onClose} />
+    );
   }
 
   return (
-    <PathTimeline
+    <TraceWorkbench
       model={model}
-      activeLeafUid={activeLeafUid}
-      selectedUid={selectedUid}
-      mode={mode}
-      scopeSegmentUid={scopeSegmentUid}
-      scrollTop={scrollTop}
-      viewportHeight={viewportHeight}
-      scrollRef={scrollRef}
-      onModeChange={setMode}
-      onScopeChange={setScopeSegmentUid}
-      onScrollTopChange={setScrollTop}
-      onSelectNode={setSelectedUid}
-      onActivateNode={activateNode}
+      activeEntryId={activeEntryId}
+      viewer={viewer}
       refreshing={refreshing}
       refreshError={error}
       onRetry={() => setReloadNonce((value) => value + 1)}
-      onStepEnding={stepEnding}
       onClose={onClose}
     />
   );
 }
 
-function PathTimeline({
+function TraceWorkbench({
   model,
-  activeLeafUid,
-  selectedUid,
-  mode,
-  scopeSegmentUid,
-  scrollTop,
-  viewportHeight,
-  scrollRef,
-  onModeChange,
-  onScopeChange,
-  onScrollTopChange,
-  onSelectNode,
-  onActivateNode,
+  activeEntryId,
+  viewer,
   refreshing,
   refreshError,
   onRetry,
-  onStepEnding,
   onClose,
 }: {
   model: SessionModel;
-  activeLeafUid: string;
-  selectedUid: string;
-  mode: TimelineMode;
-  scopeSegmentUid: string | null;
-  scrollTop: number;
-  viewportHeight: number;
-  scrollRef: React.RefObject<HTMLDivElement>;
-  onModeChange: (mode: TimelineMode) => void;
-  onScopeChange: (uid: string | null) => void;
-  onScrollTopChange: (top: number) => void;
-  onSelectNode: (uid: string) => void;
-  onActivateNode: (uid: string) => void;
+  activeEntryId?: string | null;
+  viewer?: PsmSessionViewerController;
   refreshing: boolean;
   refreshError: string | null;
   onRetry: () => void;
-  onStepEnding: (direction: -1 | 1) => void;
   onClose: () => void;
 }) {
-  const pathNodes = useMemo(
-    () => timelineNodes(model, activeLeafUid, mode),
-    [activeLeafUid, mode, model],
-  );
-  const nodes = useMemo(
-    () => filterTimelineToSegmentScope(pathNodes, model, scopeSegmentUid),
-    [model, pathNodes, scopeSegmentUid],
-  );
-  const activeLeaf = model.uidMap.get(activeLeafUid) ?? model.defaultLeaf;
-  const segmentPath = useMemo(
-    () => buildSegmentPath(model, activeLeafUid),
+  const { t } = useTranslation();
+  const [lens, setLens] = useState<TraceLens>("duration");
+  const [search, setSearch] = useState("");
+  const [selectedUid, setSelectedUid] = useState("");
+  const [inspectorTab, setInspectorTab] = useState<TraceInspectorTab>("summary");
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+
+  const activeLeafUid =
+    (activeEntryId ? model.firstById.get(activeEntryId)?.uid : undefined) ??
+    model.defaultLeaf.uid;
+
+  const timeline = useMemo(
+    () => buildTraceTimeline(model, activeLeafUid),
     [activeLeafUid, model],
   );
-  const activeSegment = activeLeaf.segment;
-  const selectedNode = model.uidMap.get(selectedUid) ?? activeLeaf;
-  const metrics = activeLeaf.cum;
-  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
-  const endIndex = Math.min(
-    nodes.length,
-    Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + OVERSCAN,
+  const steps = useMemo(
+    () => filterTraceSteps(timeline.steps, lens, search),
+    [lens, search, timeline.steps],
   );
-  const visible = nodes.slice(startIndex, endIndex);
+
+  const selected =
+    timeline.steps.find((step) => step.uid === selectedUid) ??
+    steps[steps.length - 1] ??
+    timeline.steps[timeline.steps.length - 1];
 
   useEffect(() => {
-    onScrollTopChange(0);
-    scrollRef.current?.scrollTo({ top: 0 });
-  }, [activeLeafUid, mode, onScrollTopChange, scopeSegmentUid, scrollRef]);
+    if (selected && selected.uid !== selectedUid) setSelectedUid(selected.uid);
+  }, [selected, selectedUid]);
 
   useEffect(() => {
-    onScopeChange(null);
-  }, [activeLeafUid, onScopeChange]);
+    setInspectorTab("summary");
+  }, [selectedUid]);
 
-  useEffect(() => {
-    if (nodes.length === 0 || nodes.some((node) => node.uid === selectedUid)) return;
-    onSelectNode(nodes[nodes.length - 1].uid);
-  }, [nodes, onSelectNode, selectedUid]);
+  const locate = useCallback(
+    (uid: string) => {
+      const node = model.uidMap.get(uid);
+      if (!node) return;
+      const navigation = resolveBranchNavigation(model, node);
+      if (viewer?.navigateBranch) {
+        viewer.navigateBranch(navigation.leafId, navigation.targetId, {
+          align: "center",
+          highlight: true,
+        });
+      } else {
+        viewer?.revealEntry(navigation.targetId, { align: "center", highlight: true });
+      }
+    },
+    [model, viewer],
+  );
 
-  useEffect(() => {
-    const index = nodes.findIndex((node) => node.uid === selectedUid);
-    const scroll = scrollRef.current;
-    if (index < 0 || !scroll) return;
-    const top = index * ROW_HEIGHT;
-    const bottom = top + ROW_HEIGHT;
-    if (
-      top < scroll.scrollTop ||
-      bottom > scroll.scrollTop + scroll.clientHeight
-    ) {
-      scroll.scrollTo({ top: Math.max(0, top - scroll.clientHeight / 3) });
-    }
-  }, [nodes, scrollRef, selectedUid]);
+  const stepSelection = useCallback(
+    (direction: -1 | 1) => {
+      if (!steps.length) return;
+      const index = steps.findIndex((step) => step.uid === selectedUid);
+      const next = index < 0 ? 0 : (index + direction + steps.length) % steps.length;
+      setSelectedUid(steps[next].uid);
+    },
+    [selectedUid, steps],
+  );
+
+  const laneLabels: Record<TraceLane, string> = {
+    input: t("components.trace.lanes.input", "Input"),
+    model: t("components.trace.lanes.model", "Model"),
+    tools: t("components.trace.lanes.tools", "Tools"),
+  };
 
   return (
-    <div className="path-timeline-workbench">
-    <main className="path-timeline-view timeline-pane path-timeline-pane">
-      <header className="path-timeline-header">
-        <div className="path-timeline-heading">
-          <div>
-            <span>ACTIVE PATH · {activeSegment?.code || "B?"}</span>
-            <strong>
-              {truncate(
-                activeSegment?.lastUserSummary ||
-                  activeLeaf.lastUserSummary ||
-                  activeLeaf.summary,
-                110,
-              )}
-            </strong>
-            <small>
-              #{formatNumber(activeLeaf.sequence)} ending ·{" "}
-              {formatNumber(segmentPath.length)} segments ·{" "}
-              {formatNumber(Math.max(0, segmentPath.length - 1))} forks crossed
-            </small>
+    <div className="psm-trace">
+      <div className="psm-trace__main">
+        <div className="psm-trace-toolbar">
+          <div className="psm-trace-lens" role="group" aria-label={t("components.trace.lens", "Trace lens")}>
+            {LENSES.map((item) => {
+              const Icon = item.icon;
+              const isErrorLens = item.value === "errors";
+              if (isErrorLens && timeline.stats.errors === 0) return null;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  data-lens={item.value}
+                  className={lens === item.value ? "is-active" : ""}
+                  aria-pressed={lens === item.value}
+                  onClick={() => setLens(item.value)}
+                >
+                  <Icon size={12} />
+                  <span>{t(`components.trace.lenses.${item.value}`, item.fallback)}</span>
+                  {isErrorLens ? <em>{formatNumber(timeline.stats.errors)}</em> : null}
+                </button>
+              );
+            })}
           </div>
-          <div className="path-timeline-actions">
+
+          <div className="psm-trace-search">
+            <Search size={11} />
+            <input
+              type="search"
+              value={search}
+              placeholder={t("components.trace.searchPlaceholder", "Search steps…")}
+              aria-label={t("components.trace.searchPlaceholder", "Search steps…")}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+
+          <div className="psm-trace-toolbar__actions">
             <button
               type="button"
-              onClick={() => onStepEnding(-1)}
-              disabled={model.terminalSegments.length < 2}
-              aria-label="Previous ending"
+              className="psm-trace-icon-button"
+              onClick={() => stepSelection(-1)}
+              disabled={steps.length < 2}
+              title={t("components.trace.previousStep", "Previous step")}
+              aria-label={t("components.trace.previousStep", "Previous step")}
             >
-              <ChevronLeft size={15} />
+              <ChevronLeft size={13} />
             </button>
             <button
               type="button"
-              onClick={() => onStepEnding(1)}
-              disabled={model.terminalSegments.length < 2}
-              aria-label="Next ending"
+              className="psm-trace-icon-button"
+              onClick={() => stepSelection(1)}
+              disabled={steps.length < 2}
+              title={t("components.trace.nextStep", "Next step")}
+              aria-label={t("components.trace.nextStep", "Next step")}
             >
-              <ChevronRight size={15} />
+              <ChevronRight size={13} />
             </button>
             <button
               type="button"
+              className={`psm-trace-icon-button ${inspectorOpen ? "is-active" : ""}`}
+              onClick={() => setInspectorOpen((value) => !value)}
+              aria-pressed={inspectorOpen}
+              title={t("components.trace.toggleInspector", "Toggle inspector")}
+              aria-label={t("components.trace.toggleInspector", "Toggle inspector")}
+            >
+              {inspectorOpen ? <PanelRightClose size={13} /> : <PanelRightOpen size={13} />}
+            </button>
+            <button
+              type="button"
+              className="psm-trace-icon-button"
               onClick={onClose}
-              aria-label="Close path timeline"
+              title={t("components.trace.close", "Close trace")}
+              aria-label={t("components.trace.close", "Close trace")}
             >
-              <X size={15} />
+              <X size={13} />
             </button>
           </div>
         </div>
 
-        <div
-          className="active-segment-lineage"
-          aria-label="Active segment lineage"
-        >
-          {segmentPath.map((segment, index) => (
-            <button
-              key={segment.uid}
-              type="button"
-              className={[
-                segment.uid === activeSegment?.uid ? "is-terminal" : "",
-                scopeSegmentUid === segment.uid ? "is-scope" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              aria-pressed={scopeSegmentUid === segment.uid}
-              onClick={() => {
-                onScopeChange(
-                  scopeSegmentUid === segment.uid ? null : segment.uid,
-                );
-                onSelectNode(segment.start.uid);
-              }}
-              title={`${segment.code}: ${segment.firstUserSummary}`}
-            >
-              <b>{segment.code}</b>
-              <span>
-                #{formatNumber(segment.start.sequence)}–#
-                {formatNumber(segment.end.sequence)}
-              </span>
-              {index < segmentPath.length - 1 ? <i>›</i> : null}
-            </button>
-          ))}
-        </div>
-
-        <div className="branch-metrics">
-          <Metric label="Path" value={formatNumber(metrics.entries)} />
-          <Metric label="Segments" value={formatNumber(segmentPath.length)} />
-          <Metric label="User" value={formatNumber(metrics.user)} />
-          <Metric label="Tools" value={formatNumber(metrics.toolResults)} />
-          <Metric label="Tokens" value={formatTokens(metrics.totalTokens)} />
-          <Metric label="Cost" value={formatMoney(metrics.cost)} />
-          <Metric
-            label="Errors"
-            value={formatNumber(metrics.errors + metrics.aborted)}
-            error={metrics.errors + metrics.aborted > 0}
-          />
-        </div>
-
-        <div
-          className="timeline-mode-switch"
-          role="group"
-          aria-label="Path timeline mode"
-        >
-          {MODES.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              className={mode === item.value ? "is-active" : ""}
-              aria-pressed={mode === item.value}
-              title={item.description}
-              onClick={() => onModeChange(item.value)}
-            >
-              {item.label}
-            </button>
-          ))}
-          <span>{formatNumber(nodes.length)} records</span>
-        </div>
-      </header>
-
-      {refreshing || refreshError ? (
-        <div
-          className={`trace-refresh-state ${refreshError ? "is-error" : ""}`}
-          role="status"
-        >
-          <span>{refreshError ? `Refresh failed: ${refreshError}` : "Refreshing active path…"}</span>
-          {refreshError ? (
-            <button type="button" onClick={onRetry}>Retry</button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {mode === "context" && metrics.compactions > 0 ? (
-        <div className="context-notice">
-          Effective context reconstructed from the latest Pi compaction.
-        </div>
-      ) : null}
-
-      <div
-        ref={scrollRef}
-        className="path-timeline-scroll"
-        onScroll={(event) => onScrollTopChange(event.currentTarget.scrollTop)}
-      >
-        <div
-          className="path-timeline-spacer"
-          style={{ height: nodes.length * ROW_HEIGHT }}
-        >
-          {visible.map((node, visibleIndex) => {
-            const index = startIndex + visibleIndex;
-            return (
-              <TimelineRow
-                key={node.uid}
-                node={node}
-                index={index}
-                selected={node.uid === selectedUid}
-                onSelect={() => onSelectNode(node.uid)}
-                onActivate={() => onActivateNode(node.uid)}
-              />
-            );
-          })}
-        </div>
-        {nodes.length === 0 ? (
-          <div className="path-timeline-empty">No records in this view.</div>
+        {refreshing || refreshError ? (
+          <div className={`psm-trace-banner ${refreshError ? "is-error" : ""}`} role="status">
+            <span>
+              {refreshError
+                ? t("components.trace.refreshFailed", "Refresh failed: {{message}}", {
+                    message: refreshError,
+                  })
+                : t("components.trace.refreshing", "Refreshing trace…")}
+            </span>
+            {refreshError ? (
+              <button type="button" onClick={onRetry}>
+                {t("components.trace.retry", "Retry")}
+              </button>
+            ) : null}
+          </div>
         ) : null}
+
+        <TraceLanes
+          timeline={timeline}
+          selectedUid={selectedUid}
+          labels={laneLabels}
+          onSelect={setSelectedUid}
+        />
+
+        <TraceStepList
+          steps={steps}
+          selectedUid={selectedUid}
+          emptyLabel={t("components.trace.noSteps", "No steps in this view.")}
+          turnLabel={(turn) =>
+            turn > 0
+              ? t("components.trace.turn", "Turn {{turn}}", { turn })
+              : t("components.trace.setup", "Setup")
+          }
+          onSelect={setSelectedUid}
+          onActivate={locate}
+        />
+
+        <TraceStatusBar stats={timeline.stats} visible={steps.length} />
       </div>
 
-      <footer className="path-timeline-status" role="status">
-        <span>
-          {modeLabel(mode)} · {formatNumber(nodes.length)}
-          {scopeSegmentUid
-            ? ` · ${segmentPath.find((segment) => segment.uid === scopeSegmentUid)?.code ?? "?"}`
-            : " · full ending path"}
-        </span>
-        <span>
-          {activeSegment?.code || "B?"} ending · {activeLeaf.id}
-        </span>
-      </footer>
-    </main>
-    <TraceInspector
-      model={model}
-      node={selectedNode}
-      onActivate={() => onActivateNode(selectedNode.uid)}
-    />
+      {inspectorOpen && selected ? (
+        <TraceInspector
+          model={model}
+          step={selected}
+          tab={inspectorTab}
+          onTabChange={setInspectorTab}
+          onSelect={setSelectedUid}
+          onLocate={() => locate(selected.uid)}
+          onClose={() => setInspectorOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
 
-function TraceInspector({
-  model,
-  node,
-  onActivate,
-}: {
-  model: SessionModel;
-  node: SessionNode;
-  onActivate: () => void;
-}) {
-  const { copyText } = useClipboard();
+function TraceStatusBar({ stats, visible }: { stats: TraceStats; visible: number }) {
   const { t } = useTranslation();
-  const body = nodePrimaryText(node);
-  const tool = traceToolPresentation(model, node, body);
-
   return (
-    <aside className="path-timeline-inspector" aria-label="Selected path entry">
-      <header>
-        <span>{t("components.traceInspector.title", "Entry inspector")}</span>
-        <strong>{roleLabel(node)}</strong>
-        <button type="button" onClick={onActivate}>
-          {t("components.traceInspector.locate", "Locate in session")}
-        </button>
-      </header>
-      <dl className="path-inspector-meta">
-        <div>
-          <dt>{t("components.traceInspector.segment", "Segment")}</dt>
-          <dd>{node.segment?.code || "B?"}</dd>
-        </div>
-        <div>
-          <dt>{t("components.traceInspector.sequence", "Sequence")}</dt>
-          <dd>#{formatNumber(node.sequence)}</dd>
-        </div>
-        <div>
-          <dt>{t("components.traceInspector.relation", "Relation")}</dt>
-          <dd>{t(entryRelationKey(node))}</dd>
-        </div>
-        <div>
-          <dt>{t("components.traceInspector.time", "Time")}</dt>
-          <dd>{formatTimestamp(node.timestampMs)}</dd>
-        </div>
-      </dl>
-      <div className="path-inspector-id">
-        <code>{node.id}</code>
-        <button
-          type="button"
-          onClick={() => void copyText(node.id)}
-          aria-label={t("components.traceInspector.copyId", "Copy entry ID")}
-          title={t("components.traceInspector.copyId", "Copy entry ID")}
-        >
-          <Copy size={13} />
-        </button>
-      </div>
-      {tool ? (
-        <GenericToolCall
-          name={tool.name}
-          arguments={tool.arguments}
-          output={tool.output}
-          isError={tool.isError}
-          hasResult={tool.hasResult}
-          entryId={`trace:${node.uid}`}
-        />
-      ) : (
-        <pre className="path-inspector-content">{body || node.summary}</pre>
-      )}
-    </aside>
-  );
-}
-
-function traceToolPresentation(
-  model: SessionModel,
-  node: SessionNode,
-  body: string,
-): {
-  name: string;
-  arguments: Record<string, unknown>;
-  output: string;
-  isError: boolean;
-  hasResult: boolean;
-} | null {
-  const message = node.entry.message;
-  if (!message) return null;
-  if (message.role === "toolResult") {
-    const call = message.toolCallId
-      ? model.toolCallMap.get(String(message.toolCallId))
-      : undefined;
-    return {
-      name: call?.name || message.toolName || "tool result",
-      arguments: call?.arguments || {},
-      output: body,
-      isError: Boolean(message.isError),
-      hasResult: true,
-    };
-  }
-  if (message.role !== "assistant" || !Array.isArray(message.content)) {
-    return null;
-  }
-  const call = message.content.find(
-    (block) => block.type === "toolCall" && block.name,
-  );
-  if (!call) return null;
-  const result = call.id
-    ? model.toolResultByCallId.get(String(call.id))?.[0]
-    : undefined;
-  return {
-    name: call.name || "tool",
-    arguments: call.arguments || {},
-    output: result ? nodePrimaryText(result) : "",
-    isError: Boolean(result?.entry.message?.isError),
-    hasResult: Boolean(result),
-  };
-}
-
-function TimelineRow({
-  node,
-  index,
-  selected,
-  onSelect,
-  onActivate,
-}: {
-  node: SessionNode;
-  index: number;
-  selected: boolean;
-  onSelect: () => void;
-  onActivate: () => void;
-}) {
-  const { t } = useTranslation();
-  const role = roleLabel(node);
-  const model = node.actualModel ?? node.effectiveModel;
-  const noteType =
-    node.entry.type === "session_info"
-      ? "RENAME"
-      : node.entry.type === "label"
-        ? "LABEL"
-        : node.entry.type === "model_change"
-          ? "MODEL"
-          : null;
-  const fork = node.children.length > 1;
-  const branchStart = node.relation === "branch-start";
-  return (
-    <article
-      className={[
-        "path-timeline-row",
-        selected ? "is-selected" : "",
-        `kind-${node.kind}`,
-        branchStart ? "is-branch-start" : "",
-        fork ? "is-fork-anchor" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      style={{ transform: `translateY(${index * ROW_HEIGHT}px)` }}
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      onClick={onSelect}
-      onDoubleClick={onActivate}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          onActivate();
-        } else if (event.key === " ") {
-          event.preventDefault();
-          onSelect();
-        }
-      }}
-    >
-      <div className="path-sequence-column">
-        <span>#{formatNumber(node.sequence)}</span>
-        <b>{node.segment?.code || "B?"}</b>
-        {branchStart ? <em>BRANCH</em> : fork ? <em>FORK</em> : null}
-      </div>
-      <span className={`path-timeline-avatar kind-${node.kind}`}>
-        {role.slice(0, 1).toUpperCase()}
+    <footer className="psm-trace-status" role="status">
+      <span>
+        <b>{formatNumber(stats.turns)}</b> {t("components.trace.turnsUnit", "turns")} ·{" "}
+        <b>{formatNumber(visible)}</b>/{formatNumber(stats.steps)}{" "}
+        {t("components.trace.stepsUnit", "steps")}
       </span>
-      <div className="path-timeline-copy">
-        <div className="path-timeline-meta">
-          <strong>{role}</strong>
-          <time>{formatTimestamp(node.timestampMs).slice(-8)}</time>
-          <code>{node.id}</code>
-          {noteType ? <mark>{noteType}</mark> : null}
-          {node.label ? <mark>#{node.label}</mark> : null}
-          {fork ? <mark>{node.children.length}-WAY FORK</mark> : null}
-        </div>
-        <p>{truncate(node.summary, 430)}</p>
-        <small>
-          {t(entryRelationKey(node))} · segment{" "}
-          {formatNumber(node.segmentIndex + 1)}/
-          {formatNumber(node.segment?.nodes.length ?? 1)}
-          {model ? ` · ${model.label}` : ""}
-        </small>
-      </div>
-      <div className="path-timeline-aside">
-        {node.delta.totalTokens ? (
-          <span>{formatTokens(node.delta.totalTokens)} tok</span>
-        ) : null}
-        {node.delta.toolCalls ? (
-          <span>{formatNumber(node.delta.toolCalls)} tools</span>
-        ) : null}
-        {node.delta.errors || node.delta.aborted ? (
-          <span className="is-error">error</span>
-        ) : null}
-        <code>view #{index + 1}</code>
-      </div>
-    </article>
+      <span>
+        LLM <b>{formatLatency(stats.modelMs)}</b> ·{" "}
+        {t("components.trace.toolTime", "tools")} <b>{formatLatency(stats.toolMs)}</b>
+      </span>
+      <span>
+        <b>{formatLatency(stats.msPerModelStep)}</b>/{t("components.trace.stepUnit", "step")} ·{" "}
+        <b>{stats.outputPerSecond.toFixed(0)}</b> tok/s
+      </span>
+      <span>
+        {t("components.trace.cacheHit", "cache")} <b>{formatPercent(stats.cacheHitRate)}</b>
+      </span>
+      <span>
+        <b>{formatTokens(stats.input + stats.cacheRead)}</b> in ·{" "}
+        <b>{formatTokens(stats.output)}</b> out · <b>{formatMoney(stats.cost)}</b>
+      </span>
+      {stats.errors > 0 ? (
+        <span className="is-error">
+          <b>{formatNumber(stats.errors)}</b> {t("components.trace.errorsUnit", "errors")}
+        </span>
+      ) : null}
+    </footer>
   );
 }
 
-function Metric({
-  label,
-  value,
-  error = false,
-}: {
-  label: string;
-  value: string;
-  error?: boolean;
-}) {
-  return (
-    <span className={`metric-pill ${error ? "is-error" : ""}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </span>
-  );
-}
-
-function TimelineState({
+function TraceState({
   title,
   detail,
+  isError = false,
   onRetry,
   onClose,
 }: {
   title: string;
   detail?: string;
+  isError?: boolean;
   onRetry?: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   return (
-    <div className="path-timeline-state" role="status">
+    <div className={`psm-trace-state ${isError ? "is-error" : ""}`} role="status">
       <button
         type="button"
-        className="path-timeline-state-close"
+        className="psm-trace-icon-button psm-trace-state__close"
         onClick={onClose}
-        aria-label="Close path timeline"
+        aria-label={t("components.trace.close", "Close trace")}
       >
-        <X size={15} />
+        <X size={13} />
       </button>
       <strong>{title}</strong>
       {detail ? <p>{detail}</p> : null}
       {onRetry ? (
-        <button type="button" className="path-timeline-state-retry" onClick={onRetry}>
-          Retry
+        <button type="button" className="psm-trace-state__retry" onClick={onRetry}>
+          {t("components.trace.retry", "Retry")}
         </button>
       ) : null}
     </div>
@@ -790,30 +441,10 @@ function TimelineState({
 
 function formatLoadProgress(progress: TraceLoadProgress | null): string | undefined {
   if (!progress) return undefined;
-  if (!progress.totalBytes) return `${formatNumber(progress.loadedBytes)} bytes read`;
-  const percent = Math.min(100, Math.round((progress.loadedBytes / progress.totalBytes) * 100));
+  if (!progress.totalBytes) return `${formatNumber(progress.loadedBytes)} bytes`;
+  const percent = Math.min(
+    100,
+    Math.round((progress.loadedBytes / progress.totalBytes) * 100),
+  );
   return `${percent}% · ${formatNumber(progress.loadedBytes)} / ${formatNumber(progress.totalBytes)} bytes`;
-}
-
-function roleLabel(node: SessionNode): string {
-  if (node.entry.type === "message") {
-    const role = node.entry.message?.role;
-    if (role === "toolResult")
-      return node.entry.message?.toolName
-        ? `tool · ${node.entry.message.toolName}`
-        : "tool result";
-    if (role === "bashExecution") return "bash";
-    return role || "message";
-  }
-  if (node.entry.type === "session_info") return "rename";
-  if (node.entry.type === "model_change") return "model change";
-  if (node.entry.type === "thinking_level_change") return "thinking";
-  return node.entry.type;
-}
-
-function modeLabel(mode: TimelineMode): string {
-  if (mode === "conversation") return "Conversation";
-  if (mode === "context") return "Effective context";
-  if (mode === "full") return "Full path";
-  return "Errors";
 }
