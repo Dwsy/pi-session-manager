@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next'
-import { Columns3 } from 'lucide-react'
 import type { PsmSessionListColumnRenderProps } from '@pi-session-manager/plugin-sdk'
 
 import { useOptionalAppPluginSurfaceData } from '@/components/app/AppPluginSurfaceData'
@@ -39,9 +38,8 @@ export default function KanbanSessionColumnCell({ session }: PsmSessionListColum
       aria-label={label}
     >
       {tags.length === 0 ? (
-        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/55">
-          <Columns3 className="h-3 w-3" aria-hidden="true" />
-          {t('plugins.kanbanBoard.untagged', 'Unlabeled')}
+        <span className="text-muted-foreground/45" aria-hidden="true">
+          —
         </span>
       ) : (
         <span className="flex min-w-0 items-center gap-1 overflow-hidden">

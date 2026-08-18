@@ -149,18 +149,6 @@ export default function ExplorerSessionTable({
             <th className="px-3 py-2 font-medium" aria-sort={ariaSort("title")}>
               {sortButton("title", t("explorer.columns.session", "Session"))}
             </th>
-            {sessionListColumns.map((column) => (
-              <th
-                key={column.id}
-                className="px-3 py-2 font-medium"
-                style={{ width: column.width ?? DEFAULT_PLUGIN_COLUMN_WIDTH }}
-              >
-                <span className="truncate">{column.title}</span>
-              </th>
-            ))}
-            <th className="px-3 py-2 font-medium" style={{ width: TAGS_COLUMN_WIDTH }}>
-              {t("explorer.columns.tags", "Tags")}
-            </th>
             {showProjectColumn && (
               <th
                 className="px-3 py-2 font-medium"
@@ -179,6 +167,18 @@ export default function ExplorerSessionTable({
               aria-sort={ariaSort("messages")}
             >
               {sortButton("messages", t("explorer.columns.messages", "Messages"), true)}
+            </th>
+            {sessionListColumns.map((column) => (
+              <th
+                key={column.id}
+                className="px-3 py-2 font-medium"
+                style={{ width: column.width ?? DEFAULT_PLUGIN_COLUMN_WIDTH }}
+              >
+                <span className="truncate">{column.title}</span>
+              </th>
+            ))}
+            <th className="px-3 py-2 font-medium" style={{ width: TAGS_COLUMN_WIDTH }}>
+              {t("explorer.columns.tags", "Tags")}
             </th>
             <th
               className="px-3 py-2 text-right font-medium"
@@ -263,6 +263,48 @@ export default function ExplorerSessionTable({
                     </div>
                   </div>
                 </td>
+                {showProjectColumn && (
+                  <td className="px-3 py-2 align-middle">
+                    <button
+                      type="button"
+                      className="max-w-full truncate rounded px-1 py-0.5 font-mono text-[10px] text-muted-foreground hover:bg-secondary hover:text-foreground motion-color focus-ring"
+                      title={session.cwd || t("session.list.unknownDirectory")}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (session.cwd) onSelectProject?.(session.cwd);
+                      }}
+                    >
+                      {session.cwd
+                        ? getDirectoryName(session.cwd)
+                        : t("session.list.unknownDirectory")}
+                    </button>
+                  </td>
+                )}
+                <td className="px-3 py-2 align-middle">
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    {sourceTag ? (
+                      <SessionBadge
+                        label={sourceTag}
+                        tone="source"
+                        sourceSlug={sourceSlug || undefined}
+                        className="w-fit text-[9px]"
+                      />
+                    ) : (
+                      <span className="text-muted-foreground/45">—</span>
+                    )}
+                    {session.model && (
+                      <span className="truncate text-[9px] text-muted-foreground/55">
+                        {session.model}
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-2 text-right align-middle tabular-nums text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <MessageSquare className="h-3 w-3 text-muted-foreground/60" aria-hidden="true" />
+                    {session.message_count}
+                  </span>
+                </td>
                 {sessionListColumns.map((column) => (
                   <td
                     key={column.id}
@@ -305,48 +347,6 @@ export default function ExplorerSessionTable({
                   ) : (
                     <span className="text-muted-foreground/45">—</span>
                   )}
-                </td>
-                {showProjectColumn && (
-                  <td className="px-3 py-2 align-middle">
-                    <button
-                      type="button"
-                      className="max-w-full truncate rounded px-1 py-0.5 font-mono text-[10px] text-muted-foreground hover:bg-secondary hover:text-foreground motion-color focus-ring"
-                      title={session.cwd || t("session.list.unknownDirectory")}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        if (session.cwd) onSelectProject?.(session.cwd);
-                      }}
-                    >
-                      {session.cwd
-                        ? getDirectoryName(session.cwd)
-                        : t("session.list.unknownDirectory")}
-                    </button>
-                  </td>
-                )}
-                <td className="px-3 py-2 align-middle">
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    {sourceTag ? (
-                      <SessionBadge
-                        label={sourceTag}
-                        tone="source"
-                        sourceSlug={sourceSlug || undefined}
-                        className="w-fit text-[9px]"
-                      />
-                    ) : (
-                      <span className="text-muted-foreground/45">—</span>
-                    )}
-                    {session.model && (
-                      <span className="truncate text-[9px] text-muted-foreground/55">
-                        {session.model}
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-3 py-2 text-right align-middle tabular-nums text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <MessageSquare className="h-3 w-3 text-muted-foreground/60" aria-hidden="true" />
-                    {session.message_count}
-                  </span>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-right align-middle tabular-nums text-muted-foreground">
                   {formatShortTime(session.modified, t)}

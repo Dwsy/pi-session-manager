@@ -148,7 +148,6 @@ export default function KanbanTableView({
                   {sortIcon('title')}
                 </button>
               </th>
-              <th className="w-[210px] px-3 py-2">{t('plugins.kanbanBoard.table.status', 'Status')}</th>
               {!hideProjectInfo ? (
                 <th className="w-[180px] px-3 py-2" aria-sort={sortKey === 'project' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                   <button type="button" className="inline-flex items-center gap-1 hover:text-foreground focus-ring" onClick={() => toggleSort('project')}>
@@ -159,6 +158,7 @@ export default function KanbanTableView({
               ) : null}
               <th className="w-[140px] px-3 py-2">{t('plugins.kanbanBoard.table.source', 'Source / model')}</th>
               <th className="w-[90px] px-3 py-2 text-right">{t('plugins.kanbanBoard.table.messages', 'Messages')}</th>
+              <th className="w-[210px] px-3 py-2">{t('plugins.kanbanBoard.table.status', 'Status')}</th>
               <th className="w-[100px] px-3 py-2 text-right" aria-sort={sortKey === 'updated' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                 <button type="button" className="ml-auto inline-flex items-center gap-1 hover:text-foreground focus-ring" onClick={() => toggleSort('updated')}>
                   {t('plugins.kanbanBoard.table.updated', 'Updated')}
@@ -221,16 +221,6 @@ export default function KanbanTableView({
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-2 align-middle">
-                    {tags.length > 0 ? (
-                      <div className="flex min-w-0 items-center gap-1 overflow-hidden">
-                        {tags.slice(0, 3).map((tag) => <TagBadge key={tag.id} tag={tag} compact />)}
-                        {tags.length > 3 ? <span className="text-[9px] text-muted-foreground">+{tags.length - 3}</span> : null}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground/55">{t('plugins.kanbanBoard.untagged', 'Unlabeled')}</span>
-                    )}
-                  </td>
                   {!hideProjectInfo ? (
                     <td className="px-3 py-2 align-middle font-mono text-[10px] text-muted-foreground">{projectName(session)}</td>
                   ) : null}
@@ -240,6 +230,16 @@ export default function KanbanTableView({
                   </td>
                   <td className="px-3 py-2 text-right align-middle tabular-nums text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><MessageSquare className="h-3 w-3" />{session.message_count}</span>
+                  </td>
+                  <td className="px-3 py-2 align-middle">
+                    {tags.length > 0 ? (
+                      <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+                        {tags.slice(0, 3).map((tag) => <TagBadge key={tag.id} tag={tag} compact />)}
+                        {tags.length > 3 ? <span className="text-[9px] text-muted-foreground">+{tags.length - 3}</span> : null}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground/45">—</span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-right align-middle tabular-nums text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{relativeTime(session.modified)}</span>
