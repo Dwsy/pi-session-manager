@@ -36,6 +36,16 @@ const ICON_BY_KIND: Partial<Record<CrossAgentKind, typeof Wrench>> = {
   todo: ListTodo,
 };
 
+const PI_BUILTIN_TOOLS = new Set([
+  "read",
+  "bash",
+  "edit",
+  "write",
+  "grep",
+  "find",
+  "ls",
+]);
+
 function highlighted(value: string, searchQuery?: string) {
   const escaped = escapeHtml(value);
   return searchQuery ? highlightSearchInHTML(escaped, searchQuery) : escaped;
@@ -173,7 +183,10 @@ function resolveCrossAgentData(
 export const crossAgentToolRenderer: PsmToolRendererRegistration = {
   id: "builtin-cross-agent-tool-renderer",
   name: "Cross-Agent Tool Renderer",
-  match: (toolCall) => CROSS_AGENT_TOOLS.has(toolCall.name || ""),
+  match: (toolCall) => {
+    const name = toolCall.name || "";
+    return !PI_BUILTIN_TOOLS.has(name) && CROSS_AGENT_TOOLS.has(name);
+  },
   priority: 115,
   component: CrossAgentToolRenderer,
   resolveData: resolveCrossAgentData,

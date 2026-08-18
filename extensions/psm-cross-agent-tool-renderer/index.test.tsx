@@ -3,18 +3,23 @@ import { describe, expect, it } from 'vitest'
 import { crossAgentToolRenderer } from './index'
 
 describe('crossAgentToolRenderer', () => {
-  it('keeps matching legacy cross-agent tool names', () => {
-    for (const name of ['Bash', 'bash', 'shell', 'Read', 'read_file', 'Write', 'write_file', 'Edit', 'MultiEdit', 'edit_file', 'apply_patch', 'search', 'find']) {
+  it('keeps matching legacy cross-agent aliases', () => {
+    for (const name of ['Bash', 'shell', 'Read', 'read_file', 'Write', 'write_file', 'Edit', 'MultiEdit', 'edit_file', 'apply_patch', 'search']) {
       expect(crossAgentToolRenderer.match({ type: 'toolCall', name })).toBe(true)
     }
   })
 
-  it('matches every canonical OMP built-in tool', () => {
+  it('leaves Pi built-in tool names to the core renderer', () => {
+    for (const name of ['read', 'bash', 'edit', 'write', 'grep', 'find', 'ls']) {
+      expect(crossAgentToolRenderer.match({ type: 'toolCall', name })).toBe(false)
+    }
+  })
+
+  it('matches canonical OMP-only built-in tools', () => {
     const ompBuiltins = [
-      'read', 'bash', 'edit', 'ast_grep', 'ast_edit', 'ask', 'debug', 'eval', 'github', 'glob',
-      'grep', 'lsp', 'inspect_image', 'browser', 'computer', 'checkpoint', 'rewind', 'security_scan',
-      'task', 'hub', 'todo', 'web_search', 'write', 'memory_edit', 'retain', 'recall', 'reflect',
-      'learn', 'manage_skill', 'yield', 'goal',
+      'ast_grep', 'ast_edit', 'ask', 'debug', 'eval', 'github', 'glob', 'lsp', 'inspect_image',
+      'browser', 'computer', 'checkpoint', 'rewind', 'security_scan', 'task', 'hub', 'todo',
+      'web_search', 'memory_edit', 'retain', 'recall', 'reflect', 'learn', 'manage_skill', 'yield', 'goal',
     ]
 
     for (const name of ompBuiltins) {
@@ -38,7 +43,7 @@ describe('crossAgentToolRenderer', () => {
     const toolCall = {
       type: 'toolCall' as const,
       id: 'legacy-call',
-      name: 'bash',
+      name: 'Bash',
       arguments: { command: 'cargo test' },
     }
     const data = crossAgentToolRenderer.resolveData!(toolCall, 0, new Map())
@@ -46,12 +51,12 @@ describe('crossAgentToolRenderer', () => {
     expect(crossAgentToolRenderer.getPreview!(toolCall, data)).toBe('Shell: cargo test')
   })
 
-  it('recognizes OMP grep and todo tools', () => {
-    const grepCall = {
+  it('recognizes OMP search and todo tools', () => {
+    const searchCall = {
       type: 'toolCall' as const,
-      id: 'call-grep',
-      name: 'grep',
-      arguments: { pattern: 'upload', i: 'find upload references' },
+      id: 'call-glob',
+      name: 'glob',
+      arguments: { pattern: '**/*.ts', i: 'find TypeScript files' },
     }
     const todoCall = {
       type: 'toolCall' as const,
@@ -60,26 +65,26 @@ describe('crossAgentToolRenderer', () => {
       arguments: { op: 'init', i: 'init deploy tasks', items: ['build', 'deploy'] },
     }
 
-    expect(crossAgentToolRenderer.match(grepCall)).toBe(true)
+    expect(crossAgentToolRenderer.match(searchCall)).toBe(true)
     expect(crossAgentToolRenderer.match(todoCall)).toBe(true)
-    expect(crossAgentToolRenderer.getPreview!(grepCall, crossAgentToolRenderer.resolveData!(grepCall, 0, new Map()))).toBe('Grep: find upload references')
+    expect(crossAgentToolRenderer.getPreview!(searchCall, crossAgentToolRenderer.resolveData!(searchCall, 0, new Map()))).toBe('Glob: find TypeScript files')
     expect(crossAgentToolRenderer.getPreview!(todoCall, crossAgentToolRenderer.resolveData!(todoCall, 0, new Map()))).toBe('Tasks: init deploy tasks')
   })
 
   it('links OMP message-level tool results into renderer output', () => {
     const toolCall = {
       type: 'toolCall' as const,
-      id: 'call-grep',
-      name: 'grep',
-      arguments: { pattern: 'upload' },
+      id: 'call-glob',
+      name: 'glob',
+      arguments: { pattern: '**/*.ts' },
     }
     const result = {
       type: 'message',
       id: 'omp-result',
       message: {
         role: 'toolResult',
-        toolCallId: 'call-grep',
-        toolName: 'grep',
+        toolCallId: 'call-glob',
+        toolName: 'glob',
         content: [{ type: 'text', text: 'src/upload.ts:42' }],
         isError: false,
       },
@@ -87,7 +92,7 @@ describe('crossAgentToolRenderer', () => {
     const data = crossAgentToolRenderer.resolveData!(
       toolCall,
       0,
-      new Map([['call-grep', result]]),
+      new Map([['call-glob', result]]),
     )
 
     expect(data.result).toBe(result)

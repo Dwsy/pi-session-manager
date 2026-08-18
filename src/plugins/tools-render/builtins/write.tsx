@@ -1,4 +1,6 @@
-import type { CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
+import { Eye, X } from 'lucide-react'
 import type { Content } from '@/types'
 import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '@/plugins/tools-render/types'
 import { defaultResolveData } from '@/plugins/tools-render/utils/resolveData'
@@ -12,6 +14,64 @@ import { getToolExecutionClass, getToolRenderStatus, getToolStatusLabel } from '
 /** Maximum height for tool output in pixels */
 const OUTPUT_MAX_HEIGHT = 300
 
+interface HtmlPreviewDialogProps {
+  title: string
+  content: string
+  closeLabel: string
+  onClose: () => void
+}
+
+function HtmlPreviewDialog({ title, content, closeLabel, onClose }: HtmlPreviewDialogProps) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onClose])
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[650] flex items-center justify-center bg-black/60 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <div className="flex h-[min(82vh,760px)] w-[min(92vw,1100px)] flex-col overflow-hidden rounded-md border border-border bg-background">
+        <div className="flex min-h-10 items-center justify-between gap-3 border-b border-border px-3 py-2">
+          <span className="min-w-0 truncate text-sm font-medium text-foreground">{title}</span>
+          <button
+            type="button"
+            className="tool-toggle-button h-7 w-7 shrink-0 p-0"
+            aria-label={closeLabel}
+            title={closeLabel}
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <iframe
+          className="min-h-0 w-full flex-1 border-0"
+          title={title}
+          srcDoc={content}
+          sandbox="allow-scripts"
+          referrerPolicy="no-referrer"
+        />
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 /**
  * Write tool execution renderer
  * Displays file path and written content
@@ -24,9 +84,13 @@ function WriteExecution({
   const { args, output, entryId } = resolvedData
   const { isExpanded, toggleExpanded, isMobile, disableSuccessStyle, t, copyToClipboard } = context
   const status = getToolRenderStatus(resolvedData)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   const filePath = args.file_path || args.path || ''
   const content = args.content || ''
+  const canPreviewHtml = Boolean(content) && /\.html$/i.test(String(filePath).trim())
+  const previewLabel = t('components.writeExecution.previewHtml', 'Preview HTML')
+  const previewTitle = `${previewLabel}: ${filePath}`
 
   const lang = getLanguageFromPath(filePath)
   const displayPath = isMobile ? shortenPath(filePath) : filePath
@@ -50,6 +114,17 @@ function WriteExecution({
         expanded={isExpanded}
         onToggle={toggleExpanded}
         ariaLabel={`Write: ${getToolStatusLabel(status, t)}`}
+        actions={canPreviewHtml ? (
+          <button
+            type="button"
+            className="tool-toggle-button h-7 w-7 p-0"
+            aria-label={previewLabel}
+            title={previewLabel}
+            onClick={() => setPreviewOpen(true)}
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+        ) : undefined}
       >
         <span className="tool-expand-indicator">
           {isExpanded ? '▾' : '▸'}
@@ -66,6 +141,15 @@ function WriteExecution({
         <span className="tool-detail">{lines.length} lines</span>
         <span className={`tool-status tool-status-${status}`}>{getToolStatusLabel(status, t)}</span>
       </ToolHeader>
+
+      {previewOpen && (
+        <HtmlPreviewDialog
+          title={previewTitle}
+          content={String(content)}
+          closeLabel={t('components.writeExecution.closePreview', 'Close preview')}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
 
       {content && (
         <div className={`tool-output-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
