@@ -10,7 +10,7 @@ import {
   getAutomaticDashboardRecap,
   getEasterEggDashboardRecap,
   hasShownDashboardRecap,
-  isDashboardRecapAutoEnabled,
+  isDashboardRecapPeriodAutoEnabled,
   markDashboardRecapShown,
   type DashboardRecapRequest,
 } from './dashboardRecap'
@@ -58,9 +58,9 @@ export default function DashboardRecapController({ sessions }: DashboardRecapCon
   }, [sessions])
 
   const checkAutomaticRecap = useCallback(() => {
-    if (!sessions.length || !isDashboardRecapAutoEnabled() || request) return
+    if (!sessions.length || request) return
     const automatic = getAutomaticDashboardRecap()
-    if (!automatic) return
+    if (!automatic || !isDashboardRecapPeriodAutoEnabled(automatic.period.kind)) return
     const { cycleKey } = automatic.period
     if (openedAutomaticCycleRef.current === cycleKey) return
     if (hasShownDashboardRecap(cycleKey)) return

@@ -9,6 +9,7 @@ import {
   isDashboardRecapAutoEnabled,
   requestDashboardRecap,
   setDashboardRecapAutoEnabled,
+  type DashboardRecapAutoPeriod,
 } from "@/components/dashboard/dashboardRecap";
 import type { RecapPeriodKind } from "@/components/dashboard/recap/recapTypes";
 import { invoke } from "@/transport";
@@ -20,12 +21,44 @@ const RECAP_KINDS: { kind: RecapPeriodKind; key: string; fallback: string }[] = 
   { kind: "year", key: "settings.appBehavior.openYearRecap", fallback: "This year" },
 ];
 
+const AUTO_RECAP_PERIODS: {
+  period: DashboardRecapAutoPeriod;
+  titleKey: string;
+  titleFallback: string;
+  descriptionKey: string;
+  descriptionFallback: string;
+}[] = [
+  {
+    period: "week",
+    titleKey: "settings.appBehavior.recapAutoWeek",
+    titleFallback: "Weekly recap",
+    descriptionKey: "settings.appBehavior.recapAutoWeekDescription",
+    descriptionFallback: "Open last week's recap on Mondays. Off by default.",
+  },
+  {
+    period: "month",
+    titleKey: "settings.appBehavior.recapAutoMonth",
+    titleFallback: "Monthly recap",
+    descriptionKey: "settings.appBehavior.recapAutoMonthDescription",
+    descriptionFallback: "Open last month's recap during the first three days of a new month. Off by default.",
+  },
+  {
+    period: "year",
+    titleKey: "settings.appBehavior.recapAutoYear",
+    titleFallback: "Annual recap",
+    descriptionKey: "settings.appBehavior.recapAutoYearDescription",
+    descriptionFallback: "Open midyear and year-end recaps in their seasonal windows. On by default.",
+  },
+];
+
 export default function AppBehaviorSettings(_: UpdateSettingsProps) {
   const { t } = useTranslation();
   const [lightweightMode, setLightweightMode] = useState(false);
-  const [recapAutoEnabled, setRecapAutoEnabled] = useState(() =>
-    isDashboardRecapAutoEnabled(),
-  );
+  const [recapAutoEnabled, setRecapAutoEnabled] = useState<Record<DashboardRecapAutoPeriod, boolean>>(() => ({
+    week: isDashboardRecapAutoEnabled("week"),
+    month: isDashboardRecapAutoEnabled("month"),
+    year: isDashboardRecapAutoEnabled("year"),
+  }));
 
   useEffect(() => {
     invoke<boolean>("get_lightweight_mode")
@@ -43,9 +76,9 @@ export default function AppBehaviorSettings(_: UpdateSettingsProps) {
     }
   };
 
-  const handleRecapAutoChange = (enabled: boolean) => {
-    setRecapAutoEnabled(enabled);
-    setDashboardRecapAutoEnabled(enabled);
+  const handleRecapAutoChange = (period: DashboardRecapAutoPeriod, enabled: boolean) => {
+    setRecapAutoEnabled((current) => ({ ...current, [period]: enabled }));
+    setDashboardRecapAutoEnabled(period, enabled);
   };
 
   return (
@@ -88,23 +121,22 @@ export default function AppBehaviorSettings(_: UpdateSettingsProps) {
         contentClassName="p-0"
       >
         <div className="divide-y divide-border/50">
-          <div className="flex gap-3 px-3 py-3">
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/40 bg-secondary/35 text-muted-foreground">
-              <CalendarRange className="h-4 w-4" />
+          {AUTO_RECAP_PERIODS.map(({ period, titleKey, titleFallback, descriptionKey, descriptionFallback }) => (
+            <div key={period} className="flex gap-3 px-3 py-3">
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/40 bg-secondary/35 text-muted-foreground">
+                <CalendarRange className="h-4 w-4" />
+              </div>
+              <SettingsToggleRow
+                title={t(titleKey, titleFallback)}
+                description={t(descriptionKey, descriptionFallback)}
+                checked={recapAutoEnabled[period]}
+                onChange={(enabled) => handleRecapAutoChange(period, enabled)}
+                className="min-w-0 flex-1 items-start"
+                descriptionClassName="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground"
+                searchKey={`app-behavior-dashboard-recap-auto-${period}`}
+              />
             </div>
-            <SettingsToggleRow
-              title={t("settings.appBehavior.recapAuto", "Automatic recap")}
-              description={t(
-                "settings.appBehavior.recapAutoDescription",
-                "Opens once when a period wraps up — last week on Mondays, last month in the first days of a new one, plus midyear and year-end windows. Closing it counts as shown for that cycle.",
-              )}
-              checked={recapAutoEnabled}
-              onChange={handleRecapAutoChange}
-              className="min-w-0 flex-1 items-start"
-              descriptionClassName="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground"
-              searchKey="app-behavior-dashboard-recap-auto"
-            />
-          </div>
+          ))}
           <div className="grid gap-3 px-3 py-3 md:grid-cols-[minmax(0,1fr)_auto]" data-settings-search="app-behavior-dashboard-recap-manual">
             <div className="min-w-0">
               <div className="text-sm font-medium text-foreground">

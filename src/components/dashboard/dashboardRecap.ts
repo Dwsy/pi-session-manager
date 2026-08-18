@@ -21,17 +21,43 @@ export interface DashboardRecapRequest {
 export const DASHBOARD_RECAP_EVENT = 'psm-dashboard:recap'
 export const DASHBOARD_RECAP_SETTINGS_EVENT = 'psm-dashboard:recap-settings'
 export const DASHBOARD_RECAP_AUTO_KEY = 'psm-dashboard-recap:auto-enabled'
+const DASHBOARD_RECAP_AUTO_PERIOD_KEY_PREFIX = 'psm-dashboard-recap:auto-enabled:'
 const DASHBOARD_RECAP_STATE_KEY = 'psm-dashboard-recap:shown-v2'
 /** Cycles are weekly at the fastest, so a year of history is plenty. */
 const MAX_REMEMBERED_CYCLES = 60
 
-export function isDashboardRecapAutoEnabled(): boolean {
-  return localStorage.getItem(DASHBOARD_RECAP_AUTO_KEY) !== 'false'
+export type DashboardRecapAutoPeriod = 'week' | 'month' | 'year'
+
+const DASHBOARD_RECAP_AUTO_DEFAULTS: Record<DashboardRecapAutoPeriod, boolean> = {
+  week: false,
+  month: false,
+  year: true,
 }
 
-export function setDashboardRecapAutoEnabled(enabled: boolean): void {
-  localStorage.setItem(DASHBOARD_RECAP_AUTO_KEY, String(enabled))
+function autoPeriodForRecap(kind: RecapPeriodKind): DashboardRecapAutoPeriod | null {
+  if (kind === 'week' || kind === 'month') return kind
+  if (kind === 'year' || kind === 'midyear') return 'year'
+  return null
+}
+
+export function isDashboardRecapAutoEnabled(period: DashboardRecapAutoPeriod): boolean {
+  const value = localStorage.getItem(`${DASHBOARD_RECAP_AUTO_PERIOD_KEY_PREFIX}${period}`)
+  if (value !== null) return value === 'true'
+
+  // Preserve an explicit opt-out from the former global switch. Otherwise the
+  // new per-period defaults take effect for users upgrading from older builds.
+  if (localStorage.getItem(DASHBOARD_RECAP_AUTO_KEY) === 'false') return false
+  return DASHBOARD_RECAP_AUTO_DEFAULTS[period]
+}
+
+export function setDashboardRecapAutoEnabled(period: DashboardRecapAutoPeriod, enabled: boolean): void {
+  localStorage.setItem(`${DASHBOARD_RECAP_AUTO_PERIOD_KEY_PREFIX}${period}`, String(enabled))
   window.dispatchEvent(new Event(DASHBOARD_RECAP_SETTINGS_EVENT))
+}
+
+export function isDashboardRecapPeriodAutoEnabled(kind: RecapPeriodKind): boolean {
+  const period = autoPeriodForRecap(kind)
+  return period !== null && isDashboardRecapAutoEnabled(period)
 }
 
 function readShownCycles(): string[] {
