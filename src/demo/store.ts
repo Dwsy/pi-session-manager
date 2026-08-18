@@ -252,9 +252,9 @@ export function getDemoSessionLabels(path: string): Record<string, string> {
   return Object.fromEntries(labels)
 }
 
-export function getDemoStats() {
+export function getDemoStats(scopedSessions?: SessionInfo[]) {
   const state = ensureStore()
-  return getDemoStatsFromStore(state)
+  return getDemoStatsFromStore(state, scopedSessions)
 }
 
 export function getDemoDayStats(date: string, scopedSessions?: SessionInfo[]) {

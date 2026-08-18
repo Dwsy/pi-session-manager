@@ -297,7 +297,7 @@ export const demoSessionProvider: SessionProvider = {
       sortOrder: options.sortOrder,
     }),
   getSessionLabels: async (path) => getDemoSessionLabels(path),
-  getStats: async () => getDemoStats(),
+  getStats: async (sessions) => getDemoStats(sessions),
   getDayStats: async (date, sessions) => getDemoDayStats(date, sessions),
   paginateSessions: async (options) =>
     listDemoSessionsPaginated({

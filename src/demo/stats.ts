@@ -240,8 +240,22 @@ function toSubagentSummary(state: DemoStore) {
   }
 }
 
-export function getDemoStatsFromStore(state: DemoStore): SessionStats {
-  const sessions = state.sessions
+function scopeStoreForStats(state: DemoStore, scopedSessions?: SessionInfo[]): DemoStore {
+  if (!scopedSessions) return state
+
+  const scopedPaths = new Set(scopedSessions.map((session) => session.path))
+  return {
+    ...state,
+    sessions: state.sessions.filter((session) => scopedPaths.has(session.path)),
+    entriesByPath: new Map([...state.entriesByPath].filter(([path]) => scopedPaths.has(path))),
+    sizeBytesByPath: new Map([...state.sizeBytesByPath].filter(([path]) => scopedPaths.has(path))),
+    seedByPath: new Map([...state.seedByPath].filter(([path]) => scopedPaths.has(path))),
+  }
+}
+
+export function getDemoStatsFromStore(state: DemoStore, scopedSessions?: SessionInfo[]): SessionStats {
+  const statsState = scopeStoreForStats(state, scopedSessions)
+  const sessions = statsState.sessions
 
   const sessionsByProject: Record<string, number> = {}
   const sessionsByModel: Record<string, number> = {}
@@ -251,7 +265,7 @@ export function getDemoStatsFromStore(state: DemoStore): SessionStats {
     const project = getPathBasename(session.cwd)
     sessionsByProject[project] = (sessionsByProject[project] || 0) + 1
 
-    const seed = state.seedByPath.get(session.path)
+    const seed = statsState.seedByPath.get(session.path)
     if (seed) {
       sessionsByModel[seed.model] = (sessionsByModel[seed.model] || 0) + 1
     }
@@ -259,7 +273,7 @@ export function getDemoStatsFromStore(state: DemoStore): SessionStats {
     totalMessages += session.message_count
   }
 
-  const tokenByModel = buildTokenByModel(state)
+  const tokenByModel = buildTokenByModel(statsState)
   const tokenValues = Object.values(tokenByModel)
 
   const totalInput = tokenValues.reduce((sum, item) => sum + item.input, 0)
@@ -270,18 +284,18 @@ export function getDemoStatsFromStore(state: DemoStore): SessionStats {
 
   const totalTokens = totalInput + totalOutput
 
-  const heatmapData = buildHeatmapData(state)
+  const heatmapData = buildHeatmapData(statsState)
   const messagesByDate = heatmapData.reduce<Record<string, number>>((acc, item) => {
     acc[item.date] = item.total_messages
     return acc
   }, {})
 
-  const messagesByHour = buildMessagesByHour(state)
+  const messagesByHour = buildMessagesByHour(statsState)
   const messagesByDayOfWeek = buildMessagesByDayOfWeek(messagesByDate)
 
-  const modelUsageByProject = buildModelUsageByProject(state)
+  const modelUsageByProject = buildModelUsageByProject(statsState)
   const timeDistribution = buildTimeDistribution(messagesByHour)
-  const subagentSummary = toSubagentSummary(state)
+  const subagentSummary = toSubagentSummary(statsState)
 
   const userMessages = Math.floor(totalMessages * 0.46)
   const assistantMessages = totalMessages - userMessages
