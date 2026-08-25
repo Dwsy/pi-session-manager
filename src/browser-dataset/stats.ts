@@ -223,28 +223,23 @@ export async function getBrowserDatasetStats(
   }
 
   const heatmapData: HeatmapPoint[] = [];
+  // Relative intensity: level scales with the day's token share of the busiest day
+  const maxDayTokens = Math.max(0, ...heatmapDateTokens.values());
   for (let index = 364; index >= 0; index -= 1) {
     const date = new Date();
     date.setUTCDate(date.getUTCDate() - index);
     const dateKey = date.toISOString().slice(0, 10);
     const totalMessagesForDay = messagesByDate[dateKey] || 0;
+    const dayTokens = heatmapDateTokens.get(dateKey) || 0;
+    const level =
+      dayTokens <= 0 || maxDayTokens <= 0
+        ? 0
+        : Math.min(5, Math.max(1, Math.ceil((dayTokens / maxDayTokens) * 5)));
+
     const projectMap = heatmapTopProject.get(dateKey) || new Map();
     const topProject = [...projectMap.entries()].sort(
       (a, b) => b[1] - a[1],
     )[0]?.[0];
-    const level =
-      totalMessagesForDay >= 45
-        ? 5
-        : totalMessagesForDay >= 30
-          ? 4
-          : totalMessagesForDay >= 20
-            ? 3
-            : totalMessagesForDay >= 10
-              ? 2
-              : totalMessagesForDay > 0
-                ? 1
-                : 0;
-
     heatmapData.push({
       date: dateKey,
       level,
