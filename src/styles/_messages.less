@@ -135,6 +135,83 @@
   }
 }
 
+// Skill invocation — keep injected skill instructions out of the main reading flow
+.skill-invocation-block {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  align-items: center;
+  gap: 7px;
+  margin: 0.5em 0;
+  padding: 5px 9px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--color-border) / 0.72);
+  border-radius: 5px;
+  background: rgb(var(--color-secondary) / 0.27);
+  color: rgb(var(--color-muted-foreground));
+  text-align: left;
+  transition:
+    background-color var(--motion-duration-fast, 120ms) var(--motion-ease-standard, ease),
+    border-color var(--motion-duration-fast, 120ms) var(--motion-ease-standard, ease);
+
+  &:hover {
+    border-color: rgb(var(--color-border));
+    background: rgb(var(--color-secondary) / 0.42);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(var(--color-ring) / 0.62);
+  }
+}
+
+.skill-invocation-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  color: var(--accent);
+}
+
+.skill-invocation-kind {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.skill-invocation-name,
+.skill-invocation-location {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-invocation-name {
+  flex: 0 1 auto;
+  color: rgb(var(--color-foreground) / 0.9);
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.skill-invocation-location {
+  flex: 1 1 auto;
+  color: rgb(var(--color-muted-foreground) / 0.78);
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: 10px;
+}
+
+.skill-invocation-modal-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 // User Message Modal
 .user-message-modal-overlay {
   position: fixed;

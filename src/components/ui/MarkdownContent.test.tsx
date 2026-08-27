@@ -115,4 +115,40 @@ After XML
     expect(code?.textContent).toContain('<read-files>')
     expect(code?.textContent).toContain('- [file1](file:///path/to/file1)')
   })
+
+  it('renders mermaid code blocks as themed Unicode diagrams', () => {
+    const content = `\`\`\`mermaid
+flowchart LR
+  A[Start] --> B[Done]
+\`\`\``
+    const { container } = render(<MarkdownContent content={content} />)
+
+    const diagram = container.querySelector('.mermaid-block')
+    expect(diagram).not.toBeNull()
+    expect(diagram?.textContent).toContain('Start')
+    expect(diagram?.textContent).toContain('Done')
+    expect(container.querySelector('.markdown-code-block')).toBeNull()
+
+    const sourceView = container.querySelector<HTMLElement>('.mermaid-source-view')
+    expect(sourceView?.hidden).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Mermaid' }))
+    expect(sourceView?.hidden).toBe(false)
+    expect(sourceView?.textContent).toContain('flowchart LR')
+    expect(container.querySelector<HTMLElement>('.mermaid-rendered-view')?.hidden).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rendered' }))
+    expect(sourceView?.hidden).toBe(true)
+    expect(container.querySelector<HTMLElement>('.mermaid-rendered-view')?.hidden).toBe(false)
+  })
+
+  it('falls back to the regular code block for unsupported mermaid diagrams', () => {
+    const content = `\`\`\`mermaid
+quadrantChart
+  x-axis Low --> High
+\`\`\``
+    const { container } = render(<MarkdownContent content={content} />)
+
+    expect(container.querySelector('.mermaid-block')).toBeNull()
+    expect(container.querySelector('.markdown-code-block code')?.textContent).toContain('quadrantChart')
+  })
 })

@@ -1,6 +1,7 @@
 import type { Content } from '@/types'
 import { useTranslation } from 'react-i18next'
 import MarkdownContent from '@/components/ui/MarkdownContent'
+import { SkillAwareMessage } from './SkillInvocationBlock'
 import { formatDate } from '@/utils/format'
 import { Copy, Check, Maximize2, X, FileText, Eye, ChevronDown, ChevronUp } from 'lucide-react'
 import { createPortal } from 'react-dom'
@@ -184,7 +185,7 @@ function UserMessage({ id, timestamp, content, className = '', searchQuery = '' 
               {showRaw ? (
                 <pre className="user-message-body-raw">{text}</pre>
               ) : (
-                <MarkdownContent content={text} className="user-message-body" searchQuery={searchQuery} />
+                <SkillAwareMessage text={text} searchQuery={searchQuery} />
               )}
             </div>
           )}

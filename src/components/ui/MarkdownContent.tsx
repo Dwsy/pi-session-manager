@@ -29,7 +29,29 @@ function MarkdownContent({ content, className = '', searchQuery = '' }: Markdown
   }, [content, searchQuery])
 
   const handleClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    const link = (event.target as HTMLElement | null)?.closest('a[href]') as HTMLAnchorElement | null
+    const targetElement = event.target as HTMLElement | null
+    const mermaidToggle = targetElement?.closest('[data-mermaid-toggle]') as HTMLButtonElement | null
+    if (mermaidToggle) {
+      const block = mermaidToggle.closest('.mermaid-block') as HTMLElement | null
+      const view = mermaidToggle.dataset.mermaidToggle
+      if (!block || (view !== 'rendered' && view !== 'source')) {
+        return
+      }
+
+      block.dataset.mermaidView = view
+      block.querySelectorAll<HTMLButtonElement>('[data-mermaid-toggle]').forEach((button) => {
+        const isActive = button.dataset.mermaidToggle === view
+        button.classList.toggle('is-active', isActive)
+        button.setAttribute('aria-pressed', String(isActive))
+      })
+      const renderedView = block.querySelector<HTMLElement>('.mermaid-rendered-view')
+      const sourceView = block.querySelector<HTMLElement>('.mermaid-source-view')
+      if (renderedView) renderedView.hidden = view !== 'rendered'
+      if (sourceView) sourceView.hidden = view !== 'source'
+      return
+    }
+
+    const link = targetElement?.closest('a[href]') as HTMLAnchorElement | null
     if (!link) {
       return
     }

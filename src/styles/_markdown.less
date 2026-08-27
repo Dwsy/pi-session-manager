@@ -7,6 +7,7 @@
   line-height: 1.65;
   word-break: break-word;
   overflow-wrap: anywhere;
+  overflow-x: auto;
 }
 
 .markdown-content > :first-child {
@@ -74,6 +75,91 @@
   border-radius: 0;
   font-size: 0.9em;
   line-height: 1.55;
+}
+
+.mermaid-block {
+  margin: 1em 0;
+  overflow-x: auto;
+  border: 1px solid var(--mdCodeBlockBorder);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+}
+
+.mermaid-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--mdCodeBlockBorder) 55%, transparent);
+}
+
+.mermaid-view-button {
+  border: 0;
+  border-radius: 4px;
+  padding: 3px 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mermaid-view-button:hover,
+.mermaid-view-button.is-active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+}
+
+.markdown-content .mermaid-art,
+.markdown-content .mermaid-source {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  background: transparent;
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+}
+
+.markdown-content .mermaid-art code {
+  font-size: 0.85em;
+  line-height: 1.35;
+  white-space: pre;
+}
+
+.markdown-content .mermaid-source code {
+  font-size: 0.85em;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.mermaid-border,
+.mermaid-none {
+  color: var(--thinkingText);
+}
+
+.mermaid-text,
+.mermaid-title {
+  color: var(--text);
+}
+
+.mermaid-edge {
+  color: var(--accent);
+}
+
+.mermaid-edgeLabel {
+  color: var(--text-secondary);
+}
+
+.mermaid-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.mermaid-warnings {
+  margin-bottom: 4px;
+  color: rgb(var(--color-warning));
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: 11px;
 }
 
 .markdown-content blockquote {

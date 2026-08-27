@@ -1,4 +1,5 @@
 import { marked, type Tokens } from 'marked'
+import { render as renderMermaid, type MermaidArt, type Span as MermaidSpan } from 'lovely-mermaid'
 import { createHighlighterCoreSync } from '@shikijs/core'
 import { createJavaScriptRegexEngine } from '@shikijs/engine-javascript'
 import bash from '@shikijs/langs/bash'
@@ -227,12 +228,58 @@ function renderShikiCodeHtml(code: string, language?: string, themeOverride?: Sh
   }
 }
 
+function renderMermaidSpan(span: MermaidSpan): string {
+  const className = `mermaid-${span.role}`
+  const text = `<span class="${className}">${escapeHtml(span.text)}</span>`
+  if (!span.href) {
+    return text
+  }
+
+  const target = classifyMarkdownLink(span.href)
+  const safeHref = target.kind === 'anchor' ? span.href : '#'
+  const rawHrefAttr = ` data-markdown-href="${escapeHtml(span.href)}"`
+  return `<a class="mermaid-link" href="${escapeHtml(safeHref)}"${rawHrefAttr}>${text}</a>`
+}
+
+function renderMermaidHtml(art: MermaidArt, source: string): string {
+  const rows = art.styled
+    .map((row) => row.map(renderMermaidSpan).join(''))
+    .join('\n')
+  const warnings = art.warnings.length > 0
+    ? `<div class="mermaid-warnings" title="${escapeHtml(art.warnings.join('\n'))}">Partial diagram</div>`
+    : ''
+  const highlightedSource = renderShikiCodeHtml(source, 'markdown')
+
+  return `
+    <div class="mermaid-block" data-mermaid-width="${art.width}" data-mermaid-view="rendered">
+      <div class="mermaid-toolbar" role="group" aria-label="Mermaid view">
+        <button class="mermaid-view-button is-active" type="button" data-mermaid-toggle="rendered" aria-pressed="true">Rendered</button>
+        <button class="mermaid-view-button" type="button" data-mermaid-toggle="source" aria-pressed="false">Mermaid</button>
+      </div>
+      <div class="mermaid-rendered-view">
+        ${warnings}
+        <pre class="mermaid-art"><code>${rows}</code></pre>
+      </div>
+      <div class="mermaid-source-view" hidden>
+        <pre class="mermaid-source"><code class="shiki markdown">${highlightedSource}</code></pre>
+      </div>
+    </div>
+  `
+}
+
 // Custom renderer
 const renderer = new marked.Renderer()
 
 // Custom code block rendering
 renderer.code = function({ text, lang }: { text: string; lang?: string }): string {
   const language = lang || ''
+  if (language.trim().toLowerCase() === 'mermaid') {
+    const art = renderMermaid(text)
+    if (art) {
+      return renderMermaidHtml(art, text)
+    }
+  }
+
   const validLang = normalizeShikiLanguage(language)
   const highlightedCode = renderShikiCodeHtml(text, validLang)
 

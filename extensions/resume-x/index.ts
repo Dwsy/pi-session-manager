@@ -29,10 +29,15 @@ import { SCROLL } from "./lib/types.js";
 // ── Host module resolution ───────────────────────────────────────────
 
 function getHostDistDir(): string {
-  return path.dirname(realpathSync(process.argv[1]));
+  const entryDir = path.dirname(realpathSync(process.argv[1]));
+  return path.basename(entryDir) === "bundle" ? path.dirname(entryDir) : entryDir;
 }
 
 function hostUrl(relativePath: string): string {
+  const entryDir = path.dirname(realpathSync(process.argv[1]));
+  if (path.basename(entryDir) === "bundle" && relativePath.startsWith("modes/interactive/components/")) {
+    return new URL("index.js", pathToFileURL(entryDir).href + "/").href;
+  }
   return new URL(relativePath, pathToFileURL(getHostDistDir()).href + "/").href;
 }
 

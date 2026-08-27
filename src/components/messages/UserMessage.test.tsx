@@ -67,6 +67,35 @@ describe('UserMessage interactions', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('collapses skill XML into a one-line block and opens the full skill in a dialog', () => {
+    const skillBody = '# Skill instructions\n\nKeep the service boundary intact.'
+    const trailingText = '只读：仔细看历史对话，我之前都跑了很多测试了。'
+
+    render(
+      <UserMessage
+        id="message-skill"
+        content={[{
+          type: 'text',
+          text: `<skill name="use-pi-session" location="/Users/me/.agents/skills/use-pi-session/SKILL.md">\n${skillBody}\n</skill>\n\n${trailingText}`,
+        }]}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Open skill use-pi-session' })).toBeTruthy()
+    expect(screen.queryByText(skillBody)).toBeNull()
+    expect(screen.getByText(/只读：仔细看历史对话/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open skill use-pi-session' }))
+
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'SKILL:use-pi-session' })).toBeTruthy()
+    expect(screen.getByRole('dialog').textContent).toContain(skillBody)
+    expect(screen.getByRole('dialog').textContent).toContain('/Users/me/.agents/skills/use-pi-session/SKILL.md')
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
   it('shows an inline toggle when content is truncated and expands in place', () => {
     vi.stubGlobal('ResizeObserver', ControlledResizeObserver)
 
