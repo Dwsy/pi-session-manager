@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionEntry } from "@/types";
 import { useSessionViewerData } from "./useSessionViewerData";
+import { listen } from "@/transport";
 import {
   getPreviewEntriesFromDB,
   readRuntimeSessionChunk,
@@ -41,6 +42,7 @@ function sessionEntry(): SessionEntry {
 describe("useSessionViewerData", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(listen).mockResolvedValue(() => undefined);
     vi.mocked(shouldListenRuntimeSessionEvents).mockReturnValue(false);
   });
 
@@ -150,5 +152,87 @@ describe("useSessionViewerData", () => {
       ]),
     );
     expect(result.current.hasMoreHistory).toBe(false);
+  });
+
+  it("ignores stale file-watcher chunks after switching sessions", async () => {
+    vi.mocked(shouldListenRuntimeSessionEvents).mockReturnValue(true);
+
+    let sessionsChangedHandler: ((event: any) => void) | null = null;
+    vi.mocked(listen).mockImplementation(async (eventName, handler) => {
+      if (eventName === "sessions-changed") {
+        sessionsChangedHandler = handler as (event: any) => void;
+      }
+      return () => undefined;
+    });
+
+    let releaseStaleChunk!: () => void;
+    const staleChunkReturned = vi.fn();
+    const staleChunkReady = new Promise<void>((resolve) => {
+      releaseStaleChunk = resolve;
+    });
+
+    vi.mocked(readRuntimeSessionChunk)
+      .mockResolvedValueOnce({
+        content:
+          '{"type":"message","id":"a-1","timestamp":"2026-05-23T00:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"session a initial"}]}}\n',
+        next_offset: 150,
+        file_size: 150,
+        has_more: false,
+      })
+      .mockImplementationOnce(async () => {
+        await staleChunkReady;
+        staleChunkReturned();
+        return {
+          content:
+            '{"type":"message","id":"a-2","timestamp":"2026-05-23T00:00:02.000Z","message":{"role":"assistant","content":[{"type":"text","text":"stale session a update"}]}}\n',
+          next_offset: 300,
+          file_size: 300,
+          has_more: false,
+        };
+      })
+      .mockResolvedValueOnce({
+        content:
+          '{"type":"message","id":"b-1","timestamp":"2026-05-23T00:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"session b initial"}]}}\n',
+        next_offset: 160,
+        file_size: 160,
+        has_more: false,
+      });
+
+    const isAtBottomRef = { current: true };
+    const { result, rerender } = renderHook(
+      ({ sessionPath }) =>
+        useSessionViewerData({
+          sessionPath,
+          loadErrorMessage: "failed",
+          isAtBottomRef,
+        }),
+      { initialProps: { sessionPath: "/tmp/session-a.jsonl" } },
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(sessionsChangedHandler).toBeTruthy());
+    expect(result.current.entries.map((entry) => entry.id)).toEqual(["a-1"]);
+
+    act(() => {
+      sessionsChangedHandler?.({
+        payload: {
+          updated: [{ path: "/tmp/session-a.jsonl" }],
+          removed: [],
+        },
+      });
+    });
+
+    await waitFor(() => expect(readRuntimeSessionChunk).toHaveBeenCalledTimes(2));
+
+    rerender({ sessionPath: "/tmp/session-b.jsonl" });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() =>
+      expect(result.current.entries.map((entry) => entry.id)).toEqual(["b-1"]),
+    );
+
+    releaseStaleChunk();
+
+    await waitFor(() => expect(staleChunkReturned).toHaveBeenCalled());
+    expect(result.current.entries.map((entry) => entry.id)).toEqual(["b-1"]);
   });
 });

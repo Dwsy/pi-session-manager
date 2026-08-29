@@ -206,8 +206,10 @@ export function useSessionViewerData({
   const hasMoreHistoryRef = useRef(false);
   const isLiveRef = useRef(isLive ?? false);
   const lastResponseIdRef = useRef<string | null>(null);
+  const sessionPathRef = useRef(sessionPath);
 
   lineCountRef.current = lineCount;
+  sessionPathRef.current = sessionPath;
 
   // Sync isLive prop to ref so the effect always has the latest status
   useEffect(() => {
@@ -248,14 +250,20 @@ export function useSessionViewerData({
         return;
       }
 
+      const targetSessionPath = sessionPath;
+
       try {
         loadingMoreRef.current = true;
 
         const chunk = await readRuntimeSessionChunk(
-          sessionPath,
+          targetSessionPath,
           nextOffsetRef.current,
           maxBytes,
         );
+
+        if (!pathsEqual(sessionPathRef.current, targetSessionPath)) {
+          return;
+        }
 
         nextOffsetRef.current = chunk.next_offset;
         fileSizeRef.current = chunk.file_size;
@@ -278,7 +286,7 @@ export function useSessionViewerData({
 
         setEntries((prev) => {
           const merged = mergeEntriesWithUniqueIds(prev, newEntries);
-          cacheSessionContent(sessionPath, {
+          cacheSessionContent(targetSessionPath, {
             entries: merged,
             lineCount: nextLineCount,
             nextOffset: chunk.next_offset,
@@ -560,6 +568,7 @@ export function useSessionViewerData({
     if (!sessionPath || loading) return;
     if (!shouldListenRuntimeSessionEvents()) return;
 
+    let disposed = false;
     let unlistenSessionsChanged: (() => void) | null = null;
     let unlistenLiveEvents: (() => void) | null = null;
 
@@ -595,10 +604,10 @@ export function useSessionViewerData({
       };
 
       // Only listen to file-watcher when NOT live (avoid conflict with real-time WS streaming)
-      unlistenSessionsChanged = await listen<SessionsDiff>(
+      const unlisten = await listen<SessionsDiff>(
         "sessions-changed",
         (event) => {
-          if (isLiveRef.current) return;
+          if (disposed || isLiveRef.current) return;
           const diff = event.payload;
           if (!diff?.updated?.length) return;
 
@@ -610,6 +619,11 @@ export function useSessionViewerData({
           }
         },
       );
+      if (disposed) {
+        unlisten();
+        return;
+      }
+      unlistenSessionsChanged = unlisten;
 
       const handleLiveEvent = (
         eventType: string,
@@ -956,6 +970,7 @@ export function useSessionViewerData({
     void setup();
 
     return () => {
+      disposed = true;
       isLiveRef.current = false;
       unlistenSessionsChanged?.();
       unlistenLiveEvents?.();
