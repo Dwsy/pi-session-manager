@@ -9,13 +9,13 @@
   opacity: 0.7;
 }
 
-// User Message — same surface color as the page, delineated by a neutral hairline border
+// User Message — distinct bubble color (messenger-style), user messages stand out from assistant
 .user-message {
   position: relative;
   min-width: 0;
   padding: 10px 14px 12px;
   color: var(--userMessageText);
-  background: transparent;
+  background: var(--userMessageBg);
   border: 1px solid rgb(var(--color-border) / 0.55);
   border-radius: 10px;
 }
