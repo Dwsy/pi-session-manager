@@ -4,7 +4,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo, Tag, FavoriteItem } from '@/types'
-import KanbanCard from './KanbanCard'
+import KanbanCard, { kanbanCardSortableId } from './KanbanCard'
 import KanbanContextMenu from './KanbanContextMenu'
 import type { DeleteSessionRequestOptions } from '@/components/dialogs/deleteSessionTypes'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
@@ -161,7 +161,10 @@ export default function KanbanColumn({
   }, [density, sessions.length, useVirtual, virtualizer])
 
   // Memoize session IDs for SortableContext
-  const sessionIds = useMemo(() => sessions.map(s => s.id), [sessions])
+  const sessionIds = useMemo(
+    () => sessions.map((session) => kanbanCardSortableId(id, session.id)),
+    [id, sessions],
+  )
   const getVisibleCardTags = (sessionId: string) => (
     visibleCardTagsForColumn(getTagsForSession(sessionId), tag)
   )
@@ -196,6 +199,7 @@ export default function KanbanColumn({
                 <div className="pb-2">
                   <KanbanCard
                     session={session}
+                    columnId={id}
                     tags={getVisibleCardTags(session.id)}
                     isSelected={selectedSession?.id === session.id}
                     onSelect={(rect, clickPoint) => onSelectSession(session, rect, clickPoint)}
@@ -221,6 +225,7 @@ export default function KanbanColumn({
           <KanbanCard
             key={session.id}
             session={session}
+            columnId={id}
             tags={getVisibleCardTags(session.id)}
             isSelected={selectedSession?.id === session.id}
             onSelect={(rect, clickPoint) => onSelectSession(session, rect, clickPoint)}

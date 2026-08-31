@@ -10,8 +10,13 @@ import { useSettings } from '@/hooks/useSettings'
 import { getSessionSourceSlug, getSessionSourceTag } from '@/utils/session'
 import { getLastPathSegments } from '@/utils/path'
 
+export function kanbanCardSortableId(columnId: string, sessionId: string) {
+  return `card:${columnId}:${sessionId}`
+}
+
 interface KanbanCardProps {
   session: SessionInfo
+  columnId?: string
   tags: Tag[]
   isSelected: boolean
   isDragging?: boolean
@@ -27,6 +32,7 @@ interface KanbanCardProps {
 
 function KanbanCardInner({
   session,
+  columnId,
   tags,
   isSelected,
   isDragging,
@@ -49,9 +55,9 @@ function KanbanCardInner({
     transition,
     isDragging: sortableIsDragging,
   } = useSortable({
-    id: session.id,
+    id: columnId ? kanbanCardSortableId(columnId, session.id) : session.id,
     disabled: isOverlay,
-    data: { type: 'card' },
+    data: { type: 'card', sessionId: session.id, columnId },
   })
 
   const dragging = isDragging || sortableIsDragging
@@ -110,6 +116,7 @@ function KanbanCardInner({
       onContextMenu={onContextMenu}
       data-testid="kanban-card"
       data-session-id={session.id}
+      data-sortable-id={columnId ? kanbanCardSortableId(columnId, session.id) : session.id}
       data-density={density}
       data-dragging={dragging ? 'true' : undefined}
       {...(isOverlay ? {} : { ...attributes, ...listeners })}
@@ -185,6 +192,7 @@ const KanbanCard = memo(KanbanCardInner, (prev, next) => {
     prev.session.id === next.session.id &&
     prev.session.modified === next.session.modified &&
     prev.session.name === next.session.name &&
+    prev.columnId === next.columnId &&
     prev.isSelected === next.isSelected &&
     prev.isDragging === next.isDragging &&
     prev.isOverlay === next.isOverlay &&

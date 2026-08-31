@@ -12,16 +12,16 @@ src/
 ├── bridge-connection.ts    # WebSocket connection + heartbeat + RPC
 ├── connection-manager.ts   # Live mode lifecycle, event forwarding, RPC handling
 ├── tools.ts                # LLM-callable tools (search, context, recall, tag)
-├── commands.ts             # Single /psm interactive panel
+├── commands.ts             # /psm bridge panel + /kanban custom TUI popup
 ├── env.d.ts                # Pi runtime type declarations
 └── index.ts                # Extension entry point
 ```
 
 ## Features
 
-### /psm — Interactive Panel
+### /psm — Bridge Panel
 
-Single entry point for all bridge operations:
+Bridge connection controls only:
 
 ```
  PSM Bridge
@@ -30,11 +30,22 @@ Single entry point for all bridge operations:
    Session:   abc123...
  → ● Connect / ○ Disconnect
    ○ Live: OFF (toggle on)
-   ─── Tags ───
-     Manage Tags...    ← select picker (●/○ toggle)
-     Clear All Tags
-   ───
-     Close
+   Close
+```
+
+### /kanban — Custom TUI Popup
+
+Kanban/tag operations open as a centered TUI overlay instead of being buried inside `/psm`:
+
+```
+ Kanban Tags — session abc123...
+ Assigned: todo, blocked
+
+ > [x] todo
+   [ ] review
+   [x] blocked
+
+ Enter/Space toggle · c clear · n new tag · r refresh · q close
 ```
 
 ### Live Mode
@@ -67,7 +78,7 @@ Real-time session sync via WebSocket. When connected:
 
 ### Tags
 
-All tag operations use PSM's backend API (no local SQLite). Tags are managed via the `/psm` panel's "Manage Tags..." picker or the `session_tag` LLM tool.
+All tag operations use PSM's backend API (no local SQLite). Tags are managed via the `/kanban` custom TUI popup or the `session_tag` LLM tool.
 
 ## Configuration
 

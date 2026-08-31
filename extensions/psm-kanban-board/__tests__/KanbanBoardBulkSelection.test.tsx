@@ -64,6 +64,31 @@ const tag = (id: string, name: string): Tag => ({
 describe('KanbanBoard bulk selection', () => {
   afterEach(() => cleanup())
 
+  it('uses a unique sortable id for the same session rendered in multiple tag columns', () => {
+    const { container } = render(
+      <KanbanBoard
+        sessions={[session('a')]}
+        tags={[tag('todo', 'Todo'), tag('done', 'Done')]}
+        sessionTags={[
+          { sessionId: 'a', tagId: 'todo', position: 0, assignedAt: 'now' },
+          { sessionId: 'a', tagId: 'done', position: 0, assignedAt: 'now' },
+        ]}
+        selectedSession={null}
+        onSelectSession={() => {}}
+        onMoveSession={() => {}}
+        getTagsForSession={() => []}
+        onToggleTag={() => {}}
+      />,
+    )
+
+    const cards = [...container.querySelectorAll<HTMLElement>('[data-session-id="a"]')]
+    expect(cards).toHaveLength(2)
+    expect(cards.map((card) => card.dataset.sortableId).sort()).toEqual([
+      'card:done:a',
+      'card:todo:a',
+    ])
+  })
+
   it('shows the bulk toolbar after selecting multiple cards', () => {
     render(
       <KanbanBoard

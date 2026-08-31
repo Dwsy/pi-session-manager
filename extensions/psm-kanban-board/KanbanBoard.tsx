@@ -351,14 +351,23 @@ export default function KanbanBoard({
       return
     }
 
-    setActiveId(event.active.id as string)
-    setActiveOverColumnId(findColumnForSession(event.active.id as string))
+    const sessionId = String(event.active.data.current?.sessionId ?? event.active.id)
+    const columnId = event.active.data.current?.columnId
+    setActiveId(sessionId)
+    setActiveOverColumnId(columnId ? String(columnId) : findColumnForSession(sessionId))
   }, [findColumnForSession])
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
     if (event.active.data.current?.type === 'column') return
     const overId = event.over?.id
-    setActiveOverColumnId(overId ? resolveOverColumnId(overId as string) : null)
+    const overColumnId = event.over?.data.current?.columnId
+    setActiveOverColumnId(
+      overColumnId
+        ? String(overColumnId)
+        : overId
+          ? resolveOverColumnId(String(overId))
+          : null,
+    )
   }, [resolveOverColumnId])
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
@@ -382,32 +391,42 @@ export default function KanbanBoard({
       return
     }
 
-    const sessionId = active.id as string
-    const overId = over.id as string
+    const sessionId = String(active.data.current?.sessionId ?? active.id)
+    const overId = String(over.id)
 
-    // Find source column
-    const fromColId = findColumnForSession(sessionId)
+    // A session may appear in multiple tag columns. Prefer the concrete drag
+    // instance's column instead of guessing from the shared session id.
+    const fromColId = active.data.current?.columnId
+      ? String(active.data.current.columnId)
+      : findColumnForSession(sessionId)
     if (!fromColId) return
 
     // Determine target column
     let toColId: string
     let position = 0
+    const overColumnId = over.data.current?.columnId
+    const overSessionId = over.data.current?.sessionId
 
     // Check if dropped on a column directly
-    const targetColumn = columns.find(c => c.id === overId)
+    const targetColumn = over.data.current?.type === 'column'
+      ? columns.find((column) => column.id === String(overColumnId ?? overId))
+      : columns.find((column) => column.id === overId)
     if (targetColumn) {
       toColId = targetColumn.id
       position = targetColumn.sessions.length
     } else {
-      // Dropped on another card - find its column
-      const targetColId = findColumnForSession(overId)
+      // Dropped on another card - use that card instance's concrete column.
+      const targetColId = overColumnId
+        ? String(overColumnId)
+        : findColumnForSession(String(overSessionId ?? overId))
       if (!targetColId) return
       toColId = targetColId
 
       // Calculate position
       const targetCol = columns.find(c => c.id === toColId)
       if (targetCol) {
-        const overIndex = targetCol.sessions.findIndex(s => s.id === overId)
+        const targetSessionId = String(overSessionId ?? overId)
+        const overIndex = targetCol.sessions.findIndex(s => s.id === targetSessionId)
         position = overIndex >= 0 ? overIndex : targetCol.sessions.length
       }
     }
