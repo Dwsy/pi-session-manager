@@ -242,12 +242,19 @@ function normalizeSessionEntry(raw: any): SessionEntry | null {
     type === 'label' ||
     type === 'model_change' ||
     type === 'thinking_level_change' ||
+    type === 'title_change' ||
+    type === 'service_tier_change' ||
+    type === 'mode_change' ||
+    type === 'ttsr_injection' ||
+    type === 'session_init' ||
+    type === 'reset_boundary' ||
+    type === 'credential_pin' ||
+    type === 'model_usage' ||
     type === 'toolCall' ||
     type === 'custom' ||
     type === 'custom_message' ||
     type === 'compaction' ||
-    type === 'branch_summary' ||
-    type === 'label'
+    type === 'branch_summary'
   ) {
     return raw as SessionEntry
   }

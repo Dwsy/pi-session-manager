@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
+import { buildActivePathIds } from './session-tree';
 import { findToolResult, getSessionSourceSlug, getSessionSourceTag, parseSessionEntriesWithLineCount } from './session';
 
 describe('parseSessionEntriesWithLineCount', () => {
@@ -131,6 +132,107 @@ describe('parseSessionEntriesWithLineCount', () => {
     expect(entries.find((entry) => entry.id === 'answer')?.parentId).toBe(
       'tool-call',
     )
+  })
+
+  it('preserves OMP metadata entries that advance the parent chain', () => {
+    const content = [
+      JSON.stringify({
+        type: 'message',
+        id: 'omp-user',
+        parentId: null,
+        timestamp: '2026-08-10T10:07:48.731Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Start OMP session' }],
+        },
+      }),
+      JSON.stringify({
+        type: 'title_change',
+        id: 'omp-title',
+        parentId: 'omp-user',
+        timestamp: '2026-08-10T10:07:49.000Z',
+        title: 'OMP session',
+        source: 'auto',
+      }),
+      JSON.stringify({
+        type: 'service_tier_change',
+        id: 'omp-tier',
+        parentId: 'omp-title',
+        timestamp: '2026-08-10T10:07:50.000Z',
+        serviceTier: { openai: 'priority' },
+      }),
+      JSON.stringify({
+        type: 'mode_change',
+        id: 'omp-mode',
+        parentId: 'omp-tier',
+        timestamp: '2026-08-10T10:07:50.200Z',
+        mode: 'goal',
+      }),
+      JSON.stringify({
+        type: 'ttsr_injection',
+        id: 'omp-ttsr',
+        parentId: 'omp-mode',
+        timestamp: '2026-08-10T10:07:50.400Z',
+        injectedRules: ['ts-no-any'],
+      }),
+      JSON.stringify({
+        type: 'session_init',
+        id: 'omp-init',
+        parentId: 'omp-ttsr',
+        timestamp: '2026-08-10T10:07:50.600Z',
+        systemPrompt: 'OMP init',
+      }),
+      JSON.stringify({
+        type: 'reset_boundary',
+        id: 'omp-reset',
+        parentId: 'omp-init',
+        timestamp: '2026-08-10T10:07:50.700Z',
+      }),
+      JSON.stringify({
+        type: 'credential_pin',
+        id: 'omp-pin',
+        parentId: 'omp-reset',
+        timestamp: '2026-08-10T10:07:50.800Z',
+        provider: 'openai',
+        credentialId: 'test-credential',
+      }),
+      JSON.stringify({
+        type: 'model_usage',
+        id: 'omp-usage',
+        parentId: 'omp-pin',
+        timestamp: '2026-08-10T10:07:50.900Z',
+        model: 'openai/gpt-test',
+        usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2 },
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'omp-assistant',
+        parentId: 'omp-usage',
+        timestamp: '2026-08-10T10:07:51.444Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Continue' }],
+        },
+      }),
+    ].join('\n')
+
+    const { entries } = parseSessionEntriesWithLineCount(content)
+    const entryIds = new Set(entries.map((entry) => entry.id))
+
+    expect(entries.map((entry) => entry.type)).toEqual([
+      'message',
+      'title_change',
+      'service_tier_change',
+      'mode_change',
+      'ttsr_injection',
+      'session_init',
+      'reset_boundary',
+      'credential_pin',
+      'model_usage',
+      'message',
+    ])
+    expect(entries.every((entry) => !entry.parentId || entryIds.has(entry.parentId))).toBe(true)
+    expect(buildActivePathIds('omp-assistant', entries)).toContain('omp-user')
   })
 
   it('preserves OMP v3 message blocks and links message-level tool results', () => {
