@@ -29,12 +29,14 @@ declare module "@mariozechner/pi-coding-agent" {
     on(event: string, handler: (...args: unknown[]) => unknown): void;
 
     // Message injection
-    sendUserMessage(text: string, options?: { deliverAs?: string }): void;
+    sendUserMessage(content: string | (TextContent | ImageContent)[], options?: { deliverAs?: "steer" | "followUp"; expandPromptTemplates?: boolean }): void;
     sendMessage(msg: CustomMessage): void;
 
-    // Model/thinking
-    setModel(model: string): void;
-    setThinkingLevel(level: "off" | "minimal" | "low" | "medium" | "high" | "xhigh"): void;
+    // Runtime discovery + model/thinking
+    getCommands(): SlashCommandInfo[];
+    getThinkingLevel(): ThinkingLevel;
+    setModel(model: PiModel): Promise<boolean>;
+    setThinkingLevel(level: ThinkingLevel): void;
 
     // Events bus
     events: { emit(event: string, data?: unknown): void };
@@ -46,6 +48,32 @@ declare module "@mariozechner/pi-coding-agent" {
     content: string | { type: string; text: string }[];
     display: boolean;
     details?: unknown;
+  }
+
+  export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+
+  export interface PiModel {
+    provider: string;
+    id: string;
+    name?: string;
+  }
+
+  export interface TextContent {
+    type: "text";
+    text: string;
+  }
+
+  export interface ImageContent {
+    type: "image";
+    data: string;
+    mimeType: string;
+  }
+
+  export interface SlashCommandInfo {
+    name: string;
+    description?: string;
+    source: "extension" | "prompt" | "skill";
+    sourceInfo: Record<string, unknown>;
   }
 
   export interface ExtensionContext {
@@ -63,6 +91,16 @@ declare module "@mariozechner/pi-coding-agent" {
       rename(name: string): Promise<void>;
       list(): unknown[];
     };
+    model?: PiModel;
+    modelRegistry: {
+      getAvailable(): PiModel[];
+      find(provider: string, modelId: string): PiModel | undefined;
+    };
+    thinkingLevel?: ThinkingLevel;
+    isIdle(): boolean;
+    abort(): void;
+    hasPendingMessages(): boolean;
+    getContextUsage(): { tokens: number | null; contextWindow: number; percent: number | null } | undefined;
   }
 
   export interface ToolDefinition {

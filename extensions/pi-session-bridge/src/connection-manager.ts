@@ -9,7 +9,7 @@
  * - Event forwarding (pi agent events → PSM via WS)
  * - Session state sync (model, thinking level → PSM)
  */
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ImageContent, PiModel, TextContent, ThinkingLevel } from "@mariozechner/pi-coding-agent";
 import * as path from "node:path";
 import { BridgeConnection } from "./bridge-connection.js";
 import { NOTIFY_COOLDOWN } from "./config.js";
@@ -85,8 +85,9 @@ const EVENT_FORWARD_LIST = [
   "tool_execution_end",
   "tool_call",
   "tool_result",
-  // Model
+  // Model / reasoning
   "model_select",
+  "thinking_level_select",
 ];
 
 function forwardEvent(eventType: string, data?: unknown) {
@@ -97,35 +98,81 @@ function forwardEvent(eventType: string, data?: unknown) {
 
 function registerEventForwarding(pi: ExtensionAPI) {
   for (const eventType of EVENT_FORWARD_LIST) {
-    pi.on(eventType, (event: unknown) => {
-      // Track streaming state for get_state RPC
-      if (eventType === "agent_start" || eventType === "turn_start" || eventType === "message_start") {
-        isStreaming = true;
-      } else if (eventType === "agent_end" || eventType === "turn_end" || eventType === "message_end") {
-        isStreaming = false;
-      }
+    pi.on(eventType, (event: unknown, ctx: ExtensionContext) => {
+      latestCtx = ctx;
+      // Agent lifecycle is the stable boundary for the whole streamed response;
+      // message/turn boundaries may occur multiple times while tools are running.
+      if (eventType === "agent_start") isStreaming = true;
+      else if (eventType === "agent_end") isStreaming = false;
+
       const data = event && typeof event === "object" ? event : {};
       forwardEvent(eventType, data);
+
+      if (
+        eventType === "agent_start" ||
+        eventType === "agent_end" ||
+        eventType === "turn_end" ||
+        eventType === "model_select" ||
+        eventType === "thinking_level_select"
+      ) {
+        sendSessionState();
+      }
     });
   }
 }
 
 // ── Session state sync (model/thinking → PSM) ─────────
 
+function serializeModel(model: PiModel | undefined) {
+  if (!model) return undefined;
+  return { provider: model.provider, id: model.id, ...(model.name ? { name: model.name } : {}) };
+}
+
+function getAvailableModels() {
+  return (latestCtx?.modelRegistry?.getAvailable?.() ?? []).map(serializeModel).filter(Boolean);
+}
+
+function getThinkingLevel(): ThinkingLevel | undefined {
+  return piApi?.getThinkingLevel?.() ?? latestCtx?.thinkingLevel;
+}
+
+function getContextUsage() {
+  const usage = latestCtx?.getContextUsage?.();
+  if (!usage || usage.tokens == null) return undefined;
+  return { used: usage.tokens, limit: usage.contextWindow, unit: "tokens" };
+}
+
+function getSessionStatePayload() {
+  return {
+    sessionId,
+    sessionPath,
+    model: serializeModel(latestCtx?.model),
+    availableModels: getAvailableModels(),
+    thinkingLevel: getThinkingLevel(),
+    contextUsage: getContextUsage(),
+    isStreaming,
+  };
+}
+
 function sendSessionState() {
   if (!conn || conn.state !== "connected" || !sessionId) return;
-  conn.send({
-    type: "session_state",
-    payload: {
-      sessionId,
-      model: null, // TODO: extract from ctx if available
-      thinkingLevel: null,
-      isStreaming,
-    },
-  });
+  conn.send({ type: "session_state", payload: getSessionStatePayload() });
 }
 
 // ── RPC command handler (PSM → extension) ─────────────
+
+function getMessageContent(msg: Record<string, unknown>): string | (TextContent | ImageContent)[] {
+  const message = typeof msg.message === "string" ? msg.message : "";
+  const images = Array.isArray(msg.images)
+    ? msg.images.filter((image): image is ImageContent => {
+        if (!image || typeof image !== "object") return false;
+        const value = image as Record<string, unknown>;
+        return value.type === "image" && typeof value.data === "string" && typeof value.mimeType === "string";
+      })
+    : [];
+  if (images.length === 0) return message;
+  return [{ type: "text", text: message }, ...images];
+}
 
 async function handleRpcCommand(msg: Record<string, unknown>) {
   const type = msg.type as string;
@@ -144,26 +191,40 @@ async function handleRpcCommand(msg: Record<string, unknown>) {
 
   try {
     switch (type) {
-      case "prompt":
-      case "follow_up": {
-        const message = msg.message as string;
-        if (message && piApi) {
-          piApi.sendUserMessage(message);
+      case "prompt": {
+        const content = getMessageContent(msg);
+        const hasContent = typeof content === "string" ? content.length > 0 : content.length > 1 || content[0]?.text.length > 0;
+        if (hasContent && piApi) {
+          const requestedDelivery = msg.streamingBehavior;
+          const deliverAs = requestedDelivery === "steer" || requestedDelivery === "followUp" ? requestedDelivery : undefined;
+          piApi.sendUserMessage(content, { ...(deliverAs ? { deliverAs } : {}), expandPromptTemplates: true });
           respond(true, { status: "sent" });
         } else {
-          respond(false, undefined, "No message or pi API unavailable");
+          respond(false, undefined, "No message/images or pi API unavailable");
+        }
+        break;
+      }
+
+      case "follow_up": {
+        const content = getMessageContent(msg);
+        const hasContent = typeof content === "string" ? content.length > 0 : content.length > 1 || content[0]?.text.length > 0;
+        if (hasContent && piApi) {
+          piApi.sendUserMessage(content, { deliverAs: "followUp", expandPromptTemplates: true });
+          respond(true, { status: "sent" });
+        } else {
+          respond(false, undefined, "No message/images or pi API unavailable");
         }
         break;
       }
 
       case "steer": {
-        const message = msg.message as string;
-        if (message && piApi) {
-          // sendUserMessage with steer delivery
-          piApi.sendUserMessage(`[Steer] ${message}`, { deliverAs: "steer" });
+        const content = getMessageContent(msg);
+        const hasContent = typeof content === "string" ? content.length > 0 : content.length > 1 || content[0]?.text.length > 0;
+        if (hasContent && piApi) {
+          piApi.sendUserMessage(content, { deliverAs: "steer", expandPromptTemplates: true });
           respond(true, { status: "sent" });
         } else {
-          respond(false, undefined, "No message or pi API unavailable");
+          respond(false, undefined, "No message/images or pi API unavailable");
         }
         break;
       }
@@ -171,22 +232,31 @@ async function handleRpcCommand(msg: Record<string, unknown>) {
       case "set_model": {
         const provider = msg.provider as string;
         const modelId = msg.modelId as string;
-        if (provider && modelId && piApi) {
-          piApi.setModel(`${provider}/${modelId}`);
-          sendSessionState();
-          respond(true, { status: "sent" });
-        } else {
-          respond(false, undefined, "Missing provider/modelId");
+        if (!provider || !modelId || !piApi || !latestCtx) {
+          respond(false, undefined, "Missing provider/modelId or Pi context unavailable");
+          break;
         }
+        const model = latestCtx.modelRegistry.find(provider, modelId);
+        if (!model) {
+          respond(false, undefined, `Model not available: ${provider}/${modelId}`);
+          break;
+        }
+        const changed = await piApi.setModel(model);
+        if (!changed) {
+          respond(false, undefined, `Model has no configured auth: ${provider}/${modelId}`);
+          break;
+        }
+        sendSessionState();
+        respond(true, { status: "set", model: serializeModel(model) });
         break;
       }
 
       case "set_thinking_level": {
         const level = msg.level as string;
         if (level && piApi) {
-          piApi.setThinkingLevel(level as "off" | "minimal" | "low" | "medium" | "high" | "xhigh");
+          piApi.setThinkingLevel(level as ThinkingLevel);
           sendSessionState();
-          respond(true, { status: "sent" });
+          respond(true, { status: "set", level: getThinkingLevel() });
         } else {
           respond(false, undefined, "Missing level");
         }
@@ -194,31 +264,27 @@ async function handleRpcCommand(msg: Record<string, unknown>) {
       }
 
       case "get_state": {
-        respond(true, {
-          sessionId,
-          sessionPath,
-          isStreaming,
-          model: null,
-          thinkingLevel: null,
-        });
+        respond(true, getSessionStatePayload());
         break;
       }
 
       case "get_commands": {
-        respond(true, { commands: [] });
+        respond(true, { commands: piApi?.getCommands?.() ?? [] });
         break;
       }
 
       case "get_available_models": {
-        respond(true, { models: [] });
+        respond(true, { models: getAvailableModels() });
         break;
       }
 
       case "abort": {
-        if (piApi) {
-          piApi.sendUserMessage("[Abort] Please stop current task immediately.", { deliverAs: "steer" });
+        if (!latestCtx) {
+          respond(false, undefined, "Pi context unavailable");
+          break;
         }
-        respond(true, { status: "sent" });
+        latestCtx.abort();
+        respond(true, { status: "aborted" });
         break;
       }
 

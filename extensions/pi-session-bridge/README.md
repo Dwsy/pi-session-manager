@@ -57,9 +57,12 @@ Kanban workflow metadata opens as a centered TUI overlay instead of being buried
 
 Real-time session sync via WebSocket. When connected:
 
-- **Event forwarding**: agent_start/end, turn_start/end, message_start/update/end, tool_execution_start/update/end, tool_call/result, model_select
-- **RPC handling**: PSM can send prompt, steer, follow_up, set_model, set_thinking_level, get_state, abort
-- **Session state sync**: model, thinking level, streaming state
+- **Event forwarding**: agent_start/end, turn_start/end, message_start/update/end, tool_execution_start/update/end, tool_call/result, model_select, thinking_level_select
+- **RPC handling**: PSM can send prompt, steer, follow_up, abort, set_model, set_thinking_level, get_state, get_commands, get_available_models
+- **Session state sync**: current model, available models, thinking level, context usage, and agent streaming state
+- **Remote command parity**: slash commands are discovered from Pi at runtime; remote prompts expand extension commands, skills, and prompt templates just like local Pi input; prompt/steer/follow-up preserve Pi-compatible image payloads and streaming delivery behavior
+- **Model control**: model changes resolve against Pi's live ModelRegistry and report unavailable/unauthenticated models instead of silently accepting invalid IDs
+- **Abort semantics**: remote abort calls Pi's real abort API instead of injecting a synthetic steer message
 
 ### LLM Tools
 
