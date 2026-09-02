@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   detectConfiguredSubagentProviders,
   detectSubagentProviderFromPayload,
+  isSubagentSessionPath,
   normalizeSubagentCompatibilitySettings,
 } from './subagentCompatibility'
 
@@ -10,9 +11,24 @@ describe('subagentCompatibility', () => {
   it('defaults to smart mode when config is missing', () => {
     expect(normalizeSubagentCompatibilitySettings(undefined)).toMatchObject({
       mode: 'smart',
+      showSessions: true,
       showProviderBadge: true,
       enableAsyncStatusProbe: true,
     })
+  })
+
+  it('recognizes only subagent directory segments', () => {
+    expect(
+      isSubagentSessionPath(
+        '/Users/me/.pi/agent/sessions/project/subagent/2026-09-01.jsonl',
+      ),
+    ).toBe(true)
+    expect(
+      isSubagentSessionPath(
+        'C:\\Users\\me\\.pi\\agent\\sessions\\project\\subagents\\session.jsonl',
+      ),
+    ).toBe(true)
+    expect(isSubagentSessionPath('/tmp/project/my-subagent-work/session.jsonl')).toBe(false)
   })
 
   it('keeps forced provider only in forced mode', () => {

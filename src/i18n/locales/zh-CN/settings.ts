@@ -414,6 +414,8 @@ export const settings = {
       "根据 session JSON、tool/custom message 结构自动推断当前子代理协议。",
     modeForcedHelp: "优先按指定协议解释歧义条目，必要时再安全回退。",
     providerLabel: "强制 provider",
+    showSessions: "显示子代理会话",
+    showSessionsHelp: "在会话列表中包含存放于 subagent 或 subagents 目录下的会话。",
     showProviderBadge: "显示 provider 标识",
     showProviderBadgeHelp: "在可识别时，于结果卡片上显示子代理扩展来源。",
     enableAsyncProbe: "启用异步状态探测",

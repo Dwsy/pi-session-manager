@@ -9,6 +9,10 @@ export type DetectedSubagentProvider =
   | 'generic'
   | 'unknown'
 
+export function isSubagentSessionPath(path: string): boolean {
+  return /(?:^|[\\/])subagents?(?:[\\/]|$)/i.test(path)
+}
+
 const PROVIDER_SOURCES: Array<{
   provider: Exclude<ForcedSubagentProvider, 'none'>
   matchers: string[]
@@ -40,6 +44,7 @@ export function normalizeSubagentCompatibilitySettings(
   return {
     mode,
     forcedProvider,
+    showSessions: raw.showSessions !== false,
     showProviderBadge: raw.showProviderBadge !== false,
     enableAsyncStatusProbe: raw.enableAsyncStatusProbe !== false,
   }

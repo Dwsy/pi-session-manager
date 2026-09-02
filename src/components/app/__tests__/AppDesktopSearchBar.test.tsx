@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-i18next', () => ({
@@ -40,6 +40,20 @@ const baseProps: AppDesktopSearchBarProps = {
 }
 
 describe('AppDesktopSearchBar select mode trigger', () => {
+  it('renders current-session locate at the right side of the search controls', () => {
+    const onLocateCurrentSession = vi.fn()
+    render(
+      <AppDesktopSearchBar
+        {...baseProps}
+        onLocateCurrentSession={onLocateCurrentSession}
+        canLocateCurrentSession
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /locate current session/i }))
+    expect(onLocateCurrentSession).toHaveBeenCalledTimes(1)
+  })
+
   it('shows select mode only when a SessionList is visible', () => {
     const { rerender } = render(<AppDesktopSearchBar {...baseProps} />)
 

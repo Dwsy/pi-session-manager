@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { CheckSquare2, Table2 } from "lucide-react";
+import { CheckSquare2, LocateFixed, Table2 } from "lucide-react";
 
 import SearchFilterBar from "@/components/search/SearchFilterBar";
 import ActiveFilterChips from "@/components/search/ActiveFilterChips";
@@ -34,6 +34,8 @@ export interface AppDesktopSearchBarProps {
   onSortByChange: (sortBy: SessionSortBy) => void;
   onSortOrderChange: (sortOrder: SessionSortOrder) => void;
   onSelectModeTrigger?: () => void;
+  onLocateCurrentSession?: () => void;
+  canLocateCurrentSession?: boolean;
   /** Opens/closes the full-width project + session browser in the main pane. */
   onToggleExplorer?: () => void;
   explorerActive?: boolean;
@@ -65,6 +67,8 @@ function AppDesktopSearchBar({
   onSortByChange,
   onSortOrderChange,
   onSelectModeTrigger,
+  onLocateCurrentSession,
+  canLocateCurrentSession = false,
   onToggleExplorer,
   explorerActive = false,
 }: AppDesktopSearchBarProps) {
@@ -129,6 +133,18 @@ function AppDesktopSearchBar({
             title={t("session.list.selectMode", { defaultValue: "Select mode" })}
           >
             <CheckSquare2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {onLocateCurrentSession && (
+          <button
+            type="button"
+            onClick={onLocateCurrentSession}
+            disabled={!canLocateCurrentSession}
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-secondary/40 text-muted-foreground hover:text-foreground motion-color focus-ring disabled:cursor-not-allowed disabled:opacity-30"
+            aria-label={t("app.sidebar.locateCurrentSession", { defaultValue: "Locate current session" })}
+            title={t("app.sidebar.locateCurrentSession", { defaultValue: "Locate current session" })}
+          >
+            <LocateFixed className="h-3.5 w-3.5" />
           </button>
         )}
       </div>

@@ -135,6 +135,17 @@ export default function SubagentCompatibilitySettings({
         )}
 
         <SettingsToggleRow
+          title={t('settings.subagents.showSessions', 'Show subagent sessions')}
+          description={t(
+            'settings.subagents.showSessionsHelp',
+            'Include sessions stored under subagent or subagents directories in session lists.',
+          )}
+          checked={settings.subagents.showSessions !== false}
+          onChange={(checked) => onUpdate('subagents', 'showSessions', checked)}
+          className="items-start py-1"
+        />
+
+        <SettingsToggleRow
           title={t('settings.subagents.showProviderBadge', 'Show provider badge')}
           description={t(
             'settings.subagents.showProviderBadgeHelp',

@@ -61,6 +61,7 @@ export interface AppDesktopSidebarContentProps {
   sidebarLoading: boolean;
   sidebarHasMore: boolean;
   sidebarLoadingMore: boolean;
+  locateSelectedSessionTrigger?: number;
   loading: boolean;
   getBadgeType?: SessionListProps["getBadgeType"];
   listScrollRef: RefObject<HTMLDivElement>;
@@ -81,6 +82,7 @@ function AppDesktopSidebarContent({
   sidebarLoading,
   sidebarHasMore,
   sidebarLoadingMore,
+  locateSelectedSessionTrigger,
   loading,
   listScrollRef,
   sessionListCommonProps,
@@ -121,6 +123,7 @@ function AppDesktopSidebarContent({
               hasMore={sidebarHasMore}
               loadingMore={sidebarLoadingMore}
               onLoadMore={onLoadMoreSidebarSessions}
+              locateSelectedSessionTrigger={locateSelectedSessionTrigger}
               scrollParentRef={listScrollRef}
               showDirectory={false}
             />
@@ -142,6 +145,7 @@ function AppDesktopSidebarContent({
           hasMore={sidebarHasMore}
           loadingMore={sidebarLoadingMore}
           onLoadMore={onLoadMoreSidebarSessions}
+          locateSelectedSessionTrigger={locateSelectedSessionTrigger}
           scrollParentRef={listScrollRef}
         />
       )}

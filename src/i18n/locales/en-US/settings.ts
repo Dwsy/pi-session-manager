@@ -421,6 +421,9 @@ export const settings = {
     modeForcedHelp:
       "Prefer one known protocol when rendering ambiguous subagent entries, then safely fall back.",
     providerLabel: "Forced provider",
+    showSessions: "Show subagent sessions",
+    showSessionsHelp:
+      "Include sessions stored under subagent or subagents directories in session lists.",
     showProviderBadge: "Show provider badge",
     showProviderBadgeHelp:
       "Display the detected subagent extension on result cards when available.",

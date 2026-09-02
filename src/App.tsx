@@ -287,6 +287,7 @@ function App() {
     DEFAULT_SESSION_SORT_ORDER,
   );
   const [selectionModeTrigger, setSelectionModeTrigger] = useState(0);
+  const [locateSelectedSessionTrigger, setLocateSelectedSessionTrigger] = useState(0);
   const { showOnboarding, firstScanDone, dismissOnboarding } =
     useOnboardingGate({ sessionsLoading: loading });
   const [sidebarVisible, setSidebarVisible] = useState(true);
@@ -1566,6 +1567,14 @@ function App() {
     navigateToSessions();
   };
 
+  const handleLocateCurrentSession = () => {
+    if (!selectedSession) return;
+    setSidebarMode("list");
+    setActiveAppViewId(null);
+    setSelectedProject(null);
+    setLocateSelectedSessionTrigger((trigger) => trigger + 1);
+  };
+
   const sharedSearchBarProps = {
     searchQuery: sidebarSearchQuery,
     onSearchChange: setSidebarSearchQuery,
@@ -1600,6 +1609,8 @@ function App() {
         {...sharedSearchBarProps}
         sidebarMode={sidebarMode}
         onSelectModeTrigger={triggerSelectionMode}
+        onLocateCurrentSession={handleLocateCurrentSession}
+        canLocateCurrentSession={Boolean(selectedSession)}
         onToggleExplorer={standaloneDatasetRuntime ? undefined : toggleExplorer}
         explorerActive={explorerActive}
       />
@@ -1619,6 +1630,7 @@ function App() {
       sidebarLoading={sidebarLoading}
       sidebarHasMore={sidebarHasMore}
       sidebarLoadingMore={sidebarLoadingMore}
+      locateSelectedSessionTrigger={locateSelectedSessionTrigger}
       loading={loading}
       getBadgeType={getBadgeType}
       listScrollRef={listScrollRef}

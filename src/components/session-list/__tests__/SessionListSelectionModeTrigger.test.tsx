@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-i18next', () => ({
@@ -76,6 +76,30 @@ const session: SessionInfo = {
 }
 
 describe('SessionList selectionModeTrigger', () => {
+  it('loads later pages when locating a selected session opened from a deep link', async () => {
+    const deepLinkedSession: SessionInfo = {
+      ...session,
+      id: 'session-999',
+      path: '/tmp/session-999.jsonl',
+      name: 'Deep linked session',
+    }
+    const onLoadMore = vi.fn().mockResolvedValue(undefined)
+    const props = {
+      sessions: [session],
+      selectedSession: deepLinkedSession,
+      onSelectSession: vi.fn(),
+      loading: false,
+      hasMore: true,
+      onLoadMore,
+      locateSelectedSessionTrigger: 0,
+    }
+
+    const { rerender } = render(<SessionList {...props} />)
+    rerender(<SessionList {...props} locateSelectedSessionTrigger={1} />)
+
+    await waitFor(() => expect(onLoadMore).toHaveBeenCalledTimes(1))
+  })
+
   it('toggles selection mode off on repeated select triggers', async () => {
     const props = {
       sessions: [session],

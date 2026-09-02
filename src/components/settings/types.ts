@@ -62,6 +62,7 @@ export type ForcedSubagentProvider =
 export interface AppSubagentSettings {
   mode: SubagentCompatibilityMode;
   forcedProvider?: ForcedSubagentProvider;
+  showSessions: boolean;
   showProviderBadge: boolean;
   enableAsyncStatusProbe: boolean;
 }
@@ -264,6 +265,7 @@ export const defaultSettings: AppSettings = {
   },
   subagents: {
     mode: "smart",
+    showSessions: true,
     showProviderBadge: true,
     enableAsyncStatusProbe: true,
   },

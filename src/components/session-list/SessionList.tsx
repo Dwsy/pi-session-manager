@@ -41,12 +41,11 @@ import { getPlatformDefaults } from "@/components/settings/types";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { isTextEntryTarget } from "@/hooks/useKeyboardShortcuts";
 import { useSettings } from "@/hooks/useSettings";
+import { isSubagentSessionPath } from "@/utils/subagentCompatibility";
 import { usePsmPluginSessionUi, PluginContributionBoundary, PluginContributionSlot } from '@/plugins/runtime-host';
 
 const ESTIMATED_ROW_HEIGHT = 122;
 const STICKY_SCROLL_TOP_THRESHOLD = 48;
-
-
 
 interface SessionListProps {
   sessions: SessionInfo[];
@@ -94,11 +93,12 @@ interface SessionListProps {
   onCreateTag?: (name: string, color: string) => void;
   selectionModeTrigger?: number;
   selectionModeDismissTrigger?: number;
+  locateSelectedSessionTrigger?: number;
   liveSessionIds?: Set<string>;
 }
 
 export default function SessionList({
-  sessions,
+  sessions: allSessions,
   selectedSession,
   onSelectSession,
   onDeleteSession,
@@ -129,17 +129,26 @@ export default function SessionList({
   onCreateTag,
   selectionModeTrigger,
   selectionModeDismissTrigger,
+  locateSelectedSessionTrigger,
   searchQuery,
   liveSessionIds,
 }: SessionListProps) {
   const { sessionListActions = [], sessionContextMenuActions = [] } = usePsmPluginSessionUi();
   const { t } = useTranslation();
-  const { getSessionSetting } = useSettings();
+  const { getSessionSetting, settings } = useSettings();
   const isMobile = useIsMobile();
   const showAgentIconInBadge =
     getSessionSetting("showAgentIconInSessionBadge") !== false;
   const showModelIconInBadge =
     getSessionSetting("showModelIconInSessionBadge") === true;
+  const showSubagentSessions = settings?.subagents?.showSessions !== false;
+  const sessions = useMemo(
+    () =>
+      showSubagentSessions
+        ? allSessions
+        : allSessions.filter((session) => !isSubagentSessionPath(session.path)),
+    [allSessions, showSubagentSessions],
+  );
   const listContainerRef = useRef<HTMLDivElement>(null);
   const [columnCount, setColumnCount] = useState(1);
   const [tagPickerSessionId, setTagPickerSessionId] = useState<string | null>(
@@ -164,6 +173,10 @@ export default function SessionList({
   const lastSelectionModeDismissTriggerRef = useRef(
     selectionModeDismissTrigger,
   );
+  const lastLocateSelectedSessionTriggerRef = useRef(
+    locateSelectedSessionTrigger,
+  );
+  const [locatingSelectedSessionId, setLocatingSelectedSessionId] = useState<string | null>(null);
   const scrollAnchorRef = useRef<{
     sessionId: string;
     top: number;
@@ -434,6 +447,45 @@ export default function SessionList({
   ]);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
+
+  useEffect(() => {
+    if (locateSelectedSessionTrigger === undefined) return;
+    if (locateSelectedSessionTrigger === lastLocateSelectedSessionTriggerRef.current) return;
+
+    lastLocateSelectedSessionTriggerRef.current = locateSelectedSessionTrigger;
+    setLocatingSelectedSessionId(selectedSession?.id ?? null);
+  }, [locateSelectedSessionTrigger, selectedSession]);
+
+  useEffect(() => {
+    if (!locatingSelectedSessionId) return;
+
+    const sessionIndex = sessionIndexById.get(locatingSelectedSessionId);
+    if (sessionIndex !== undefined) {
+      rowVirtualizer.scrollToIndex(
+        Math.floor(sessionIndex / Math.max(1, columnCount)),
+        { align: "center", behavior: "auto" },
+      );
+      setLocatingSelectedSessionId(null);
+      return;
+    }
+
+    if (hasMore && onLoadMore && !loadingMore) {
+      void onLoadMore();
+      return;
+    }
+
+    if (!loadingMore && !hasMore) {
+      setLocatingSelectedSessionId(null);
+    }
+  }, [
+    columnCount,
+    hasMore,
+    loadingMore,
+    locatingSelectedSessionId,
+    onLoadMore,
+    rowVirtualizer,
+    sessionIndexById,
+  ]);
 
   useLayoutEffect(() => {
     // Keep the first visible card visually anchored across incremental refreshes.
@@ -776,6 +828,7 @@ export default function SessionList({
                       (session.first_message && !session.name);
                     const sourceTag = getSessionSourceTag(session.path);
                     const sourceSlug = getSessionSourceSlug(session.path);
+                    const isSubagentSession = isSubagentSessionPath(session.path);
                     const sessionTags = getTagsForSession
                       ? getTagsForSession(session.id)
                       : [];
@@ -835,7 +888,7 @@ export default function SessionList({
                           isSelected
                             ? isSelectionMode
                               ? "border-primary/60 bg-primary/10 shadow-lg ring-1 ring-primary/30"
-                              : "border-primary/30 bg-surface/75 shadow-lg"
+                              : "border-primary/25 bg-primary/5"
                             : isSelectionMode
                               ? "border-border/70 hover:bg-surface/70"
                               : "border-transparent hover:bg-surface/60"
@@ -945,6 +998,13 @@ export default function SessionList({
                                 tone="source"
                                 sourceSlug={sourceSlug || undefined}
                                 showIcon={showAgentIconInBadge}
+                                className="text-[9px] sm:text-[10px]"
+                              />
+                            )}
+                            {isSubagentSession && (
+                              <SessionBadge
+                                label="subagent"
+                                tone="source"
                                 className="text-[9px] sm:text-[10px]"
                               />
                             )}
