@@ -2,6 +2,19 @@
 
 All notable changes to Pi Session Manager will be documented in this file.
 
+## [0.8.4] - 2026-09-02
+
+### Added
+
+- Added Grok-inspired conversation folding that groups consecutive tool calls into independently expandable runs, keeps visible text boundaries intact, and makes the new tool-call grouping mode the default while preserving the legacy whole-turn fold as a setting.
+- Added KaTeX-powered LaTeX math rendering in Markdown content.
+
+### Changed
+
+- Split Kanban workflow Status from GitHub-style Labels across the Kanban board and Pi session bridge, with dedicated storage, commands, tooling, and UI for each concept.
+- Aligned Pi session bridge live RPC connection behavior with the current Pi runtime.
+- Tightened the desktop search bar layout for a more compact presentation.
+
 ## [0.8.3] - 2026-09-02
 
 ### Added
