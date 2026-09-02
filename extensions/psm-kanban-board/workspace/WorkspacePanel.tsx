@@ -36,7 +36,7 @@ interface WorkspacePanelProps {
     | 'sessionTags'
     | 'sourceOptions'
     | 'getDescendantIds'
-    | 'onToggleTag'
+    | 'onMoveSession'
     | 'onClearSelectedSession'
   >
   workspaceStore: KanbanWorkspaceStore
@@ -71,7 +71,7 @@ export default function WorkspacePanel({
     filterSessions({
       sessions: data.sessions,
       projectFilter: activeWorkspace.config.projectFilter,
-      filterTagIds: activeWorkspace.config.filterTagIds,
+      filterTagIds: activeWorkspace.config.filterStatusIds,
       sourceFilterSlugs: activeWorkspace.config.sourceFilterSlugs,
       sessionTags: data.sessionTags,
       getDescendantIds: data.getDescendantIds,
@@ -100,11 +100,11 @@ export default function WorkspacePanel({
       .sort((a, b) => b.lastModified - a.lastModified)
   }, [effectiveSessions, searchQuery, t])
 
-  const archiveTag = data.tags.find((tag) => tag.id === 'builtin-archive')
+  const archiveStatus = data.tags.find((status) => status.id === 'builtin-archive')
 
   const hasFilters =
     activeWorkspace.config.projectFilter ||
-    activeWorkspace.config.filterTagIds.length > 0 ||
+    activeWorkspace.config.filterStatusIds.length > 0 ||
     activeWorkspace.config.sourceFilterSlugs.length > 0
 
   const openCreateEditor = () => {
@@ -130,15 +130,15 @@ export default function WorkspacePanel({
   }
 
   const archiveProject = (project: string) => {
-    if (!archiveTag) return
-    const archivedSessionIds = new Set(
-      data.sessionTags
-        .filter((sessionTag) => sessionTag.tagId === archiveTag.id)
-        .map((sessionTag) => sessionTag.sessionId),
-    )
+    if (!archiveStatus) return
     for (const session of effectiveSessions) {
-      if (session.cwd === project && !archivedSessionIds.has(session.id)) {
-        data.onToggleTag(session.id, archiveTag.id, true)
+      if (session.cwd !== project) continue
+      const currentAssignments = data.sessionTags.filter((assignment) => assignment.sessionId === session.id)
+      const currentStatusId = currentAssignments.length > 0
+        ? [...currentAssignments].sort((left, right) => Date.parse(right.assignedAt) - Date.parse(left.assignedAt))[0]?.tagId ?? null
+        : null
+      if (currentStatusId !== archiveStatus.id) {
+        data.onMoveSession(session.id, currentStatusId, archiveStatus.id, 0)
       }
     }
     data.onClearSelectedSession()
@@ -238,10 +238,10 @@ export default function WorkspacePanel({
               {activeWorkspace.config.projectFilter.split('/').pop()}
             </span>
           )}
-          {activeWorkspace.config.filterTagIds.length > 0 && (
+          {activeWorkspace.config.filterStatusIds.length > 0 && (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px]">
               <Tag className="h-3 w-3" />
-              {activeWorkspace.config.filterTagIds.length} tags
+              {activeWorkspace.config.filterStatusIds.length} statuses
             </span>
           )}
           {activeWorkspace.config.sourceFilterSlugs.length > 0 && (
@@ -308,7 +308,7 @@ export default function WorkspacePanel({
                     aria-label={`Archive project ${project.dirName}`}
                     title="Archive project"
                     onClick={() => archiveProject(project.dir)}
-                    disabled={!archiveTag}
+                    disabled={!archiveStatus}
                     className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-primary focus-ring disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Archive className="h-3.5 w-3.5" />
@@ -341,7 +341,7 @@ export default function WorkspacePanel({
         <WorkspaceEditor
           workspace={editingWorkspace}
           sessions={data.sessions}
-          tags={data.tags}
+          statuses={data.tags}
           sourceOptions={data.sourceOptions}
           onSave={(workspace) => workspaceStore.saveWorkspace(workspace)}
           onClose={() => setShowEditor(false)}

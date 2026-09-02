@@ -1,8 +1,7 @@
 /**
- * Commands — bridge control plus Kanban tags.
+ * Commands — bridge control plus Kanban Status / Labels.
  *
- * Keep connection/liveness under /psm and session tagging under /kanban.
- * Stuffing both into one tiny select menu was not UX, it was archaeology.
+ * /psm owns connection/liveness. /kanban owns workflow metadata.
  */
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
@@ -10,7 +9,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import * as connMgr from "./connection-manager.js";
 import * as kanbanStore from "./kanban-store.js";
 import { openPsmSession } from "./open-psm.js";
-import type { TagItem } from "./types.js";
+import type { LabelItem, StatusItem } from "./types.js";
 
 export type CommandHandler = (args: string, ctx: ExtensionContext) => Promise<void>;
 
@@ -25,12 +24,13 @@ type CustomComponent = {
   invalidate(): void;
   handleInput?(data: string): void;
 };
-type KanbanAction = "up" | "down" | "toggle" | "clear" | "new" | "refresh" | "close";
-type KanbanPanelResult = "new" | undefined;
+type KanbanAction = "up" | "down" | "toggle" | "clear-status" | "new-status" | "new-label" | "refresh" | "close";
+type KanbanPanelResult = "new-status" | "new-label" | undefined;
+type KanbanItem =
+  | { kind: "status"; status: StatusItem; active: boolean }
+  | { kind: "label"; label: LabelItem; assigned: boolean };
 
-type TagStatus = { tag: TagItem; assigned: boolean };
-
-const KANBAN_POPUP_WIDTH = 70;
+const KANBAN_POPUP_WIDTH = 76;
 
 interface CommandDef { name: string; description: string; handler: CommandHandler }
 const commandDefs: CommandDef[] = [];
@@ -48,8 +48,6 @@ export function registerAll(pi: ExtensionAPI) {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────
-
 function statusLines(): string[] {
   const conn = connMgr.getConnection();
   const state = conn?.state ?? "disconnected";
@@ -61,17 +59,6 @@ function statusLines(): string[] {
     `  Live Mode: ${live ? "ON" : "OFF"}`,
     `  Session:   ${sid ? sid.slice(0, 12) + "..." : "none"}`,
   ];
-}
-
-async function getTagsWithStatus(sid: string): Promise<TagStatus[]> {
-  const [allTags, allSessionTags] = await Promise.all([
-    kanbanStore.getAllTags(),
-    kanbanStore.getAllSessionTags(),
-  ]);
-  const assignedIds = new Set(
-    allSessionTags.filter((st) => st.session_id === sid).map((st) => st.tag_id),
-  );
-  return allTags.map((tag) => ({ tag, assigned: assignedIds.has(tag.id) }));
 }
 
 function getActiveSessionId(ctx: ExtensionContext): string {
@@ -87,8 +74,9 @@ export function parseKanbanInput(data: string): KanbanAction | null {
   if (data === "\u001b[A" || data === "k") return "up";
   if (data === "\u001b[B" || data === "j") return "down";
   if (data === "\r" || data === "\n" || data === " ") return "toggle";
-  if (data === "c" || data === "C") return "clear";
-  if (data === "n" || data === "N") return "new";
+  if (data === "c" || data === "C") return "clear-status";
+  if (data === "s" || data === "S") return "new-status";
+  if (data === "l" || data === "L") return "new-label";
   if (data === "r" || data === "R") return "refresh";
   if (data === "q" || data === "Q" || data === "\u001b") return "close";
   return null;
@@ -99,11 +87,6 @@ function clampIndex(index: number, length: number): number {
   return Math.max(0, Math.min(index, length - 1));
 }
 
-function formatAssigned(tags: TagStatus[]): string {
-  const assigned = tags.filter((entry) => entry.assigned).map((entry) => entry.tag.name);
-  return assigned.length > 0 ? assigned.join(", ") : "none";
-}
-
 function color(theme: CustomTheme, name: ThemeColor, text: string): string {
   return theme.fg(name, text);
 }
@@ -112,12 +95,9 @@ function bold(theme: CustomTheme, text: string): string {
   return theme.bold(text);
 }
 
-/**
- * PSM tag colors are business/UI tokens, not Pi theme tokens.
- * Never pass a persisted tag color directly to theme.fg(): Theme throws on unknown names.
- */
-export function mapKanbanTagColorToTheme(tagColor: string | null | undefined): ThemeColor {
-  switch (tagColor) {
+/** Host status colors are business/UI tokens, not Pi theme tokens. */
+export function mapKanbanStatusColorToTheme(statusColor: string | null | undefined): ThemeColor {
+  switch (statusColor) {
     case "success":
     case "emerald":
       return "success";
@@ -139,20 +119,28 @@ export function mapKanbanTagColorToTheme(tagColor: string | null | undefined): T
   }
 }
 
-function tagColor(tag: TagItem): ThemeColor {
-  return mapKanbanTagColorToTheme(tag.color);
+function statusThemeColor(status: StatusItem): ThemeColor {
+  return mapKanbanStatusColorToTheme(status.color);
 }
 
-function renderTagLine(entry: TagStatus, selected: boolean, theme: CustomTheme): string {
+function renderStatusLine(entry: Extract<KanbanItem, { kind: "status" }>, selected: boolean, theme: CustomTheme): string {
   const cursor = selected ? color(theme, "accent", ">") : " ";
-  const checked = entry.assigned
-    ? color(theme, tagColor(entry.tag), "[x]")
-    : color(theme, "dim", "[ ]");
+  const marker = entry.active
+    ? color(theme, statusThemeColor(entry.status), "(●)")
+    : color(theme, "dim", "( )");
   const name = selected
-    ? color(theme, "accent", bold(theme, entry.tag.name))
-    : color(theme, tagColor(entry.tag), entry.tag.name);
-  const builtin = entry.tag.is_builtin ? ` ${color(theme, "dim", "builtin")}` : "";
-  return `${cursor} ${checked} ${name}${builtin}`;
+    ? color(theme, "accent", bold(theme, entry.status.name))
+    : color(theme, statusThemeColor(entry.status), entry.status.name);
+  const builtin = entry.status.is_builtin ? ` ${color(theme, "dim", "builtin")}` : "";
+  return `${cursor} ${marker} ${name}${builtin}`;
+}
+
+function renderLabelLine(entry: Extract<KanbanItem, { kind: "label" }>, selected: boolean, theme: CustomTheme): string {
+  const cursor = selected ? color(theme, "accent", ">") : " ";
+  const marker = entry.assigned ? color(theme, "accent", "[x]") : color(theme, "dim", "[ ]");
+  const name = selected ? color(theme, "accent", bold(theme, entry.label.name)) : entry.label.name;
+  const description = entry.label.description ? ` ${color(theme, "dim", `— ${entry.label.description}`)}` : "";
+  return `${cursor} ${marker} ${name} ${color(theme, "dim", entry.label.color)}${description}`;
 }
 
 function stripAnsi(text: string): string {
@@ -193,15 +181,42 @@ function renderPopup(lines: string[], width: number, theme: CustomTheme): string
   ];
 }
 
+async function loadKanbanItems(sid: string): Promise<{ items: KanbanItem[]; statusName: string; labelNames: string[] }> {
+  const [statuses, currentStatus, labels, labelAssignments] = await Promise.all([
+    kanbanStore.getAllStatuses(),
+    kanbanStore.getSessionStatus(sid),
+    kanbanStore.getAllLabels(),
+    kanbanStore.getAllSessionLabels(),
+  ]);
+  const assignedLabelIds = new Set(
+    labelAssignments.filter((assignment) => assignment.session_id === sid).map((assignment) => assignment.label_id),
+  );
+  const statusItems: KanbanItem[] = statuses.map((status) => ({
+    kind: "status",
+    status,
+    active: currentStatus?.id === status.id,
+  }));
+  const labelItems: KanbanItem[] = labels.map((label) => ({
+    kind: "label",
+    label,
+    assigned: assignedLabelIds.has(label.id),
+  }));
+  return {
+    items: [...statusItems, ...labelItems],
+    statusName: currentStatus?.name ?? "none",
+    labelNames: labels.filter((label) => assignedLabelIds.has(label.id)).map((label) => label.name),
+  };
+}
+
 async function showKanbanPanel(ctx: ExtensionContext, sid: string): Promise<KanbanPanelResult> {
-  let tags = await getTagsWithStatus(sid);
-  let selected = clampIndex(0, tags.length);
-  let message = "Enter/Space toggle · c clear · n new tag · r refresh · q close";
+  let snapshot = await loadKanbanItems(sid);
+  let selected = clampIndex(0, snapshot.items.length);
+  let message = "Enter/Space set/toggle · c clear status · s new status · l new label · r refresh · q close";
   let busy = false;
 
   async function refresh(): Promise<void> {
-    tags = await getTagsWithStatus(sid);
-    selected = clampIndex(selected, tags.length);
+    snapshot = await loadKanbanItems(sid);
+    selected = clampIndex(selected, snapshot.items.length);
   }
 
   return ctx.ui.custom((tuiUnknown, themeUnknown, _kb, done) => {
@@ -210,25 +225,25 @@ async function showKanbanPanel(ctx: ExtensionContext, sid: string): Promise<Kanb
 
     async function run(action: KanbanAction): Promise<void> {
       if (busy) return;
-
       if (action === "close") {
         done(undefined);
         return;
       }
-
-      if (action === "new") {
-        done("new");
+      if (action === "new-status") {
+        done("new-status");
         return;
       }
-
+      if (action === "new-label") {
+        done("new-label");
+        return;
+      }
       if (action === "up") {
-        selected = clampIndex(selected - 1, tags.length);
+        selected = clampIndex(selected - 1, snapshot.items.length);
         tui.requestRender();
         return;
       }
-
       if (action === "down") {
-        selected = clampIndex(selected + 1, tags.length);
+        selected = clampIndex(selected + 1, snapshot.items.length);
         tui.requestRender();
         return;
       }
@@ -240,32 +255,30 @@ async function showKanbanPanel(ctx: ExtensionContext, sid: string): Promise<Kanb
           message = "Refreshed";
           return;
         }
-
-        if (action === "clear") {
-          const assigned = tags.filter((entry) => entry.assigned);
-          for (const entry of assigned) {
-            await kanbanStore.removeTagFromSession(sid, entry.tag.id);
-          }
-          connMgr.notifyPsmTagChange(sid, []);
+        if (action === "clear-status") {
+          await kanbanStore.clearSessionStatus(sid);
+          connMgr.notifyPsmStatusChange(sid);
           await refresh();
-          message = assigned.length > 0 ? `Cleared ${assigned.length} tag(s)` : "No tags to clear";
+          message = "Status cleared";
           return;
         }
 
-        const entry = tags[selected];
+        const entry = snapshot.items[selected];
         if (!entry) {
-          message = "No tags yet. Press n to create one.";
+          message = "No Status or Labels yet. Press s or l to create one.";
           return;
         }
-
-        if (entry.assigned) {
-          await kanbanStore.removeTagFromSession(sid, entry.tag.id);
-          message = `Removed: ${entry.tag.name}`;
+        if (entry.kind === "status") {
+          await kanbanStore.setSessionStatus(sid, entry.status.id, 0);
+          connMgr.notifyPsmStatusChange(sid);
+          message = `Status: ${entry.status.name}`;
+        } else if (entry.assigned) {
+          await kanbanStore.removeLabel(sid, entry.label.id);
+          message = `Label removed: ${entry.label.name}`;
         } else {
-          await kanbanStore.moveSessionTag(sid, null, entry.tag.id, 0);
-          message = `Set: ${entry.tag.name}`;
+          await kanbanStore.assignLabel(sid, entry.label.id);
+          message = `Label added: ${entry.label.name}`;
         }
-        connMgr.notifyPsmTagChange(sid, []);
         await refresh();
       } catch (err) {
         message = `Error: ${err}`;
@@ -279,20 +292,31 @@ async function showKanbanPanel(ctx: ExtensionContext, sid: string): Promise<Kanb
       width: KANBAN_POPUP_WIDTH,
       render(width: number) {
         const popupWidth = Math.min(KANBAN_POPUP_WIDTH, Math.max(32, width || KANBAN_POPUP_WIDTH));
-        const title = `Kanban Tags — session ${shortSessionId(sid)}`;
-        const body = tags.length > 0
-          ? tags.map((entry, index) => renderTagLine(entry, index === selected, theme))
-          : [color(theme, "dim", "  No tags yet. Press n to create one.")];
-        const status = busy
+        const title = `Kanban — session ${shortSessionId(sid)}`;
+        const statuses = snapshot.items.filter((item): item is Extract<KanbanItem, { kind: "status" }> => item.kind === "status");
+        const labels = snapshot.items.filter((item): item is Extract<KanbanItem, { kind: "label" }> => item.kind === "label");
+        let itemIndex = 0;
+        const statusLines = statuses.length > 0
+          ? statuses.map((entry) => renderStatusLine(entry, itemIndex++ === selected, theme))
+          : [color(theme, "dim", "  No statuses yet. Press s to create one.")];
+        const labelLines = labels.length > 0
+          ? labels.map((entry) => renderLabelLine(entry, itemIndex++ === selected, theme))
+          : [color(theme, "dim", "  No labels yet. Press l to create one.")];
+        const state = busy
           ? color(theme, "warning", "Working...")
           : color(theme, message.startsWith("Error:") ? "error" : "dim", message);
         const lines = [
           ` ${color(theme, "accent", bold(theme, title))}`,
-          ` ${color(theme, "dim", "Assigned:")} ${color(theme, "accent", formatAssigned(tags))}`,
+          ` ${color(theme, "dim", "Status:")} ${color(theme, "accent", snapshot.statusName)}`,
+          ` ${color(theme, "dim", "Labels:")} ${color(theme, "accent", snapshot.labelNames.join(", ") || "none")}`,
           "",
-          ...body,
+          ` ${bold(theme, "Status")}`,
+          ...statusLines,
           "",
-          ` ${status}`,
+          ` ${bold(theme, "Labels")}`,
+          ...labelLines,
+          "",
+          ` ${state}`,
         ];
         return renderPopup(lines, popupWidth, theme);
       },
@@ -308,15 +332,12 @@ async function showKanbanPanel(ctx: ExtensionContext, sid: string): Promise<Kanb
   }, { overlay: true }) as Promise<KanbanPanelResult>;
 }
 
-// ── /open-in-psm — Open current session in PSM ───────
-
 async function openInPsmCommand(args: string, ctx: ExtensionContext) {
   const sid = getActiveSessionId(ctx);
   if (!sid) {
     ctx.ui.notify("No session", "error");
     return;
   }
-
   try {
     const result = await openPsmSession(sid, args);
     ctx.ui.notify(result.mode === "cli" || result.mode === "web" ? "Opened PSM web session" : "Opened PSM desktop session", "info");
@@ -327,24 +348,15 @@ async function openInPsmCommand(args: string, ctx: ExtensionContext) {
 
 register("open-in-psm", "Open current session in Pi Session Manager", openInPsmCommand);
 
-// ── /psm — Bridge connection panel ───────────────────
-
 register("psm", "PSM bridge connection panel", async (_args, ctx) => {
   const conn = connMgr.getConnection();
   const state = conn?.state ?? "disconnected";
   const live = connMgr.isLiveEnabled();
   const connected = state === "connected";
-
   const connLabel = connected ? "○ Disconnect" : "● Connect";
   const liveLabel = live ? "● Live: ON  (toggle off)" : "○ Live: OFF (toggle on)";
-
-  const choice = await ctx.ui.select(
-    `PSM Bridge\n${statusLines().join("\n")}`,
-    [connLabel, liveLabel, "  Close"],
-  );
-
+  const choice = await ctx.ui.select(`PSM Bridge\n${statusLines().join("\n")}`, [connLabel, liveLabel, "  Close"]);
   if (!choice || choice.includes("Close")) return;
-
   if (choice.includes("Connect") || choice.includes("Disconnect")) {
     if (connected) {
       connMgr.doDisconnect();
@@ -355,7 +367,6 @@ register("psm", "PSM bridge connection panel", async (_args, ctx) => {
     }
     return;
   }
-
   if (choice.includes("Live")) {
     if (live) connMgr.disableLiveMode();
     else connMgr.enableLiveMode(ctx);
@@ -363,15 +374,12 @@ register("psm", "PSM bridge connection panel", async (_args, ctx) => {
   }
 });
 
-// ── /kanban — Custom TUI tag popup ───────────────────
-
-register("kanban", "Manage current session Kanban tags", async (_args, ctx) => {
+register("kanban", "Manage current session Kanban Status and Labels", async (_args, ctx) => {
   const sid = getActiveSessionId(ctx);
   if (!sid) {
     ctx.ui.notify("No session", "error");
     return;
   }
-
   if ((ctx as { mode?: string }).mode !== "tui") {
     ctx.ui.notify("/kanban requires TUI mode", "error");
     return;
@@ -379,18 +387,33 @@ register("kanban", "Manage current session Kanban tags", async (_args, ctx) => {
 
   while (true) {
     const result = await showKanbanPanel(ctx, sid);
-    if (result !== "new") return;
+    if (!result) return;
 
-    const name = (await ctx.ui.input("New Kanban tag name"))?.trim();
-    if (!name) return;
+    if (result === "new-status") {
+      const name = (await ctx.ui.input("New Kanban status name"))?.trim();
+      if (!name) continue;
+      try {
+        const status = await kanbanStore.createStatus(name, "info");
+        await kanbanStore.setSessionStatus(sid, status.id, 0);
+        connMgr.notifyPsmStatusChange(sid);
+        ctx.ui.notify(`Created status: ${status.name}`, "info");
+      } catch (err) {
+        ctx.ui.notify(`Failed to create status: ${err}`, "error");
+        return;
+      }
+      continue;
+    }
 
+    const name = (await ctx.ui.input("New label name"))?.trim();
+    if (!name) continue;
+    const colorValue = (await ctx.ui.input("Label color (#RRGGBB)", "#0969da"))?.trim() || "#0969da";
+    const description = (await ctx.ui.input("Label description (optional)"))?.trim() || "";
     try {
-      const tag = await kanbanStore.createTag(name, "info");
-      await kanbanStore.moveSessionTag(sid, null, tag.id, 0);
-      connMgr.notifyPsmTagChange(sid, []);
-      ctx.ui.notify(`Created and set: ${tag.name}`, "info");
+      const label = await kanbanStore.createLabel(name, colorValue, description);
+      await kanbanStore.assignLabel(sid, label.id);
+      ctx.ui.notify(`Created label: ${label.name}`, "info");
     } catch (err) {
-      ctx.ui.notify(`Failed to create tag: ${err}`, "error");
+      ctx.ui.notify(`Failed to create label: ${err}`, "error");
       return;
     }
   }

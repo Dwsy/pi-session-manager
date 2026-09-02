@@ -4,14 +4,14 @@
  * session_search:  Full-text search across indexed sessions.
  * session_context: Fetch dialogue context from a specific session.
  * session_recall:  Search + retrieve surrounding context.
- * session_tag:     Tag management via PSM JSON files.
+ * session_status:  Single Kanban workflow Status via PSM JSON files.
+ * session_label:   GitHub-style multi Labels via Kanban plugin config.
  */
 
 import * as psm from "./psm-client.js";
 import * as kanbanStore from "./kanban-store.js";
-import { getSessionId } from "./connection-manager.js";
-import { notifyPsmTagChange } from "./connection-manager.js";
-import type { FullTextSearchResponse, SessionEntry, SessionInfo, TagItem } from "./types.js";
+import { getSessionId, notifyPsmStatusChange } from "./connection-manager.js";
+import type { FullTextSearchResponse, LabelItem, SessionEntry, SessionInfo, StatusItem } from "./types.js";
 
 // ── Session cache (shared across tools) ───────────────
 
@@ -295,73 +295,150 @@ export const sessionRecallTool = {
   },
 };
 
-// ── Tool: session_tag ─────────────────────────────────
+// ── Tools: session_status / session_label ─────────────
 
-function findTag(name: string, tags: TagItem[]): TagItem | null {
-  const n = name.toLowerCase().trim();
-  return tags.find((t) => t.name.toLowerCase() === n)
-    || tags.find((t) => t.name.toLowerCase().includes(n)) || null;
+function findStatus(name: string, statuses: StatusItem[]): StatusItem | null {
+  const normalized = name.toLowerCase().trim();
+  return statuses.find((status) => status.name.toLowerCase() === normalized)
+    || statuses.find((status) => status.name.toLowerCase().includes(normalized)) || null;
 }
 
-export const sessionTagTool = {
-  name: "session_tag",
-  label: "Session Tag Manager",
+function findLabel(name: string, labels: LabelItem[]): LabelItem | null {
+  const normalized = name.toLowerCase().trim();
+  return labels.find((label) => label.name.toLowerCase() === normalized)
+    || labels.find((label) => label.name.toLowerCase().includes(normalized)) || null;
+}
+
+export const sessionStatusTool = {
+  name: "session_status",
+  label: "Session Status",
   description:
-    "Inspect or change tags on the current session. list is read-only. set/remove mutate session metadata and should be used only when the user explicitly requests a tag change; set creates the named tag if no existing tag matches.",
+    "Inspect or change the current session's single Kanban workflow Status. list is read-only; set/clear mutate session metadata and should be used only when explicitly requested. set creates the named Status when no existing Status matches.",
   parameters: {
     type: "object" as const,
     properties: {
-      action: { type: "string", enum: ["list", "set", "remove"], description: "Action: list, set, or remove" },
-      tag: { type: "string", description: "Tag name for set/remove actions." },
+      action: { type: "string", enum: ["list", "set", "clear"], description: "Action: list, set, or clear" },
+      status: { type: "string", description: "Status name for set." },
     },
     required: ["action"],
   },
   async execute(_toolCallId: string, params: Record<string, unknown>) {
     const sid = getSessionId();
-    const allTags = await kanbanStore.getAllTags();
-    const allSessionTags = await kanbanStore.getAllSessionTags();
-    const assignedIds = new Set(allSessionTags.filter((st) => st.session_id === sid).map((st) => st.tag_id));
-    const currentTags = allTags.filter((t) => assignedIds.has(t.id));
+    const [statuses, current] = await Promise.all([
+      kanbanStore.getAllStatuses(),
+      kanbanStore.getSessionStatus(sid),
+    ]);
 
     if (params.action === "list") {
       const lines = [
-        `Session Tags (ID: ${sid.slice(0, 8)}...)`,
-        `Active: ${currentTags.length > 0 ? currentTags.map((t) => t.name).join(", ") : "none"}`,
+        `Session Status (ID: ${sid.slice(0, 8)}...)`,
+        `Current: ${current?.name ?? "none"}`,
         "", "Available:",
-        ...allTags.map((t) => `  ${assignedIds.has(t.id) ? "[x]" : "[ ]"} ${t.name}`),
+        ...statuses.map((status) => `  ${current?.id === status.id ? "(●)" : "( )"} ${status.name}`),
       ];
       return { content: [{ type: "text", text: lines.join("\n") }] };
     }
 
     if (params.action === "set") {
-      const tagName = String(params.tag || "").trim();
-      if (!tagName) return { content: [{ type: "text", text: "tag is required for set." }], isError: true };
-      let target = findTag(tagName, allTags);
+      const statusName = String(params.status || "").trim();
+      if (!statusName) return { content: [{ type: "text", text: "status is required for set." }], isError: true };
+      let target = findStatus(statusName, statuses);
       if (!target) {
-        try { target = await kanbanStore.createTag(tagName, "info"); } catch (e) {
-          return { content: [{ type: "text", text: `Failed: ${e}` }], isError: true };
+        try { target = await kanbanStore.createStatus(statusName, "info"); } catch (error) {
+          return { content: [{ type: "text", text: `Failed: ${error}` }], isError: true };
         }
       }
       try {
-        await kanbanStore.moveSessionTag(sid, null, target.id, 0);
-        notifyPsmTagChange(sid, []);
-        return { content: [{ type: "text", text: `Tag set: ${target.name}` }] };
-      } catch (e) {
-        return { content: [{ type: "text", text: `Failed: ${e}` }], isError: true };
+        await kanbanStore.setSessionStatus(sid, target.id, 0);
+        notifyPsmStatusChange(sid);
+        return { content: [{ type: "text", text: `Status set: ${target.name}` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: `Failed: ${error}` }], isError: true };
+      }
+    }
+
+    if (params.action === "clear") {
+      try {
+        await kanbanStore.clearSessionStatus(sid);
+        notifyPsmStatusChange(sid);
+        return { content: [{ type: "text", text: "Status cleared" }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: `Failed: ${error}` }], isError: true };
+      }
+    }
+
+    return { content: [{ type: "text", text: "Unknown action" }], isError: true };
+  },
+};
+
+export const sessionLabelTool = {
+  name: "session_label",
+  label: "Session Labels",
+  description:
+    "Inspect or change GitHub-style Labels on the current session. Labels are multi-value and independent from workflow Status. set creates a missing Label and accepts optional #RRGGBB color and description.",
+  parameters: {
+    type: "object" as const,
+    properties: {
+      action: { type: "string", enum: ["list", "set", "remove"], description: "Action: list, set, or remove" },
+      label: { type: "string", description: "Label name for set/remove." },
+      color: { type: "string", description: "Optional #RRGGBB color used when creating a Label." },
+      description: { type: "string", description: "Optional description used when creating a Label." },
+    },
+    required: ["action"],
+  },
+  async execute(_toolCallId: string, params: Record<string, unknown>) {
+    const sid = getSessionId();
+    const [labels, assignments] = await Promise.all([
+      kanbanStore.getAllLabels(),
+      kanbanStore.getAllSessionLabels(),
+    ]);
+    const assignedIds = new Set(
+      assignments.filter((assignment) => assignment.session_id === sid).map((assignment) => assignment.label_id),
+    );
+
+    if (params.action === "list") {
+      const active = labels.filter((label) => assignedIds.has(label.id));
+      const lines = [
+        `Session Labels (ID: ${sid.slice(0, 8)}...)`,
+        `Active: ${active.map((label) => label.name).join(", ") || "none"}`,
+        "", "Available:",
+        ...labels.map((label) => `  ${assignedIds.has(label.id) ? "[x]" : "[ ]"} ${label.name} ${label.color}${label.description ? ` — ${label.description}` : ""}`),
+      ];
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    }
+
+    const labelName = String(params.label || "").trim();
+    if (!labelName) return { content: [{ type: "text", text: "label is required for set/remove." }], isError: true };
+
+    if (params.action === "set") {
+      let target = findLabel(labelName, labels);
+      if (!target) {
+        try {
+          target = await kanbanStore.createLabel(
+            labelName,
+            String(params.color || "#0969da"),
+            String(params.description || ""),
+          );
+        } catch (error) {
+          return { content: [{ type: "text", text: `Failed: ${error}` }], isError: true };
+        }
+      }
+      try {
+        await kanbanStore.assignLabel(sid, target.id);
+        return { content: [{ type: "text", text: `Label added: ${target.name}` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: `Failed: ${error}` }], isError: true };
       }
     }
 
     if (params.action === "remove") {
-      const tagName = String(params.tag || "").trim();
-      if (!tagName) return { content: [{ type: "text", text: "tag is required for remove." }], isError: true };
-      const target = findTag(tagName, allTags);
-      if (!target) return { content: [{ type: "text", text: `Tag not found: ${tagName}` }], isError: true };
+      const target = findLabel(labelName, labels);
+      if (!target) return { content: [{ type: "text", text: `Label not found: ${labelName}` }], isError: true };
       try {
-        await kanbanStore.removeTagFromSession(sid, target.id);
-        notifyPsmTagChange(sid, []);
-        return { content: [{ type: "text", text: `Removed: ${target.name}` }] };
-      } catch (e) {
-        return { content: [{ type: "text", text: `Failed: ${e}` }], isError: true };
+        await kanbanStore.removeLabel(sid, target.id);
+        return { content: [{ type: "text", text: `Label removed: ${target.name}` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: `Failed: ${error}` }], isError: true };
       }
     }
 

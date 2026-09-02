@@ -5,6 +5,8 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 
 import TagBadge from '@/components/tags/TagBadge'
 import type { SessionInfo, Tag } from '@/types'
+import KanbanLabelBadge from '../labels/KanbanLabelBadge'
+import type { KanbanLabel } from '../labels/kanbanLabelsStore'
 import { getPathBasename } from '@/utils/path'
 import { getSessionSourceTag } from '@/utils/session'
 
@@ -19,7 +21,8 @@ interface KanbanTableViewProps {
   selectedSession: SessionInfo | null
   selectedSessionIds: Set<string>
   selectionMode: boolean
-  getTagsForSession: (sessionId: string) => Tag[]
+  getStatusForSession: (sessionId: string) => Tag | null
+  getLabelsForSession: (sessionId: string) => KanbanLabel[]
   onToggleBulkSelect: (sessionId: string) => void
   onOpenSession: (session: SessionInfo) => void
   hideProjectInfo?: boolean
@@ -48,7 +51,8 @@ export default function KanbanTableView({
   selectedSession,
   selectedSessionIds,
   selectionMode,
-  getTagsForSession,
+  getStatusForSession,
+  getLabelsForSession,
   onToggleBulkSelect,
   onOpenSession,
   hideProjectInfo = false,
@@ -109,7 +113,7 @@ export default function KanbanTableView({
         virtualRow,
       }))
     : sortedSessions.map((session) => ({ session, virtualRow: null }))
-  const columnCount = hideProjectInfo ? 6 : 7
+  const columnCount = hideProjectInfo ? 7 : 8
 
   const toggleSort = (nextKey: TableSortKey) => {
     if (sortKey === nextKey) {
@@ -158,7 +162,8 @@ export default function KanbanTableView({
               ) : null}
               <th className="w-[140px] px-3 py-2">{t('plugins.kanbanBoard.table.source', 'Source / model')}</th>
               <th className="w-[90px] px-3 py-2 text-right">{t('plugins.kanbanBoard.table.messages', 'Messages')}</th>
-              <th className="w-[210px] px-3 py-2">{t('plugins.kanbanBoard.table.status', 'Status')}</th>
+              <th className="w-[150px] px-3 py-2">{t('plugins.kanbanBoard.table.status', 'Status')}</th>
+              <th className="w-[210px] px-3 py-2">{t('plugins.kanbanBoard.labels', 'Labels')}</th>
               <th className="w-[100px] px-3 py-2 text-right" aria-sort={sortKey === 'updated' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
                 <button type="button" className="ml-auto inline-flex items-center gap-1 hover:text-foreground focus-ring" onClick={() => toggleSort('updated')}>
                   {t('plugins.kanbanBoard.table.updated', 'Updated')}
@@ -174,7 +179,8 @@ export default function KanbanTableView({
               </tr>
             ) : null}
             {renderedRows.map(({ session, virtualRow }) => {
-              const tags = getTagsForSession(session.id)
+              const status = getStatusForSession(session.id)
+              const labels = getLabelsForSession(session.id)
               const bulkSelected = selectedSessionIds.has(session.id)
               const active = selectedSession?.id === session.id
               const source = getSessionSourceTag(session.path)
@@ -232,14 +238,15 @@ export default function KanbanTableView({
                     <span className="inline-flex items-center gap-1"><MessageSquare className="h-3 w-3" />{session.message_count}</span>
                   </td>
                   <td className="px-3 py-2 align-middle">
-                    {tags.length > 0 ? (
+                    {status ? <TagBadge tag={status} compact /> : <span className="text-muted-foreground/45">—</span>}
+                  </td>
+                  <td className="px-3 py-2 align-middle">
+                    {labels.length > 0 ? (
                       <div className="flex min-w-0 items-center gap-1 overflow-hidden">
-                        {tags.slice(0, 3).map((tag) => <TagBadge key={tag.id} tag={tag} compact />)}
-                        {tags.length > 3 ? <span className="text-[9px] text-muted-foreground">+{tags.length - 3}</span> : null}
+                        {labels.slice(0, 3).map((label) => <KanbanLabelBadge key={label.id} label={label} compact />)}
+                        {labels.length > 3 ? <span className="text-[9px] text-muted-foreground">+{labels.length - 3}</span> : null}
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground/45">—</span>
-                    )}
+                    ) : <span className="text-muted-foreground/45">—</span>}
                   </td>
                   <td className="px-3 py-2 text-right align-middle tabular-nums text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{relativeTime(session.modified)}</span>

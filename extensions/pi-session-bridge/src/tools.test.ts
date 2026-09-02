@@ -3,9 +3,11 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const notifyPsmStatusChange = vi.fn();
+
 vi.mock("./connection-manager.js", () => ({
   getSessionId: () => "sid",
-  notifyPsmTagChange: vi.fn(),
+  notifyPsmStatusChange,
 }));
 
 const fullTextSearch = vi.fn();
@@ -172,8 +174,8 @@ describe("pi-session-bridge tools", () => {
     expect(output.length).toBeLessThan(12_100);
   });
 
-  it("sets an existing session tag through local Kanban files", async () => {
-    const home = mkdtempSync(join(tmpdir(), "psm-tools-"));
+  it("sets and clears the single session Status through legacy-compatible local files", async () => {
+    const home = mkdtempSync(join(tmpdir(), "psm-tools-status-"));
     const previousHome = process.env.HOME;
     process.env.HOME = home;
     try {
@@ -186,18 +188,50 @@ describe("pi-session-bridge tools", () => {
       }));
       writeFileSync(join(configDir, "session_mark.json"), JSON.stringify({ version: 1, sessionTags: [] }));
       globalThis.fetch = vi.fn(() => Promise.reject(new Error("HTTP should not be used"))) as unknown as typeof fetch;
-      const { sessionTagTool } = await import("./tools.js");
+      const { sessionStatusTool } = await import("./tools.js");
 
-      const setResult = await sessionTagTool.execute("call-1", { action: "set", tag: "review" });
-      const listResult = await sessionTagTool.execute("call-2", { action: "list" });
-      const removeResult = await sessionTagTool.execute("call-3", { action: "remove", tag: "review" });
+      const setResult = await sessionStatusTool.execute("call-1", { action: "set", status: "review" });
+      const listResult = await sessionStatusTool.execute("call-2", { action: "list" });
+      const clearResult = await sessionStatusTool.execute("call-3", { action: "clear" });
 
       const marksFile = JSON.parse(readFileSync(join(configDir, "session_mark.json"), "utf-8"));
       expect(setResult.isError).toBeUndefined();
-      expect(listResult.content[0].text).toContain("[x] review");
-      expect(removeResult.content[0].text).toBe("Removed: review");
+      expect(listResult.content[0].text).toContain("(●) review");
+      expect(clearResult.content[0].text).toBe("Status cleared");
       expect(marksFile.sessionTags).toEqual([]);
+      expect(notifyPsmStatusChange).toHaveBeenCalledWith("sid");
       expect(globalThis.fetch).not.toHaveBeenCalled();
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("adds and removes independent GitHub-style Labels through the shared plugin config", async () => {
+    const home = mkdtempSync(join(tmpdir(), "psm-tools-label-"));
+    const previousHome = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const { readFileSync } = await import("node:fs");
+      const configDir = join(home, ".pi", "pi-session-manager");
+      const { sessionLabelTool } = await import("./tools.js");
+
+      const setResult = await sessionLabelTool.execute("call-1", {
+        action: "set",
+        label: "backend",
+        color: "#0969da",
+        description: "Backend work",
+      });
+      const listResult = await sessionLabelTool.execute("call-2", { action: "list" });
+      const removeResult = await sessionLabelTool.execute("call-3", { action: "remove", label: "backend" });
+
+      const labelsFile = JSON.parse(readFileSync(join(configDir, "plugin-config", "builtin.kanban-board", "labels.json"), "utf-8"));
+      expect(setResult.content[0].text).toBe("Label added: backend");
+      expect(listResult.content[0].text).toContain("[x] backend #0969da — Backend work");
+      expect(removeResult.content[0].text).toBe("Label removed: backend");
+      expect(labelsFile.labels[0]).toEqual(expect.objectContaining({ name: "backend", color: "#0969da", description: "Backend work" }));
+      expect(labelsFile.assignments).toEqual([]);
     } finally {
       if (previousHome === undefined) delete process.env.HOME;
       else process.env.HOME = previousHome;

@@ -24,12 +24,12 @@ vi.mock('@/components/ui/CompositionInput', () => ({
   ),
 }))
 
-vi.mock('../WorkspaceEditor', () => ({
+vi.mock('../workspace/WorkspaceEditor', () => ({
   default: () => null,
 }))
 
-import WorkspacePanel from '../WorkspacePanel'
-import { createKanbanWorkspaceStore } from '../workspaceStore'
+import WorkspacePanel from '../workspace/WorkspacePanel'
+import { createKanbanWorkspaceStore } from '../workspace/workspaceStore'
 
 const archiveTag: Tag = {
   id: 'builtin-archive',
@@ -74,7 +74,7 @@ function createCtx(initial: unknown = null) {
 function renderPanel() {
   const { ctx, getStored } = createCtx(null)
   const store = createKanbanWorkspaceStore(ctx)
-  const onToggleTag = vi.fn()
+  const onMoveSession = vi.fn()
   render(
     <WorkspacePanel
       workspaceStore={store}
@@ -84,12 +84,12 @@ function renderPanel() {
         sessionTags: [],
         sourceOptions: [],
         getDescendantIds: () => [],
-        onToggleTag,
+        onMoveSession,
         onClearSelectedSession: vi.fn(),
       }}
     />,
   )
-  return { store, getStored, onToggleTag }
+  return { store, getStored, onMoveSession }
 }
 
 describe('WorkspacePanel project pin', () => {
@@ -119,12 +119,12 @@ describe('WorkspacePanel project pin', () => {
     expect(getStored()).toBeNull()
   })
 
-  it('archives project sessions with the builtin archive tag', async () => {
-    const { onToggleTag } = renderPanel()
+  it('moves project sessions to the builtin archive status', async () => {
+    const { onMoveSession } = renderPanel()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Archive project frontend' }))
 
-    expect(onToggleTag).toHaveBeenCalledWith('a', 'builtin-archive', true)
-    expect(onToggleTag).toHaveBeenCalledTimes(1)
+    expect(onMoveSession).toHaveBeenCalledWith('a', null, 'builtin-archive', 0)
+    expect(onMoveSession).toHaveBeenCalledTimes(1)
   })
 })

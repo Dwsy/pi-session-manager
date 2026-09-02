@@ -1,12 +1,12 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import type { PsmPluginHostContext } from '@pi-session-manager/plugin-sdk'
-import type { KanbanCardDensity, KanbanViewMode } from './kanbanBoardModel'
+import type { KanbanCardDensity, KanbanViewMode } from '../board/kanbanBoardModel'
 
 export interface KanbanWorkspaceConfig {
   projectFilter: string | null
-  filterTagIds: string[]
+  filterStatusIds: string[]
   sourceFilterSlugs: string[]
-  columnOrder: string[]
+  statusOrder: string[]
   cardDensity: KanbanCardDensity
   viewMode: KanbanViewMode
 }
@@ -48,9 +48,9 @@ const DEFAULT_CREATED_AT = '1970-01-01T00:00:00.000Z'
 
 const EMPTY_CONFIG: KanbanWorkspaceConfig = {
   projectFilter: null,
-  filterTagIds: [],
+  filterStatusIds: [],
   sourceFilterSlugs: [],
-  columnOrder: [],
+  statusOrder: [],
   cardDensity: 'comfortable',
   viewMode: 'board',
 }
@@ -65,7 +65,7 @@ interface StoreState {
 }
 
 interface StoredWorkspaceConfig {
-  version: 1
+  version: 2
   activeWorkspaceId: string
   defaultWorkspaceConfig: KanbanWorkspaceConfig
   workspaces: KanbanWorkspace[]
@@ -74,9 +74,9 @@ interface StoredWorkspaceConfig {
 function cloneConfig(config: KanbanWorkspaceConfig): KanbanWorkspaceConfig {
   return {
     projectFilter: config.projectFilter,
-    filterTagIds: [...config.filterTagIds],
+    filterStatusIds: [...config.filterStatusIds],
     sourceFilterSlugs: [...config.sourceFilterSlugs],
-    columnOrder: [...config.columnOrder],
+    statusOrder: [...config.statusOrder],
     cardDensity: config.cardDensity,
     viewMode: config.viewMode,
   }
@@ -108,9 +108,9 @@ function sanitizeConfig(value: unknown): KanbanWorkspaceConfig {
     : 'board'
   return {
     projectFilter: typeof value.projectFilter === 'string' && value.projectFilter ? value.projectFilter : null,
-    filterTagIds: stringArray(value.filterTagIds),
+    filterStatusIds: stringArray(value.filterStatusIds ?? value.filterTagIds),
     sourceFilterSlugs: stringArray(value.sourceFilterSlugs),
-    columnOrder: stringArray(value.columnOrder),
+    statusOrder: stringArray(value.statusOrder ?? value.columnOrder),
     cardDensity,
     viewMode,
   }
@@ -154,7 +154,7 @@ function normalizeStoredConfig(raw: unknown): Pick<StoreState, 'customWorkspaces
 
 function buildStoredConfig(state: StoreState): StoredWorkspaceConfig {
   return {
-    version: 1,
+    version: 2,
     activeWorkspaceId: state.activeWorkspaceId,
     defaultWorkspaceConfig: cloneConfig(state.defaultWorkspaceConfig),
     workspaces: state.customWorkspaces,

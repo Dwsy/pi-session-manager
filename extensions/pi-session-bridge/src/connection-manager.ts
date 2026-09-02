@@ -391,7 +391,8 @@ export function doDisconnect() {
   if (latestCtx) latestCtx.ui.setStatus("psm", undefined);
 }
 
-export function notifyPsmTagChange(sid: string, tags: unknown[]) {
+export function notifyPsmStatusChange(sid: string) {
   if (conn?.state !== "connected") return;
-  conn.send({ type: "session_tag_changed", payload: { sessionId: sid, tags } });
+  // The wire event keeps its legacy name for compatibility with existing PSM bridge consumers.
+  conn.send({ type: "session_tag_changed", payload: { sessionId: sid, tags: [] } });
 }

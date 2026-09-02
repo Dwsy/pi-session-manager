@@ -10,7 +10,7 @@ import type { KanbanWorkspace, KanbanWorkspaceDraft } from './workspaceStore'
 interface WorkspaceEditorProps {
   workspace?: KanbanWorkspace | null
   sessions: SessionInfo[]
-  tags: TagType[]
+  statuses: TagType[]
   sourceOptions?: Array<{ slug: string; label: string }>
   onSave: (workspace: KanbanWorkspaceDraft) => void | Promise<void>
   onClose: () => void
@@ -19,7 +19,7 @@ interface WorkspaceEditorProps {
 export default function WorkspaceEditor({
   workspace,
   sessions,
-  tags,
+  statuses,
   sourceOptions = [],
   onSave,
   onClose,
@@ -27,16 +27,16 @@ export default function WorkspaceEditor({
   const { t } = useTranslation()
   const [name, setName] = useState(workspace?.name || '')
   const [projectFilter, setProjectFilter] = useState<string | null>(workspace?.config.projectFilter || null)
-  const [filterTagIds, setFilterTagIds] = useState<string[]>(workspace?.config.filterTagIds || [])
+  const [filterStatusIds, setFilterStatusIds] = useState<string[]>(workspace?.config.filterStatusIds || [])
   const [sourceFilterSlugs, setSourceFilterSlugs] = useState<string[]>(workspace?.config.sourceFilterSlugs || [])
 
   const projects = Array.from(new Set(sessions.map((session) => session.cwd).filter(Boolean))).sort()
 
-  const handleToggleTag = (tagId: string) => {
-    setFilterTagIds((prev) => (
-      prev.includes(tagId)
-        ? prev.filter((id) => id !== tagId)
-        : [...prev, tagId]
+  const handleToggleStatus = (statusId: string) => {
+    setFilterStatusIds((prev) => (
+      prev.includes(statusId)
+        ? prev.filter((id) => id !== statusId)
+        : [...prev, statusId]
     ))
   }
 
@@ -56,9 +56,9 @@ export default function WorkspaceEditor({
       name: name.trim(),
       config: {
         projectFilter,
-        filterTagIds,
+        filterStatusIds,
         sourceFilterSlugs,
-        columnOrder: workspace?.config.columnOrder ?? [],
+        statusOrder: workspace?.config.statusOrder ?? [],
         cardDensity: workspace?.config.cardDensity ?? 'comfortable',
         viewMode: workspace?.config.viewMode ?? 'board',
       },
@@ -115,21 +115,21 @@ export default function WorkspaceEditor({
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
               <Tag className="h-3 w-3" />
-              {t('plugins.kanbanBoard.workspace.tagFilters')}
+              {t('plugins.kanbanBoard.workspace.statusFilters', 'Status filters')}
             </label>
             <div className="flex flex-wrap gap-2">
-              {tags.map((tag) => (
+              {statuses.map((status) => (
                 <button
-                  key={tag.id}
-                  onClick={() => handleToggleTag(tag.id)}
+                  key={status.id}
+                  onClick={() => handleToggleStatus(status.id)}
                   className={`px-2 py-1 rounded-md text-xs flex items-center gap-1 ${
-                    filterTagIds.includes(tag.id)
+                    filterStatusIds.includes(status.id)
                       ? 'bg-primary/10 text-primary ring-1 ring-primary/50'
                       : 'bg-muted hover:bg-muted/80 text-muted-foreground'
                   }`}
                 >
-                  <TagBadge tag={tag} compact />
-                  <span>{tag.name}</span>
+                  <TagBadge tag={status} compact />
+                  <span>{status.name}</span>
                 </button>
               ))}
             </div>

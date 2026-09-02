@@ -4,21 +4,18 @@ import type { PsmSessionListColumnRenderProps } from '@pi-session-manager/plugin
 import { useOptionalAppPluginSurfaceData } from '@/components/app/AppPluginSurfaceData'
 import TagBadge from '@/components/tags/TagBadge'
 
-import { KANBAN_VIEW_ID } from './viewIds'
+import { KANBAN_VIEW_ID } from '../viewIds'
+import { getSessionStatusId } from '../board/kanbanBoardModel'
 
-const MAX_VISIBLE_TAGS = 2
-
-/**
- * Shows which board column a session currently sits in, so host session tables
- * expose the same status the Kanban view assigns through labels.
- */
+/** Shows the canonical single Kanban status in host session tables. */
 export default function KanbanSessionColumnCell({ session }: PsmSessionListColumnRenderProps) {
   const { t } = useTranslation()
   const surface = useOptionalAppPluginSurfaceData()
 
   if (!surface || !session.id) return null
 
-  const tags = surface.getTagsForSession(session.id)
+  const statusId = getSessionStatusId(surface.tags, surface.sessionTags, session.id)
+  const status = statusId ? surface.tags.find((item) => item.id === statusId) ?? null : null
   const openBoard = surface.onOpenAppView
     ? () => surface.onOpenAppView?.(KANBAN_VIEW_ID)
     : undefined
@@ -37,21 +34,8 @@ export default function KanbanSessionColumnCell({ session }: PsmSessionListColum
       title={label}
       aria-label={label}
     >
-      {tags.length === 0 ? (
-        <span className="text-muted-foreground/45" aria-hidden="true">
-          —
-        </span>
-      ) : (
-        <span className="flex min-w-0 items-center gap-1 overflow-hidden">
-          {tags.slice(0, MAX_VISIBLE_TAGS).map((tag) => (
-            <TagBadge key={tag.id} tag={tag} compact={false} />
-          ))}
-          {tags.length > MAX_VISIBLE_TAGS && (
-            <span className="text-[9px] text-muted-foreground">
-              +{tags.length - MAX_VISIBLE_TAGS}
-            </span>
-          )}
-        </span>
+      {status ? <TagBadge tag={status} compact={false} /> : (
+        <span className="text-muted-foreground/45" aria-hidden="true">—</span>
       )}
     </button>
   )

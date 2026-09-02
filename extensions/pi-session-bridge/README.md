@@ -1,6 +1,6 @@
 # psm-bridge
 
-Bridge Pi agent sessions to Pi Session Manager — live sync, search, tags, and context recall.
+Bridge Pi agent sessions to Pi Session Manager — live sync, search, Kanban Status/Labels, and context recall.
 
 ## Architecture
 
@@ -11,7 +11,7 @@ src/
 ├── psm-client.ts           # HTTP client for PSM's POST /api dispatch
 ├── bridge-connection.ts    # WebSocket connection + heartbeat + RPC
 ├── connection-manager.ts   # Live mode lifecycle, event forwarding, RPC handling
-├── tools.ts                # LLM-callable tools (search, context, recall, tag)
+├── tools.ts                # LLM-callable tools (search, context, recall, status, labels)
 ├── commands.ts             # /psm bridge panel + /kanban custom TUI popup
 ├── env.d.ts                # Pi runtime type declarations
 └── index.ts                # Extension entry point
@@ -35,17 +35,22 @@ Bridge connection controls only:
 
 ### /kanban — Custom TUI Popup
 
-Kanban/tag operations open as a centered TUI overlay instead of being buried inside `/psm`:
+Kanban workflow metadata opens as a centered TUI overlay instead of being buried inside `/psm`. Status is single-value; Labels are independent and multi-value:
 
 ```
- Kanban Tags — session abc123...
- Assigned: todo, blocked
+ Kanban — session abc123...
+ Status: in-progress
+ Labels: backend, urgent
 
- > [x] todo
-   [ ] review
-   [x] blocked
+ Status
+ > ( ) todo
+   (●) in-progress
 
- Enter/Space toggle · c clear · n new tag · r refresh · q close
+ Labels
+   [x] backend #0969da — Backend work
+   [x] urgent  #d1242f
+
+ Enter/Space set/toggle · c clear status · s new status · l new label · r refresh · q close
 ```
 
 ### Live Mode
@@ -63,7 +68,8 @@ Real-time session sync via WebSocket. When connected:
 | `session_search` | Full-text search across indexed sessions |
 | `session_recall` | Search + retrieve surrounding dialogue context |
 | `session_context` | Fetch messages from a specific session |
-| `session_tag` | List/set/remove session tags |
+| `session_status` | List/set/clear the single workflow Status |
+| `session_label` | List/add/remove GitHub-style multi Labels |
 
 `session_search` 可选参数：
 
@@ -76,9 +82,11 @@ Real-time session sync via WebSocket. When connected:
 - `to`：结束时间（RFC3339，可选）
 - `projectPath`：按会话 `cwd` 精确匹配项目路径（可选）
 
-### Tags
+### Kanban Status & Labels
 
-All tag operations use PSM's backend API (no local SQLite). Tags are managed via the `/kanban` custom TUI popup or the `session_tag` LLM tool.
+The bridge shares the same file-backed Kanban SSOT as Pi Session Manager. Legacy `tags_config.json` + `session_mark.json` remain the persistence compatibility layer for Status, so existing Tag data is preserved and interpreted deterministically as one current Status per session. Setting a Status rewrites only that session's legacy assignments to a single assignment.
+
+GitHub-style Labels are stored independently in `~/.pi/pi-session-manager/plugin-config/builtin.kanban-board/labels.json`; they support multiple assignments plus name, `#RRGGBB` color, and description. `/kanban`, `session_status`, and `session_label` all read and write these same files.
 
 ## Configuration
 

@@ -5,27 +5,26 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => {
+    t: (key: string, fallback?: string | { defaultValue?: string }) => {
+      if (typeof fallback === 'string') return fallback
+      if (fallback?.defaultValue) return fallback.defaultValue
       if (key === 'common.delete') return 'Delete'
       if (key === 'common.confirm') return 'Confirm?'
       if (key === 'common.cancel') return 'Cancel'
       if (key === 'favorites.add') return 'Add'
       if (key === 'favorites.remove') return 'Remove'
-      if (key === 'tags.manage') return 'Manage tags'
       if (key === 'session.openInTerminal') return 'Open in Terminal'
       if (key === 'session.openInBrowser') return 'Open in Browser'
       if (key === 'tags.contextMenu.copyResume') return 'Copy resume'
       if (key === 'tags.contextMenu.rename') return 'Rename'
-      if (key === 'common.rename') return 'Rename'
-      if (key === 'common.back') return 'Back'
-      if (key === 'tags.empty') return 'Empty'
       return key
     },
   }),
 }))
 
-import KanbanContextMenu from '../KanbanContextMenu'
+import KanbanContextMenu from '../board/KanbanContextMenu'
 import type { SessionInfo, Tag } from '@/types'
+import type { KanbanLabel } from '../labels/kanbanLabelsStore'
 
 const session: SessionInfo = {
   id: 'session-1',
@@ -38,96 +37,84 @@ const session: SessionInfo = {
   last_message: 'world',
 }
 
+const status: Tag = {
+  id: 'doing',
+  name: 'Doing',
+  color: 'blue',
+  sortOrder: 0,
+  isBuiltin: false,
+  createdAt: '2026-04-15T12:00:00.000Z',
+}
+
+const label: KanbanLabel = {
+  id: 'frontend',
+  name: 'Frontend',
+  color: '#1f6feb',
+  description: 'Frontend work',
+  createdAt: '2026-04-15T12:00:00.000Z',
+  updatedAt: '2026-04-15T12:00:00.000Z',
+}
+
+function baseProps() {
+  return {
+    session,
+    statuses: [status],
+    currentStatusId: null,
+    labels: [] as KanbanLabel[],
+    allLabels: [label],
+    favorites: [],
+    position: { x: 100, y: 100 },
+    onClose: vi.fn(),
+    onOpenInTerminal: vi.fn(),
+    onOpenInBrowser: vi.fn(),
+    onToggleFavorite: vi.fn(),
+    onSetStatus: vi.fn(),
+    onToggleLabel: vi.fn(),
+    onDelete: vi.fn(),
+  }
+}
+
 describe('KanbanContextMenu', () => {
-  it('shows tags directly in the main menu and toggles them without opening a submenu', () => {
-    const onToggleTag = vi.fn()
-    const tag = {
-      id: 'tag-1',
-      name: 'Frontend',
-      color: 'blue',
-      icon: null,
-      parentId: null,
-      isBuiltin: false,
-    } as Tag
+  it('sets one workflow status and toggles labels independently', () => {
+    const props = baseProps()
+    render(<KanbanContextMenu {...props} />)
 
-    render(
-      <KanbanContextMenu
-        session={session}
-        tags={[]}
-        allTags={[tag]}
-        favorites={[]}
-        position={{ x: 100, y: 100 }}
-        onClose={() => {}}
-        onOpenInTerminal={() => {}}
-        onOpenInBrowser={() => {}}
-        onToggleFavorite={() => {}}
-        onToggleTag={onToggleTag}
-        onDelete={() => {}}
-      />,
-    )
+    fireEvent.click(screen.getByRole('button', { name: /doing/i }))
+    expect(props.onSetStatus).toHaveBeenCalledWith('doing')
 
-    expect(screen.queryByRole('button', { name: /manage tags/i })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /frontend/i }))
-    expect(onToggleTag).toHaveBeenCalledWith('tag-1', false)
+    expect(props.onToggleLabel).toHaveBeenCalledWith('frontend', true)
+    expect(props.onSetStatus).toHaveBeenCalledTimes(1)
+  })
+
+  it('can clear the current status without affecting labels', () => {
+    const props = { ...baseProps(), currentStatusId: 'doing', labels: [label] }
+    render(<KanbanContextMenu {...props} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /no status/i }))
+    expect(props.onSetStatus).toHaveBeenCalledWith(null)
+    expect(props.onToggleLabel).not.toHaveBeenCalled()
   })
 
   it('invokes onRename when rename item is clicked', () => {
-    const onRename = vi.fn()
-    const onClose = vi.fn()
-
-    render(
-      <KanbanContextMenu
-        session={session}
-        tags={[]}
-        allTags={[]}
-        favorites={[]}
-        position={{ x: 100, y: 100 }}
-        onClose={onClose}
-        onOpenInTerminal={() => {}}
-        onOpenInBrowser={() => {}}
-        onToggleFavorite={() => {}}
-        onToggleTag={() => {}}
-        onDelete={() => {}}
-        onRename={onRename}
-      />,
-    )
-
+    const props = { ...baseProps(), onRename: vi.fn() }
+    render(<KanbanContextMenu {...props} />)
     fireEvent.click(screen.getByRole('button', { name: /rename/i }))
-    expect(onRename).toHaveBeenCalledTimes(1)
-    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(props.onRename).toHaveBeenCalledTimes(1)
+    expect(props.onClose).toHaveBeenCalledTimes(1)
   })
 
   it('requires a second click before deleting and passes an anchor point', () => {
-    const onDelete = vi.fn()
-    const onClose = vi.fn()
-
-    render(
-      <KanbanContextMenu
-        session={session}
-        tags={[]}
-        allTags={[]}
-        favorites={[]}
-        position={{ x: 1180, y: 24 }}
-        onClose={onClose}
-        onOpenInTerminal={() => {}}
-        onOpenInBrowser={() => {}}
-        onToggleFavorite={() => {}}
-        onToggleTag={() => {}}
-        onDelete={onDelete}
-      />,
-    )
+    const props = baseProps()
+    render(<KanbanContextMenu {...props} />)
 
     fireEvent.click(screen.getByRole('button', { name: /delete/i }))
-    expect(onDelete).not.toHaveBeenCalled()
-    expect(onClose).not.toHaveBeenCalled()
+    expect(props.onDelete).not.toHaveBeenCalled()
+    expect(props.onClose).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
-
-    expect(onDelete).toHaveBeenCalledTimes(1)
-    expect(onDelete.mock.calls[0][0]).toMatchObject({
-      x: expect.any(Number),
-      y: expect.any(Number),
-    })
-    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(props.onDelete).toHaveBeenCalledTimes(1)
+    expect(props.onDelete.mock.calls[0][0]).toMatchObject({ x: expect.any(Number), y: expect.any(Number) })
+    expect(props.onClose).toHaveBeenCalledTimes(1)
   })
 })

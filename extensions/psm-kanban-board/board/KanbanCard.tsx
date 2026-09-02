@@ -2,9 +2,10 @@ import { memo, useRef } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { CheckSquare, Clock, MessageSquare, Square } from 'lucide-react'
-import type { SessionInfo, Tag } from '@/types'
+import type { SessionInfo } from '@/types'
 import type { KanbanCardDensity } from './kanbanBoardModel'
-import TagBadge from '@/components/tags/TagBadge'
+import KanbanLabelBadge from '../labels/KanbanLabelBadge'
+import type { KanbanLabel } from '../labels/kanbanLabelsStore'
 import { SessionBadge } from '@/components/session-viewer/SessionBadge'
 import { useSettings } from '@/hooks/useSettings'
 import { getSessionSourceSlug, getSessionSourceTag } from '@/utils/session'
@@ -17,7 +18,7 @@ export function kanbanCardSortableId(columnId: string, sessionId: string) {
 interface KanbanCardProps {
   session: SessionInfo
   columnId?: string
-  tags: Tag[]
+  labels: KanbanLabel[]
   isSelected: boolean
   isDragging?: boolean
   isOverlay?: boolean
@@ -33,7 +34,7 @@ interface KanbanCardProps {
 function KanbanCardInner({
   session,
   columnId,
-  tags,
+  labels,
   isSelected,
   isDragging,
   isOverlay,
@@ -136,18 +137,18 @@ function KanbanCardInner({
         {isBulkSelected ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
       </button>
 
-      {/* Header: Title + Tags */}
+      {/* Header: Title + Labels */}
       <div className={`flex items-start gap-1.5 pr-5 ${isCompact ? 'mb-1' : 'mb-1.5'}`}>
         <span className={`flex-1 font-medium text-foreground leading-tight min-w-0 ${isCompact ? 'text-[10px] line-clamp-1' : 'text-[11px] line-clamp-2'}`}>
           {session.name || session.first_message || 'Untitled'}
         </span>
-        {tags.length > 0 && (
+        {labels.length > 0 && (
           <div className="flex gap-0.5 flex-shrink-0 mt-0.5">
-            {tags.slice(0, 2).map(tag => (
-              <TagBadge key={tag.id} tag={tag} compact />
+            {labels.slice(0, 2).map((label) => (
+              <KanbanLabelBadge key={label.id} label={label} compact />
             ))}
-            {tags.length > 2 && (
-              <span className="text-[8px] text-muted-foreground">+{tags.length - 2}</span>
+            {labels.length > 2 && (
+              <span className="text-[8px] text-muted-foreground">+{labels.length - 2}</span>
             )}
           </div>
         )}
@@ -199,7 +200,10 @@ const KanbanCard = memo(KanbanCardInner, (prev, next) => {
     prev.isBulkSelected === next.isBulkSelected &&
     prev.selectionMode === next.selectionMode &&
     prev.density === next.density &&
-    prev.tags.length === next.tags.length
+    prev.labels.length === next.labels.length &&
+    prev.labels.every((label, index) => (
+      label.id === next.labels[index]?.id && label.updatedAt === next.labels[index]?.updatedAt
+    ))
   )
 })
 

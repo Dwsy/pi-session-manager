@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect, type HTMLAttributes, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { AlignJustify, Loader2, Plus, Rows3 } from 'lucide-react'
+import { AlignJustify, Loader2, Plus, Rows3, Tags } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
@@ -24,8 +24,11 @@ import type { TerminalType } from '@/components/settings/types'
 import KanbanColumn from './KanbanColumn'
 import KanbanCard from './KanbanCard'
 import KanbanBulkToolbar from './KanbanBulkToolbar'
-import KanbanRoadmapView from './KanbanRoadmapView'
-import KanbanTableView from './KanbanTableView'
+import KanbanRoadmapView from '../views/KanbanRoadmapView'
+import KanbanTableView from '../views/KanbanTableView'
+import KanbanLabelManager from '../labels/KanbanLabelManager'
+import type { KanbanLabel, KanbanLabelAssignment } from '../labels/kanbanLabelsStore'
+import { labelsForSession } from '../labels/kanbanLabelsStore'
 import SearchFilterBar from '@/components/search/SearchFilterBar'
 import SessionPreviewModal from '@/components/session-preview/SessionPreviewModal'
 import TimeRangeSelector from './TimeRangeSelector'
@@ -36,8 +39,9 @@ import {
   buildKanbanColumns,
   DESKTOP_KANBAN_COLUMN_WIDTH,
   filterColumnSessions,
-  reorderTagColumnIds,
-  UNTAGGED_COLUMN_ID,
+  getSessionStatusId,
+  NO_STATUS_COLUMN_ID,
+  reorderStatusColumnIds,
   type KanbanCardDensity,
   type KanbanColumnData,
   type KanbanViewMode,
@@ -45,13 +49,18 @@ import {
 
 interface KanbanBoardProps {
   sessions: SessionInfo[]
-  tags: Tag[]
-  sessionTags: SessionTag[]
+  statuses: Tag[]
+  statusAssignments: SessionTag[]
+  labels: KanbanLabel[]
+  labelAssignments: KanbanLabelAssignment[]
   selectedSession: SessionInfo | null
   onSelectSession: (session: SessionInfo) => void
   onMoveSession: (sessionId: string, fromTagId: string | null, toTagId: string, position: number) => void
-  getTagsForSession: (sessionId: string) => Tag[]
   onToggleTag: (sessionId: string, tagId: string, assigned: boolean) => void
+  onToggleLabel: (sessionId: string, labelId: string, assigned: boolean) => void
+  onCreateLabel: (input: Pick<KanbanLabel, 'name' | 'color' | 'description'>) => void | Promise<KanbanLabel>
+  onUpdateLabel: (id: string, updates: Partial<Pick<KanbanLabel, 'name' | 'color' | 'description'>>) => void | Promise<void>
+  onDeleteLabel: (id: string) => void | Promise<void>
   onDeleteSession?: (
     session: SessionInfo,
     options?: import('@/components/dialogs/deleteSessionTypes').DeleteSessionRequestOptions,
@@ -71,17 +80,16 @@ interface KanbanBoardProps {
   piPath?: string
   customCommand?: string
   resumeCommand?: string
-  onCreateTag?: (name: string, color: string) => void
-  columnOrder?: string[]
-  onColumnOrderChange?: (tagIds: string[]) => void | Promise<void>
+  statusOrder?: string[]
+  onStatusOrderChange?: (statusIds: string[]) => void | Promise<void>
   cardDensity?: KanbanCardDensity
   onCardDensityChange?: (density: KanbanCardDensity) => void | Promise<void>
   viewMode?: KanbanViewMode
   onViewModeChange?: (viewMode: KanbanViewMode) => void | Promise<void>
   projectFilter?: string | null // null = all projects
-  filterTagIds?: string[]
+  filterStatusIds?: string[]
   sourceFilterSlugs?: string[]
-  onFilterChange?: (tagIds: string[]) => void
+  onStatusFilterChange?: (statusIds: string[]) => void
   getDescendantIds?: (tagId: string) => string[]
   liveSessionIds?: Set<string>
   loading?: boolean
@@ -158,13 +166,18 @@ function SortableColumnFrame({ column, disabled, children }: SortableColumnFrame
 
 export default function KanbanBoard({
   sessions,
-  tags,
-  sessionTags,
+  statuses,
+  statusAssignments,
+  labels,
+  labelAssignments,
   selectedSession,
   onSelectSession,
   onMoveSession,
-  getTagsForSession,
   onToggleTag,
+  onToggleLabel,
+  onCreateLabel,
+  onUpdateLabel,
+  onDeleteLabel,
   onDeleteSession,
   onDeleteSessions,
   onConvertSession,
@@ -178,16 +191,16 @@ export default function KanbanBoard({
   piPath,
   customCommand,
   resumeCommand,
-  columnOrder = [],
-  onColumnOrderChange,
+  statusOrder = [],
+  onStatusOrderChange,
   cardDensity = 'comfortable',
   onCardDensityChange,
   viewMode = 'board',
   onViewModeChange,
   projectFilter,
-  filterTagIds = [],
+  filterStatusIds = [],
   sourceFilterSlugs = [],
-  onFilterChange,
+  onStatusFilterChange,
   getDescendantIds = () => [],
   liveSessionIds,
   loading = false,
@@ -204,6 +217,7 @@ export default function KanbanBoard({
   const [timeRange, setTimeRange] = useState<TimeRange>('any')
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(() => new Set())
   const [columnQueries, setColumnQueries] = useState<Record<string, string>>({})
+  const [showLabelManager, setShowLabelManager] = useState(false)
   const suppressPreviewOpenUntilRef = useRef(0)
 
   // Filter sessions by project + search query + time range
@@ -213,12 +227,12 @@ export default function KanbanBoard({
       projectFilter,
       searchQuery,
       sourceFilterSlugs,
-      filterTagIds,
-      sessionTags,
+      filterTagIds: filterStatusIds,
+      sessionTags: statusAssignments,
       getDescendantIds,
       timeRange,
     })
-  }, [sessions, projectFilter, searchQuery, sourceFilterSlugs, filterTagIds, sessionTags, getDescendantIds, timeRange])
+  }, [sessions, projectFilter, searchQuery, sourceFilterSlugs, filterStatusIds, statusAssignments, getDescendantIds, timeRange])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -226,11 +240,21 @@ export default function KanbanBoard({
     })
   )
 
-  // Sort tags by sortOrder
-  const sortedTags = useMemo(
-    () => [...tags].sort((a, b) => a.sortOrder - b.sortOrder),
-    [tags]
+  // Existing host tags are the persisted compatibility layer for Kanban statuses.
+  const sortedStatuses = useMemo(
+    () => [...statuses].sort((a, b) => a.sortOrder - b.sortOrder),
+    [statuses]
   )
+
+  const getLabelsForSession = useCallback(
+    (sessionId: string) => labelsForSession(labels, labelAssignments, sessionId),
+    [labelAssignments, labels],
+  )
+
+  const getStatusForSession = useCallback((sessionId: string) => {
+    const statusId = getSessionStatusId(sortedStatuses, statusAssignments, sessionId)
+    return statusId ? sortedStatuses.find((status) => status.id === statusId) ?? null : null
+  }, [sortedStatuses, statusAssignments])
 
   // Build session map for quick lookup (using filtered sessions)
   const sessionMap = useMemo(
@@ -268,11 +292,11 @@ export default function KanbanBoard({
   const columns = useMemo(
     () => buildKanbanColumns({
       sessions: filteredSessions,
-      tags: sortedTags,
-      sessionTags,
-      columnOrder,
+      statuses: sortedStatuses,
+      statusAssignments,
+      statusOrder,
     }),
-    [columnOrder, filteredSessions, sortedTags, sessionTags],
+    [filteredSessions, sortedStatuses, statusAssignments, statusOrder],
   )
 
   const displayColumns = useMemo(
@@ -286,7 +310,7 @@ export default function KanbanBoard({
 
   const columnIds = useMemo(() => new Set(columns.map(col => col.id)), [columns])
   const sortableColumnIds = useMemo(
-    () => columns.filter((col) => col.id !== UNTAGGED_COLUMN_ID).map((col) => columnSortableId(col.id)),
+    () => columns.filter((col) => col.id !== NO_STATUS_COLUMN_ID).map((col) => columnSortableId(col.id)),
     [columns],
   )
 
@@ -343,6 +367,38 @@ export default function KanbanBoard({
     return findColumnForSession(overId)
   }, [columns, findColumnForSession])
 
+  const setSessionStatus = useCallback((sessionId: string, targetStatusId: string | null, position?: number) => {
+    const validStatusIds = new Set(sortedStatuses.map((status) => status.id))
+    const currentIds = Array.from(new Set(
+      statusAssignments
+        .filter((assignment) => assignment.sessionId === sessionId && validStatusIds.has(assignment.tagId))
+        .map((assignment) => assignment.tagId),
+    ))
+    const currentStatusId = getSessionStatusId(sortedStatuses, statusAssignments, sessionId)
+
+    for (const statusId of currentIds) {
+      if (statusId !== currentStatusId && statusId !== targetStatusId) {
+        onToggleTag(sessionId, statusId, true)
+      }
+    }
+
+    if (targetStatusId === null) {
+      for (const statusId of currentIds) {
+        if (statusId === currentStatusId) onToggleTag(sessionId, statusId, true)
+      }
+      return
+    }
+
+    if (currentStatusId === targetStatusId) return
+    const targetColumn = columns.find((column) => column.id === targetStatusId)
+    onMoveSession(
+      sessionId,
+      currentStatusId,
+      targetStatusId,
+      position ?? targetColumn?.sessions.length ?? 0,
+    )
+  }, [columns, onMoveSession, onToggleTag, sortedStatuses, statusAssignments])
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
     if (event.active.data.current?.type === 'column') {
       setActiveColumnId(String(event.active.data.current.columnId ?? columnIdFromDndId(String(event.active.id))))
@@ -382,11 +438,11 @@ export default function KanbanBoard({
       const activeColumn = String(active.data.current.columnId ?? columnIdFromDndId(String(active.id)))
       const overColumn = String(over.data.current?.columnId ?? columnIdFromDndId(String(over.id)))
       const currentOrder = columns
-        .filter((column) => column.id !== UNTAGGED_COLUMN_ID)
+        .filter((column) => column.id !== NO_STATUS_COLUMN_ID)
         .map((column) => column.id)
-      const nextOrder = reorderTagColumnIds(currentOrder, activeColumn, overColumn)
+      const nextOrder = reorderStatusColumnIds(currentOrder, activeColumn, overColumn)
       if (nextOrder.some((id, index) => id !== currentOrder[index])) {
-        void onColumnOrderChange?.(nextOrder)
+        void onStatusOrderChange?.(nextOrder)
       }
       return
     }
@@ -394,8 +450,7 @@ export default function KanbanBoard({
     const sessionId = String(active.data.current?.sessionId ?? active.id)
     const overId = String(over.id)
 
-    // A session may appear in multiple tag columns. Prefer the concrete drag
-    // instance's column instead of guessing from the shared session id.
+    // Status is single-value, but keep the concrete drag source for stable DnD.
     const fromColId = active.data.current?.columnId
       ? String(active.data.current.columnId)
       : findColumnForSession(sessionId)
@@ -434,33 +489,22 @@ export default function KanbanBoard({
     // No change needed
     if (fromColId === toColId) return
 
-    // Handle move to untagged
-    if (toColId === UNTAGGED_COLUMN_ID) {
-      if (fromColId !== UNTAGGED_COLUMN_ID) {
-        onToggleTag(sessionId, fromColId, true) // Remove tag
-      }
-      return
-    }
+    setSessionStatus(sessionId, toColId === NO_STATUS_COLUMN_ID ? null : toColId, position)
+  }, [columns, findColumnForSession, onStatusOrderChange, setSessionStatus])
 
-    // Handle move to tagged column
-    const fromTagId = fromColId === UNTAGGED_COLUMN_ID ? null : fromColId
-    onMoveSession(sessionId, fromTagId, toColId, position)
-  }, [columns, findColumnForSession, onColumnOrderChange, onMoveSession, onToggleTag])
-
-  const handleBulkMoveToTag = useCallback((tagId: string) => {
-    const targetColumn = columns.find((column) => column.id === tagId)
+  const handleBulkMoveToStatus = useCallback((statusId: string) => {
+    const targetColumn = columns.find((column) => column.id === statusId)
     let position = targetColumn?.sessions.length ?? 0
 
     for (const session of selectedSessions) {
       const fromColId = findColumnForSession(session.id)
-      if (!fromColId || fromColId === tagId) continue
-      const fromTagId = fromColId === UNTAGGED_COLUMN_ID ? null : fromColId
-      onMoveSession(session.id, fromTagId, tagId, position)
+      if (!fromColId || fromColId === statusId) continue
+      setSessionStatus(session.id, statusId, position)
       position += 1
     }
 
     clearBulkSelection()
-  }, [clearBulkSelection, columns, findColumnForSession, onMoveSession, selectedSessions])
+  }, [clearBulkSelection, columns, findColumnForSession, selectedSessions, setSessionStatus])
 
   const handleBulkDelete = useCallback(() => {
     if (selectedSessions.length === 0) return
@@ -542,10 +586,10 @@ export default function KanbanBoard({
           <SearchFilterBar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            tags={tags}
-            sessionTags={sessionTags}
-            filterTagIds={filterTagIds}
-            onFilterChange={onFilterChange || (() => {})}
+            tags={sortedStatuses}
+            sessionTags={statusAssignments}
+            filterTagIds={filterStatusIds}
+            onFilterChange={onStatusFilterChange || (() => {})}
             getDescendantIds={getDescendantIds}
             compact
           />
@@ -572,11 +616,20 @@ export default function KanbanBoard({
         </span>
         <KanbanBulkToolbar
           selectedCount={selectedSessions.length}
-          tags={sortedTags}
-          onMoveToTag={handleBulkMoveToTag}
+          statuses={sortedStatuses}
+          onMoveToStatus={handleBulkMoveToStatus}
           onDeleteSelected={handleBulkDelete}
           onClearSelection={clearBulkSelection}
         />
+        <button
+          type="button"
+          onClick={() => setShowLabelManager(true)}
+          className="flex h-7 items-center gap-1 rounded-md border border-border/35 bg-background/40 px-2 text-[10px] text-muted-foreground hover:text-foreground focus-ring"
+          title={t('plugins.kanbanBoard.manageLabels', 'Manage labels')}
+        >
+          <Tags className="h-3.5 w-3.5" />
+          <span>{t('plugins.kanbanBoard.labels', 'Labels')}</span>
+        </button>
         {viewMode === 'board' && <div className="flex items-center rounded-md border border-border/35 bg-background/40 p-0.5">
           <button
             type="button"
@@ -620,7 +673,8 @@ export default function KanbanBoard({
           selectedSession={selectedSession}
           selectedSessionIds={selectedSessionIds}
           selectionMode={selectedSessionIds.size > 0}
-          getTagsForSession={getTagsForSession}
+          getStatusForSession={getStatusForSession}
+          getLabelsForSession={getLabelsForSession}
           onToggleBulkSelect={toggleBulkSelect}
           onOpenSession={onSelectSession}
           hideProjectInfo={!!projectFilter}
@@ -632,7 +686,8 @@ export default function KanbanBoard({
           selectedSession={selectedSession}
           selectedSessionIds={selectedSessionIds}
           selectionMode={selectedSessionIds.size > 0}
-          getTagsForSession={getTagsForSession}
+          getStatusForSession={getStatusForSession}
+          getLabelsForSession={getLabelsForSession}
           onToggleBulkSelect={toggleBulkSelect}
           onOpenSession={onSelectSession}
           hideProjectInfo={!!projectFilter}
@@ -662,7 +717,7 @@ export default function KanbanBoard({
                       : 'text-muted-foreground'
                   }`}
                 >
-                  {col.tag?.name || t('plugins.kanbanBoard.untagged', 'Unlabeled')}
+                  {col.status?.name || t('plugins.kanbanBoard.noStatus', 'No status')}
                   <span className="text-[9px] opacity-60">{col.sessions.length}</span>
                 </button>
               ))}
@@ -672,15 +727,17 @@ export default function KanbanBoard({
               {displayColumns[mobileColIndex] && (
                 <KanbanColumn
                   id={displayColumns[mobileColIndex].id}
-                  tag={displayColumns[mobileColIndex].tag}
+                  status={displayColumns[mobileColIndex].status}
                   sessions={displayColumns[mobileColIndex].sessions}
                   selectedSession={selectedSession}
                   onSelectSession={handleCardClick}
-                  getTagsForSession={getTagsForSession}
-                  allTags={tags}
+                  getLabelsForSession={getLabelsForSession}
+                  allLabels={labels}
+                  statuses={sortedStatuses}
                   favorites={favorites || []}
                     onToggleFavorite={onToggleFavorite || (() => {})}
-                    onToggleTag={onToggleTag}
+                    onSetStatus={setSessionStatus}
+                    onToggleLabel={onToggleLabel}
                     onDeleteSession={onDeleteSession}
                     onResumeSession={onResumeSession}
                     onCopyResumeSession={onCopyResumeSession}
@@ -712,20 +769,22 @@ export default function KanbanBoard({
                   <SortableColumnFrame
                     key={col.id}
                     column={col}
-                    disabled={col.id === UNTAGGED_COLUMN_ID || !onColumnOrderChange}
+                    disabled={col.id === NO_STATUS_COLUMN_ID || !onStatusOrderChange}
                   >
                     {({ dragHandleProps, isDragging }) => (
                       <KanbanColumn
                         id={col.id}
-                        tag={col.tag}
+                        status={col.status}
                         sessions={col.sessions}
                         selectedSession={selectedSession}
                         onSelectSession={handleCardClick}
-                        getTagsForSession={getTagsForSession}
-                        allTags={tags}
+                        getLabelsForSession={getLabelsForSession}
+                        allLabels={labels}
+                        statuses={sortedStatuses}
                         favorites={favorites || []}
                         onToggleFavorite={onToggleFavorite || (() => {})}
-                        onToggleTag={onToggleTag}
+                        onSetStatus={setSessionStatus}
+                        onToggleLabel={onToggleLabel}
                         onDeleteSession={onDeleteSession}
                         onResumeSession={onResumeSession}
                         onCopyResumeSession={onCopyResumeSession}
@@ -756,7 +815,7 @@ export default function KanbanBoard({
           {activeSession && (
             <KanbanCard
               session={activeSession}
-              tags={getTagsForSession(activeSession.id)}
+              labels={getLabelsForSession(activeSession.id)}
               isSelected={false}
               isOverlay
               onSelect={() => {}}
@@ -765,6 +824,16 @@ export default function KanbanBoard({
           )}
         </DragOverlay>
       </DndContext>
+      )}
+
+      {showLabelManager && (
+        <KanbanLabelManager
+          labels={labels}
+          onCreate={onCreateLabel}
+          onUpdate={onUpdateLabel}
+          onDelete={onDeleteLabel}
+          onClose={() => setShowLabelManager(false)}
+        />
       )}
 
       {/* Session Preview Modal */}

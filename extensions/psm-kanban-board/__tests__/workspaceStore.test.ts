@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest'
-import { createKanbanWorkspaceStore } from '../workspaceStore'
+import { createKanbanWorkspaceStore } from '../workspace/workspaceStore'
 
 function createCtx(initial: unknown = null) {
   let stored = initial
@@ -20,14 +20,14 @@ function createCtx(initial: unknown = null) {
   }
 }
 
-describe('kanban workspace store view config', () => {
-  it('sanitizes and persists per-workspace column order and card density', async () => {
-    const { ctx, getStored } = createCtx({
+describe('kanban workspace store status config', () => {
+  it('migrates legacy tag filter and column order fields to status naming', async () => {
+    const { ctx } = createCtx({
       version: 1,
       activeWorkspaceId: '__default__',
       defaultWorkspaceConfig: {
         projectFilter: null,
-        filterTagIds: [],
+        filterTagIds: ['todo'],
         sourceFilterSlugs: [],
         columnOrder: ['todo', 'done'],
         cardDensity: 'compact',
@@ -35,48 +35,45 @@ describe('kanban workspace store view config', () => {
       workspaces: [],
     })
     const store = createKanbanWorkspaceStore(ctx)
-
     store.load()
-    await vi.waitFor(() => {
-      expect(store.getSnapshot().loading).toBe(false)
-    })
+    await vi.waitFor(() => expect(store.getSnapshot().loading).toBe(false))
 
-    expect(store.getSnapshot().activeWorkspace.config.columnOrder).toEqual(['todo', 'done'])
+    expect(store.getSnapshot().activeWorkspace.config.filterStatusIds).toEqual(['todo'])
+    expect(store.getSnapshot().activeWorkspace.config.statusOrder).toEqual(['todo', 'done'])
     expect(store.getSnapshot().activeWorkspace.config.cardDensity).toBe('compact')
+  })
 
-    await store.updateActiveWorkspaceConfig({
-      columnOrder: ['done', 'todo'],
-      cardDensity: 'comfortable',
-    })
+  it('persists per-workspace status order and card density as version 2', async () => {
+    const { ctx, getStored } = createCtx(null)
+    const store = createKanbanWorkspaceStore(ctx)
+    store.load()
+    await vi.waitFor(() => expect(store.getSnapshot().loading).toBe(false))
 
-    expect(store.getSnapshot().activeWorkspace.config.columnOrder).toEqual(['done', 'todo'])
-    expect(store.getSnapshot().activeWorkspace.config.cardDensity).toBe('comfortable')
+    await store.updateActiveWorkspaceConfig({ statusOrder: ['done', 'todo'], cardDensity: 'comfortable' })
+
+    expect(store.getSnapshot().activeWorkspace.config.statusOrder).toEqual(['done', 'todo'])
     expect(getStored()).toMatchObject({
-      defaultWorkspaceConfig: {
-        columnOrder: ['done', 'todo'],
-        cardDensity: 'comfortable',
-      },
+      version: 2,
+      defaultWorkspaceConfig: { statusOrder: ['done', 'todo'], cardDensity: 'comfortable' },
     })
   })
 
-  it('keeps different column orders for different saved workspaces', async () => {
+  it('keeps different status orders for different saved workspaces', async () => {
     const { ctx, getStored } = createCtx(null)
     const store = createKanbanWorkspaceStore(ctx)
-
     store.load()
-    await vi.waitFor(() => {
-      expect(store.getSnapshot().loading).toBe(false)
-    })
+    await vi.waitFor(() => expect(store.getSnapshot().loading).toBe(false))
 
     await store.saveWorkspace({
       id: '__new__',
       name: 'Frontend',
       config: {
         projectFilter: null,
-        filterTagIds: [],
+        filterStatusIds: [],
         sourceFilterSlugs: [],
-        columnOrder: ['todo', 'done'],
+        statusOrder: ['todo', 'done'],
         cardDensity: 'comfortable',
+        viewMode: 'board',
       },
     })
     const firstId = store.getSnapshot().activeWorkspaceId
@@ -86,23 +83,24 @@ describe('kanban workspace store view config', () => {
       name: 'Backend',
       config: {
         projectFilter: null,
-        filterTagIds: [],
+        filterStatusIds: [],
         sourceFilterSlugs: [],
-        columnOrder: ['blocked', 'doing'],
+        statusOrder: ['blocked', 'doing'],
         cardDensity: 'compact',
+        viewMode: 'table',
       },
     })
     const secondId = store.getSnapshot().activeWorkspaceId
 
     store.selectWorkspace(firstId)
-    expect(store.getSnapshot().activeWorkspace.config.columnOrder).toEqual(['todo', 'done'])
+    expect(store.getSnapshot().activeWorkspace.config.statusOrder).toEqual(['todo', 'done'])
 
     store.selectWorkspace(secondId)
-    expect(store.getSnapshot().activeWorkspace.config.columnOrder).toEqual(['blocked', 'doing'])
+    expect(store.getSnapshot().activeWorkspace.config.statusOrder).toEqual(['blocked', 'doing'])
     expect(getStored()).toMatchObject({
       workspaces: expect.arrayContaining([
-        expect.objectContaining({ id: firstId, config: expect.objectContaining({ columnOrder: ['todo', 'done'] }) }),
-        expect.objectContaining({ id: secondId, config: expect.objectContaining({ columnOrder: ['blocked', 'doing'] }) }),
+        expect.objectContaining({ id: firstId, config: expect.objectContaining({ statusOrder: ['todo', 'done'] }) }),
+        expect.objectContaining({ id: secondId, config: expect.objectContaining({ statusOrder: ['blocked', 'doing'] }) }),
       ]),
     })
   })

@@ -13,7 +13,7 @@ vi.mock('react-i18next', () => ({
 
 afterEach(() => cleanup())
 
-import KanbanBulkToolbar from '../KanbanBulkToolbar'
+import KanbanBulkToolbar from '../board/KanbanBulkToolbar'
 
 const tag = (id: string, name: string): Tag => ({
   id,
@@ -25,16 +25,16 @@ const tag = (id: string, name: string): Tag => ({
 })
 
 describe('KanbanBulkToolbar', () => {
-  it('moves selected sessions to a chosen tag and can clear selection', () => {
-    const onMoveToTag = vi.fn()
+  it('moves selected sessions to a chosen status and can clear selection', () => {
+    const onMoveToStatus = vi.fn()
     const onDeleteSelected = vi.fn()
     const onClearSelection = vi.fn()
 
     render(
       <KanbanBulkToolbar
         selectedCount={2}
-        tags={[tag('todo', 'Todo'), tag('done', 'Done')]}
-        onMoveToTag={onMoveToTag}
+        statuses={[tag('todo', 'Todo'), tag('done', 'Done')]}
+        onMoveToStatus={onMoveToStatus}
         onDeleteSelected={onDeleteSelected}
         onClearSelection={onClearSelection}
       />,
@@ -43,7 +43,7 @@ describe('KanbanBulkToolbar', () => {
     expect(screen.getByText('2 selected')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('Move selected'), { target: { value: 'done' } })
-    expect(onMoveToTag).toHaveBeenCalledWith('done')
+    expect(onMoveToStatus).toHaveBeenCalledWith('done')
 
     fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }))
     expect(onClearSelection).toHaveBeenCalledTimes(1)
@@ -56,8 +56,8 @@ describe('KanbanBulkToolbar', () => {
     render(
       <KanbanBulkToolbar
         selectedCount={3}
-        tags={[]}
-        onMoveToTag={() => {}}
+        statuses={[]}
+        onMoveToStatus={() => {}}
         onDeleteSelected={onDeleteSelected}
         onClearSelection={() => {}}
       />,

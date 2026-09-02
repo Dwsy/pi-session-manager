@@ -29,7 +29,7 @@ vi.mock('@/hooks/useSettings', () => ({
   }),
 }))
 
-import KanbanCard from '../KanbanCard'
+import KanbanCard from '../board/KanbanCard'
 
 const session: SessionInfo = {
   id: 'session-1',
@@ -50,7 +50,7 @@ describe('KanbanCard density', () => {
     const { rerender } = render(
       <KanbanCard
         session={session}
-        tags={[]}
+        labels={[]}
         isSelected={false}
         density="comfortable"
         onSelect={() => {}}
@@ -63,7 +63,7 @@ describe('KanbanCard density', () => {
     rerender(
       <KanbanCard
         session={session}
-        tags={[]}
+        labels={[]}
         isSelected={false}
         density="compact"
         onSelect={() => {}}

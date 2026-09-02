@@ -4,7 +4,7 @@
  * Features:
  * - Live mode: real-time session sync via WebSocket
  * - Search: full-text search across indexed sessions via HTTP API
- * - Tags: PSM-backed session tagging (no local SQLite)
+ * - Kanban: single Status plus GitHub-style multi Labels
  * - Context: recall and context from past sessions
  *
  * ENV: PSM_URL (default ws://127.0.0.1:52131/ws), PSM_TOKEN
@@ -15,7 +15,7 @@
  *   psm-client     — HTTP client for PSM's POST /api dispatch
  *   bridge-conn    — WebSocket connection with heartbeat + RPC
  *   conn-manager   — live mode lifecycle, UI status, session state
- *   tools          — LLM-callable tools (search, context, recall, tag)
+ *   tools          — LLM-callable tools (search, context, recall, status, labels)
  *   commands       — single /psm panel
  */
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
@@ -25,7 +25,8 @@ import {
   sessionSearchTool,
   sessionContextTool,
   sessionRecallTool,
-  sessionTagTool,
+  sessionStatusTool,
+  sessionLabelTool,
 } from "./tools.js";
 
 export default async function (pi: ExtensionAPI) {
@@ -33,7 +34,8 @@ export default async function (pi: ExtensionAPI) {
   pi.registerTool(sessionSearchTool);
   pi.registerTool(sessionContextTool);
   pi.registerTool(sessionRecallTool);
-  pi.registerTool(sessionTagTool);
+  pi.registerTool(sessionStatusTool);
+  pi.registerTool(sessionLabelTool);
 
   // ── Register commands ───────────────────────────────
   registerAll(pi);

@@ -65,9 +65,10 @@ export interface FullTextSearchResponse {
   has_more: boolean;
 }
 
-// ── Tags (PSM backend schema) ─────────────────────────
+// ── Kanban status + labels ────────────────────────────
 
-export interface TagItem {
+/** Host Tag schema used as the persistence compatibility layer for Kanban Status. */
+export interface StatusItem {
   id: string;
   name: string;
   color: string;
@@ -78,11 +79,26 @@ export interface TagItem {
   parent_id?: string | null;
 }
 
-export interface SessionTagItem {
+/** Host SessionTag schema interpreted as a single Kanban Status assignment. */
+export interface SessionStatusItem {
   session_id: string;
-  tag_id: string;
+  status_id: string;
   position: number;
   assigned_at: string;
+}
+
+export interface LabelItem {
+  id: string;
+  name: string;
+  color: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SessionLabelItem {
+  session_id: string;
+  label_id: string;
 }
 
 // ── Bridge connection ─────────────────────────────────

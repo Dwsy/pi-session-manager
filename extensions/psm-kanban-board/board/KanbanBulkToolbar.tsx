@@ -4,16 +4,16 @@ import type { Tag } from '@/types'
 
 interface KanbanBulkToolbarProps {
   selectedCount: number
-  tags: Tag[]
-  onMoveToTag: (tagId: string) => void
+  statuses: Tag[]
+  onMoveToStatus: (statusId: string) => void
   onDeleteSelected: () => void
   onClearSelection: () => void
 }
 
 export default function KanbanBulkToolbar({
   selectedCount,
-  tags,
-  onMoveToTag,
+  statuses,
+  onMoveToStatus,
   onDeleteSelected,
   onClearSelection,
 }: KanbanBulkToolbarProps) {
@@ -31,15 +31,15 @@ export default function KanbanBulkToolbar({
         className="h-7 max-w-[160px] rounded-md border border-border/35 bg-background/70 px-2 text-[11px] text-foreground outline-none focus:border-primary/60"
         defaultValue=""
         onChange={(event) => {
-          const tagId = event.currentTarget.value
-          if (!tagId) return
-          onMoveToTag(tagId)
+          const statusId = event.currentTarget.value
+          if (!statusId) return
+          onMoveToStatus(statusId)
           event.currentTarget.value = ''
         }}
       >
         <option value="">{t('plugins.kanbanBoard.bulk.moveTo', 'Move to...')}</option>
-        {tags.map((tag) => (
-          <option key={tag.id} value={tag.id}>{tag.name}</option>
+        {statuses.map((status) => (
+          <option key={status.id} value={status.id}>{status.name}</option>
         ))}
       </select>
       <button

@@ -5,6 +5,8 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 
 import TagBadge from '@/components/tags/TagBadge'
 import type { SessionInfo, Tag } from '@/types'
+import KanbanLabelBadge from '../labels/KanbanLabelBadge'
+import type { KanbanLabel } from '../labels/kanbanLabelsStore'
 import { getPathBasename } from '@/utils/path'
 
 import {
@@ -21,7 +23,8 @@ interface KanbanRoadmapViewProps {
   selectedSession: SessionInfo | null
   selectedSessionIds: Set<string>
   selectionMode: boolean
-  getTagsForSession: (sessionId: string) => Tag[]
+  getStatusForSession: (sessionId: string) => Tag | null
+  getLabelsForSession: (sessionId: string) => KanbanLabel[]
   onToggleBulkSelect: (sessionId: string) => void
   onOpenSession: (session: SessionInfo) => void
   hideProjectInfo?: boolean
@@ -58,7 +61,8 @@ export default function KanbanRoadmapView({
   selectedSession,
   selectedSessionIds,
   selectionMode,
-  getTagsForSession,
+  getStatusForSession,
+  getLabelsForSession,
   onToggleBulkSelect,
   onOpenSession,
   hideProjectInfo = false,
@@ -133,7 +137,8 @@ export default function KanbanRoadmapView({
         {useVirtual && topPadding > 0 ? <div aria-hidden="true" style={{ height: topPadding }} /> : null}
         {renderedRows.map(({ session, virtualRow }) => {
           const position = getKanbanRoadmapPosition(session, domain)
-          const tags = getTagsForSession(session.id)
+          const status = getStatusForSession(session.id)
+          const labels = getLabelsForSession(session.id)
           const bulkSelected = selectedSessionIds.has(session.id)
           const active = selectedSession?.id === session.id
           const live = liveSessionIds?.has(session.id) || session.isLive
@@ -170,7 +175,8 @@ export default function KanbanRoadmapView({
                   <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[9px] text-muted-foreground/65">
                     {!hideProjectInfo && session.cwd ? <span className="truncate font-mono">{getPathBasename(session.cwd)}</span> : null}
                     <span className="inline-flex flex-none items-center gap-0.5"><MessageSquare className="h-2.5 w-2.5" />{session.message_count}</span>
-                    {tags.slice(0, 1).map((tag) => <TagBadge key={tag.id} tag={tag} compact />)}
+                    {status ? <TagBadge tag={status} compact /> : null}
+                    {labels.slice(0, 1).map((label) => <KanbanLabelBadge key={label.id} label={label} compact />)}
                   </div>
                 </button>
               </div>

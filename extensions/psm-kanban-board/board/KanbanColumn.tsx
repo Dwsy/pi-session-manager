@@ -4,6 +4,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useTranslation } from 'react-i18next'
 import type { SessionInfo, Tag, FavoriteItem } from '@/types'
+import type { KanbanLabel } from '../labels/kanbanLabelsStore'
 import KanbanCard, { kanbanCardSortableId } from './KanbanCard'
 import KanbanContextMenu from './KanbanContextMenu'
 import type { DeleteSessionRequestOptions } from '@/components/dialogs/deleteSessionTypes'
@@ -18,20 +19,21 @@ import {
 import {
   DESKTOP_KANBAN_COLUMN_WIDTH,
   type KanbanCardDensity,
-  visibleCardTagsForColumn,
 } from './kanbanBoardModel'
 
 interface KanbanColumnProps {
   id: string
-  tag: Tag | null
+  status: Tag | null
   sessions: SessionInfo[]
   selectedSession: SessionInfo | null
   onSelectSession: (session: SessionInfo, rect: DOMRect, clickPoint?: { x: number; y: number }) => void
-  getTagsForSession: (sessionId: string) => Tag[]
-  allTags: Tag[]
+  getLabelsForSession: (sessionId: string) => KanbanLabel[]
+  allLabels: KanbanLabel[]
+  statuses: Tag[]
   favorites: FavoriteItem[]
   onToggleFavorite: (item: Omit<FavoriteItem, 'addedAt'>) => void
-  onToggleTag: (sessionId: string, tagId: string, assigned: boolean) => void
+  onSetStatus: (sessionId: string, statusId: string | null) => void
+  onToggleLabel: (sessionId: string, labelId: string, assigned: boolean) => void
   onDeleteSession?: (
     session: SessionInfo,
     options?: DeleteSessionRequestOptions,
@@ -66,15 +68,17 @@ const CARD_ROW_GAP = 8
 
 export default function KanbanColumn({
   id,
-  tag,
+  status,
   sessions,
   selectedSession,
   onSelectSession,
-  getTagsForSession,
-  allTags,
+  getLabelsForSession,
+  allLabels,
+  statuses,
   favorites,
   onToggleFavorite,
-  onToggleTag,
+  onSetStatus,
+  onToggleLabel,
   onDeleteSession,
   onResumeSession,
   onCopyResumeSession,
@@ -120,7 +124,7 @@ export default function KanbanColumn({
     })
   }
 
-  const isHex = tag?.color?.startsWith('#')
+  const isHex = status?.color?.startsWith('#')
   const useVirtual = sessions.length > VIRTUALIZATION_THRESHOLD
   const isEmptyColumn = sessions.length === 0
   const cardHeight = density === 'compact' ? COMPACT_CARD_HEIGHT : COMFORTABLE_CARD_HEIGHT
@@ -165,9 +169,6 @@ export default function KanbanColumn({
     () => sessions.map((session) => kanbanCardSortableId(id, session.id)),
     [id, sessions],
   )
-  const getVisibleCardTags = (sessionId: string) => (
-    visibleCardTagsForColumn(getTagsForSession(sessionId), tag)
-  )
 
   // Render cards - virtualized or normal
   const renderCards = () => {
@@ -200,7 +201,7 @@ export default function KanbanColumn({
                   <KanbanCard
                     session={session}
                     columnId={id}
-                    tags={getVisibleCardTags(session.id)}
+                    labels={getLabelsForSession(session.id)}
                     isSelected={selectedSession?.id === session.id}
                     onSelect={(rect, clickPoint) => onSelectSession(session, rect, clickPoint)}
                     onContextMenu={(e) => handleContextMenu(session, e)}
@@ -226,7 +227,7 @@ export default function KanbanColumn({
             key={session.id}
             session={session}
             columnId={id}
-            tags={getVisibleCardTags(session.id)}
+            labels={getLabelsForSession(session.id)}
             isSelected={selectedSession?.id === session.id}
             onSelect={(rect, clickPoint) => onSelectSession(session, rect, clickPoint)}
             onContextMenu={(e) => handleContextMenu(session, e)}
@@ -254,7 +255,7 @@ export default function KanbanColumn({
       {/* Column Header - hidden on mobile (tabs handle this) */}
       {!isMobile && (
       <div className="flex items-center gap-2 px-3 py-2.5 mb-1">
-        {columnDragHandleProps && tag && (
+        {columnDragHandleProps && status && (
           <button
             type="button"
             className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-secondary hover:text-foreground focus-ring"
@@ -265,16 +266,16 @@ export default function KanbanColumn({
             <GripVertical className="h-3.5 w-3.5" />
           </button>
         )}
-        {tag ? (
+        {status ? (
           <span
-            className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isHex ? '' : getColorClass(tag.color)}`}
-            style={getColorStyle(tag.color)}
+            className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isHex ? '' : getColorClass(status.color)}`}
+            style={getColorStyle(status.color)}
           />
         ) : (
           <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-muted-foreground/30" />
         )}
         <span className="text-xs font-medium text-foreground flex-1 truncate">
-          {tag?.name || t('plugins.kanbanBoard.untagged', 'Unlabeled')}
+          {status?.name || t('plugins.kanbanBoard.noStatus', 'No status')}
         </span>
         <div className="relative w-20 flex-shrink-0">
           <Search className="pointer-events-none absolute left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/45" />
@@ -337,8 +338,10 @@ export default function KanbanColumn({
       {contextMenu && (
         <KanbanContextMenu
           session={contextMenu.session}
-          tags={getTagsForSession(contextMenu.session.id)}
-          allTags={allTags}
+          statuses={statuses}
+          currentStatusId={status?.id ?? null}
+          labels={getLabelsForSession(contextMenu.session.id)}
+          allLabels={allLabels}
           favorites={favorites}
           position={contextMenu.position}
           onClose={() => setContextMenu(null)}
@@ -382,8 +385,11 @@ export default function KanbanColumn({
                 }
               : undefined
           }
-          onToggleTag={(tagId, assigned) => {
-            onToggleTag(contextMenu.session.id, tagId, assigned)
+          onSetStatus={(statusId) => {
+            onSetStatus(contextMenu.session.id, statusId)
+          }}
+          onToggleLabel={(labelId, assigned) => {
+            onToggleLabel(contextMenu.session.id, labelId, assigned)
           }}
           onCopyResume={
             onCopyResumeSession

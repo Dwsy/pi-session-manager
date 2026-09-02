@@ -7,12 +7,17 @@ vi.mock("@earendil-works/pi-tui", () => ({
 
 const openPsmSession = vi.fn();
 const getSessionId = vi.fn();
-const notifyPsmTagChange = vi.fn();
-const getAllTags = vi.fn();
-const getAllSessionTags = vi.fn();
-const moveSessionTag = vi.fn();
-const removeTagFromSession = vi.fn();
-const createTag = vi.fn();
+const notifyPsmStatusChange = vi.fn();
+const getAllStatuses = vi.fn();
+const getSessionStatus = vi.fn();
+const getAllLabels = vi.fn();
+const getAllSessionLabels = vi.fn();
+const setSessionStatus = vi.fn();
+const clearSessionStatus = vi.fn();
+const createStatus = vi.fn();
+const assignLabel = vi.fn();
+const removeLabel = vi.fn();
+const createLabel = vi.fn();
 
 vi.mock("./open-psm.js", () => ({ openPsmSession }));
 vi.mock("./connection-manager.js", () => ({
@@ -23,14 +28,19 @@ vi.mock("./connection-manager.js", () => ({
   doConnect: vi.fn(),
   disableLiveMode: vi.fn(),
   enableLiveMode: vi.fn(),
-  notifyPsmTagChange,
+  notifyPsmStatusChange,
 }));
 vi.mock("./kanban-store.js", () => ({
-  getAllTags,
-  getAllSessionTags,
-  moveSessionTag,
-  removeTagFromSession,
-  createTag,
+  getAllStatuses,
+  getSessionStatus,
+  getAllLabels,
+  getAllSessionLabels,
+  setSessionStatus,
+  clearSessionStatus,
+  createStatus,
+  assignLabel,
+  removeLabel,
+  createLabel,
 }));
 
 function makePi() {
@@ -48,20 +58,30 @@ describe("pi-session-bridge commands", () => {
     vi.resetModules();
     openPsmSession.mockReset();
     getSessionId.mockReset();
-    notifyPsmTagChange.mockReset();
-    getAllTags.mockReset();
-    getAllSessionTags.mockReset();
-    moveSessionTag.mockReset();
-    removeTagFromSession.mockReset();
-    createTag.mockReset();
+    notifyPsmStatusChange.mockReset();
+    getAllStatuses.mockReset();
+    getSessionStatus.mockReset();
+    getAllLabels.mockReset();
+    getAllSessionLabels.mockReset();
+    setSessionStatus.mockReset();
+    clearSessionStatus.mockReset();
+    createStatus.mockReset();
+    assignLabel.mockReset();
+    removeLabel.mockReset();
+    createLabel.mockReset();
 
     getSessionId.mockReturnValue("sid");
     openPsmSession.mockResolvedValue({ url: "pi-session://sessions/sid", mode: "desktop" });
-    getAllTags.mockResolvedValue([{ id: "tag-1", name: "Todo", color: "info", sort_order: 0, is_builtin: false, created_at: "", parent_id: null }]);
-    getAllSessionTags.mockResolvedValue([]);
-    moveSessionTag.mockResolvedValue(undefined);
-    removeTagFromSession.mockResolvedValue(undefined);
-    createTag.mockResolvedValue({ id: "tag-new", name: "New", color: "info", sort_order: 1, is_builtin: false, created_at: "", parent_id: null });
+    getAllStatuses.mockResolvedValue([{ id: "tag-1", name: "Todo", color: "info", sort_order: 0, is_builtin: false, created_at: "", parent_id: null }]);
+    getSessionStatus.mockResolvedValue(null);
+    getAllLabels.mockResolvedValue([{ id: "label-1", name: "backend", color: "#0969da", description: "Backend work", created_at: "", updated_at: "" }]);
+    getAllSessionLabels.mockResolvedValue([]);
+    setSessionStatus.mockResolvedValue(undefined);
+    clearSessionStatus.mockResolvedValue(undefined);
+    createStatus.mockResolvedValue({ id: "tag-new", name: "New", color: "info", sort_order: 1, is_builtin: false, created_at: "", parent_id: null });
+    assignLabel.mockResolvedValue(undefined);
+    removeLabel.mockResolvedValue(undefined);
+    createLabel.mockResolvedValue({ id: "label-new", name: "New", color: "#0969da", description: "", created_at: "", updated_at: "" });
   });
 
   it("registers bridge and kanban commands", async () => {
@@ -117,7 +137,7 @@ describe("pi-session-bridge commands", () => {
     expect(ctx.ui.notify).toHaveBeenCalledWith("/kanban requires TUI mode", "error");
   });
 
-  it("toggles the selected Kanban tag from the custom TUI popup", async () => {
+  it("sets the selected Kanban Status from the custom TUI popup", async () => {
     const { pi, handlers } = makePi();
     const render = vi.fn();
     const custom = vi.fn(async (
@@ -135,9 +155,10 @@ describe("pi-session-bridge commands", () => {
       };
       const component = factory({ requestRender: render }, theme, {}, vi.fn()) as { width?: number; render(width: number): string[]; handleInput(data: string): void };
       const output = component.render(80).join("\n");
-      expect(component.width).toBe(70);
+      expect(component.width).toBe(76);
       expect(output).toContain("╭");
-      expect(output).toContain("[ ] Todo");
+      expect(output).toContain("( ) Todo");
+      expect(output).toContain("[ ] backend #0969da — Backend work");
       expect(theme.fg).toHaveBeenCalledWith("accent", expect.any(String));
       expect(theme.fg).toHaveBeenCalledWith("border", expect.any(String));
       component.handleInput("\r");
@@ -153,25 +174,25 @@ describe("pi-session-bridge commands", () => {
     await handlers.get("kanban")!("", ctx);
 
     expect(custom).toHaveBeenCalledWith(expect.any(Function), { overlay: true });
-    expect(moveSessionTag).toHaveBeenCalledWith("sid", null, "tag-1", 0);
-    expect(notifyPsmTagChange).toHaveBeenCalledWith("sid", []);
+    expect(setSessionStatus).toHaveBeenCalledWith("sid", "tag-1", 0);
+    expect(notifyPsmStatusChange).toHaveBeenCalledWith("sid");
   });
 
-  it("maps every PSM tag color to a valid Pi theme color", async () => {
-    const { mapKanbanTagColorToTheme } = await import("./commands.js");
+  it("maps every PSM Status color to a valid Pi theme color", async () => {
+    const { mapKanbanStatusColorToTheme } = await import("./commands.js");
 
-    expect(mapKanbanTagColorToTheme("info")).toBe("accent");
-    expect(mapKanbanTagColorToTheme("success")).toBe("success");
-    expect(mapKanbanTagColorToTheme("emerald")).toBe("success");
-    expect(mapKanbanTagColorToTheme("warning")).toBe("warning");
-    expect(mapKanbanTagColorToTheme("amber")).toBe("warning");
-    expect(mapKanbanTagColorToTheme("destructive")).toBe("error");
-    expect(mapKanbanTagColorToTheme("slate")).toBe("muted");
+    expect(mapKanbanStatusColorToTheme("info")).toBe("accent");
+    expect(mapKanbanStatusColorToTheme("success")).toBe("success");
+    expect(mapKanbanStatusColorToTheme("emerald")).toBe("success");
+    expect(mapKanbanStatusColorToTheme("warning")).toBe("warning");
+    expect(mapKanbanStatusColorToTheme("amber")).toBe("warning");
+    expect(mapKanbanStatusColorToTheme("destructive")).toBe("error");
+    expect(mapKanbanStatusColorToTheme("slate")).toBe("muted");
     for (const color of ["purple", "pink", "indigo", "cyan", "ring"]) {
-      expect(mapKanbanTagColorToTheme(color)).toBe("accent");
+      expect(mapKanbanStatusColorToTheme(color)).toBe("accent");
     }
-    expect(mapKanbanTagColorToTheme("#4f46e5")).toBe("accent");
-    expect(mapKanbanTagColorToTheme("future-color")).toBe("accent");
-    expect(mapKanbanTagColorToTheme(undefined)).toBe("accent");
+    expect(mapKanbanStatusColorToTheme("#4f46e5")).toBe("accent");
+    expect(mapKanbanStatusColorToTheme("future-color")).toBe("accent");
+    expect(mapKanbanStatusColorToTheme(undefined)).toBe("accent");
   });
 });

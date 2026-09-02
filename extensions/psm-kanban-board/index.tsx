@@ -14,23 +14,28 @@ import {
   AppPluginSidebarState,
 } from '@/components/app/AppPluginSidebarShell'
 
-import KanbanSessionColumnCell from './KanbanSessionColumnCell'
+import KanbanSessionColumnCell from './views/KanbanSessionColumnCell'
 import { manifest } from './manifest'
 import {
   KANBAN_SESSION_COLUMN_ID,
   KANBAN_SIDEBAR_VIEW_ID,
   KANBAN_VIEW_ID,
 } from './viewIds'
-import WorkspacePanel from './WorkspacePanel'
+import WorkspacePanel from './workspace/WorkspacePanel'
 import {
   createKanbanWorkspaceStore,
   type KanbanWorkspaceStore,
   useKanbanWorkspaceSnapshot,
-} from './workspaceStore'
+} from './workspace/workspaceStore'
+import {
+  createKanbanLabelsStore,
+  type KanbanLabelsStore,
+  useKanbanLabelsSnapshot,
+} from './labels/kanbanLabelsStore'
 
 export { manifest }
 
-const KanbanBoard = lazy(() => import('./KanbanBoard'))
+const KanbanBoard = lazy(() => import('./board/KanbanBoard'))
 
 type KanbanViewData = AppPluginSurfaceData
 type KanbanSidebarData = Pick<
@@ -40,6 +45,7 @@ type KanbanSidebarData = Pick<
   | 'sessionTags'
   | 'sourceOptions'
   | 'getDescendantIds'
+  | 'onMoveSession'
   | 'onClearSelectedSession'
 >
 
@@ -54,8 +60,13 @@ function isKanbanSidebarData(data: unknown): data is KanbanSidebarData {
 function KanbanAppView({
   data,
   workspaceStore,
-}: PsmAppViewRenderProps<KanbanViewData> & { workspaceStore: KanbanWorkspaceStore }) {
+  labelsStore,
+}: PsmAppViewRenderProps<KanbanViewData> & {
+  workspaceStore: KanbanWorkspaceStore
+  labelsStore: KanbanLabelsStore
+}) {
   const workspace = useKanbanWorkspaceSnapshot(workspaceStore)
+  const labelSnapshot = useKanbanLabelsSnapshot(labelsStore)
 
   if (!isKanbanViewData(data)) {
     return (
@@ -66,9 +77,9 @@ function KanbanAppView({
   }
 
   const projectFilter = workspace.activeWorkspace.config.projectFilter ?? workspace.selectedProject
-  const filterTagIds = workspace.activeWorkspace.config.filterTagIds
+  const filterStatusIds = workspace.activeWorkspace.config.filterStatusIds
   const sourceFilterSlugs = workspace.activeWorkspace.config.sourceFilterSlugs
-  const columnOrder = workspace.activeWorkspace.config.columnOrder
+  const statusOrder = workspace.activeWorkspace.config.statusOrder
   const cardDensity = workspace.activeWorkspace.config.cardDensity
   const viewMode = workspace.activeWorkspace.config.viewMode
 
@@ -83,15 +94,25 @@ function KanbanAppView({
     >
       <KanbanBoard
         {...data}
-        loading={data.loading || workspace.loading}
+        loading={data.loading || workspace.loading || labelSnapshot.loading}
+        statuses={data.tags}
+        statusAssignments={data.sessionTags}
+        labels={labelSnapshot.labels}
+        labelAssignments={labelSnapshot.assignments}
+        onToggleLabel={(sessionId, labelId, assigned) => {
+          void labelsStore.toggleLabel(sessionId, labelId, assigned)
+        }}
+        onCreateLabel={(input) => labelsStore.createLabel(input)}
+        onUpdateLabel={(id, updates) => labelsStore.updateLabel(id, updates)}
+        onDeleteLabel={(id) => labelsStore.deleteLabel(id)}
         projectFilter={projectFilter}
-        filterTagIds={filterTagIds}
+        filterStatusIds={filterStatusIds}
         sourceFilterSlugs={sourceFilterSlugs}
-        columnOrder={columnOrder}
+        statusOrder={statusOrder}
         cardDensity={cardDensity}
         viewMode={viewMode}
-        onColumnOrderChange={(tagIds) => {
-          void workspaceStore.updateActiveWorkspaceConfig({ columnOrder: tagIds })
+        onStatusOrderChange={(statusIds) => {
+          void workspaceStore.updateActiveWorkspaceConfig({ statusOrder: statusIds })
         }}
         onCardDensityChange={(density) => {
           void workspaceStore.updateActiveWorkspaceConfig({ cardDensity: density })
@@ -99,8 +120,8 @@ function KanbanAppView({
         onViewModeChange={(nextViewMode) => {
           void workspaceStore.updateActiveWorkspaceConfig({ viewMode: nextViewMode })
         }}
-        onFilterChange={(tagIds) => {
-          void workspaceStore.updateActiveWorkspaceConfig({ filterTagIds: tagIds })
+        onStatusFilterChange={(statusIds) => {
+          void workspaceStore.updateActiveWorkspaceConfig({ filterStatusIds: statusIds })
         }}
       />
     </Suspense>
@@ -135,6 +156,7 @@ function KanbanSidebarView({
 
 export default function activate(ctx: PsmPluginHostContext) {
   const workspaceStore = createKanbanWorkspaceStore(ctx)
+  const labelsStore = createKanbanLabelsStore(ctx)
 
   ctx.ui.registerAppView({
     id: KANBAN_VIEW_ID,
@@ -145,6 +167,7 @@ export default function activate(ctx: PsmPluginHostContext) {
     render: (props) => createElement(KanbanAppView, {
       ...(props as PsmAppViewRenderProps<KanbanViewData>),
       workspaceStore,
+      labelsStore,
     }),
   })
 
