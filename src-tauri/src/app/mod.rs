@@ -259,7 +259,7 @@ mod tests {
         assert_eq!(handler_set.len(), handlers.len());
 
         let dispatch_only = dispatch_set.difference(&handler_set).copied().collect::<Vec<_>>();
-        assert_eq!(dispatch_only, vec!["get_agent_usage_status", "invoke_model_text", "invoke_model_text_stream", "session_digest"]);
+        assert_eq!(dispatch_only, vec!["get_agent_usage_status", "invoke_model_text", "invoke_model_text_stream", "plugin_terminal_history_list", "plugin_terminal_history_read", "session_digest"]);
 
         let tauri_only = handler_set.difference(&dispatch_set).copied().collect::<Vec<_>>();
         assert_eq!(
