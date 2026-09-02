@@ -63,7 +63,7 @@ Keep these grouped as host-owned or privileged surfaces in the docs:
 | --- | --- | --- |
 | App/admin | `reset_database`, `backup_database`, `toggle_devtools` | host-internal |
 | API keys | `list_api_keys`, `create_api_key`, `revoke_api_key` | host-internal |
-| Raw terminal | `terminal_create`, `terminal_write`, `terminal_resize`, `terminal_close` | host-internal |
+| Raw terminal control | `terminal_create`, `terminal_write`, `terminal_resize`, `terminal_close` | host-internal; plugins only get opt-in `terminal:read` transcript access through `ctx.psm.terminalHistory` |
 | Pi Live control | `pi_agent_prompt`, `pi_agent_steer`, `pi_agent_abort` | privileged or host-internal |
 | Settings/config | app and server settings writes | host-internal except plugin-scoped JSON config |
 | File/session mutation | `delete_sessions`, `rename_session`, `fork_session`, `export_session` | privileged or host-internal |

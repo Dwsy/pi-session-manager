@@ -194,6 +194,69 @@ describe('PsmPluginHost', () => {
     })
   })
 
+  it('prompts for opt-in terminal history permission before reading transcripts', async () => {
+    const requestPermission = vi.fn(async () => true)
+    const setPluginPermissions = vi.fn(async () => config())
+    const host = new PsmPluginHost({
+      builtinEntries: [{
+        source: 'builtin',
+        sourceId: 'extensions/terminal-history-plugin',
+        async load() {
+          return {
+            manifest: {
+              manifestVersion: 1,
+              id: 'terminal-history-plugin',
+              name: 'Terminal History Plugin',
+              version: '1.0.0',
+              permissions: ['terminal:read'],
+            },
+            activate(ctx: any) {
+              ctx.registerCommand('terminal-history.list', async () => ctx.psm.terminalHistory.listSessions())
+            },
+          }
+        },
+      }],
+      services: {
+        loadConfig: async () => config({
+          'terminal-history-plugin': {
+            enabled: true,
+            source: 'builtin',
+            permissionOverrides: { 'terminal:read': false },
+          },
+        }),
+        listNpmEntries: async () => [],
+        listPathEntries: async () => [],
+        listDevEntries: async () => [],
+        setPluginPermissions,
+        requestPermission,
+      },
+    })
+
+    await host.reload()
+    vi.mocked(appInvoke).mockResolvedValueOnce([])
+
+    await expect(host.executeCommand('terminal-history.list')).resolves.toEqual([])
+    expect(requestPermission).toHaveBeenCalledWith({
+      pluginId: 'terminal-history-plugin',
+      pluginName: 'Terminal History Plugin',
+      permission: 'terminal:read',
+    })
+    expect(setPluginPermissions).toHaveBeenCalledWith({
+      pluginId: 'terminal-history-plugin',
+      permissionOverrides: { 'terminal:read': true },
+      source: 'builtin',
+      packageName: null,
+      entryPath: null,
+      projectPath: null,
+    })
+    expect(appInvoke).toHaveBeenCalledWith('plugin_terminal_history_list', {
+      __psm: {
+        pluginId: 'terminal-history-plugin',
+        permissions: ['terminal:read'],
+      },
+    })
+  })
+
   it('does not call local file transport when fs permission request is denied', async () => {
     const requestPermission = vi.fn(async () => false)
     const host = new PsmPluginHost({

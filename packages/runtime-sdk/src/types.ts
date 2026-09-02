@@ -12,7 +12,8 @@ export type PsmPermission =
   | "agent:invoke"
   | "fs:read"
   | "windows:open"
-  | "usage:read";
+  | "usage:read"
+  | "terminal:read";
 
 export interface PsmPermissionContext {
   pluginId?: string;
@@ -873,6 +874,32 @@ export interface PsmAgentUsageClient {
   getStatus(options?: { providerIds?: string[] }): Promise<PsmAgentUsageStatus>;
 }
 
+export interface PsmTerminalTranscriptSummary {
+  id: string;
+  cwd: string;
+  shell: string;
+  startedAt: string;
+  updatedAt: string;
+  bytes: number;
+  active: boolean;
+}
+
+export interface PsmTerminalTranscriptChunk {
+  id: string;
+  entries: unknown[];
+  nextOffset: number;
+  fileSize: number;
+  hasMore: boolean;
+}
+
+export interface PsmTerminalHistoryClient {
+  listSessions(): Promise<PsmTerminalTranscriptSummary[]>;
+  readTranscript(
+    id: string,
+    options?: { offset?: number; maxBytes?: number },
+  ): Promise<PsmTerminalTranscriptChunk>;
+}
+
 export interface PsmJsonConfigReadOptions<TDefault = unknown> {
   defaultValue?: TDefault;
 }
@@ -989,6 +1016,7 @@ export interface PsmCapabilityClient {
   agent: PsmAgentClient;
   models: PsmModelsClient;
   agentUsage: PsmAgentUsageClient;
+  terminalHistory: PsmTerminalHistoryClient;
   tags: PsmTagsClient;
   config: PsmJsonConfigClient;
   fs: PsmFsClient;

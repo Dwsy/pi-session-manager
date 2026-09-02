@@ -18,6 +18,7 @@ enum PluginPermission {
     FsRead,
     WindowsOpen,
     UsageRead,
+    TerminalRead,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -41,6 +42,7 @@ fn parse_plugin_permission(value: &str) -> Option<PluginPermission> {
         "fs:read" => Some(PluginPermission::FsRead),
         "windows:open" => Some(PluginPermission::WindowsOpen),
         "usage:read" => Some(PluginPermission::UsageRead),
+        "terminal:read" => Some(PluginPermission::TerminalRead),
         _ => None,
     }
 }
@@ -73,6 +75,7 @@ fn required_permissions_for_command(command: &str) -> &'static [PluginPermission
         "plugin_fs_roots" | "plugin_fs_list" | "plugin_fs_read" | "plugin_fs_stat" => &[PluginPermission::FsRead],
         "plugin_window_open" | "plugin_window_close" => &[PluginPermission::WindowsOpen],
         "get_agent_usage_status" => &[PluginPermission::UsageRead],
+        "plugin_terminal_history_list" | "plugin_terminal_history_read" => &[PluginPermission::TerminalRead],
         _ => &[],
     }
 }
@@ -94,4 +97,31 @@ pub(super) fn enforce_plugin_permission(command: &str, payload: &Value) -> Resul
 
     let plugin_name = ctx.plugin_id.unwrap_or_else(|| "unknown-plugin".to_string());
     Err(format!("Plugin permission denied: {plugin_name} cannot call {command}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn terminal_history_requires_terminal_read_for_plugins() {
+        let denied = json!({
+            "__psm": {
+                "pluginId": "example.terminal-history",
+                "permissions": ["sessions:read"]
+            }
+        });
+        assert!(enforce_plugin_permission("plugin_terminal_history_list", &denied).is_err());
+        assert!(enforce_plugin_permission("plugin_terminal_history_read", &denied).is_err());
+
+        let allowed = json!({
+            "__psm": {
+                "pluginId": "example.terminal-history",
+                "permissions": ["terminal:read"]
+            }
+        });
+        assert!(enforce_plugin_permission("plugin_terminal_history_list", &allowed).is_ok());
+        assert!(enforce_plugin_permission("plugin_terminal_history_read", &allowed).is_ok());
+    }
 }

@@ -57,6 +57,10 @@ export const PSM_PERMISSION_META: Record<PsmPermission, { label: string; descrip
     label: 'Agent usage',
     description: 'Read local agent login credentials and fetch read-only subscription usage',
   },
+  'terminal:read': {
+    label: 'Terminal history',
+    description: 'Read persisted PSM terminal transcripts',
+  },
 }
 
 export function permissionLabel(permission: PsmPermission) {
@@ -79,6 +83,9 @@ export function requiredRuntimeRequestPermissions(command: string): PsmPermissio
       return ['windows:open']
     case 'get_agent_usage_status':
       return ['usage:read']
+    case 'plugin_terminal_history_list':
+    case 'plugin_terminal_history_read':
+      return ['terminal:read']
     default:
       return []
   }

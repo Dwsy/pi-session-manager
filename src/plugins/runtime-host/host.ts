@@ -168,7 +168,7 @@ function settingsFor(manifest: PsmPluginManifest, entry: PsmPluginConfigEntry): 
 }
 
 function isOptInPermission(permission: PsmPermission) {
-  return permission === 'fs:read' || permission === 'usage:read'
+  return permission === 'fs:read' || permission === 'usage:read' || permission === 'terminal:read'
 }
 
 function permissionStatusesFor(manifest: PsmPluginManifest, entry: PsmPluginConfigEntry) {

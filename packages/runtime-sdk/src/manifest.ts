@@ -21,6 +21,7 @@ const SUPPORTED_PERMISSIONS = new Set<PsmPermission>([
   'fs:read',
   'windows:open',
   'usage:read',
+  'terminal:read',
 ])
 
 const SUPPORTED_SCOPES = new Set<PsmRecordScope>([

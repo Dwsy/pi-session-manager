@@ -14,6 +14,8 @@ import type {
   PsmAgentSessionHandle,
   PsmAgentUsageStatus,
   PsmCapabilityClient,
+  PsmTerminalTranscriptChunk,
+  PsmTerminalTranscriptSummary,
   PsmCreateTagParams,
   PsmFavoriteItem,
   PsmFullTextSearchParams,
@@ -288,6 +290,18 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
       getStatus(options) {
         return invoke<PsmAgentUsageStatus>('get_agent_usage_status', {
           providerIds: options?.providerIds,
+        })
+      },
+    },
+    terminalHistory: {
+      listSessions() {
+        return invoke<PsmTerminalTranscriptSummary[]>('plugin_terminal_history_list')
+      },
+      readTranscript(id, options) {
+        return invoke<PsmTerminalTranscriptChunk>('plugin_terminal_history_read', {
+          id,
+          offset: options?.offset,
+          maxBytes: options?.maxBytes,
         })
       },
     },

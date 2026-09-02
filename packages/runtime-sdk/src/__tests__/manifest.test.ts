@@ -88,6 +88,17 @@ describe('runtime-sdk manifest contract', () => {
     expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
   })
 
+  it('accepts read-only terminal history permissions', () => {
+    const manifest: PsmPluginManifest = {
+      id: 'example.terminal-history',
+      name: 'Terminal History',
+      version: '0.1.0',
+      permissions: ['terminal:read'],
+    }
+
+    expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
+  })
+
   it('accepts agent invocation permissions', () => {
     const manifest: PsmPluginManifest = {
       id: 'builtin.agent-search',
@@ -665,6 +676,41 @@ describe('plugin capability client', () => {
             pluginId: 'builtin.agent-usage',
             permissions: ['usage:read'],
           },
+        },
+      },
+    ])
+  })
+
+  it('sends terminal transcript reads through the read-only terminal transport', async () => {
+    const calls: Array<{ command: string; payload?: unknown }> = []
+    const transport: PsmTransport = {
+      invoke: async (command, payload) => {
+        calls.push({ command, payload })
+        if (command === 'plugin_terminal_history_list') return []
+        return { id: 'term@1', entries: [], nextOffset: 12, fileSize: 12, hasMore: false }
+      },
+    }
+    const permissions: PsmPermissionContext = {
+      pluginId: 'example.terminal-history',
+      permissions: ['terminal:read'],
+    }
+    const client = createPluginCapabilityClient({ transport, permissions })
+
+    await client.terminalHistory.listSessions()
+    await client.terminalHistory.readTranscript('term@1', { offset: 4, maxBytes: 1024 })
+
+    expect(calls).toEqual([
+      {
+        command: 'plugin_terminal_history_list',
+        payload: { __psm: { pluginId: 'example.terminal-history', permissions: ['terminal:read'] } },
+      },
+      {
+        command: 'plugin_terminal_history_read',
+        payload: {
+          id: 'term@1',
+          offset: 4,
+          maxBytes: 1024,
+          __psm: { pluginId: 'example.terminal-history', permissions: ['terminal:read'] },
         },
       },
     ])

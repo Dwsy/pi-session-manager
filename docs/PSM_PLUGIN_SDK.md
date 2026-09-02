@@ -191,6 +191,7 @@ Plugin-safe permissions currently include:
 | `fs:read` | Read files through declared restricted filesystem roots, including saved widget HTML under the `widgets` root |
 | `windows:open` | Open host-managed popup windows |
 | `usage:read` | Read local AI agent login credentials and fetch read-only official subscription usage (opt-in, sensitive) |
+| `terminal:read` | Read persisted PSM built-in terminal transcripts (opt-in, sensitive; no PTY control) |
 
 ## AI Plugin Guidance
 
@@ -272,6 +273,15 @@ features.
 | Method | Notes |
 | --- | --- |
 | `getStatus(options?)` | Returns local agent subscription/quota snapshots. Requires `usage:read`. Optional `providerIds` filters the host collector. Tokens never appear in the response. |
+
+### `terminalHistory`
+
+| Method | Notes |
+| --- | --- |
+| `listSessions()` | Lists persisted PSM built-in terminal transcripts, including cwd, shell, timestamps, size, and whether the terminal is still active. Requires `terminal:read`. |
+| `readTranscript(id, options?)` | Reads append-only transcript JSONL as parsed entries. `offset` + `maxBytes` provide bounded pagination. Requires `terminal:read`. |
+
+`terminalHistory` is intentionally read-only. Raw PTY lifecycle and input commands (`terminal_create`, `terminal_write`, `terminal_resize`, `terminal_close`) remain host-internal.
 
 ### `tags`
 

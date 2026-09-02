@@ -95,6 +95,7 @@ function permissionLabel(permission: PsmPermission, t: (key: string, defaultValu
     "fs:read": "Files",
     "windows:open": "Windows",
     "usage:read": "Agent usage",
+    "terminal:read": "Terminal history",
   };
   return t(labelKey, labels[permission] ?? permission);
 }
@@ -116,6 +117,7 @@ function permissionDescription(permission: PsmPermission, t: (key: string, defau
     "fs:read": "Read-only access to specific project path files",
     "windows:open": "Request host to open window dialogs",
     "usage:read": "Read local agent credentials and fetch read-only subscription usage",
+    "terminal:read": "Read persisted PSM terminal transcripts without terminal control access",
   };
   return t(descKey, descriptions[permission] ?? permission);
 }

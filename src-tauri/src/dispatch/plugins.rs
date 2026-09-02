@@ -15,6 +15,8 @@ pub(super) const COMMANDS: &[&str] = &[
     "plugin_fs_stat",
     "plugin_window_open",
     "plugin_window_close",
+    "plugin_terminal_history_list",
+    "plugin_terminal_history_read",
     "load_psm_plugin_config",
     "set_psm_plugin_enabled",
     "set_psm_plugin_settings",
@@ -145,6 +147,33 @@ pub(super) async fn dispatch(app_state: &Option<DispatchAppState>, command: &str
                     #[cfg(not(feature = "gui"))]
                     {
                         Err("plugin_window_close is desktop-only".to_string())
+                    }
+                }
+                "plugin_terminal_history_list" => {
+                    #[cfg(feature = "gui")]
+                    {
+                        let state = app_state.as_ref().ok_or_else(|| "terminal history requires GUI app state".to_string())?;
+                        let manager = state.terminal_manager.lock().map_err(|error| format!("Failed to lock terminal manager: {error}"))?;
+                        Ok(to_val(manager.list_transcripts()?, "serialize terminal transcript summaries")?)
+                    }
+                    #[cfg(not(feature = "gui"))]
+                    {
+                        Err("terminal history is desktop-only".to_string())
+                    }
+                }
+                "plugin_terminal_history_read" => {
+                    #[cfg(feature = "gui")]
+                    {
+                        let state = app_state.as_ref().ok_or_else(|| "terminal history requires GUI app state".to_string())?;
+                        let id = extract(payload, "id")?;
+                        let offset = payload.get("offset").and_then(Value::as_u64).unwrap_or(0);
+                        let max_bytes = payload.get("maxBytes").or_else(|| payload.get("max_bytes")).and_then(Value::as_u64);
+                        let manager = state.terminal_manager.lock().map_err(|error| format!("Failed to lock terminal manager: {error}"))?;
+                        Ok(to_val(manager.read_transcript(&id, offset, max_bytes)?, "serialize terminal transcript chunk")?)
+                    }
+                    #[cfg(not(feature = "gui"))]
+                    {
+                        Err("terminal history is desktop-only".to_string())
                     }
                 }
                 "load_psm_plugin_config" => {
