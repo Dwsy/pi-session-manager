@@ -151,4 +151,12 @@ quadrantChart
     expect(container.querySelector('.mermaid-block')).toBeNull()
     expect(container.querySelector('.markdown-code-block code')?.textContent).toContain('quadrantChart')
   })
+
+  it('renders inline and block LaTeX with KaTeX', () => {
+    const content = `速度$v$保持不变。\n\n$$\n\\int_0^1 x^2 \\, dx = \\frac{1}{3}\n$$`
+    const { container } = render(<MarkdownContent content={content} />)
+
+    expect(container.querySelector('.katex')).not.toBeNull()
+    expect(container.querySelector('.katex-display')).not.toBeNull()
+  })
 })

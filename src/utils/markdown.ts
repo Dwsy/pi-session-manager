@@ -1,4 +1,5 @@
 import { marked, type Tokens } from 'marked'
+import { renderToString as renderKatexToString } from 'katex'
 import { render as renderMermaid, type MermaidArt, type Span as MermaidSpan } from 'lovely-mermaid'
 import { createHighlighterCoreSync } from '@shikijs/core'
 import { createJavaScriptRegexEngine } from '@shikijs/engine-javascript'
@@ -316,7 +317,52 @@ renderer.link = function({ href, title, tokens }: Tokens.Link): string {
   return `<a href="${escapeHtml(safeHref)}"${rawHrefAttr}${titleAttr}>${label}</a>`
 }
 
-// Configure marked
+// KaTeX extensions run inside Marked's tokenizer, so fenced/inline code keeps
+// its literal `$` content while normal Markdown supports inline and display math.
+marked.use({
+  extensions: [
+    {
+      name: 'latexBlock',
+      level: 'block',
+      start(src) {
+        const index = src.indexOf('$$')
+        return index >= 0 ? index : undefined
+      },
+      tokenizer(src) {
+        const match = src.match(/^\$\$[ \t]*\n([\s\S]+?)\n\$\$(?:\n|$)/)
+        if (!match) return undefined
+        return { type: 'latexBlock', raw: match[0], text: match[1] }
+      },
+      renderer(token) {
+        return renderKatexToString(String(token.text ?? ''), {
+          displayMode: true,
+          throwOnError: false,
+          trust: false,
+        })
+      },
+    },
+    {
+      name: 'latexInline',
+      level: 'inline',
+      start(src) {
+        const index = src.indexOf('$')
+        return index >= 0 ? index : undefined
+      },
+      tokenizer(src) {
+        const match = src.match(/^\$(?!\$)((?:\\.|[^\\$\n])+?)\$/)
+        if (!match) return undefined
+        return { type: 'latexInline', raw: match[0], text: match[1] }
+      },
+      renderer(token) {
+        return renderKatexToString(String(token.text ?? ''), {
+          displayMode: false,
+          throwOnError: false,
+          trust: false,
+        })
+      },
+    },
+  ],
+})
 marked.setOptions({
   breaks: true,
   gfm: true,

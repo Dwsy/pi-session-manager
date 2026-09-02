@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo } from 'react'
+import 'katex/dist/katex.min.css'
 import { parseMarkdown } from '@/utils/markdown'
 import {
   classifyMarkdownLink,
