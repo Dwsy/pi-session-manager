@@ -102,4 +102,32 @@ describe('ResumeSessionDialog', () => {
 
     expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
   })
+
+  it('supports arrow selection and Enter in copy mode', async () => {
+    const onResume = vi.fn().mockResolvedValue(undefined)
+    const onClose = vi.fn()
+
+    render(
+      <ResumeSessionDialog
+        session={session}
+        defaultTarget="pi"
+        mode="copy"
+        onResume={onResume}
+        onClose={onClose}
+      />,
+    )
+
+    const dialog = screen.getByRole('dialog')
+    await screen.findByRole('button', { name: /Codex/ })
+
+    fireEvent.keyDown(dialog, { key: 'ArrowDown' })
+    expect(screen.getByRole('button', { name: /Codex/ }).getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.keyDown(dialog, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(onResume).toHaveBeenCalledWith('codex')
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
 })

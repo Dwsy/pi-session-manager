@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Circle, Play, X } from "lucide-react";
+import { CheckCircle2, Play, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -75,20 +75,49 @@ export default function ResumeSessionDialog({
     }
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (providers.length === 0 || submitting) return;
+
+    const currentIndex = Math.max(
+      0,
+      providers.findIndex((provider) => provider.slug === target),
+    );
+
+    if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+      event.preventDefault();
+      setTarget(providers[(currentIndex + 1) % providers.length].slug);
+      return;
+    }
+
+    if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+      event.preventDefault();
+      setTarget(
+        providers[(currentIndex - 1 + providers.length) % providers.length].slug,
+      );
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void handleSubmit(target);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="resume-session-title"
-        className={`border border-border bg-background p-5 shadow-xl rounded-lg ${
-          isMobile ? "w-[95vw] max-w-md" : "w-[32rem]"
+        onKeyDown={handleKeyDown}
+        className={`max-h-[calc(100vh-2rem)] overflow-hidden border border-border bg-background p-3 shadow-xl rounded-lg ${
+          isMobile ? "w-[95vw] max-w-md" : "w-[28rem]"
         }`}
       >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Play className="h-5 w-5 text-primary" />
-            <h3 id="resume-session-title" className="text-base font-semibold">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <Play className="h-4 w-4 shrink-0 text-primary" />
+            <h3 id="resume-session-title" className="truncate text-sm font-semibold">
               {mode === "copy"
                 ? t(
                     "session.resumeDialog.copyTitle",
@@ -99,81 +128,47 @@ export default function ResumeSessionDialog({
           </div>
           <button
             onClick={onClose}
-            className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="focus-ring shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label={t("common.close")}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="mb-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-          <div className="font-medium truncate">
+        <div className="mb-2 flex min-w-0 items-center gap-2 border-b border-border/60 pb-2 text-[11px] text-muted-foreground">
+          <span className="min-w-0 flex-1 truncate text-foreground">
             {getSessionListDisplayName(session, t("session.list.untitled"))}
-          </div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            {t("session.convert.source")}: {sourceLabel}
-          </div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            {mode === "copy"
-              ? t(
-                  "session.resumeDialog.copyHelp",
-                  "Choose which CLI command should be copied for this session.",
-                )
-              : t(
-                  "session.resumeDialog.resumeHelp",
-                  "Choose which CLI this session should resume into.",
-                )}
-          </div>
+          </span>
+          <span className="shrink-0">{sourceLabel}</span>
+          <span className="shrink-0 text-[10px]">
+            {t("session.resumeDialog.keyboardHint", "↑↓ select · Enter run · Esc close")}
+          </span>
         </div>
 
-        <div className="space-y-2">
+        <div className="grid max-h-[min(68vh,28rem)] grid-cols-2 gap-1.5 overflow-y-auto pr-1">
           {providers.map((option) => (
             <button
               key={option.slug}
               type="button"
               onClick={() => handleSubmit(option.slug)}
               disabled={submitting}
-              className={`flex w-full items-start justify-between gap-3 rounded-md border px-3 py-2.5 text-left focus-ring ${
+              aria-pressed={target === option.slug}
+              onFocus={() => setTarget(option.slug)}
+              className={`flex min-w-0 w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left text-xs focus-ring ${
                 target === option.slug
                   ? "border-primary/40 bg-primary/10"
-                  : "border-border bg-background hover:bg-muted"
+                  : "border-border/70 bg-background hover:bg-muted"
               }`}
             >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 font-medium">
-                  <AgentIcon source={option.slug} size={16} />
-                  <span className="truncate">{option.display_name}</span>
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {t(`session.convert.targetDescriptions.${option.slug}`)}
-                </div>
-              </div>
-              <span
-                className={`mt-0.5 shrink-0 ${
-                  target === option.slug
-                    ? "text-primary"
-                    : "text-muted-foreground/70"
-                }`}
-              >
-                {target === option.slug ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <Circle className="h-4 w-4" />
-                )}
-              </span>
+              <AgentIcon source={option.slug} size={15} />
+              <span className="min-w-0 flex-1 truncate font-medium">{option.display_name}</span>
+              {target === option.slug && (
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-primary" />
+              )}
             </button>
           ))}
         </div>
 
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="focus-ring rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
-          >
-            {t("common.cancel")}
-          </button>
-        </div>
       </div>
     </div>
   );
