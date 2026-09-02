@@ -25,7 +25,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 import KanbanContextMenu from '../KanbanContextMenu'
-import type { SessionInfo } from '@/types'
+import type { SessionInfo, Tag } from '@/types'
 
 const session: SessionInfo = {
   id: 'session-1',
@@ -38,7 +38,39 @@ const session: SessionInfo = {
   last_message: 'world',
 }
 
-describe('KanbanContextMenu delete action', () => {
+describe('KanbanContextMenu', () => {
+  it('shows tags directly in the main menu and toggles them without opening a submenu', () => {
+    const onToggleTag = vi.fn()
+    const tag = {
+      id: 'tag-1',
+      name: 'Frontend',
+      color: 'blue',
+      icon: null,
+      parentId: null,
+      isBuiltin: false,
+    } as Tag
+
+    render(
+      <KanbanContextMenu
+        session={session}
+        tags={[]}
+        allTags={[tag]}
+        favorites={[]}
+        position={{ x: 100, y: 100 }}
+        onClose={() => {}}
+        onOpenInTerminal={() => {}}
+        onOpenInBrowser={() => {}}
+        onToggleFavorite={() => {}}
+        onToggleTag={onToggleTag}
+        onDelete={() => {}}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: /manage tags/i })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /frontend/i }))
+    expect(onToggleTag).toHaveBeenCalledWith('tag-1', false)
+  })
+
   it('invokes onRename when rename item is clicked', () => {
     const onRename = vi.fn()
     const onClose = vi.fn()

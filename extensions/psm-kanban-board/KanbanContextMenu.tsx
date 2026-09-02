@@ -52,7 +52,6 @@ export default function KanbanContextMenu({
 }: ContextMenuProps) {
   const { t } = useTranslation()
   const [adjustedPosition, setAdjustedPosition] = useState(position)
-  const [showTagSubmenu, setShowTagSubmenu] = useState(false)
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false)
   const deleteConfirmTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -77,7 +76,7 @@ export default function KanbanContextMenu({
   // Adjust position to keep menu within viewport
   useEffect(() => {
     const menuWidth = 200
-    const menuHeight = showTagSubmenu ? 300 : 220
+    const menuHeight = 260 + Math.min(allTags.length, 6) * 30
     const padding = 10
 
     let x = position.x
@@ -91,7 +90,7 @@ export default function KanbanContextMenu({
     }
 
     setAdjustedPosition({ x, y })
-  }, [position, showTagSubmenu])
+  }, [position, allTags.length])
 
   // Close on outside click or escape
   useEffect(() => {
@@ -129,12 +128,6 @@ export default function KanbanContextMenu({
       icon: <Star size={14} className={isFavorite ? 'fill-yellow-400 text-yellow-400' : ''} />,
       onClick: onToggleFavorite,
     },
-    {
-      id: 'tags',
-      label: t('tags.manage'),
-      icon: <Tag size={14} />,
-      onClick: () => setShowTagSubmenu(true),
-    },
     ...(onResume ? [{
       id: 'resume' as const,
       label: `${t('session.resume', 'Resume')} (⌘R)`,
@@ -160,62 +153,8 @@ export default function KanbanContextMenu({
     e.stopPropagation()
 
     item.onClick()
-    if (item.id !== 'tags') {
-      onClose()
-    }
+    onClose()
   }, [onClose])
-
-  if (showTagSubmenu) {
-    return (
-      <div
-        className="fixed z-50 bg-card border border-border rounded-lg shadow-lg py-1 min-w-[180px] ui-enter-zoom"
-        style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Back button */}
-        <button
-          onClick={() => setShowTagSubmenu(false)}
-          className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-muted motion-color focus-ring border-b border-border/50"
-        >
-          <X size={12} />
-          {t('common.back')}
-        </button>
-
-        {/* Tag list */}
-        <div className="max-h-[200px] overflow-y-auto py-1">
-          {allTags.length === 0 ? (
-            <div className="px-3 py-2 text-[11px] text-muted-foreground">
-              {t('tags.empty')}
-            </div>
-          ) : (
-            allTags.map(tag => {
-              const isAssigned = tags.some(t => t.id === tag.id)
-              return (
-                <button
-                  key={tag.id}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onToggleTag(tag.id, isAssigned)
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] hover:bg-muted motion-color focus-ring text-foreground"
-                >
-                  <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                    <TagBadge tag={tag} compact />
-                    <span className="flex-1 text-left truncate">{tag.name}</span>
-                  </div>
-                  {isAssigned && (
-                    <svg className="h-3.5 w-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-              )
-            })
-          )}
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div
@@ -241,14 +180,43 @@ export default function KanbanContextMenu({
           >
             {item.icon && <span className="text-muted-foreground">{item.icon}</span>}
             <span className="flex-1 text-left">{item.label}</span>
-            {item.id === 'tags' && (
-              <svg className="h-3.5 w-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            )}
           </button>
         )
       })}
+      <div className="px-3 pb-1 text-[10px] font-medium text-muted-foreground flex items-center gap-1.5">
+        <Tag size={12} />
+        {t('tags.contextMenu.labels')}
+      </div>
+      <div className="max-h-[200px] overflow-y-auto pb-1">
+        {allTags.length === 0 ? (
+          <div className="px-3 py-1.5 text-[11px] text-muted-foreground">{t('tags.empty')}</div>
+        ) : (
+          allTags.map(tag => {
+            const isAssigned = tags.some(t => t.id === tag.id)
+            return (
+              <button
+                key={tag.id}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onToggleTag(tag.id, isAssigned)
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] hover:bg-muted motion-color focus-ring text-foreground"
+              >
+                <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                  <TagBadge tag={tag} compact />
+                  <span className="flex-1 text-left truncate">{tag.name}</span>
+                </div>
+                {isAssigned && (
+                  <svg className="h-3.5 w-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+            )
+          })
+        )}
+      </div>
+      <div className="my-1 border-t border-border/50" />
       {isDeleteConfirming ? (
         <div className="px-2 py-1">
           <div className="flex items-center gap-1">
