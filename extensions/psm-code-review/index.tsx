@@ -1,4 +1,4 @@
-import { ListFilter, Loader2 } from 'lucide-react'
+import { GitBranch, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
   PsmCapabilityClient,
@@ -140,7 +140,7 @@ function CodeReviewToolbarButton({
   }, [])
 
   const title = i18n.t('session.codeReview.title', 'Code review')
-  const shortLabel = i18n.t('session.codeReview.shortLabel', 'Review')
+  const shortLabel = i18n.t('session.codeReview.traceLabel', 'Trace')
 
   return (
     <>
@@ -161,7 +161,7 @@ function CodeReviewToolbarButton({
         {loading ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
         ) : (
-          <ListFilter className="h-3.5 w-3.5" aria-hidden="true" />
+          <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
         )}
         <span className="font-medium">{shortLabel}</span>
       </button>

@@ -177,6 +177,7 @@ describe('CodeReviewToolbarButton', () => {
     )
 
     const reviewButton = await screen.findByRole('button', { name: 'Code review' })
+    expect(reviewButton.textContent).toContain('Trace')
     await waitFor(() => expect((reviewButton as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(reviewButton)
 
