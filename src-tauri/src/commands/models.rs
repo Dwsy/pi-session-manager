@@ -153,11 +153,22 @@ where
 }
 
 #[cfg(feature = "gui")]
-async fn run_pi_model_agent_stream<F>(request: serde_json::Value, mut on_event: F) -> Result<serde_json::Value, String>
+async fn run_pi_model_agent_stream<F>(request: serde_json::Value, on_event: F) -> Result<serde_json::Value, String>
 where
     F: FnMut(&serde_json::Value) + Send,
 {
-    let script = pi_model_text_script_path()?;
+    if let Ok(script) = pi_model_text_script_path() {
+        return run_pi_model_agent_helper(script, request, on_event).await;
+    }
+
+    run_pi_cli_agent_stream(request, on_event).await
+}
+
+#[cfg(feature = "gui")]
+async fn run_pi_model_agent_helper<F>(script: std::path::PathBuf, request: serde_json::Value, mut on_event: F) -> Result<serde_json::Value, String>
+where
+    F: FnMut(&serde_json::Value) + Send,
+{
     let mut child = TokioCommand::new("node").arg(script).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().map_err(|error| format!("Failed to start Pi AI SDK helper: {error}"))?;
 
     if let Some(mut stdin) = child.stdin.take() {
@@ -194,6 +205,112 @@ where
     }
 
     Ok(final_response.unwrap_or(serde_json::Value::Null))
+}
+
+#[cfg(feature = "gui")]
+fn pi_cli_request_string(request: &serde_json::Value, key: &str) -> Option<String> {
+    request.get(key).and_then(serde_json::Value::as_str).map(str::trim).filter(|value| !value.is_empty()).map(str::to_string)
+}
+
+#[cfg(feature = "gui")]
+fn pi_cli_text_delta(event: &serde_json::Value) -> Option<&str> {
+    if event.get("type").and_then(serde_json::Value::as_str) != Some("message_update") {
+        return None;
+    }
+    let update = event.get("assistantMessageEvent")?;
+    if update.get("type").and_then(serde_json::Value::as_str) != Some("text_delta") {
+        return None;
+    }
+    update.get("delta").and_then(serde_json::Value::as_str)
+}
+
+#[cfg(feature = "gui")]
+fn pi_cli_assistant_error(event: &serde_json::Value) -> Option<&str> {
+    if event.get("type").and_then(serde_json::Value::as_str) != Some("message_end") {
+        return None;
+    }
+    let message = event.get("message")?;
+    if message.get("role").and_then(serde_json::Value::as_str) != Some("assistant") || message.get("stopReason").and_then(serde_json::Value::as_str) != Some("error") {
+        return None;
+    }
+    message.get("errorMessage").and_then(serde_json::Value::as_str)
+}
+
+#[cfg(feature = "gui")]
+async fn run_pi_cli_agent_stream<F>(request: serde_json::Value, mut on_event: F) -> Result<serde_json::Value, String>
+where
+    F: FnMut(&serde_json::Value) + Send,
+{
+    if request.get("tools").and_then(serde_json::Value::as_array).is_some_and(|tools| !tools.is_empty()) {
+        return Err("Installed Pi CLI fallback does not support PSM agent tools".to_string());
+    }
+
+    let system_prompt = pi_cli_request_string(&request, "systemPrompt").unwrap_or_default();
+    let prompt = pi_cli_request_string(&request, "prompt").unwrap_or_default();
+    let provider = pi_cli_request_string(&request, "provider");
+    let model = pi_cli_request_string(&request, "model");
+    let reasoning = pi_cli_request_string(&request, "reasoning");
+
+    let mut args = vec!["--mode".to_string(), "json".to_string(), "--print".to_string(), "--no-session".to_string(), "--no-tools".to_string(), "--no-skills".to_string(), "--no-extensions".to_string(), "--system-prompt".to_string(), system_prompt];
+    if let Some(value) = provider.as_deref() {
+        args.extend(["--provider".to_string(), value.to_string()]);
+    }
+    if let Some(value) = model.as_deref() {
+        args.extend(["--model".to_string(), value.to_string()]);
+    }
+    if let Some(value) = reasoning.as_deref() {
+        args.extend(["--thinking".to_string(), value.to_string()]);
+    }
+    args.extend(["--".to_string(), prompt]);
+
+    let mut child = None;
+    let mut spawn_errors = Vec::new();
+    for command in ["pi", "omp"] {
+        match TokioCommand::new(command).args(&args).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
+            Ok(process) => {
+                child = Some(process);
+                break;
+            }
+            Err(error) => spawn_errors.push(format!("{command}: {error}")),
+        }
+    }
+    let mut child = child.ok_or_else(|| format!("Failed to start installed Pi CLI: {}", spawn_errors.join("; ")))?;
+
+    let stdout = child.stdout.take().ok_or_else(|| "Installed Pi CLI did not expose stdout".to_string())?;
+    let mut lines = BufReader::new(stdout).lines();
+    let mut text = String::new();
+    let mut agent_error: Option<String> = None;
+
+    while let Some(line) = lines.next_line().await.map_err(|error| format!("Failed to read installed Pi CLI output: {error}"))? {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let event: serde_json::Value = serde_json::from_str(&line).map_err(|error| format!("Invalid installed Pi CLI event: {error}. Raw: {line}"))?;
+        if let Some(delta) = pi_cli_text_delta(&event) {
+            text.push_str(delta);
+            on_event(&serde_json::json!({ "type": "delta", "delta": delta }));
+        }
+        if let Some(error) = pi_cli_assistant_error(&event) {
+            agent_error = Some(error.to_string());
+        }
+    }
+
+    let output = child.wait_with_output().await.map_err(|error| format!("Failed to wait for installed Pi CLI: {error}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() { format!("Installed Pi CLI exited with {}", output.status) } else { stderr });
+    }
+    if let Some(error) = agent_error {
+        return Err(error);
+    }
+
+    let response = serde_json::json!({
+        "text": text,
+        "provider": provider.unwrap_or_default(),
+        "model": model.unwrap_or_default(),
+    });
+    on_event(&serde_json::json!({ "type": "done", "response": response.clone() }));
+    Ok(response)
 }
 
 fn pi_model_text_script_path() -> Result<std::path::PathBuf, String> {
@@ -283,4 +400,36 @@ pub async fn test_models_batch(models: Vec<(String, String)>, prompt: Option<Str
     }
 
     Ok(results)
+}
+
+#[cfg(all(test, feature = "gui"))]
+mod tests {
+    use super::{pi_cli_assistant_error, pi_cli_text_delta};
+
+    #[test]
+    fn extracts_text_delta_from_pi_cli_agent_event() {
+        let event = serde_json::json!({
+            "type": "message_update",
+            "assistantMessageEvent": {
+                "type": "text_delta",
+                "delta": "hello"
+            }
+        });
+
+        assert_eq!(pi_cli_text_delta(&event), Some("hello"));
+    }
+
+    #[test]
+    fn extracts_assistant_error_from_pi_cli_message_end() {
+        let event = serde_json::json!({
+            "type": "message_end",
+            "message": {
+                "role": "assistant",
+                "stopReason": "error",
+                "errorMessage": "token expired"
+            }
+        });
+
+        assert_eq!(pi_cli_assistant_error(&event), Some("token expired"));
+    }
 }
