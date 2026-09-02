@@ -2,6 +2,25 @@
 
 All notable changes to Pi Session Manager will be documented in this file.
 
+## [0.8.3] - 2026-09-02
+
+### Added
+
+- Persisted built-in terminal transcripts and exposed bounded read-only history to plugins through the opt-in `terminal:read` permission and `ctx.psm.terminalHistory` SDK.
+- Added a desktop “locate current session” action that can load later sidebar pages until the selected session is found.
+- Added a setting to show or hide sessions stored under `subagent` / `subagents` directories, with an explicit subagent badge when shown.
+
+### Changed
+
+- Made the resume/copy provider picker denser and keyboard-operable with arrow-key selection and Enter activation.
+- Inlined Kanban tag toggles into the main context menu instead of routing through a tag submenu.
+- Renamed the code-review toolbar action to “Trace” with a branch icon, and fixed the cache-usage plugin build to use its host React shim without external React imports.
+
+### Fixed
+
+- Model testing now falls back to an installed `pi` or `omp` CLI when the bundled Pi AI helper script is unavailable, while rejecting unsupported tool-bearing requests explicitly.
+- Preserved OMP session metadata chains when normalizing session entries.
+
 ## [Unreleased]
 
 ### Added
