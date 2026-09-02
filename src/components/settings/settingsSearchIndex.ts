@@ -319,6 +319,18 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
       "assistant",
     ],
   },
+  {
+    id: "session-conversationFoldMode",
+    section: "session-viewer",
+    labelKey: "settings.session.conversationFoldMode",
+    fallbackLabel: "Conversation folding",
+    extraKeys: [
+      "settings.session.conversationFoldModeHelp",
+      "settings.session.conversationFoldModes.toolGroups",
+      "settings.session.conversationFoldModes.wholeTurn",
+    ],
+    keywords: ["fold", "group", "tool calls", "grok", "whole turn", "conversation"],
+  },
   // ── External Sessions ──
   {
     id: "external-sessions-includeInStats",

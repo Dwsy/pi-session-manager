@@ -155,6 +155,9 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
   const session = {
     ...defaultSettings.session,
     ...raw.session,
+    conversationFoldMode: (
+      rawSession?.conversationFoldMode === "wholeTurn" ? "wholeTurn" : "toolGroups"
+    ) as "wholeTurn" | "toolGroups",
     sourceMode: (rawSession?.sourceMode === "dataset" ? "dataset" : "local") as
       | "local"
       | "dataset",

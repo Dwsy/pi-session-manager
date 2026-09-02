@@ -160,7 +160,7 @@ const SessionViewerMessages = forwardRef<
     isAtBottomRef,
     onReachBottom,
     previewMode,
-    handlesScrollTarget: previewVariant === "conversation",
+    handlesScrollTarget: previewVariant !== "none",
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();
@@ -282,7 +282,7 @@ const SessionViewerMessages = forwardRef<
         return;
       }
 
-      if (previewVariant !== "conversation") {
+      if (previewVariant === "none") {
         scrollToEntryId(rowEntryId, align);
       }
 
@@ -390,7 +390,7 @@ const SessionViewerMessages = forwardRef<
         />
         <div className="messages" ref={setContentRef}>
           {renderableEntries.length > 0 ? (
-            previewVariant === "conversation" ? (
+            previewVariant !== "none" ? (
               <ConversationPreviewMessages
                 entries={renderableEntries}
                 toolResultByCallId={toolResultByCallId}
@@ -398,6 +398,11 @@ const SessionViewerMessages = forwardRef<
                 streamingId={streamingId}
                 scrollTargetId={scrollTargetId}
                 setScrollTargetId={setScrollTargetId}
+                foldMode={
+                  previewVariant === "conversation-whole-turn"
+                    ? "wholeTurn"
+                    : "toolGroups"
+                }
               />
             ) : (
               <div

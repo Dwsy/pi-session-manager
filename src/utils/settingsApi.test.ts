@@ -223,6 +223,51 @@ describe('saveAppSettings', () => {
     })
   })
 
+  it('defaults conversation folding to tool-call groups when backend settings omit the mode', async () => {
+    const { loadAppSettings } = await import('./settingsApi')
+
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'load_app_settings') {
+        return {
+          session: {
+            sourceMode: 'local',
+            activeDatasetId: '',
+            activeDatasetIds: [],
+            conversationModeEnabled: true,
+          },
+        }
+      }
+      return undefined
+    })
+
+    const settings = await loadAppSettings()
+
+    expect(settings.session.conversationFoldMode).toBe('toolGroups')
+  })
+
+  it('preserves the legacy whole-turn conversation folding setting', async () => {
+    const { loadAppSettings } = await import('./settingsApi')
+
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'load_app_settings') {
+        return {
+          session: {
+            sourceMode: 'local',
+            activeDatasetId: '',
+            activeDatasetIds: [],
+            conversationModeEnabled: true,
+            conversationFoldMode: 'wholeTurn',
+          },
+        }
+      }
+      return undefined
+    })
+
+    const settings = await loadAppSettings()
+
+    expect(settings.session.conversationFoldMode).toBe('wholeTurn')
+  })
+
   it('merges default subagent compatibility settings when backend settings omit them', async () => {
     const { loadAppSettings } = await import('./settingsApi')
 

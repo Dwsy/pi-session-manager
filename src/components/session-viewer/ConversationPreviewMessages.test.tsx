@@ -8,7 +8,10 @@ import { SessionViewProvider } from "@/contexts/SessionViewContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { registerBuiltinToolPlugins } from "@/plugins/tools-render";
 import type { SessionEntry } from "@/types";
-import ConversationPreviewMessages, { buildConversationPreviewTurns } from "./ConversationPreviewMessages";
+import ConversationPreviewMessages, {
+  buildConversationPreviewTurns,
+  buildToolCallPreviewSegments,
+} from "./ConversationPreviewMessages";
 
 function Providers({ children }: { children: ReactNode }) {
   return (
@@ -38,6 +41,31 @@ function toolCall(id: string, name: string): SessionEntry {
     message: {
       role: "assistant",
       content: [{ type: "toolCall", id, name, arguments: {} }],
+    },
+  };
+}
+
+function thinking(id: string, text: string): SessionEntry {
+  return {
+    type: "message",
+    id,
+    timestamp: "2026-05-19T00:00:00.000Z",
+    message: {
+      role: "assistant",
+      content: [{ type: "thinking", thinking: text }],
+    },
+  };
+}
+
+function toolResult(id: string, toolCallId: string): SessionEntry {
+  return {
+    type: "message",
+    id,
+    timestamp: "2026-05-19T00:00:00.000Z",
+    message: {
+      role: "toolResult",
+      toolCallId,
+      content: [{ type: "text", text: "ok" }],
     },
   };
 }
@@ -83,6 +111,111 @@ describe("buildConversationPreviewTurns", () => {
     expect(turns[0].userEntry).toBeUndefined();
     expect(turns[0].assistantEntry?.id).toBe("assistant-1");
     expect(turns[1].userEntry?.id).toBe("user-1");
+  });
+
+  it("keeps intermediate assistant text in chronological process order", () => {
+    const turns = buildConversationPreviewTurns([
+      message("user-1", "user", "Inspect"),
+      toolCall("read-1", "read"),
+      message("checkpoint", "assistant", "I found the first boundary"),
+      toolCall("bash-1", "bash"),
+      message("done", "assistant", "Done"),
+    ]);
+
+    expect(turns).toHaveLength(1);
+    expect(turns[0].processEntries.map((entry) => entry.id)).toEqual([
+      "read-1",
+      "checkpoint",
+      "bash-1",
+    ]);
+    expect(turns[0].assistantEntry?.id).toBe("done");
+  });
+
+  it("builds Grok-style tool runs across thinking and tool results but stops at visible text", () => {
+    const segments = buildToolCallPreviewSegments([
+      toolCall("read-1", "read"),
+      thinking("thinking-1", "checking"),
+      toolResult("result-1", "read-1"),
+      toolCall("bash-1", "bash"),
+      message("checkpoint", "assistant", "Visible boundary"),
+      toolCall("write-1", "write"),
+    ]);
+
+    expect(segments.map((segment) => segment.kind)).toEqual([
+      "group",
+      "entry",
+      "group",
+    ]);
+    const firstGroup = segments[0];
+    expect(firstGroup.kind).toBe("group");
+    if (firstGroup.kind === "group") {
+      expect(firstGroup.memberEntries.map((entry) => entry.id)).toEqual([
+        "read-1",
+        "bash-1",
+      ]);
+      expect(firstGroup.transparentEntries.map((entry) => entry.id)).toEqual([
+        "result-1",
+      ]);
+      expect(firstGroup.entries.map((entry) => entry.id)).toEqual([
+        "read-1",
+        "thinking-1",
+        "result-1",
+        "bash-1",
+      ]);
+    }
+  });
+
+  it("renders V2 tool groups independently and leaves assistant text boundaries visible", () => {
+    render(
+      <Providers>
+        <ConversationPreviewMessages
+          entries={[
+            message("user-1", "user", "Inspect"),
+            toolCall("read-1", "read"),
+            message("checkpoint", "assistant", "Visible boundary"),
+            toolCall("bash-1", "bash"),
+            message("done", "assistant", "Done"),
+          ]}
+          toolResultByCallId={new Map()}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+        />
+      </Providers>,
+    );
+
+    expect(screen.getByText("Visible boundary")).toBeTruthy();
+    expect(screen.getAllByText("Show")).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByText("Show")[0]);
+    expect(screen.getAllByText("Hide")).toHaveLength(1);
+    expect(screen.getAllByText("Show")).toHaveLength(1);
+  });
+
+  it("keeps the legacy whole-turn fold as a single summary", () => {
+    render(
+      <Providers>
+        <ConversationPreviewMessages
+          entries={[
+            message("user-1", "user", "Inspect"),
+            toolCall("read-1", "read"),
+            message("checkpoint", "assistant", "Legacy hidden boundary"),
+            toolCall("bash-1", "bash"),
+            message("done", "assistant", "Done"),
+          ]}
+          toolResultByCallId={new Map()}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+          foldMode="wholeTurn"
+        />
+      </Providers>,
+    );
+
+    expect(screen.queryByText("Legacy hidden boundary")).toBeNull();
+    expect(screen.getAllByText("Show")).toHaveLength(1);
   });
 
   it("renders a developer-starting conversation", () => {

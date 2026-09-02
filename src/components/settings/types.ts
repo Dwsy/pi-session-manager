@@ -117,6 +117,7 @@ export interface AppSettings {
     refreshInterval: number;
     defaultViewMode: "list" | "directory" | "project";
     conversationModeEnabled: boolean;
+    conversationFoldMode: "wholeTurn" | "toolGroups";
     sourceMode: "local" | "dataset";
     activeDatasetId: string;
     activeDatasetIds: string[];
@@ -223,6 +224,7 @@ export const defaultSettings: AppSettings = {
     refreshInterval: 30,
     defaultViewMode: "project",
     conversationModeEnabled: true,
+    conversationFoldMode: "toolGroups",
     sourceMode: "local",
     activeDatasetId: "",
     activeDatasetIds: [],

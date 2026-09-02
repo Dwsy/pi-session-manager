@@ -210,6 +210,50 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
               searchKey="session-conversationModeEnabled"
             />
 
+            {settings.session.conversationModeEnabled !== false && (
+              <SettingsField
+                label={t(
+                  "settings.session.conversationFoldMode",
+                  "Conversation folding",
+                )}
+                description={t(
+                  "settings.session.conversationFoldModeHelp",
+                  "Choose how intermediate work is folded in conversation mode.",
+                )}
+                searchKey="session-conversationFoldMode"
+              >
+                <SettingsRadioCardGroup
+                  name="session-conversation-fold-mode"
+                  options={["toolGroups", "wholeTurn"] as const}
+                  value={settings.session.conversationFoldMode ?? "toolGroups"}
+                  onChange={(value) =>
+                    onUpdate("session", "conversationFoldMode", value)
+                  }
+                  getLabel={(value) =>
+                    value === "toolGroups"
+                      ? t(
+                          "settings.session.conversationFoldModes.toolGroups",
+                          "Tool-call grouping",
+                        )
+                      : t(
+                          "settings.session.conversationFoldModes.wholeTurn",
+                          "Whole-turn folding",
+                        )
+                  }
+                  getDescription={(value) =>
+                    value === "toolGroups"
+                      ? t(
+                          "settings.session.conversationFoldModeHints.toolGroups",
+                          "Group consecutive tool calls like Grok, keep text boundaries visible, and expand each group independently.",
+                        )
+                      : t(
+                          "settings.session.conversationFoldModeHints.wholeTurn",
+                          "Fold all intermediate thinking and tool steps for a user request into one summary.",
+                        )
+                  }
+                />
+              </SettingsField>
+            )}
 
             <SettingsField
               label={t(

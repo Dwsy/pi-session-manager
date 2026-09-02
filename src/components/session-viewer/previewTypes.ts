@@ -1,1 +1,4 @@
-export type SessionPreviewVariant = "conversation" | "none";
+export type SessionPreviewVariant =
+  | "conversation"
+  | "conversation-whole-turn"
+  | "none";

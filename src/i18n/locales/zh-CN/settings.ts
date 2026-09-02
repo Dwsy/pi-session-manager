@@ -725,6 +725,18 @@ export const settings = {
     scrollMarkersGuideSeenHelp: "首次打开会话时显示滚动标记的使用提示",
     timelineNavEnabled: "时间线导航",
     timelineNavEnabledHelp: "在右侧显示圆点时间线，hover 预览消息并快速跳转",
+    conversationModeEnabled: "对话模式",
+    conversationModeEnabledHelp: "将每次用户请求与最终回复组织在一起，并在主会话视图折叠中间过程",
+    conversationFoldMode: "对话折叠方式",
+    conversationFoldModeHelp: "选择对话模式如何折叠中间过程。",
+    conversationFoldModes: {
+      toolGroups: "工具调用分组",
+      wholeTurn: "整轮折叠",
+    },
+    conversationFoldModeHints: {
+      toolGroups: "参考 Grok 对连续工具调用分组，保留文本边界，并允许每组独立展开。",
+      wholeTurn: "将一次用户请求中的全部中间 thinking 和工具步骤折叠为一个摘要。",
+    },
   },
   externalSessions: {
     title: "外部 Agent 会话",

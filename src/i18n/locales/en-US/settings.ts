@@ -767,6 +767,22 @@ export const settings = {
     timelineNavEnabled: "Timeline navigation",
     timelineNavEnabledHelp:
       "Show a dot timeline on the right side for quick message jumping with hover preview",
+    conversationModeEnabled: "Conversation mode",
+    conversationModeEnabledHelp:
+      "Group each user request with its final assistant response and fold intermediate work in the main session view",
+    conversationFoldMode: "Conversation folding",
+    conversationFoldModeHelp:
+      "Choose how intermediate work is folded in conversation mode.",
+    conversationFoldModes: {
+      toolGroups: "Tool-call grouping",
+      wholeTurn: "Whole-turn folding",
+    },
+    conversationFoldModeHints: {
+      toolGroups:
+        "Group consecutive tool calls like Grok, keep text boundaries visible, and expand each group independently.",
+      wholeTurn:
+        "Fold all intermediate thinking and tool steps for a user request into one summary.",
+    },
   },
   externalSessions: {
     title: "External agent sessions",

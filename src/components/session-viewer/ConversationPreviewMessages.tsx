@@ -20,6 +20,8 @@ interface ConversationPreviewTurn {
   assistantEntry?: SessionEntry;
 }
 
+export type ConversationFoldMode = "wholeTurn" | "toolGroups";
+
 export interface ConversationPreviewMessagesProps {
   entries: SessionEntry[];
   toolResultByCallId: Map<string, SessionEntry>;
@@ -27,6 +29,7 @@ export interface ConversationPreviewMessagesProps {
   streamingId: string | null;
   scrollTargetId: string | null;
   setScrollTargetId: (entryId: string | null) => void;
+  foldMode?: ConversationFoldMode;
 }
 
 function isPromptMessage(entry: SessionEntry): boolean {
@@ -80,6 +83,13 @@ export function buildConversationPreviewTurns(
       continue;
     }
 
+    // Once more process work appears, the previous text response was an
+    // intermediate boundary rather than the turn's final assistant message.
+    // Flush it before the new entry so V2 grouping sees the real chronology.
+    if (current.assistantEntry) {
+      current.processEntries.push(current.assistantEntry);
+      current.assistantEntry = undefined;
+    }
     current.processEntries.push(entry);
   }
 
@@ -214,6 +224,7 @@ function InlineToolIcon({ kind }: { kind: ProcessSummaryItem["icon"] }) {
 function getProcessSummaryItems(
   entries: SessionEntry[],
   fallback: string,
+  preserveFirstAppearance = false,
 ): ProcessSummaryItem[] {
   const counts = new Map<string, number>();
 
@@ -223,8 +234,12 @@ function getProcessSummaryItems(
     }
   }
 
-  return Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  const summaryEntries = Array.from(counts.entries());
+  if (!preserveFirstAppearance) {
+    summaryEntries.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }
+
+  return summaryEntries
     .slice(0, 6)
     .map(([key, count]) => {
       const label = key.startsWith("tool:") ? key.slice("tool:".length) : key;
@@ -239,11 +254,15 @@ function getProcessSummaryItems(
 
 function CollapsedProcessSummary({
   entries,
+  summaryEntries = entries,
+  preserveSummaryOrder = false,
   expanded,
   onToggle,
   toolResultByCallId,
 }: {
   entries: SessionEntry[];
+  summaryEntries?: SessionEntry[];
+  preserveSummaryOrder?: boolean;
   expanded: boolean;
   onToggle: () => void;
   toolResultByCallId: Map<string, SessionEntry>;
@@ -264,8 +283,9 @@ function CollapsedProcessSummary({
   if (entries.length === 0) return null;
 
   const summaryItems = getProcessSummaryItems(
-    entries,
+    summaryEntries,
     t("session.preview.process", "process"),
+    preserveSummaryOrder,
   );
 
   const hasReviewableOps = summaryItems.some((item) =>
@@ -330,6 +350,106 @@ function getProcessEntryKind(entry: SessionEntry): "tool" | "thinking" | "event"
   return "event";
 }
 
+type ToolGroupRunStep = "member" | "thought" | "transparent" | "break";
+
+export type ToolCallPreviewSegment =
+  | {
+      kind: "entry";
+      entry: SessionEntry;
+      sourceIndex: number;
+    }
+  | {
+      kind: "group";
+      id: string;
+      entries: SessionEntry[];
+      memberEntries: SessionEntry[];
+      transparentEntries: SessionEntry[];
+    };
+
+function getToolGroupRunStep(
+  entry: SessionEntry,
+  streamingId: string | null,
+): ToolGroupRunStep {
+  if (entry.type !== "message") return "break";
+
+  const role = entry.message?.role;
+  if (role === "toolResult") return "transparent";
+  if (role !== "assistant") return "break";
+
+  const content = entry.message?.content ?? [];
+  const hasVisibleText = content.some(
+    (item) => item.type === "text" && Boolean(item.text?.trim()),
+  );
+  if (hasVisibleText) return "break";
+
+  if (content.some((item) => item.type === "toolCall")) return "member";
+  if (content.some((item) => item.type === "thinking")) {
+    return entry.id === streamingId ? "transparent" : "thought";
+  }
+  return "break";
+}
+
+/**
+ * Grok-inspired view-time grouping for one conversation turn.
+ *
+ * Tool-call entries are counted members. Finished thinking can be claimed into
+ * a run without appearing in its summary, while tool results and live thinking
+ * stay transparent so they do not split surrounding calls. Any visible text or
+ * non-message event is a hard boundary. A run folds only when it contains at
+ * least one tool member, matching Grok's eager singleton-group behavior.
+ */
+export function buildToolCallPreviewSegments(
+  entries: SessionEntry[],
+  streamingId: string | null = null,
+): ToolCallPreviewSegment[] {
+  const segments: ToolCallPreviewSegment[] = [];
+  let index = 0;
+
+  while (index < entries.length) {
+    const startStep = getToolGroupRunStep(entries[index], streamingId);
+    if (startStep !== "member" && startStep !== "thought") {
+      segments.push({ kind: "entry", entry: entries[index], sourceIndex: index });
+      index += 1;
+      continue;
+    }
+
+    const runStart = index;
+    const memberEntries: SessionEntry[] = [];
+    const transparentEntries: SessionEntry[] = [];
+    let cursor = index;
+
+    while (cursor < entries.length) {
+      const step = getToolGroupRunStep(entries[cursor], streamingId);
+      if (step === "break") break;
+      if (step === "member") memberEntries.push(entries[cursor]);
+      if (step === "transparent") transparentEntries.push(entries[cursor]);
+      cursor += 1;
+    }
+
+    if (memberEntries.length > 0) {
+      segments.push({
+        kind: "group",
+        id: `${entries[runStart].id}:${runStart}`,
+        entries: entries.slice(runStart, cursor),
+        memberEntries,
+        transparentEntries,
+      });
+    } else {
+      for (let sourceIndex = runStart; sourceIndex < cursor; sourceIndex += 1) {
+        segments.push({
+          kind: "entry",
+          entry: entries[sourceIndex],
+          sourceIndex,
+        });
+      }
+    }
+
+    index = Math.max(cursor, index + 1);
+  }
+
+  return segments;
+}
+
 function splitProcessEntries(entries: SessionEntry[]): {
   modelChanges: SessionEntry[];
   foldableEntries: SessionEntry[];
@@ -346,11 +466,151 @@ function splitProcessEntries(entries: SessionEntry[]): {
   return { modelChanges, foldableEntries };
 }
 
+function ToolGroupedProcessEntries({
+  entries,
+  allProcessEntries,
+  toolResultByCallId,
+  searchQuery,
+  streamingId,
+  scrollTargetId,
+}: {
+  entries: SessionEntry[];
+  allProcessEntries: SessionEntry[];
+  toolResultByCallId: Map<string, SessionEntry>;
+  searchQuery: string;
+  streamingId: string | null;
+  scrollTargetId: string | null;
+}) {
+  const segments = useMemo(
+    () => buildToolCallPreviewSegments(entries, streamingId),
+    [entries, streamingId],
+  );
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  useEffect(() => {
+    if (!scrollTargetId) return;
+    const targetGroup = segments.find(
+      (segment) =>
+        segment.kind === "group" &&
+        segment.entries.some((entry) => entry.id === scrollTargetId),
+    );
+    if (!targetGroup || targetGroup.kind !== "group") return;
+
+    setExpandedGroupIds((prev) => {
+      if (prev.has(targetGroup.id)) return prev;
+      const next = new Set(prev);
+      next.add(targetGroup.id);
+      return next;
+    });
+  }, [scrollTargetId, segments]);
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
+  return (
+    <>
+      {segments.map((segment, segmentIndex) => {
+        if (segment.kind === "entry") {
+          const entry = segment.entry;
+          return (
+            <SessionEntryRenderer
+              key={`${entry.id}:${entry.type}:${segment.sourceIndex}`}
+              entry={entry}
+              toolResultByCallId={toolResultByCallId}
+              searchQuery={searchQuery}
+              isStreaming={entry.id === streamingId}
+              previewMode={false}
+              processEntries={allProcessEntries}
+            />
+          );
+        }
+
+        const expanded = expandedGroupIds.has(segment.id);
+        if (!expanded) {
+          return (
+            <div key={`tool-group:${segment.id}:${segmentIndex}`}>
+              <CollapsedProcessSummary
+                entries={segment.entries}
+                summaryEntries={segment.memberEntries}
+                preserveSummaryOrder
+                expanded={false}
+                onToggle={() => toggleGroup(segment.id)}
+                toolResultByCallId={toolResultByCallId}
+              />
+              {segment.transparentEntries.map((entry, index) => (
+                <SessionEntryRenderer
+                  key={`transparent:${entry.id}:${entry.type}:${index}`}
+                  entry={entry}
+                  toolResultByCallId={toolResultByCallId}
+                  searchQuery={searchQuery}
+                  isStreaming={entry.id === streamingId}
+                  previewMode={false}
+                  processEntries={allProcessEntries}
+                />
+              ))}
+            </div>
+          );
+        }
+
+        return (
+          <div
+            key={`tool-group:${segment.id}:${segmentIndex}`}
+            className="conversation-preview-process"
+          >
+            <div className="conversation-preview-process__header">
+              <CollapsedProcessSummary
+                entries={segment.entries}
+                summaryEntries={segment.memberEntries}
+                preserveSummaryOrder
+                expanded
+                onToggle={() => toggleGroup(segment.id)}
+                toolResultByCallId={toolResultByCallId}
+              />
+            </div>
+            <div className="conversation-preview-process__list" role="list">
+              {segment.entries.map((entry, index) => (
+                <div
+                  key={`${entry.id}:${entry.type}:${index}`}
+                  className="conversation-preview-process__entry"
+                  data-process-kind={getProcessEntryKind(entry)}
+                  role="listitem"
+                >
+                  <SessionEntryRenderer
+                    entry={entry}
+                    toolResultByCallId={toolResultByCallId}
+                    searchQuery={searchQuery}
+                    isStreaming={entry.id === streamingId}
+                    previewMode={false}
+                    processEntries={allProcessEntries}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 function ConversationPreviewTurnView({
   turn,
   toolResultByCallId,
   searchQuery,
   streamingId,
+  scrollTargetId,
+  foldMode,
   expanded,
   onToggle,
 }: {
@@ -358,10 +618,12 @@ function ConversationPreviewTurnView({
   toolResultByCallId: Map<string, SessionEntry>;
   searchQuery: string;
   streamingId: string | null;
+  scrollTargetId: string | null;
+  foldMode: ConversationFoldMode;
   expanded: boolean;
   onToggle: () => void;
 }) {
-  // model_change is always visible and never folded into the process summary.
+  // Legacy whole-turn folding keeps model_change visible outside its summary.
   const { modelChanges, foldableEntries } = useMemo(
     () => splitProcessEntries(turn.processEntries),
     [turn.processEntries],
@@ -378,57 +640,70 @@ function ConversationPreviewTurnView({
         />
       )}
 
-      {modelChanges.map((entry, index) => (
-        <SessionEntryRenderer
-          key={`${entry.id}:${entry.type}:${index}`}
-          entry={entry}
+      {foldMode === "toolGroups" ? (
+        <ToolGroupedProcessEntries
+          entries={turn.processEntries}
+          allProcessEntries={turn.processEntries}
           toolResultByCallId={toolResultByCallId}
           searchQuery={searchQuery}
-          isStreaming={entry.id === streamingId}
-          previewMode={false}
-          processEntries={turn.processEntries}
+          streamingId={streamingId}
+          scrollTargetId={scrollTargetId}
         />
-      ))}
+      ) : (
+        <>
+          {modelChanges.map((entry, index) => (
+            <SessionEntryRenderer
+              key={`${entry.id}:${entry.type}:${index}`}
+              entry={entry}
+              toolResultByCallId={toolResultByCallId}
+              searchQuery={searchQuery}
+              isStreaming={entry.id === streamingId}
+              previewMode={false}
+              processEntries={turn.processEntries}
+            />
+          ))}
 
-      {!expanded && foldableEntries.length > 0 && (
-        <CollapsedProcessSummary
-          entries={foldableEntries}
-          expanded={expanded}
-          onToggle={onToggle}
-          toolResultByCallId={toolResultByCallId}
-        />
-      )}
-
-      {expanded && foldableEntries.length > 0 && (
-        <div className="conversation-preview-process">
-          <div className="conversation-preview-process__header">
+          {!expanded && foldableEntries.length > 0 && (
             <CollapsedProcessSummary
               entries={foldableEntries}
               expanded={expanded}
               onToggle={onToggle}
               toolResultByCallId={toolResultByCallId}
             />
-          </div>
-          <div className="conversation-preview-process__list" role="list">
-            {foldableEntries.map((entry, index) => (
-              <div
-                key={`${entry.id}:${entry.type}:${index}`}
-                className="conversation-preview-process__entry"
-                data-process-kind={getProcessEntryKind(entry)}
-                role="listitem"
-              >
-                <SessionEntryRenderer
-                  entry={entry}
+          )}
+
+          {expanded && foldableEntries.length > 0 && (
+            <div className="conversation-preview-process">
+              <div className="conversation-preview-process__header">
+                <CollapsedProcessSummary
+                  entries={foldableEntries}
+                  expanded={expanded}
+                  onToggle={onToggle}
                   toolResultByCallId={toolResultByCallId}
-                  searchQuery={searchQuery}
-                  isStreaming={entry.id === streamingId}
-                  previewMode={false}
-                  processEntries={turn.processEntries}
                 />
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="conversation-preview-process__list" role="list">
+                {foldableEntries.map((entry, index) => (
+                  <div
+                    key={`${entry.id}:${entry.type}:${index}`}
+                    className="conversation-preview-process__entry"
+                    data-process-kind={getProcessEntryKind(entry)}
+                    role="listitem"
+                  >
+                    <SessionEntryRenderer
+                      entry={entry}
+                      toolResultByCallId={toolResultByCallId}
+                      searchQuery={searchQuery}
+                      isStreaming={entry.id === streamingId}
+                      previewMode={false}
+                      processEntries={turn.processEntries}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {turn.assistantEntry && (
@@ -452,6 +727,7 @@ export default function ConversationPreviewMessages({
   streamingId,
   scrollTargetId,
   setScrollTargetId,
+  foldMode = "toolGroups",
 }: ConversationPreviewMessagesProps) {
   const turns = useMemo(
     () => buildConversationPreviewTurns(entries),
@@ -480,12 +756,14 @@ export default function ConversationPreviewMessages({
   useEffect(() => {
     if (!scrollTargetId || !targetTurnId) return;
 
-    setExpandedTurnIds((prev) => {
-      if (prev.has(targetTurnId)) return prev;
-      const next = new Set(prev);
-      next.add(targetTurnId);
-      return next;
-    });
+    if (foldMode === "wholeTurn") {
+      setExpandedTurnIds((prev) => {
+        if (prev.has(targetTurnId)) return prev;
+        const next = new Set(prev);
+        next.add(targetTurnId);
+        return next;
+      });
+    }
 
     const rafId = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -506,7 +784,7 @@ export default function ConversationPreviewMessages({
     });
 
     return () => cancelAnimationFrame(rafId);
-  }, [scrollTargetId, setScrollTargetId, targetTurnId]);
+  }, [foldMode, scrollTargetId, setScrollTargetId, targetTurnId]);
 
   const toggleTurn = (turnId: string) => {
     setExpandedTurnIds((prev) => {
@@ -529,6 +807,8 @@ export default function ConversationPreviewMessages({
           toolResultByCallId={toolResultByCallId}
           searchQuery={searchQuery}
           streamingId={streamingId}
+          scrollTargetId={scrollTargetId}
+          foldMode={foldMode}
           expanded={expandedTurnIds.has(turn.id)}
           onToggle={() => toggleTurn(turn.id)}
         />

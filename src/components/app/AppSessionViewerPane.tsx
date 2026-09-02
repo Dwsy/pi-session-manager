@@ -64,6 +64,7 @@ function AppSessionViewerPane({
   const { t } = useTranslation();
   const { getSessionSetting } = useSettings();
   const conversationModeEnabled = getSessionSetting("conversationModeEnabled") !== false;
+  const conversationFoldMode = getSessionSetting("conversationFoldMode") ?? "toolGroups";
   const { toolbarItems, panels, treeViews, mainViews = [] } = usePsmPluginSessionUi();
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
   const [renderedPanelId, setRenderedPanelId] = useState<string | null>(null);
@@ -764,7 +765,13 @@ function AppSessionViewerPane({
       customCommand={customCommand}
       resumeCommand={resumeCommand}
       initialEntryId={initialEntryId}
-      previewVariant={conversationModeEnabled ? "conversation" : "none"}
+      previewVariant={
+        conversationModeEnabled
+          ? conversationFoldMode === "wholeTurn"
+            ? "conversation-whole-turn"
+            : "conversation"
+          : "none"
+      }
       slots={mergedSlots}
       layoutSlots={layoutSlots}
       mainViewSlot={mainViewSlot}
