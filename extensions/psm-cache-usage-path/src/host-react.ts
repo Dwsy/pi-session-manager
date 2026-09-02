@@ -9,3 +9,7 @@ export function hostReact(): HostReact {
   }
   return value
 }
+
+const runtime = hostReact()
+export const createElement = runtime.createElement
+export const forwardRef = runtime.forwardRef

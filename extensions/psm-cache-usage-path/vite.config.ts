@@ -6,6 +6,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   root: __dirname,
+  resolve: {
+    alias: {
+      react: path.resolve(__dirname, 'src/host-react.ts'),
+    },
+  },
   esbuild: {
     jsx: 'transform',
     jsxFactory: 'React.createElement',
@@ -24,10 +29,6 @@ export default defineConfig({
       output: {
         inlineDynamicImports: true,
       },
-      external: [
-        'react',
-        'react/jsx-runtime',
-      ],
     },
   },
 })
