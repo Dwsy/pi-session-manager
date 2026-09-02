@@ -106,7 +106,7 @@ function AppDesktopSearchBar({
               : undefined
           }
           compact
-          className="flex-1"
+          className="min-w-0 flex-[0_1_220px]"
         />
         {onToggleExplorer && (
           <button

@@ -11,7 +11,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('@/components/search/SearchFilterBar', () => ({
-  default: () => <div data-testid="search-filter-bar" />,
+  default: ({ className = '' }: { className?: string }) => <div data-testid="search-filter-bar" className={className} />,
 }))
 
 vi.mock('@/components/search/ActiveFilterChips', () => ({
@@ -40,6 +40,12 @@ const baseProps: AppDesktopSearchBarProps = {
 }
 
 describe('AppDesktopSearchBar select mode trigger', () => {
+  it('keeps the desktop search controls compact so trailing actions are not squeezed out', () => {
+    render(<AppDesktopSearchBar {...baseProps} />)
+
+    expect(screen.getByTestId('search-filter-bar').className).toContain('flex-[0_1_220px]')
+  })
+
   it('renders current-session locate at the right side of the search controls', () => {
     const onLocateCurrentSession = vi.fn()
     render(
