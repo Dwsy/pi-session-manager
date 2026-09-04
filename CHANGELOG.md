@@ -2,6 +2,18 @@
 
 All notable changes to Pi Session Manager will be documented in this file.
 
+## [0.8.5] - 2026-09-04
+
+### Added
+
+- Added a Grok Pi Team session-tree view that recursively reconstructs persisted Subagents V2 hierarchies from session sidecars.
+- Team rows now expose status, agent metadata, complete hierarchy rails, and direct navigation into each child session.
+
+### Changed
+
+- Persisted team siblings are ordered by spawn time with stable path tie-breaking, matching the live Pager hierarchy.
+- The Team view is scrollable and uses compact leaf labels plus secondary metadata for clearer deep-tree scanning.
+
 ## [0.8.4] - 2026-09-02
 
 ### Added
