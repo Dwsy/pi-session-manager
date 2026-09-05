@@ -724,7 +724,7 @@ export default function SessionList({
   return (
     <div className="relative">
       {onDeleteSessions && isSelectionMode && (
-        <div className="sticky top-0 z-20 border-b border-border/40 bg-background/95 px-2 py-1.5">
+        <div className="sticky top-0 z-20 border-b border-border/40 bg-background px-2 py-1.5">
           <div className="flex items-center justify-between gap-2 rounded-md border border-primary/25 bg-primary/5 px-2 py-1.5">
             <div className="min-w-0">
               <div className="truncate text-[11px] font-medium text-foreground/90">

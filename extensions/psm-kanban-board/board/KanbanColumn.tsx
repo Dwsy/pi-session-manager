@@ -6,16 +6,10 @@ import { useTranslation } from 'react-i18next'
 import type { SessionInfo, Tag, FavoriteItem } from '@/types'
 import type { KanbanLabel } from '../labels/kanbanLabelsStore'
 import KanbanCard, { kanbanCardSortableId } from './KanbanCard'
-import KanbanContextMenu from './KanbanContextMenu'
+import KanbanSessionContextMenu from './KanbanSessionContextMenu'
 import type { DeleteSessionRequestOptions } from '@/components/dialogs/deleteSessionTypes'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
 import { GripVertical, Search } from 'lucide-react'
-import { invoke, isTauri } from '@/transport'
-import { useClipboard } from '@/hooks/useClipboard'
-import {
-  buildCopyResumeCommand,
-  openSessionInTerminalDirect,
-} from '@/utils/sessionResume'
 import {
   DESKTOP_KANBAN_COLUMN_WIDTH,
   type KanbanCardDensity,
@@ -30,8 +24,8 @@ interface KanbanColumnProps {
   getLabelsForSession: (sessionId: string) => KanbanLabel[]
   allLabels: KanbanLabel[]
   statuses: Tag[]
-  favorites: FavoriteItem[]
-  onToggleFavorite: (item: Omit<FavoriteItem, 'addedAt'>) => void
+  favorites?: FavoriteItem[]
+  onToggleFavorite?: (item: Omit<FavoriteItem, 'addedAt'>) => void
   onSetStatus: (sessionId: string, statusId: string | null) => void
   onToggleLabel: (sessionId: string, labelId: string, assigned: boolean) => void
   onDeleteSession?: (
@@ -102,7 +96,6 @@ export default function KanbanColumn({
   totalSessionCount = sessions.length,
 }: KanbanColumnProps) {
   const { t } = useTranslation()
-  const { copyText } = useClipboard()
   const { setNodeRef, isOver } = useDroppable({
     id,
     data: { type: 'column' },
@@ -131,12 +124,17 @@ export default function KanbanColumn({
   const estimatedCardRowHeight = cardHeight + CARD_ROW_GAP
   const emptyDropHeight = cardHeight
   const emptyDropInnerHeight = Math.max(0, emptyDropHeight - 12)
-  const columnContentSizingClass = isEmptyColumn
-    ? 'flex-none'
-    : useVirtual
-      ? 'flex-1 min-h-0'
-      : 'flex-initial min-h-0'
-  const scrollAreaClass = useVirtual ? 'h-full overflow-y-auto' : 'overflow-y-auto'
+  const columnContentSizingClass = isEmptyColumn ? 'flex-none' : 'flex-1 min-h-0'
+  const scrollAreaClass = [
+    isEmptyColumn ? 'overflow-y-auto' : 'h-full overflow-y-auto',
+    'pr-2 [scrollbar-gutter:stable]',
+    '[scrollbar-width:thin]',
+    '[&::-webkit-scrollbar]:w-1.5',
+    '[&::-webkit-scrollbar-track]:bg-transparent',
+    '[&::-webkit-scrollbar-thumb]:rounded-full',
+    '[&::-webkit-scrollbar-thumb]:bg-muted-foreground/15',
+    'hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/30',
+  ].join(' ')
 
   const liveCount = useMemo(
     () => sessions.filter(
@@ -315,6 +313,7 @@ export default function KanbanColumn({
       >
         <div
           ref={scrollRef}
+          data-kanban-column-scroll="true"
           className={scrollAreaClass}
           style={isEmptyColumn ? { minHeight: emptyDropInnerHeight } : undefined}
         >
@@ -336,86 +335,30 @@ export default function KanbanColumn({
 
       {/* Context Menu */}
       {contextMenu && (
-        <KanbanContextMenu
+        <KanbanSessionContextMenu
           session={contextMenu.session}
           statuses={statuses}
           currentStatusId={status?.id ?? null}
           labels={getLabelsForSession(contextMenu.session.id)}
           allLabels={allLabels}
           favorites={favorites}
+          onToggleFavorite={onToggleFavorite}
           position={contextMenu.position}
           onClose={() => setContextMenu(null)}
-          onOpenInTerminal={async () => {
-            if (onResumeSession) {
-              await onResumeSession(contextMenu.session)
-              return
-            }
-            if (!isTauri()) return
-            try {
-              await openSessionInTerminalDirect(contextMenu.session, {
-                terminal: propTerminal,
-                customCommand: propCustomCommand,
-                piPath: propPiPath,
-                resumeCommand: propResumeCommand,
-              })
-            } catch (err) {
-              console.error('Failed to open in terminal:', err)
-            }
-          }}
-          onOpenInBrowser={async () => {
-            if (!isTauri()) return
-            try {
-              await invoke('open_session_in_browser', { path: contextMenu.session.path })
-            } catch (err) {
-              console.error('Failed to open in browser:', err)
-            }
-          }}
-          onToggleFavorite={() => {
-            onToggleFavorite({
-              type: 'session',
-              id: contextMenu.session.id,
-              name: contextMenu.session.name || contextMenu.session.first_message || 'Untitled',
-              path: contextMenu.session.path,
-            })
-          }}
-          onResume={
-            onResumeSession
-              ? async () => {
-                  await onResumeSession(contextMenu.session)
-                }
-              : undefined
-          }
           onSetStatus={(statusId) => {
             onSetStatus(contextMenu.session.id, statusId)
           }}
           onToggleLabel={(labelId, assigned) => {
             onToggleLabel(contextMenu.session.id, labelId, assigned)
           }}
-          onCopyResume={
-            onCopyResumeSession
-              ? async () => {
-                  await onCopyResumeSession(contextMenu.session)
-                }
-              : isTauri()
-              ? () => {
-                  void buildCopyResumeCommand(contextMenu.session, {
-                    piPath: propPiPath,
-                    resumeCommand: propResumeCommand,
-                  }).then((command) => copyText(command).catch(console.error))
-                }
-              : undefined
-          }
-          onRename={
-            onOpenPreviewRenameDialog
-              ? () => {
-                  onOpenPreviewRenameDialog(contextMenu.session)
-                }
-              : undefined
-          }
-          onDelete={(anchorPoint) => {
-            onDeleteSession?.(contextMenu.session, { anchorPoint })
-            setContextMenu(null)
-          }}
+          onDeleteSession={onDeleteSession}
+          onResumeSession={onResumeSession}
+          onCopyResumeSession={onCopyResumeSession}
+          onOpenPreviewRenameDialog={onOpenPreviewRenameDialog}
+          terminal={propTerminal}
+          piPath={propPiPath}
+          customCommand={propCustomCommand}
+          resumeCommand={propResumeCommand}
         />
       )}
 

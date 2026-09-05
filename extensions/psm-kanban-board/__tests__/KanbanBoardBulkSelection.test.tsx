@@ -74,6 +74,26 @@ describe('KanbanBoard status and bulk selection', () => {
     expect(cards[0]?.dataset.sortableId).toBe('card:done:a')
   })
 
+  it('keeps a dedicated gutter between cards and the column scrollbar', () => {
+    const { container } = render(
+      <KanbanBoard
+        {...commonProps}
+        sessions={[session('a')]}
+        statuses={[status('todo', 'Todo')]}
+        statusAssignments={[]}
+      />,
+    )
+
+    const scrollAreas = [...container.querySelectorAll<HTMLElement>('[data-kanban-column-scroll="true"]')]
+    expect(scrollAreas.length).toBeGreaterThan(0)
+    for (const scrollArea of scrollAreas) {
+      expect(scrollArea.className).toContain('pr-2')
+      expect(scrollArea.className).toContain('[scrollbar-gutter:stable]')
+      expect(scrollArea.className).toContain('[&::-webkit-scrollbar]:w-1.5')
+      expect(scrollArea.className).toContain('[&::-webkit-scrollbar-track]:bg-transparent')
+    }
+  })
+
   it('shows the bulk toolbar after selecting multiple cards', () => {
     render(
       <KanbanBoard

@@ -44,7 +44,7 @@ export default function KanbanLabelManager({ labels, onCreate, onUpdate, onDelet
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Manage labels">
-      <div className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-2xl">
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
           <div>
             <h3 className="text-sm font-medium text-foreground">Labels</h3>
@@ -55,8 +55,8 @@ export default function KanbanLabelManager({ labels, onCreate, onUpdate, onDelet
           </button>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_220px]">
-          <div className="min-h-0 overflow-y-auto border-r border-border/30 p-3">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto sm:grid-cols-[minmax(0,1fr)_240px] sm:overflow-hidden">
+          <div className="min-h-0 border-b border-border/30 p-3 sm:overflow-y-auto sm:border-b-0 sm:border-r">
             {labels.length === 0 ? (
               <div className="rounded-md border border-dashed border-border/50 px-3 py-8 text-center text-xs text-muted-foreground">No labels yet.</div>
             ) : (

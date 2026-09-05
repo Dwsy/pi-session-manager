@@ -79,6 +79,7 @@ describe('KanbanContextMenu', () => {
     const props = baseProps()
     render(<KanbanContextMenu {...props} />)
 
+    expect(screen.getByText('Doing')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /doing/i }))
     expect(props.onSetStatus).toHaveBeenCalledWith('doing')
 

@@ -115,7 +115,7 @@ export default function KanbanRoadmapView({
   return (
     <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto p-3" data-testid="kanban-roadmap-view">
       <div className="min-w-[980px] overflow-hidden rounded-md border border-border/35 bg-card/25">
-        <div className="sticky top-0 z-20 grid grid-cols-[300px_minmax(680px,1fr)] border-b border-border/35 bg-background/95 backdrop-blur-sm">
+        <div className="sticky top-0 z-20 grid grid-cols-[300px_minmax(680px,1fr)] border-b border-border/35 bg-background">
           <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             {t('plugins.kanbanBoard.roadmap.session', 'Session activity')}
           </div>

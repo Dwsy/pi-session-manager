@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ArrowLeft, FolderOpen, Star } from "lucide-react";
 
 interface SelectedProjectHeaderProps {
@@ -8,6 +9,7 @@ interface SelectedProjectHeaderProps {
   nameClassName?: string;
   liveCount?: number;
   isFavorite?: boolean;
+  trailing?: ReactNode;
 }
 
 function SelectedProjectHeader({
@@ -17,9 +19,10 @@ function SelectedProjectHeader({
   backLabel,
   nameClassName = "text-sm",
   isFavorite = false,
+  trailing,
 }: SelectedProjectHeaderProps) {
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/30 flex-shrink-0 sticky top-0 z-10">
+    <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background flex-shrink-0 sticky top-0 z-10">
       <button
         onClick={onBack}
         className="p-1 rounded motion-color focus-ring flex-shrink-0 hover:bg-accent"
@@ -45,6 +48,7 @@ function SelectedProjectHeader({
           ({sessionCount})
         </span>
       </div>
+      {trailing ? <div className="flex-shrink-0">{trailing}</div> : null}
     </div>
   );
 }

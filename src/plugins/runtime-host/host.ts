@@ -405,7 +405,7 @@ export class PsmPluginHost {
   private toolRenderers = new Map<string, PsmToolRendererRuntimeRegistration>()
   private readonly uiContributions = new PsmPluginUiContributionCatalog()
   private commandSnapshot: PsmPluginCommandRuntimeRegistration[] = []
-  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { ready: false, appViews: [], appSidebarViews: [], sessionListActions: [], sessionListColumns: [], projectListActions: [], sessionContextMenuActions: [], toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
+  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { ready: false, appViews: [], appSidebarViews: [], projectSessionViews: [], sessionListActions: [], sessionListColumns: [], projectListActions: [], sessionContextMenuActions: [], toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
   private listeners = new Set<() => void>()
   private activePlugins = new Map<string, ActivePlugin>()
   private statuses = new Map<string, PsmPluginStatus>()
@@ -457,6 +457,10 @@ export class PsmPluginHost {
 
   listAppSidebarViews() {
     return this.uiContributions.listAppSidebarViews()
+  }
+
+  listProjectSessionViews() {
+    return this.uiContributions.listProjectSessionViews()
   }
 
   listSessionListActions() {
@@ -821,6 +825,10 @@ export class PsmPluginHost {
         },
         registerAppSidebarView: (view) => {
           const result = this.uiContributions.registerAppSidebarView(manifest.id, view)
+          if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
+        },
+        registerProjectSessionView: (view) => {
+          const result = this.uiContributions.registerProjectSessionView(manifest.id, view)
           if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
         },
         registerSessionListAction: (action) => {

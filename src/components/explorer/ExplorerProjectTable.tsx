@@ -95,7 +95,7 @@ export default function ExplorerProjectTable({
   return (
     <div ref={scrollRef} className="h-full overflow-auto" data-testid="explorer-project-table">
       <table className="w-full min-w-[760px] table-fixed border-collapse text-left text-[11px]">
-        <thead className="sticky top-0 z-10 bg-background/95 text-[10px] uppercase tracking-wide text-muted-foreground/80 backdrop-blur-sm">
+        <thead className="sticky top-0 z-10 bg-background text-[10px] uppercase tracking-wide text-muted-foreground/80">
           <tr className="border-b border-border/40">
             <th className="w-[34%] px-3 py-2 font-medium" aria-sort={ariaSort("name")}>
               {sortButton("name", t("explorer.columns.project", "Project"))}

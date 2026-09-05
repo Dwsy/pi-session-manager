@@ -143,7 +143,7 @@ export default function KanbanTableView({
     <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto p-3" data-testid="kanban-table-view">
       <div className="min-w-[860px] overflow-hidden rounded-md border border-border/35 bg-card/30">
         <table className="w-full border-collapse text-left text-[11px]">
-          <thead className="sticky top-0 z-10 bg-background/95 text-[10px] uppercase tracking-wide text-muted-foreground backdrop-blur-sm">
+          <thead className="sticky top-0 z-10 bg-background text-[10px] uppercase tracking-wide text-muted-foreground">
             <tr className="border-b border-border/35">
               <th className="w-10 px-2 py-2" aria-label={t('plugins.kanbanBoard.table.selection', 'Selection')} />
               <th className="min-w-[300px] px-3 py-2" aria-sort={sortKey === 'title' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>

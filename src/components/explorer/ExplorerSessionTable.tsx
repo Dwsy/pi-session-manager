@@ -144,7 +144,7 @@ export default function ExplorerSessionTable({
         className="w-full table-fixed border-collapse text-left text-[11px]"
         style={{ minWidth: tableMinWidth }}
       >
-        <thead className="sticky top-0 z-10 bg-background/95 text-[10px] uppercase tracking-wide text-muted-foreground/80 backdrop-blur-sm">
+        <thead className="sticky top-0 z-10 bg-background text-[10px] uppercase tracking-wide text-muted-foreground/80">
           <tr className="border-b border-border/40">
             <th className="px-3 py-2 font-medium" aria-sort={ariaSort("title")}>
               {sortButton("title", t("explorer.columns.session", "Session"))}

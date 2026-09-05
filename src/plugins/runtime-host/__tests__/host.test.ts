@@ -1530,6 +1530,12 @@ describe('PsmPluginHost', () => {
                   appViewId: 'failed.app',
                   render: () => 'sidebar',
                 })
+                ctx.ui.registerProjectSessionView({
+                  id: 'failed.project-session',
+                  title: 'Project Sessions',
+                  modes: [{ id: 'day', title: 'Day' }],
+                  render: () => 'project sessions',
+                })
                 ctx.ui.registerSessionListAction({
                   id: 'failed.session-list',
                   title: 'Session List',
@@ -1590,6 +1596,7 @@ describe('PsmPluginHost', () => {
       ready: true,
       appViews: [expect.objectContaining({ id: 'healthy.app', pluginId: 'builtin.ui.healthy' })],
       appSidebarViews: [],
+      projectSessionViews: [],
       sessionListActions: [],
       sessionListColumns: [],
       projectListActions: [],

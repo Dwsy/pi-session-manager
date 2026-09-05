@@ -19,6 +19,8 @@
  *   commands       — single /psm panel
  */
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import * as connMgr from "./connection-manager.js";
 import { registerAll } from "./commands.js";
 import {
@@ -29,7 +31,13 @@ import {
   sessionLabelTool,
 } from "./tools.js";
 
+const baseDir = dirname(fileURLToPath(import.meta.url));
+
 export default async function (pi: ExtensionAPI) {
+  pi.on("resources_discover", () => ({
+    skillPaths: [join(baseDir, "..", "skills", "session-metadata", "SKILL.md")],
+  }));
+
   // ── Register tools ──────────────────────────────────
   pi.registerTool(sessionSearchTool);
   pi.registerTool(sessionContextTool);

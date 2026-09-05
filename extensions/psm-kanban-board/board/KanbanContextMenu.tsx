@@ -167,7 +167,10 @@ export default function KanbanContextMenu({
             }}
             className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] text-foreground hover:bg-muted motion-color focus-ring"
           >
-            <div className="min-w-0 flex-1 text-left"><TagBadge tag={status} compact /></div>
+            <div className="inline-flex min-w-0 flex-1 items-center gap-2 text-left">
+              <TagBadge tag={status} compact />
+              <span className="truncate">{status.name}</span>
+            </div>
             {currentStatusId === status.id ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
           </button>
         ))}

@@ -325,11 +325,16 @@ marked.use({
       name: 'latexBlock',
       level: 'block',
       start(src) {
-        const index = src.indexOf('$$')
-        return index >= 0 ? index : undefined
+        const dollarIndex = src.indexOf('$$')
+        const bracketIndex = src.indexOf(String.fromCharCode(92) + '[')
+        if (dollarIndex < 0) return bracketIndex >= 0 ? bracketIndex : undefined
+        if (bracketIndex < 0) return dollarIndex
+        return Math.min(dollarIndex, bracketIndex)
       },
       tokenizer(src) {
-        const match = src.match(/^\$\$[ \t]*\n([\s\S]+?)\n\$\$(?:\n|$)/)
+        const match =
+          src.match(/^\$\$[ \t]*\n([\s\S]+?)\n\$\$(?:\n|$)/) ??
+          src.match(/^\\\[[ \t]*(?:\n)?([\s\S]+?)(?:\n)?[ \t]*\\\](?:\n|$)/)
         if (!match) return undefined
         return { type: 'latexBlock', raw: match[0], text: match[1] }
       },
@@ -345,11 +350,16 @@ marked.use({
       name: 'latexInline',
       level: 'inline',
       start(src) {
-        const index = src.indexOf('$')
-        return index >= 0 ? index : undefined
+        const dollarIndex = src.indexOf('$')
+        const parenIndex = src.indexOf(String.fromCharCode(92) + '(')
+        if (dollarIndex < 0) return parenIndex >= 0 ? parenIndex : undefined
+        if (parenIndex < 0) return dollarIndex
+        return Math.min(dollarIndex, parenIndex)
       },
       tokenizer(src) {
-        const match = src.match(/^\$(?!\$)((?:\\.|[^\\$\n])+?)\$/)
+        const match =
+          src.match(/^\$(?!\$)((?:\\.|[^\\$\n])+?)\$/) ??
+          src.match(/^\\\((.+?)\\\)/)
         if (!match) return undefined
         return { type: 'latexInline', raw: match[0], text: match[1] }
       },

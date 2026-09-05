@@ -1188,6 +1188,9 @@ function App() {
       selectedSession,
       onSelectSession: handleSelectSession,
       onMoveSession: moveSession,
+      onClearSessionStatus: (sessionId: string, statusId: string) => {
+        void removeTagFromSession(sessionId, statusId);
+      },
       getTagsForSession,
       onToggleTag: handleToggleSessionTag,
       onDeleteSession: standaloneDatasetRuntime ? undefined : handleDeleteSession,
@@ -1222,6 +1225,7 @@ function App() {
       selectedSession,
       handleSelectSession,
       moveSession,
+      removeTagFromSession,
       getTagsForSession,
       handleToggleSessionTag,
       standaloneDatasetRuntime,

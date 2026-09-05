@@ -99,6 +99,12 @@ describe('PsmPluginUiContributionCatalog', () => {
       appViewId: 'failed.app',
       render,
     })
+    catalog.registerProjectSessionView(failedPlugin, {
+      id: 'failed.project-session',
+      title: 'Project Sessions',
+      modes: [{ id: 'day', title: 'Day' }],
+      render,
+    })
     catalog.registerSessionListAction(failedPlugin, {
       id: 'failed.session-list',
       title: 'Session List',
@@ -156,6 +162,7 @@ describe('PsmPluginUiContributionCatalog', () => {
       ready: true,
       appViews: [expect.objectContaining({ id: 'healthy.app', pluginId: 'plugin.healthy' })],
       appSidebarViews: [],
+      projectSessionViews: [],
       sessionListActions: [],
       sessionListColumns: [],
       projectListActions: [],
@@ -171,6 +178,7 @@ describe('PsmPluginUiContributionCatalog', () => {
       ready: false,
       appViews: [],
       appSidebarViews: [],
+      projectSessionViews: [],
       sessionListActions: [],
       sessionListColumns: [],
       projectListActions: [],

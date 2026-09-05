@@ -5,6 +5,7 @@ import type {
   PsmAppSidebarViewRegistration,
   PsmAppViewRegistration,
   PsmProjectListActionRegistration,
+  PsmProjectSessionViewRegistration,
   PsmSessionContextMenuActionRegistration,
   PsmSessionListActionRegistration,
   PsmSessionListColumnRegistration,
@@ -176,6 +177,10 @@ export interface PsmAppSidebarViewRuntimeRegistration extends PsmAppSidebarViewR
   pluginId: string
 }
 
+export interface PsmProjectSessionViewRuntimeRegistration extends PsmProjectSessionViewRegistration {
+  pluginId: string
+}
+
 export interface PsmSessionToolbarItemRuntimeRegistration extends PsmSessionToolbarItemRegistration {
   pluginId: string
 }
@@ -216,6 +221,7 @@ export interface PsmPluginSessionUiSnapshot {
   ready: boolean
   appViews: PsmAppViewRuntimeRegistration[]
   appSidebarViews: PsmAppSidebarViewRuntimeRegistration[]
+  projectSessionViews: PsmProjectSessionViewRuntimeRegistration[]
   sessionListActions: PsmSessionListActionRuntimeRegistration[]
   sessionListColumns: PsmSessionListColumnRuntimeRegistration[]
   projectListActions: PsmProjectListActionRuntimeRegistration[]

@@ -4,6 +4,7 @@ import type {
   PsmAppSidebarViewRenderProps,
   PsmAppViewRenderProps,
   PsmPluginHostContext,
+  PsmProjectSessionViewRenderProps,
 } from '@pi-session-manager/plugin-sdk'
 
 import type { AppPluginSurfaceData } from '@/components/app/AppPluginSurfaceData'
@@ -15,6 +16,10 @@ import {
 } from '@/components/app/AppPluginSidebarShell'
 
 import KanbanSessionColumnCell from './views/KanbanSessionColumnCell'
+import KanbanSessionTree, {
+  isKanbanSessionTreeMode,
+} from './sidebar/KanbanSessionTree'
+import KanbanSessionMetadataMenu from './sidebar/KanbanSessionMetadataMenu'
 import { manifest } from './manifest'
 import {
   KANBAN_SESSION_COLUMN_ID,
@@ -48,12 +53,17 @@ type KanbanSidebarData = Pick<
   | 'onMoveSession'
   | 'onClearSelectedSession'
 >
+type KanbanProjectSessionData = AppPluginSurfaceData
 
 function isKanbanViewData(data: unknown): data is KanbanViewData {
   return typeof data === 'object' && data !== null
 }
 
 function isKanbanSidebarData(data: unknown): data is KanbanSidebarData {
+  return typeof data === 'object' && data !== null
+}
+
+function isKanbanProjectSessionData(data: unknown): data is KanbanProjectSessionData {
   return typeof data === 'object' && data !== null
 }
 
@@ -154,6 +164,36 @@ function KanbanSidebarView({
   )
 }
 
+function KanbanProjectSessionView({
+  data,
+  projectPath,
+  sessionIds,
+  mode,
+  loading,
+  loadingMore,
+  hasMore,
+  onLoadMore,
+  labelsStore,
+}: PsmProjectSessionViewRenderProps<KanbanProjectSessionData> & {
+  labelsStore: KanbanLabelsStore
+}) {
+  if (!isKanbanProjectSessionData(data) || !isKanbanSessionTreeMode(mode)) return null
+
+  return (
+    <KanbanSessionTree
+      key={projectPath}
+      data={data}
+      labelsStore={labelsStore}
+      sessionIds={sessionIds}
+      mode={mode}
+      loading={loading}
+      loadingMore={loadingMore}
+      hasMore={hasMore}
+      onLoadMore={onLoadMore}
+    />
+  )
+}
+
 export default function activate(ctx: PsmPluginHostContext) {
   const workspaceStore = createKanbanWorkspaceStore(ctx)
   const labelsStore = createKanbanLabelsStore(ctx)
@@ -180,6 +220,27 @@ export default function activate(ctx: PsmPluginHostContext) {
       ...(props as PsmAppSidebarViewRenderProps<KanbanSidebarData>),
       workspaceStore,
     }),
+  })
+
+  ctx.ui.registerProjectSessionView({
+    id: 'builtin.kanban-board.project-sessions',
+    title: ctx.i18n.t('plugins.kanbanBoard.projectSessions', 'Project session grouping'),
+    defaultMode: 'day',
+    modes: [
+      { id: 'day', title: ctx.i18n.t('plugins.kanbanBoard.tree.day', 'Day') },
+      { id: 'status', title: ctx.i18n.t('plugins.kanbanBoard.tree.status', 'Status') },
+      { id: 'label', title: ctx.i18n.t('plugins.kanbanBoard.tree.label', 'Labels') },
+    ],
+    render: (props) => createElement(KanbanProjectSessionView, {
+      ...(props as PsmProjectSessionViewRenderProps<KanbanProjectSessionData>),
+      labelsStore,
+    }),
+  })
+
+  ctx.ui.registerSessionContextMenuAction({
+    id: 'builtin.kanban-board.session-metadata',
+    title: ctx.i18n.t('plugins.kanbanBoard.sessionMetadata', 'Status and labels'),
+    render: (props) => createElement(KanbanSessionMetadataMenu, { ...props, labelsStore }),
   })
 
   ctx.ui.registerSessionListColumn({

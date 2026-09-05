@@ -531,7 +531,7 @@ export default function Dashboard({
           {isScopeTransition ? (
             <div className={`absolute inset-0 z-20 cursor-wait ${showScopeTransition ? "bg-background/35 backdrop-blur-[1px]" : "bg-transparent"}`}>
               {showScopeTransition ? (
-                <div className="sticky top-2 mx-auto flex w-fit items-center gap-2 rounded border border-border bg-background/95 px-3 py-2 text-xs text-muted-foreground shadow-lg" role="status" aria-live="polite">
+                <div className="sticky top-2 mx-auto flex w-fit items-center gap-2 rounded border border-border bg-background px-3 py-2 text-xs text-muted-foreground shadow-lg" role="status" aria-live="polite">
                   <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                   {t("dashboard.timeFilter.updating", "Updating selected range…")}
                 </div>

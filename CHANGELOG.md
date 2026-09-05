@@ -50,6 +50,8 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Added
 
+- Added a plugin-backed project session Tree for selected projects, with Day, Status, and Labels grouping modes, an inline mode selector, compact metadata rows, and direct session navigation.
+- Added shared session Status/Labels metadata actions to the plugin context-menu surface, plus a Pi session-metadata skill that keeps workflow Status separate from GitHub-style Labels.
 - **Full CASR provider coverage** — session support grew from 10 to 18 providers, adding Aider, Amp, ChatGPT, Cline, OpenClaw, Vibe, Kiro CLI and Grok Build. All are scannable, browsable and usable as conversion sources and targets
   - Upgraded the vendored CASR crate from 0.2.2 to upstream 0.3.0, which brings the official Antigravity, Kiro and Grok readers/writers, and replayed PSM's local fixes for Claude Code tool results, legacy Codex tool calls, and the current OpenCode SQLite schema
   - Added `casr_min/providers/vendored.rs`, which owns path matching for the delegated providers and forwards reads to CASR instead of maintaining a second set of parsers
@@ -57,11 +59,18 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ### Changed
 
+- Kanban cards and project Tree rows now share the same session context menu, including resume/open, favorite, rename/delete, workflow Status, and Labels actions.
+- Tightened project/Explorer/list sticky surfaces to use opaque backgrounds, and stabilized Kanban column scrolling with reserved thin-scrollbar space and clearer Tree row hover/12px typography.
 - Provider detection no longer lets CASR pick the reader by itself. PSM identifies the provider from the path and calls that reader explicitly, so a permissive JSONL parser can no longer claim a session that lives outside a known provider root
 - The scanner and the file watcher now share one `is_session_candidate_path` gate instead of two copies of the same extension checks
 
+### Performance
+
+- Project session views now request the backend's 500-session maximum per page, while Day/Status grouping appends into existing groups instead of repeatedly copying arrays, reducing incremental date-group renders and grouping overhead.
+
 ### Fixed
 
+- Markdown math now recognizes standard LaTeX `\(...\)` and `\[...\]` delimiters in addition to `$...$` and `$$...$$`, so common model-generated formulas render through KaTeX instead of appearing as escaped source.
 - Cursor and Antigravity were missing from the resume-target validator and the conversion dialog's i18n tables, so selecting them silently fell back to Pi
 
 - **OMP (oh-my-pi) session support** — the Pi fork's sessions (`~/.omp/agent/sessions`) are now scanned, parsed, and shown with their own source badge/icon alongside Pi and other external agents

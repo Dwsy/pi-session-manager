@@ -195,7 +195,7 @@ export function useSidebarSessions({
     patchSession: patchSidebarSession,
   } = usePaginatedSessions({
     enabled: shouldEnablePagedSidebar,
-    pageSize: 100,
+    pageSize: showProjectSessionList ? 500 : 100,
     searchQuery: sidebarSearchQuery,
     projectFilter: listProjectFilter,
     filterTagIds: effectiveFilterTagIds,

@@ -2,6 +2,7 @@ import type {
   PsmAppSidebarViewRegistration,
   PsmAppViewRegistration,
   PsmProjectListActionRegistration,
+  PsmProjectSessionViewRegistration,
   PsmSessionContextMenuActionRegistration,
   PsmSessionListActionRegistration,
   PsmSessionListColumnRegistration,
@@ -16,6 +17,7 @@ import type {
   PsmAppViewRuntimeRegistration,
   PsmPluginSessionUiSnapshot,
   PsmProjectListActionRuntimeRegistration,
+  PsmProjectSessionViewRuntimeRegistration,
   PsmSessionContextMenuActionRuntimeRegistration,
   PsmSessionListActionRuntimeRegistration,
   PsmSessionListColumnRuntimeRegistration,
@@ -56,6 +58,7 @@ function ownedIds<T extends { id: string; pluginId: string }>(entries: Map<strin
 export class PsmPluginUiContributionCatalog {
   private readonly appViews = new Map<string, PsmAppViewRuntimeRegistration>()
   private readonly appSidebarViews = new Map<string, PsmAppSidebarViewRuntimeRegistration>()
+  private readonly projectSessionViews = new Map<string, PsmProjectSessionViewRuntimeRegistration>()
   private readonly sessionListActions = new Map<string, PsmSessionListActionRuntimeRegistration>()
   private readonly sessionListColumns = new Map<string, PsmSessionListColumnRuntimeRegistration>()
   private readonly projectListActions = new Map<string, PsmProjectListActionRuntimeRegistration>()
@@ -81,6 +84,17 @@ export class PsmPluginUiContributionCatalog {
       return { registered: false, duplicateMessage: `App sidebar view already registered: ${view.id}` }
     }
     this.appSidebarViews.set(view.id, { ...view, pluginId })
+    return { registered: true }
+  }
+
+  registerProjectSessionView(
+    pluginId: string,
+    view: PsmProjectSessionViewRegistration,
+  ): PsmUiContributionRegistrationResult {
+    if (this.projectSessionViews.has(view.id)) {
+      return { registered: false, duplicateMessage: `Project session view already registered: ${view.id}` }
+    }
+    this.projectSessionViews.set(view.id, { ...view, pluginId })
     return { registered: true }
   }
 
@@ -174,6 +188,10 @@ export class PsmPluginUiContributionCatalog {
     return sortedValues(this.appSidebarViews)
   }
 
+  listProjectSessionViews(): PsmProjectSessionViewRuntimeRegistration[] {
+    return sortedValues(this.projectSessionViews)
+  }
+
   listSessionListActions(): PsmSessionListActionRuntimeRegistration[] {
     return sortedValues(this.sessionListActions)
   }
@@ -213,6 +231,7 @@ export class PsmPluginUiContributionCatalog {
       ready,
       appViews: this.listAppViews(),
       appSidebarViews: this.listAppSidebarViews(),
+      projectSessionViews: this.listProjectSessionViews(),
       sessionListActions: this.listSessionListActions(),
       sessionListColumns: this.listSessionListColumns(),
       projectListActions: this.listProjectListActions(),
@@ -234,6 +253,7 @@ export class PsmPluginUiContributionCatalog {
   removePlugin(pluginId: string) {
     removeOwned(this.appViews, pluginId)
     removeOwned(this.appSidebarViews, pluginId)
+    removeOwned(this.projectSessionViews, pluginId)
     removeOwned(this.sessionListActions, pluginId)
     removeOwned(this.sessionListColumns, pluginId)
     removeOwned(this.projectListActions, pluginId)
@@ -247,6 +267,7 @@ export class PsmPluginUiContributionCatalog {
   clear() {
     this.appViews.clear()
     this.appSidebarViews.clear()
+    this.projectSessionViews.clear()
     this.sessionListActions.clear()
     this.sessionListColumns.clear()
     this.projectListActions.clear()

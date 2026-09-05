@@ -734,8 +734,8 @@ export default function KanbanBoard({
                   getLabelsForSession={getLabelsForSession}
                   allLabels={labels}
                   statuses={sortedStatuses}
-                  favorites={favorites || []}
-                    onToggleFavorite={onToggleFavorite || (() => {})}
+                  favorites={favorites}
+                  onToggleFavorite={onToggleFavorite}
                     onSetStatus={setSessionStatus}
                     onToggleLabel={onToggleLabel}
                     onDeleteSession={onDeleteSession}
@@ -781,8 +781,8 @@ export default function KanbanBoard({
                         getLabelsForSession={getLabelsForSession}
                         allLabels={labels}
                         statuses={sortedStatuses}
-                        favorites={favorites || []}
-                        onToggleFavorite={onToggleFavorite || (() => {})}
+                        favorites={favorites}
+                        onToggleFavorite={onToggleFavorite}
                         onSetStatus={setSessionStatus}
                         onToggleLabel={onToggleLabel}
                         onDeleteSession={onDeleteSession}

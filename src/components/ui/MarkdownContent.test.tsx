@@ -159,4 +159,12 @@ quadrantChart
     expect(container.querySelector('.katex')).not.toBeNull()
     expect(container.querySelector('.katex-display')).not.toBeNull()
   })
+
+  it('renders standard LaTeX bracket and parenthesis delimiters', () => {
+    const content = `最少需要摸出：\n\n\\[\n\\boxed{16\\text{ 颗}}\n\\]\n\n概率为 \\(\\frac{1}{2}\\)。`
+    const { container } = render(<MarkdownContent content={content} />)
+
+    expect(container.querySelectorAll('.katex').length).toBeGreaterThanOrEqual(2)
+    expect(container.querySelector('.katex-display')).not.toBeNull()
+  })
 })

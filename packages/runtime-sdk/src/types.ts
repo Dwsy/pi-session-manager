@@ -422,6 +422,30 @@ export interface PsmAppSidebarViewRegistration<TData = unknown> {
   render(props: PsmAppSidebarViewRenderProps<TData>): unknown;
 }
 
+export interface PsmProjectSessionViewMode {
+  id: string;
+  title: string;
+}
+
+export interface PsmProjectSessionViewRenderProps<TData = unknown> {
+  projectPath: string;
+  sessionIds: string[];
+  mode: string;
+  loading?: boolean;
+  loadingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void | Promise<void>;
+  data?: TData;
+}
+
+export interface PsmProjectSessionViewRegistration<TData = unknown> {
+  id: string;
+  title: string;
+  modes: PsmProjectSessionViewMode[];
+  defaultMode?: string;
+  render(props: PsmProjectSessionViewRenderProps<TData>): unknown;
+}
+
 export interface PsmFavoriteItem {
   type: 'session' | 'project';
   id: string;
@@ -492,6 +516,7 @@ export interface PsmSessionContextMenuActionRegistration {
 export interface PsmPluginUiRegistry {
   registerAppView(view: PsmAppViewRegistration): void;
   registerAppSidebarView(view: PsmAppSidebarViewRegistration): void;
+  registerProjectSessionView(view: PsmProjectSessionViewRegistration): void;
   registerSessionListAction(action: PsmSessionListActionRegistration): void;
   registerSessionListColumn(column: PsmSessionListColumnRegistration): void;
   registerProjectListAction(action: PsmProjectListActionRegistration): void;
