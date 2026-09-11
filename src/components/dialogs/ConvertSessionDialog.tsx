@@ -84,11 +84,11 @@ export default function ConvertSessionDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="convert-session-title"
-        className={`rounded-md border border-border bg-background p-5 shadow-xl ${
+        className={`flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-md border border-border bg-background p-5 shadow-xl ${
           isMobile ? 'w-[95vw] max-w-md' : 'w-[32rem]'
         }`}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex shrink-0 items-center justify-between">
           <div className="flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5 text-primary" />
             <h3 id="convert-session-title" className="text-lg font-semibold">
@@ -104,63 +104,65 @@ export default function ConvertSessionDialog({
           </button>
         </div>
 
-        <div className="mb-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-          <div className="font-medium truncate">
-            {getSessionListDisplayName(session, t('session.list.untitled'))}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mb-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+            <div className="font-medium truncate">
+              {getSessionListDisplayName(session, t('session.list.untitled'))}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {t('session.convert.source')}: {sourceLabel}
+            </div>
           </div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            {t('session.convert.source')}: {sourceLabel}
+
+          <div className="space-y-2">
+            {convertTargets.map(option => (
+              <button
+                key={option.slug}
+                type="button"
+                onClick={() => setTarget(option.slug)}
+                className={`focus-ring w-full rounded-md border px-3 py-2.5 text-left ${
+                  target === option.slug
+                    ? 'border-primary/40 bg-primary/10'
+                    : 'border-border bg-muted/30 hover:bg-muted/50'
+                }`}
+              >
+                <div className="font-medium">{t(`session.convert.targets.${option.slug}`)}</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {t(`session.convert.targetDescriptions.${option.slug}`)}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 space-y-3 rounded-md border border-border bg-muted/30 p-3">
+            <label className="flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={dryRun}
+                onChange={(event) => setDryRun(event.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              <span className="flex items-center gap-2">
+                <Eye className="h-4 w-4 text-muted-foreground" />
+                {t('session.convert.dryRun')}
+              </span>
+            </label>
+            <label className="flex items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={force}
+                onChange={(event) => setForce(event.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              <span className="flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                {t('session.convert.force')}
+              </span>
+            </label>
           </div>
         </div>
 
-        <div className="space-y-2">
-          {convertTargets.map(option => (
-            <button
-              key={option.slug}
-              type="button"
-              onClick={() => setTarget(option.slug)}
-              className={`focus-ring w-full rounded-md border px-3 py-2.5 text-left ${
-                target === option.slug
-                  ? 'border-primary/40 bg-primary/10'
-                  : 'border-border bg-muted/30 hover:bg-muted/50'
-              }`}
-            >
-              <div className="font-medium">{t(`session.convert.targets.${option.slug}`)}</div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {t(`session.convert.targetDescriptions.${option.slug}`)}
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-4 space-y-3 rounded-md border border-border bg-muted/30 p-3">
-          <label className="flex items-center gap-3 text-sm">
-            <input
-              type="checkbox"
-              checked={dryRun}
-              onChange={(event) => setDryRun(event.target.checked)}
-              className="h-4 w-4 rounded border-border"
-            />
-            <span className="flex items-center gap-2">
-              <Eye className="h-4 w-4 text-muted-foreground" />
-              {t('session.convert.dryRun')}
-            </span>
-          </label>
-          <label className="flex items-center gap-3 text-sm">
-            <input
-              type="checkbox"
-              checked={force}
-              onChange={(event) => setForce(event.target.checked)}
-              className="h-4 w-4 rounded border-border"
-            />
-            <span className="flex items-center gap-2">
-              <RefreshCw className="h-4 w-4 text-muted-foreground" />
-              {t('session.convert.force')}
-            </span>
-          </label>
-        </div>
-
-        <div className="mt-5 flex items-center justify-end gap-2">
+        <div className="mt-5 flex shrink-0 items-center justify-end gap-2">
           <button
             type="button"
             onClick={onClose}

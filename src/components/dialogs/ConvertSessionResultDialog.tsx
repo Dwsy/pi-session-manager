@@ -54,11 +54,11 @@ export default function ConvertSessionResultDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="convert-session-result-title"
-        className={`rounded-md border border-border bg-background p-5 shadow-xl ${
+        className={`flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-md border border-border bg-background p-5 shadow-xl ${
           isMobile ? 'w-[95vw] max-w-md' : 'w-[34rem]'
         }`}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex shrink-0 items-center justify-between">
           <div className="flex items-center gap-2">
             {result.dry_run ? (
               <Eye className="h-5 w-5 text-primary" />
@@ -80,7 +80,7 @@ export default function ConvertSessionResultDialog({
           </button>
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="mb-4 flex shrink-0 flex-wrap items-center gap-2">
           <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${providerTone(result.source_provider)}`}>
             {result.source_provider}
           </span>
@@ -95,42 +95,44 @@ export default function ConvertSessionResultDialog({
           </span>
         </div>
 
-        <div className="space-y-3">
-          <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
-            <div className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2">
-              <span className="text-muted-foreground">{t('session.convert.source')}</span>
-              <span>{result.source_provider}</span>
-              <span className="text-muted-foreground">{t('session.convert.target')}</span>
-              <span>{result.target_provider}</span>
-              <span className="text-muted-foreground">{t('session.convert.sessionId')}</span>
-              <span className="font-mono text-xs break-all">{result.target_session_id}</span>
-              <span className="text-muted-foreground">{t('session.convert.path')}</span>
-              <span className="font-mono text-xs break-all">{writtenPath || '-'}</span>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="space-y-3">
+            <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
+              <div className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2">
+                <span className="text-muted-foreground">{t('session.convert.source')}</span>
+                <span>{result.source_provider}</span>
+                <span className="text-muted-foreground">{t('session.convert.target')}</span>
+                <span>{result.target_provider}</span>
+                <span className="text-muted-foreground">{t('session.convert.sessionId')}</span>
+                <span className="font-mono text-xs break-all">{result.target_session_id}</span>
+                <span className="text-muted-foreground">{t('session.convert.path')}</span>
+                <span className="font-mono text-xs break-all">{writtenPath || '-'}</span>
+              </div>
             </div>
-          </div>
 
-          <div className="rounded-md border border-border bg-background/40 p-3">
-            <div className="mb-2 text-sm font-medium">
-              {t('session.convert.resumeCommand')}
+            <div className="rounded-md border border-border bg-background/40 p-3">
+              <div className="mb-2 text-sm font-medium">
+                {t('session.convert.resumeCommand')}
+              </div>
+              <pre className="whitespace-pre-wrap break-all rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
+                {result.resume_command}
+              </pre>
             </div>
-            <pre className="whitespace-pre-wrap break-all rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
-              {result.resume_command}
-            </pre>
-          </div>
 
-          {result.warnings.length > 0 && (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
-              <div className="font-medium mb-1">{t('common.warning')}</div>
-              <ul className="space-y-1 text-xs">
-                {result.warnings.map((warning, index) => (
-                  <li key={`${warning}-${index}`}>• {warning}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+            {result.warnings.length > 0 && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+                <div className="font-medium mb-1">{t('common.warning')}</div>
+                <ul className="space-y-1 text-xs">
+                  {result.warnings.map((warning, index) => (
+                    <li key={`${warning}-${index}`}>• {warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
+        <div className="mt-5 flex shrink-0 flex-wrap items-center justify-end gap-2">
           {!result.dry_run && writtenPath && (
             <button
               type="button"
