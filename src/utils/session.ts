@@ -210,6 +210,45 @@ function generateFallbackId(prefix: string): string {
   return `${prefix}-${base}`
 }
 
+/**
+ * Coerce a Pi message body into content parts.
+ *
+ * Pi stores most messages as a `Content[]`, but it also writes some roles
+ * (e.g. `system` / `developer`) with a plain string body. Every consumer of
+ * `entry.message.content` (renderers, previews, stats) assumes an array, so
+ * non-array payloads are coerced once at the parse boundary instead of being
+ * defended against in each consumer.
+ */
+function normalizePiContent(value: unknown): Content[] {
+  if (Array.isArray(value)) return value as Content[]
+
+  if (typeof value === 'string') {
+    return value.length > 0 ? [{ type: 'text', text: value }] : []
+  }
+
+  if (value && typeof value === 'object') {
+    return [value as Content]
+  }
+
+  return []
+}
+
+/**
+ * Pi writes `role: "system"` (and occasionally `"developer"`) messages with
+ * `message.content` as a string. Normalize it so renderers never receive a
+ * non-array and crash on `.filter(...)`. Already-array content is returned
+ * untouched.
+ */
+function normalizePiMessageEntry(raw: any): SessionEntry {
+  const message = raw?.message
+
+  if (message && typeof message === 'object' && !Array.isArray(message.content)) {
+    message.content = normalizePiContent(message.content)
+  }
+
+  return raw as SessionEntry
+}
+
 function normalizeSessionEntry(raw: any): SessionEntry | null {
   if (!raw || typeof raw !== 'object') return null
   const type = typeof raw.type === 'string' ? raw.type : undefined
@@ -233,7 +272,7 @@ function normalizeSessionEntry(raw: any): SessionEntry | null {
   }
 
   if (type === 'message') {
-    return raw as SessionEntry
+    return normalizePiMessageEntry(raw)
   }
 
   if (

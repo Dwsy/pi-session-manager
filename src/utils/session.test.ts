@@ -668,6 +668,57 @@ describe('parseSessionEntriesWithLineCount', () => {
     const { entries } = parseSessionEntriesWithLineCount(content);
     expect(entries.filter((e) => e.message?.role === 'assistant')).toHaveLength(2);
   });
+
+  it('coerces string message content into text parts', () => {
+    const content = [
+      JSON.stringify({
+        type: 'message',
+        id: 'system-1',
+        timestamp: '2026-04-09T10:00:00Z',
+        message: { role: 'system', content: 'You are a helpful assistant.' },
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'user-1',
+        parentId: 'system-1',
+        timestamp: '2026-04-09T10:01:00Z',
+        message: { role: 'user', content: 'hello' },
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'system-2',
+        parentId: 'user-1',
+        timestamp: '2026-04-09T10:02:00Z',
+        message: { role: 'system', content: '' },
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'assistant-1',
+        parentId: 'system-2',
+        timestamp: '2026-04-09T10:03:00Z',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'already parts' }] },
+      }),
+    ].join('\n');
+
+    const { entries } = parseSessionEntriesWithLineCount(content);
+
+    // Pi persists some roles (system/developer) with a plain string body, but
+    // every consumer assumes `Content[]`. The parser has to coerce it, otherwise
+    // renderers crash on `.filter(...)` ("e.filter is not a function").
+    expect(entries[0].message?.content).toEqual([{ type: 'text', text: 'You are a helpful assistant.' }]);
+    expect(entries[1].message?.content).toEqual([{ type: 'text', text: 'hello' }]);
+    expect(entries[2].message?.content).toEqual([]);
+
+    // Already-array content stays untouched.
+    expect(entries[3].message?.content).toEqual([{ type: 'text', text: 'already parts' }]);
+
+    // Invariant: nothing that reaches the UI carries a non-array body.
+    for (const entry of entries) {
+      if (entry.message) {
+        expect(Array.isArray(entry.message.content)).toBe(true);
+      }
+    }
+  });
 });
 
 

@@ -13,12 +13,27 @@ import type { Content, SessionEntry } from "@/types";
 
 const EMPTY_TOOL_RESULTS = new Map<string, SessionEntry>();
 
-function stripPreviewAssistantContent(content: Content[]): Content[] {
-  return content.filter((item) => item.type === "text");
+/**
+ * Renderers must not crash the whole app on unexpected session data. Pi JSONL
+ * is not schema validated and some roles persist `content` as a plain string;
+ * live (`get_pi_agent_entries`) entries bypass the JSONL parser entirely.
+ * Coerce non-array payloads into content parts so a message body still renders
+ * instead of tripping the app-wide error boundary.
+ */
+function asContentParts(content: unknown): Content[] {
+  if (Array.isArray(content)) return content as Content[];
+  if (typeof content === "string" && content.length > 0) {
+    return [{ type: "text", text: content }];
+  }
+  return [];
 }
 
-function contentToText(content: Content[]): string {
-  return content
+function stripPreviewAssistantContent(content: unknown): Content[] {
+  return asContentParts(content).filter((item) => item.type === "text");
+}
+
+function contentToText(content: unknown): string {
+  return asContentParts(content)
     .filter((item) => item.type === "text" && typeof item.text === "string")
     .map((item) => item.text?.trim())
     .filter(Boolean)
@@ -51,7 +66,7 @@ export function renderSessionEntry(
         return (
           <UserMessage
             key={entry.id}
-            content={entry.message.content}
+            content={asContentParts(entry.message.content)}
             timestamp={entry.timestamp}
             id={entry.id}
             searchQuery={searchQuery}
@@ -63,7 +78,7 @@ export function renderSessionEntry(
         return (
           <AssistantMessage
             key={entry.id}
-            content={previewMode ? stripPreviewAssistantContent(entry.message.content) : entry.message.content}
+            content={previewMode ? stripPreviewAssistantContent(entry.message.content) : asContentParts(entry.message.content)}
             timestamp={entry.timestamp}
             entryId={entry.id}
             toolResultByCallId={toolResultByCallId}
