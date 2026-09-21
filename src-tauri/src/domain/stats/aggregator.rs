@@ -195,18 +195,26 @@ fn process_session_data(
         return (cached.user_messages, cached.assistant_messages, cached.input_tokens, cached.output_tokens, cached.cache_read_tokens, cached.cache_write_tokens, cached.input_cost + cached.output_cost + cached.cache_read_cost + cached.cache_write_cost);
     }
 
-    // 3. Cache miss: use session-level fallback (NO file I/O)
-    // Background warm_details_cache will populate cache asynchronously.
-    // On next stats calculation, this entry will hit the cache.
+    // 3. Cache miss: derive role counts from the indexed corpus. This keeps
+    // Total Messages and Message Distribution on the same definition while the
+    // heavier token/model details cache is still warming.
     bump_model_project_count(model_usage_by_project, "unknown", project_path);
     *sessions_by_model.entry("unknown".to_string()).or_insert(0) += 1;
-    let msg_count = session.message_count;
+    let indexed_counts = conn.and_then(|conn| {
+        conn.query_row("SELECT SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END), SUM(CASE WHEN role = 'assistant' THEN 1 ELSE 0 END) FROM message_entries WHERE session_path = ?1", rusqlite::params![session.path], |row| {
+            Ok((row.get::<_, Option<i64>>(0)?.unwrap_or(0) as usize, row.get::<_, Option<i64>>(1)?.unwrap_or(0) as usize))
+        })
+        .ok()
+    });
+    let (user_msgs, assistant_msgs) = indexed_counts.unwrap_or((0, 0));
+    let msg_count = user_msgs + assistant_msgs;
+    let effective_count = if msg_count == 0 { session.message_count } else { msg_count };
     let date = session_modified.format("%Y-%m-%d").to_string();
-    *messages_by_date.entry(date.clone()).or_insert(0) += msg_count;
-    daily_stats.add_session(&date, project, msg_count, 0, 0.0);
-    add_time_and_weekday_counts(messages_by_hour, messages_by_day_of_week, session_modified, msg_count);
+    *messages_by_date.entry(date.clone()).or_insert(0) += effective_count;
+    daily_stats.add_session(&date, project, effective_count, 0, 0.0);
+    add_time_and_weekday_counts(messages_by_hour, messages_by_day_of_week, session_modified, effective_count);
 
-    (0, 0, 0, 0, 0, 0, 0.0)
+    (user_msgs, assistant_msgs, 0, 0, 0, 0, 0.0)
 }
 
 pub fn calculate_stats_from_inputs(sessions: &[SessionStatsInput]) -> SessionStats {
