@@ -177,6 +177,14 @@ fn make_codex_session_file(id: &str, cwd: &str, user_text: &str) -> String {
 }
 
 #[tokio::test]
+async fn test_legacy_session_fts_search_uses_message_index() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+    let _temp_dir = setup_test_db(&[("legacy-current-index", "/repo", &[("user", "legacy-cli-needle")])]);
+    let results = pi_session_manager::domain::session_search::search_sessions_fts("legacy-cli-needle".to_string(), 10).await.unwrap();
+    assert!(results.iter().any(|session| session.id == "legacy-current-index"));
+}
+
+#[tokio::test]
 async fn test_full_text_search_command_basic() {
     // Acquire global test lock to prevent concurrent DB access
     let _lock = TEST_DB_LOCK.lock().unwrap();
@@ -695,6 +703,30 @@ async fn test_full_text_search_normalized_cjk_index_handles_partial_query() {
     let response = full_text_search("默认系统中文".to_string(), "all".to_string(), None, None, 0, 10, Some("all".to_string()), None).await.unwrap();
     assert_eq!(response.total_hits, 1);
     assert_eq!(response.hits[0].entry_id, "normalized1-msg0");
+}
+
+#[tokio::test]
+async fn test_full_text_search_includes_codex_when_external_search_enabled() {
+    let _lock = TEST_DB_LOCK.lock().unwrap();
+    let temp_dir = tempdir().unwrap();
+    env::set_var("HOME", temp_dir.path());
+    let codex_dir = temp_dir.path().join(".codex/sessions/2026/04/11");
+    fs::create_dir_all(&codex_dir).unwrap();
+    let codex_path = codex_dir.join("codex-enabled.jsonl");
+    fs::write(&codex_path, make_codex_session_file("codex-enabled", "/repo/codex", "enabled-external-needle")).unwrap();
+
+    let mut config = Config::default();
+    config.external_sessions_include_in_search = true;
+    config.external_session_provider_slugs = vec!["codex".to_string()];
+    config.scan_other_agent_jsonl = true;
+    pi_session_manager::config::save_config(&config).unwrap();
+    let mut conn = sqlite_cache::init_db_with_config(&config).unwrap();
+    let (session, entries) = scanner::parse_session_info(&codex_path).unwrap();
+    sqlite_cache::upsert_session(&mut conn, &session, Utc::now(), Some(&entries)).unwrap();
+    drop(conn);
+
+    let results = full_text_search("enabled-external-needle".to_string(), "all".to_string(), None, None, 0, 10, None, None).await.unwrap();
+    assert!(results.hits.iter().any(|hit| hit.session_path == codex_path.to_string_lossy()));
 }
 
 #[tokio::test]
