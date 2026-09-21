@@ -761,13 +761,20 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             all_sessions.push(session);
         }
 
-        // The same Pi conversation can be discovered from an explicitly added
-        // backup/archive root. Prefer the canonical ~/.pi tree and otherwise a
-        // single stable representative so stats/search do not double count it.
+        // The same conversation can be discovered from an explicitly added
+        // backup/archive root. Session ids are provider-native identities; for
+        // custom roots where path detection cannot identify Pi, a matching id
+        // against a canonical Pi session still denotes the same conversation.
         let canonical_pi_root = get_sessions_dir().ok();
+        let canonical_pi_ids = all_sessions.iter().filter(|session| canonical_pi_root.as_ref().is_some_and(|root| Path::new(&session.path).starts_with(root))).map(|session| session.id.clone()).collect::<std::collections::HashSet<_>>();
         let mut by_identity: std::collections::HashMap<(String, String), SessionInfo> = std::collections::HashMap::new();
         for session in all_sessions {
-            let provider = crate::domain::session_bridge::source_from_path(Path::new(&session.path)).map(|source| source.slug().to_string()).unwrap_or_else(|| "unknown".to_string());
+            let source = crate::domain::session_bridge::source_from_path(Path::new(&session.path));
+            let provider = match source {
+                Some(source) => source.slug().to_string(),
+                None if canonical_pi_ids.contains(&session.id) => "pi".to_string(),
+                None => format!("unknown:{}", session.path),
+            };
             let key = (provider, session.id.clone());
             match by_identity.entry(key) {
                 std::collections::hash_map::Entry::Vacant(entry) => {
@@ -1367,6 +1374,45 @@ mod tests {
         assert!(dirs.iter().any(|dir| dir == &extra_path));
         if let Ok(pi_root) = crate::paths::pi_agent_sessions_dir() {
             assert!(!dirs.iter().any(|dir| dir == &pi_root));
+        }
+    }
+
+    #[tokio::test]
+    async fn scan_dedupes_pi_session_copied_into_custom_root() {
+        let _env_lock = crate::paths::acquire_test_env_lock();
+        let temp = tempfile::tempdir().expect("tempdir");
+        let old_home = std::env::var_os("HOME");
+        let old_test_db = std::env::var_os("PPM_TEST_DB");
+        std::env::set_var("HOME", temp.path());
+        std::env::set_var("PPM_TEST_DB", temp.path().join("sessions.db"));
+
+        let canonical = temp.path().join(".pi/agent/sessions/project");
+        let backup = temp.path().join(".dotfiles/.pi/agent/sessions/project");
+        std::fs::create_dir_all(&canonical).unwrap();
+        std::fs::create_dir_all(&backup).unwrap();
+        let content = concat!(
+            "{\"type\":\"session\",\"version\":3,\"id\":\"same-id\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"cwd\":\"/repo\"}\n",
+            "{\"type\":\"message\",\"id\":\"u1\",\"parentId\":null,\"timestamp\":\"2026-01-01T00:01:00Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"}]}}\n"
+        );
+        std::fs::write(canonical.join("same.jsonl"), content).unwrap();
+        std::fs::write(backup.join("same.jsonl"), content).unwrap();
+
+        let mut config = Config::default();
+        config.session_paths = vec![backup.to_string_lossy().to_string()];
+        let sessions = scan_sessions_with_config(&config).await.unwrap();
+        let matches = sessions.iter().filter(|session| session.id == "same-id").collect::<Vec<_>>();
+        assert_eq!(matches.len(), 1);
+        assert!(Path::new(&matches[0].path).starts_with(&canonical));
+
+        if let Some(value) = old_home {
+            std::env::set_var("HOME", value);
+        } else {
+            std::env::remove_var("HOME");
+        }
+        if let Some(value) = old_test_db {
+            std::env::set_var("PPM_TEST_DB", value);
+        } else {
+            std::env::remove_var("PPM_TEST_DB");
         }
     }
 
