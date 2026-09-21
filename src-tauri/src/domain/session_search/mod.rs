@@ -666,6 +666,19 @@ fn search_message_hits_for_mode(
         SortMode::Relevance => "d.score DESC, julianday(d.timestamp) DESC, d.session_path ASC, d.entry_id ASC",
     };
     let per_session_order = sort_mode.per_session_order_sql();
+    // Provider visibility used to be applied after the SQL LIMIT. That lets
+    // disallowed-provider rows consume the candidate window and can hide valid
+    // external sessions. Push the configured scope into SQL before ranking.
+    let allowed_paths = crate::data::sqlite::get_all_sessions(conn)?.into_iter().filter(|session| session_allowed_in_search(&session.path, config)).map(|session| session.path).collect::<Vec<_>>();
+    if allowed_paths.is_empty() {
+        return Ok(Vec::new());
+    }
+    let allowed_placeholders = std::iter::repeat_n("?", allowed_paths.len()).collect::<Vec<_>>().join(",");
+    where_clause = format!("{where_clause} AND m.session_path IN ({allowed_placeholders})");
+    for path in &allowed_paths {
+        params.push(path);
+    }
+
     let candidate_limit = message_candidate_limit(fetch_limit);
     let data_sql = format!(
         "WITH candidate_rows AS (
