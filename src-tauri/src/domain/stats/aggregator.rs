@@ -340,6 +340,68 @@ mod tests {
     }
 
     #[test]
+    fn cache_miss_uses_indexed_role_counts_for_reconciled_totals() {
+        let _env_lock = crate::paths::acquire_test_env_lock();
+        let temp = tempfile::tempdir().expect("tempdir");
+        let _test_db = EnvVarGuard::set("PPM_TEST_DB", temp.path().join("stats.db"));
+        let path = temp.path().join("indexed.jsonl");
+        let modified = chrono::Utc::now();
+        let mut conn = crate::data::sqlite::init_db().unwrap();
+        let session = crate::types::SessionInfo {
+            path: path.to_string_lossy().to_string(),
+            id: "indexed".into(),
+            cwd: "/repo".into(),
+            name: None,
+            created: modified,
+            modified,
+            message_count: 99,
+            first_message: String::new(),
+            user_messages_text: String::new(),
+            assistant_messages_text: String::new(),
+            last_message: String::new(),
+            last_message_role: String::new(),
+            parent_session_path: None,
+            model: None,
+            models: None,
+        };
+        let entries = vec![
+            crate::types::SessionEntry {
+                entry_type: "message".into(),
+                id: "u1".into(),
+                parent_id: None,
+                timestamp: modified,
+                message: Some(crate::types::Message { role: "user".into(), content: vec![], tool_call_id: None, tool_name: None, is_error: None, model: None, provider: None, usage: None }),
+                target_id: None,
+                label: None,
+                name: None,
+                provider: None,
+                model_id: None,
+            },
+            crate::types::SessionEntry {
+                entry_type: "message".into(),
+                id: "a1".into(),
+                parent_id: None,
+                timestamp: modified,
+                message: Some(crate::types::Message { role: "assistant".into(), content: vec![], tool_call_id: None, tool_name: None, is_error: None, model: None, provider: None, usage: None }),
+                target_id: None,
+                label: None,
+                name: None,
+                provider: None,
+                model_id: None,
+            },
+        ];
+        crate::data::sqlite::upsert_session(&mut conn, &session, modified, Some(&entries)).unwrap();
+        conn.execute("DELETE FROM session_details_cache WHERE path = ?1", rusqlite::params![session.path]).unwrap();
+        drop(conn);
+
+        let stats = calculate_stats_from_inputs(&[SessionStatsInput { path: session.path, cwd: session.cwd, modified: modified.to_rfc3339(), message_count: 99 }]);
+        assert_eq!(stats.user_messages, 1);
+        assert_eq!(stats.assistant_messages, 1);
+        assert_eq!(stats.total_messages, 2);
+        assert_eq!(stats.total_messages, stats.user_messages + stats.assistant_messages);
+    }
+
+    #[test]
     fn calculate_stats_from_inputs_populates_daily_token_and_cost_totals() {
         let _env_lock = crate::paths::acquire_test_env_lock();
         let temp = tempfile::tempdir().expect("tempdir");
