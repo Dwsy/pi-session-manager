@@ -40,7 +40,7 @@ pub fn canonical_to_session_info(canonical: &CanonicalSession, path: &Path, modi
         cwd: canonical.workspace.as_ref().map(|value| value.to_string_lossy().to_string()).unwrap_or_default(),
         name: canonical.title.clone(),
         created: canonical.started_at.and_then(DateTime::<Utc>::from_timestamp_millis).unwrap_or(modified),
-        modified,
+        modified: canonical.ended_at.or_else(|| canonical.messages.iter().filter_map(|message| message.timestamp).max()).and_then(DateTime::<Utc>::from_timestamp_millis).unwrap_or(modified),
         message_count,
         first_message,
         user_messages_text: String::new(),

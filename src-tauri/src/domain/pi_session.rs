@@ -102,8 +102,11 @@ pub fn parse_pi_session_info(path: &Path, file_modified: DateTime<Utc>) -> Resul
         last_message_role = message.role.clone();
     }
 
+    // Session activity is a property of the conversation, not the filesystem.
+    // Using file mtime here makes copied/restored session trees appear active on
+    // the copy/import date and produces artificial dashboard spikes.
     let latest_entry_activity = raw_entries.iter().map(RawPiEntry::timestamp).max();
-    let modified = latest_entry_activity.unwrap_or(header.timestamp).max(file_modified).max(latest_message_activity.unwrap_or(header.timestamp));
+    let modified = latest_entry_activity.unwrap_or(header.timestamp).max(latest_message_activity.unwrap_or(header.timestamp));
     let session_name = resolve_session_name(header.name.clone(), &raw_entries);
 
     Ok((
@@ -539,7 +542,7 @@ mod tests {
         assert_eq!(info.id, "sess-1");
         assert_eq!(info.cwd, "/workspace/project");
         assert_eq!(info.created, timestamp("2026-04-09T10:00:00Z"));
-        assert_eq!(info.modified, timestamp("2026-04-09T10:05:00Z"));
+        assert_eq!(info.modified, timestamp("2026-04-09T10:02:00Z"));
         assert_eq!(info.message_count, 2);
         assert_eq!(info.first_message, "hello world");
         assert_eq!(info.last_message, "hi back");

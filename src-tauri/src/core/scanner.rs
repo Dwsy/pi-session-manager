@@ -761,6 +761,28 @@ pub async fn scan_sessions_with_config(config: &Config) -> Result<Vec<SessionInf
             all_sessions.push(session);
         }
 
+        // The same Pi conversation can be discovered from an explicitly added
+        // backup/archive root. Prefer the canonical ~/.pi tree and otherwise a
+        // single stable representative so stats/search do not double count it.
+        let canonical_pi_root = get_sessions_dir().ok();
+        let mut by_identity: std::collections::HashMap<(String, String), SessionInfo> = std::collections::HashMap::new();
+        for session in all_sessions {
+            let provider = crate::domain::session_bridge::source_from_path(Path::new(&session.path)).map(|source| source.slug().to_string()).unwrap_or_else(|| "unknown".to_string());
+            let key = (provider, session.id.clone());
+            match by_identity.entry(key) {
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(session);
+                }
+                std::collections::hash_map::Entry::Occupied(mut entry) => {
+                    let existing_is_canonical = canonical_pi_root.as_ref().is_some_and(|root| Path::new(&entry.get().path).starts_with(root));
+                    let candidate_is_canonical = canonical_pi_root.as_ref().is_some_and(|root| Path::new(&session.path).starts_with(root));
+                    if candidate_is_canonical && !existing_is_canonical {
+                        entry.insert(session);
+                    }
+                }
+            }
+        }
+        let mut all_sessions = by_identity.into_values().collect::<Vec<_>>();
         all_sessions.sort_by_key(|b| std::cmp::Reverse(b.modified));
 
         let merge_elapsed_ms = merge_started_at.elapsed().as_millis();
