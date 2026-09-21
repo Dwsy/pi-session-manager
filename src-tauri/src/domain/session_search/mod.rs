@@ -185,11 +185,18 @@ pub async fn search_sessions_fts(query: String, limit: usize) -> Result<Vec<Sess
     let config = config::load_config()?;
     let conn = crate::data::sqlite::init_db_with_config(&config)?;
 
-    let paths = crate::data::sqlite::search_fts5(&conn, &query, limit)?;
-
+    // `sessions_fts` was removed in favor of the message-level FTS index.
+    // Search the current index, dedupe session paths, and only then resolve
+    // SessionInfo records for the legacy CLI/session-search API.
+    let fetch_limit = limit.saturating_mul(8).max(limit);
+    let hits = crate::data::sqlite::search_message_fts(&conn, &query, None, fetch_limit)?;
     let mut sessions = Vec::new();
-    for path in paths {
-        if !session_allowed_in_search(&path, &config) {
+    let mut seen = std::collections::HashSet::new();
+    for (_, path, _, _, _, _) in hits {
+        if sessions.len() >= limit {
+            break;
+        }
+        if !seen.insert(path.clone()) || !session_allowed_in_search(&path, &config) {
             continue;
         }
         if let Some(session) = crate::data::sqlite::get_session(&conn, &path)? {
