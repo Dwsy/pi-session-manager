@@ -19,6 +19,7 @@ const SUPPORTED_PERMISSIONS = new Set<PsmPermission>([
   'model:invoke',
   'agent:invoke',
   'fs:read',
+  'system-prompts:read',
   'windows:open',
   'usage:read',
   'terminal:read',

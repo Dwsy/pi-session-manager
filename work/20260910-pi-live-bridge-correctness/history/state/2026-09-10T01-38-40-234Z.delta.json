@@ -1,0 +1,76 @@
+{
+  "ts": "2026-09-10T01:38:40.234Z",
+  "kind": "delta",
+  "delta": {
+    "pdca": {
+      "stage": "do",
+      "stages": [
+        {
+          "id": "plan",
+          "label": "Plan",
+          "status": "completed"
+        },
+        {
+          "id": "do",
+          "label": "Do",
+          "status": "in_progress"
+        },
+        {
+          "id": "check",
+          "label": "Check",
+          "status": "planned"
+        },
+        {
+          "id": "act",
+          "label": "Act",
+          "status": "planned"
+        }
+      ]
+    },
+    "current_phase": "P1",
+    "updated_at": "2026-09-10T01:38:40.234Z",
+    "phases": [
+      {
+        "id": "P0",
+        "name": "frame objective and constraints",
+        "pdca_stage": "plan",
+        "status": "completed"
+      },
+      {
+        "id": "P1",
+        "name": "execute first tracer path",
+        "pdca_stage": "do",
+        "status": "in_progress"
+      },
+      {
+        "id": "D1",
+        "name": "choose implementation route",
+        "pdca_stage": "check",
+        "status": "planned",
+        "type": "decision"
+      },
+      {
+        "id": "P2",
+        "name": "validate evidence and regressions",
+        "pdca_stage": "check",
+        "status": "planned"
+      },
+      {
+        "id": "D2",
+        "name": "decide continue, pivot, or close",
+        "pdca_stage": "act",
+        "status": "planned",
+        "type": "decision"
+      },
+      {
+        "id": "P3",
+        "name": "act on learning and hand off",
+        "pdca_stage": "act",
+        "status": "planned"
+      }
+    ],
+    "next_action": "收集两名审计成员的证据与最小修复，审阅非冲突 diff 后进入 D1。",
+    "notes": "P0 已完成：真实调用链、Pi 0.75.5 API、Workhub Issue、验收边界与双线审计已建立；SSOT/Scope 详见 task.md。"
+  },
+  "event": "plan-framed"
+}

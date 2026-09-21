@@ -20,6 +20,23 @@ let cachedSessions: SessionInfo[] | null = null;
 const MAX_RECALL_ENTRY_CHARS = 2_000;
 const MAX_RECALL_OUTPUT_CHARS = 12_000;
 
+type BridgeToolResult = { content: { type: string; text: string }[]; isError?: boolean };
+type BridgeTool = { execute: (toolCallId: string, params: Record<string, unknown>) => Promise<BridgeToolResult> };
+
+function withToolDetails<T extends BridgeTool>(tool: T) {
+  return {
+    ...tool,
+    async execute(toolCallId: string, params: Record<string, unknown>) {
+      const result = await tool.execute(toolCallId, params);
+      return {
+        content: result.content.map((item) => ({ type: "text" as const, text: item.text })),
+        details: {},
+        ...(result.isError ? { isError: true } : {}),
+      };
+    },
+  };
+}
+
 function truncateRecallText(text: string, maxChars: number, scope: "entry" | "output"): string {
   const normalized = text.trim();
   if (normalized.length <= maxChars) return normalized;
@@ -52,7 +69,7 @@ async function getEntriesForSession(sessionId: string): Promise<SessionEntry[]> 
 
 // ── Tool: session_search ──────────────────────────────
 
-export const sessionSearchTool = {
+export const sessionSearchTool = withToolDetails({
   name: "session_search",
   label: "Session Search",
   description:
@@ -144,11 +161,11 @@ export const sessionSearchTool = {
       return { content: [{ type: "text", text: `Search failed: ${err}` }], isError: true };
     }
   },
-};
+});
 
 // ── Tool: session_context ─────────────────────────────
 
-export const sessionContextTool = {
+export const sessionContextTool = withToolDetails({
   name: "session_context",
   label: "Session Context",
   description:
@@ -202,11 +219,11 @@ export const sessionContextTool = {
       return { content: [{ type: "text", text: `Failed: ${err}` }], isError: true };
     }
   },
-};
+});
 
 // ── Tool: session_recall ──────────────────────────────
 
-export const sessionRecallTool = {
+export const sessionRecallTool = withToolDetails({
   name: "session_recall",
   label: "Session Recall",
   description:
@@ -293,7 +310,7 @@ export const sessionRecallTool = {
       return { content: [{ type: "text", text: `Recall failed: ${err}` }], isError: true };
     }
   },
-};
+});
 
 // ── Tools: session_status / session_label ─────────────
 
@@ -309,7 +326,7 @@ function findLabel(name: string, labels: LabelItem[]): LabelItem | null {
     || labels.find((label) => label.name.toLowerCase().includes(normalized)) || null;
 }
 
-export const sessionStatusTool = {
+export const sessionStatusTool = withToolDetails({
   name: "session_status",
   label: "Session Status",
   description:
@@ -369,9 +386,9 @@ export const sessionStatusTool = {
 
     return { content: [{ type: "text", text: "Unknown action" }], isError: true };
   },
-};
+});
 
-export const sessionLabelTool = {
+export const sessionLabelTool = withToolDetails({
   name: "session_label",
   label: "Session Labels",
   description:
@@ -444,4 +461,4 @@ export const sessionLabelTool = {
 
     return { content: [{ type: "text", text: "Unknown action" }], isError: true };
   },
-};
+});

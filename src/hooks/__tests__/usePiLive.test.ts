@@ -35,4 +35,19 @@ describe('usePiLive session list reducers', () => {
 
     expect(next).toBe(prev)
   })
+
+  it('counts only completed message/tool entries and uses agent lifecycle for streaming', () => {
+    let next = applyPiLiveChatEvent([baseSession], 'agent_start', 'session-1', matches)
+    expect(next[0]).toMatchObject({ isStreaming: true, entryCount: 3 })
+
+    next = applyPiLiveChatEvent(next, 'turn_end', 'session-1', matches)
+    expect(next[0]).toMatchObject({ isStreaming: true, entryCount: 3 })
+
+    next = applyPiLiveChatEvent(next, 'message_end', 'session-1', matches)
+    next = applyPiLiveChatEvent(next, 'tool_execution_end', 'session-1', matches)
+    expect(next[0]).toMatchObject({ isStreaming: true, entryCount: 5 })
+
+    next = applyPiLiveChatEvent(next, 'agent_end', 'session-1', matches)
+    expect(next[0]).toMatchObject({ isStreaming: false, entryCount: 5 })
+  })
 })

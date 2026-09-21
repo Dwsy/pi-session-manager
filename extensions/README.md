@@ -166,5 +166,5 @@ editing source files.
 ### Dependencies
 
 - **better-sqlite3** (`^12.9.0`): used by `pi-session-bridge` and `resume-x` for SQLite access, resolved from the project root `node_modules`
-- **@mariozechner/pi-coding-agent**: older Pi extension API used by `pi-session-bridge`
-- **@earendil-works/pi-coding-agent** / **@earendil-works/pi-tui**: newer Pi extension APIs used by `resume-x` and `rename-nag`; injected by the Pi runtime and not declared by these packages
+- **@earendil-works/pi-coding-agent**: current Pi extension API used by `pi-session-bridge`, `resume-x`, and `rename-nag`; PSM tracks the current release line from the project root dependency
+- **@earendil-works/pi-agent-core** / **@earendil-works/pi-ai**: canonical Pi core/model/content types used where the coding-agent package no longer re-exports those types

@@ -1,0 +1,81 @@
+{
+  "ts": "2026-09-10T01:51:00.621Z",
+  "kind": "delta",
+  "delta": {
+    "pdca": {
+      "stage": "check",
+      "stages": [
+        {
+          "id": "plan",
+          "label": "Plan",
+          "status": "completed"
+        },
+        {
+          "id": "do",
+          "label": "Do",
+          "status": "completed"
+        },
+        {
+          "id": "check",
+          "label": "Check",
+          "status": "in_progress"
+        },
+        {
+          "id": "act",
+          "label": "Act",
+          "status": "planned"
+        }
+      ]
+    },
+    "current_phase": "P2",
+    "updated_at": "2026-09-10T01:51:00.621Z",
+    "phases": [
+      {
+        "id": "P0",
+        "name": "frame objective and constraints",
+        "pdca_stage": "plan",
+        "status": "completed"
+      },
+      {
+        "id": "P1",
+        "name": "execute first tracer path",
+        "pdca_stage": "do",
+        "status": "completed"
+      },
+      {
+        "id": "D1",
+        "name": "choose implementation route",
+        "pdca_stage": "check",
+        "status": "completed",
+        "type": "decision"
+      },
+      {
+        "id": "P2",
+        "name": "validate evidence and regressions",
+        "pdca_stage": "check",
+        "status": "in_progress"
+      },
+      {
+        "id": "D2",
+        "name": "decide continue, pivot, or close",
+        "pdca_stage": "act",
+        "status": "planned",
+        "type": "decision"
+      },
+      {
+        "id": "P3",
+        "name": "act on learning and hand off",
+        "pdca_stage": "act",
+        "status": "planned"
+      }
+    ],
+    "validation": {
+      "passed": true,
+      "commands": [
+        "git diff --check"
+      ],
+      "notes": "Earendil 0.85.1: bridge 8 files/33 tests passed; focused TS 3 files/18 tests passed; extension typecheck passed; Rust registry 3 tests + pi_live integration 7 tests passed; cargo fmt/check passed; pnpm build passed; stale current refs scan clean."
+    }
+  },
+  "event": "validation-passed"
+}

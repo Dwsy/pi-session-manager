@@ -76,6 +76,8 @@ pi-session-*.html
 
 # Development tasks
 tasks/
+# CASR test fixtures include provider data under a directory named `tasks`.
+!src-tauri/crates/casr/tests/fixtures/cline/tasks/
 .ace-tool/
 build-output/
 

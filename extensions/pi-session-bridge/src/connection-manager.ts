@@ -9,8 +9,9 @@
  * - Event forwarding (pi agent events → PSM via WS)
  * - Session state sync (model, thinking level → PSM)
  */
-import type { ExtensionAPI, ExtensionContext, ImageContent, PiModel, TextContent, ThinkingLevel } from "@mariozechner/pi-coding-agent";
-import * as path from "node:path";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+import type { ImageContent, Model, TextContent } from "@earendil-works/pi-ai";
 import { BridgeConnection } from "./bridge-connection.js";
 import { NOTIFY_COOLDOWN } from "./config.js";
 import type { BridgeState } from "./types.js";
@@ -38,18 +39,6 @@ function shouldNotify(newState: string): boolean {
   return true;
 }
 
-function resolveSessionId(sessionFile: string): string {
-  const base = sessionFile.replace(/\.jsonl$/, "");
-  const stem = base.substring(base.lastIndexOf("/") + 1);
-
-  const underscoreIndex = stem.lastIndexOf("_");
-  if (underscoreIndex >= 0 && underscoreIndex < stem.length - 1) {
-    return stem.substring(underscoreIndex + 1);
-  }
-
-  return stem;
-}
-
 // ── Status badge mapping ──────────────────────────────
 
 function applyStatus(ctx: ExtensionContext, state: BridgeState, attempt: number) {
@@ -68,62 +57,51 @@ function applyStatus(ctx: ExtensionContext, state: BridgeState, attempt: number)
 
 // ── Event forwarding (pi agent events → PSM) ──────────
 
-// pi emits these events; PSM expects these exact names
-const EVENT_FORWARD_LIST = [
-  // Lifecycle
-  "agent_start",
-  "agent_end",
-  "turn_start",
-  "turn_end",
-  // Content (streaming)
-  "message_start",
-  "message_update",
-  "message_end",
-  // Tools
-  "tool_execution_start",
-  "tool_execution_update",
-  "tool_execution_end",
-  "tool_call",
-  "tool_result",
-  // Model / reasoning
-  "model_select",
-  "thinking_level_select",
-];
-
 function forwardEvent(eventType: string, data?: unknown) {
   if (!conn || conn.state !== "connected" || !sessionId) return;
   const payload = data && typeof data === "object" ? data : {};
   conn.send({ type: eventType, sessionId, sessionPath, ...payload });
 }
 
-function registerEventForwarding(pi: ExtensionAPI) {
-  for (const eventType of EVENT_FORWARD_LIST) {
-    pi.on(eventType, (event: unknown, ctx: ExtensionContext) => {
-      latestCtx = ctx;
-      // Agent lifecycle is the stable boundary for the whole streamed response;
-      // message/turn boundaries may occur multiple times while tools are running.
-      if (eventType === "agent_start") isStreaming = true;
-      else if (eventType === "agent_end") isStreaming = false;
+function handleForwardedEvent(eventType: string, event: unknown, ctx: ExtensionContext) {
+  latestCtx = ctx;
+  // Agent lifecycle is the stable boundary for the whole streamed response;
+  // message/turn boundaries may occur multiple times while tools are running.
+  if (eventType === "agent_start") isStreaming = true;
+  else if (eventType === "agent_end") isStreaming = false;
 
-      const data = event && typeof event === "object" ? event : {};
-      forwardEvent(eventType, data);
-
-      if (
-        eventType === "agent_start" ||
-        eventType === "agent_end" ||
-        eventType === "turn_end" ||
-        eventType === "model_select" ||
-        eventType === "thinking_level_select"
-      ) {
-        sendSessionState();
-      }
-    });
+  forwardEvent(eventType, event);
+  if (
+    eventType === "agent_start" ||
+    eventType === "agent_end" ||
+    eventType === "turn_end" ||
+    eventType === "model_select" ||
+    eventType === "thinking_level_select"
+  ) {
+    sendSessionState();
   }
+}
+
+function registerEventForwarding(pi: ExtensionAPI) {
+  pi.on("agent_start", (event, ctx) => handleForwardedEvent("agent_start", event, ctx));
+  pi.on("agent_end", (event, ctx) => handleForwardedEvent("agent_end", event, ctx));
+  pi.on("turn_start", (event, ctx) => handleForwardedEvent("turn_start", event, ctx));
+  pi.on("turn_end", (event, ctx) => handleForwardedEvent("turn_end", event, ctx));
+  pi.on("message_start", (event, ctx) => handleForwardedEvent("message_start", event, ctx));
+  pi.on("message_update", (event, ctx) => handleForwardedEvent("message_update", event, ctx));
+  pi.on("message_end", (event, ctx) => handleForwardedEvent("message_end", event, ctx));
+  pi.on("tool_execution_start", (event, ctx) => handleForwardedEvent("tool_execution_start", event, ctx));
+  pi.on("tool_execution_update", (event, ctx) => handleForwardedEvent("tool_execution_update", event, ctx));
+  pi.on("tool_execution_end", (event, ctx) => handleForwardedEvent("tool_execution_end", event, ctx));
+  pi.on("tool_call", (event, ctx) => handleForwardedEvent("tool_call", event, ctx));
+  pi.on("tool_result", (event, ctx) => handleForwardedEvent("tool_result", event, ctx));
+  pi.on("model_select", (event, ctx) => handleForwardedEvent("model_select", event, ctx));
+  pi.on("thinking_level_select", (event, ctx) => handleForwardedEvent("thinking_level_select", event, ctx));
 }
 
 // ── Session state sync (model/thinking → PSM) ─────────
 
-function serializeModel(model: PiModel | undefined) {
+function serializeModel(model: Model<any> | undefined) {
   if (!model) return undefined;
   return { provider: model.provider, id: model.id, ...(model.name ? { name: model.name } : {}) };
 }
@@ -133,7 +111,7 @@ function getAvailableModels() {
 }
 
 function getThinkingLevel(): ThinkingLevel | undefined {
-  return piApi?.getThinkingLevel?.() ?? latestCtx?.thinkingLevel;
+  return piApi?.getThinkingLevel();
 }
 
 function getContextUsage() {
@@ -174,6 +152,11 @@ function getMessageContent(msg: Record<string, unknown>): string | (TextContent 
   return [{ type: "text", text: message }, ...images];
 }
 
+function hasMessageContent(content: string | (TextContent | ImageContent)[]): boolean {
+  if (typeof content === "string") return content.length > 0;
+  return content.some((part) => part.type === "image" || (part.type === "text" && part.text.length > 0));
+}
+
 async function handleRpcCommand(msg: Record<string, unknown>) {
   const type = msg.type as string;
   const sid = (msg.sessionId as string) || sessionId;
@@ -182,7 +165,7 @@ async function handleRpcCommand(msg: Record<string, unknown>) {
     conn?.send({
       type: "response",
       sessionId: sid,
-      id: msg.id || type,
+      id: typeof msg.id === "string" ? msg.id : null,
       success,
       data,
       error,
@@ -193,22 +176,25 @@ async function handleRpcCommand(msg: Record<string, unknown>) {
     switch (type) {
       case "prompt": {
         const content = getMessageContent(msg);
-        const hasContent = typeof content === "string" ? content.length > 0 : content.length > 1 || content[0]?.text.length > 0;
-        if (hasContent && piApi) {
-          const requestedDelivery = msg.streamingBehavior;
-          const deliverAs = requestedDelivery === "steer" || requestedDelivery === "followUp" ? requestedDelivery : undefined;
-          piApi.sendUserMessage(content, { ...(deliverAs ? { deliverAs } : {}), expandPromptTemplates: true });
-          respond(true, { status: "sent" });
-        } else {
+        if (!hasMessageContent(content) || !piApi) {
           respond(false, undefined, "No message/images or pi API unavailable");
+          break;
         }
+        const requestedDelivery = msg.streamingBehavior;
+        const deliverAs = requestedDelivery === "steer" || requestedDelivery === "followUp" ? requestedDelivery : undefined;
+        if (!deliverAs && latestCtx && !latestCtx.isIdle()) {
+          respond(false, undefined, "Agent is busy; streamingBehavior must be steer or followUp");
+          break;
+        }
+        // Pi 0.85.1+ can dispatch extension commands and expand skills/templates from ExtensionAPI.
+        piApi.sendUserMessage(content, { ...(deliverAs ? { deliverAs } : {}), expandPromptTemplates: true });
+        respond(true, { status: "sent" });
         break;
       }
 
       case "follow_up": {
         const content = getMessageContent(msg);
-        const hasContent = typeof content === "string" ? content.length > 0 : content.length > 1 || content[0]?.text.length > 0;
-        if (hasContent && piApi) {
+        if (hasMessageContent(content) && piApi) {
           piApi.sendUserMessage(content, { deliverAs: "followUp", expandPromptTemplates: true });
           respond(true, { status: "sent" });
         } else {
@@ -219,8 +205,7 @@ async function handleRpcCommand(msg: Record<string, unknown>) {
 
       case "steer": {
         const content = getMessageContent(msg);
-        const hasContent = typeof content === "string" ? content.length > 0 : content.length > 1 || content[0]?.text.length > 0;
-        if (hasContent && piApi) {
+        if (hasMessageContent(content) && piApi) {
           piApi.sendUserMessage(content, { deliverAs: "steer", expandPromptTemplates: true });
           respond(true, { status: "sent" });
         } else {
@@ -252,14 +237,15 @@ async function handleRpcCommand(msg: Record<string, unknown>) {
       }
 
       case "set_thinking_level": {
-        const level = msg.level as string;
-        if (level && piApi) {
-          piApi.setThinkingLevel(level as ThinkingLevel);
-          sendSessionState();
-          respond(true, { status: "set", level: getThinkingLevel() });
-        } else {
-          respond(false, undefined, "Missing level");
+        const level = msg.level;
+        const validLevels: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
+        if (typeof level !== "string" || !validLevels.includes(level as ThinkingLevel) || !piApi) {
+          respond(false, undefined, "Invalid or missing thinking level");
+          break;
         }
+        piApi.setThinkingLevel(level as ThinkingLevel);
+        sendSessionState();
+        respond(true, { status: "set", level: getThinkingLevel() });
         break;
       }
 
@@ -369,7 +355,7 @@ export function initSession(ctx: ExtensionContext, pi?: ExtensionAPI) {
   if (pi) piApi = pi;
   const sf = ctx.sessionManager.getSessionFile() || "";
   sessionPath = sf;
-  sessionId = resolveSessionId(sf);
+  sessionId = ctx.sessionManager.getSessionId();
   lastNotifyState = "";
 
   if (!liveModeEnabled) return;
@@ -388,24 +374,6 @@ export function init(pi: ExtensionAPI) {
 
 export function shutdown() {
   doDisconnect();
-}
-
-/** Mid-session reconnect for extensions loaded after session_start. */
-export function tryMidSessionInit(pi: {
-  getCurrentContext?: () => ExtensionContext;
-  context?: ExtensionContext;
-}) {
-  try {
-    const ctx = pi.getCurrentContext?.() || pi.context;
-    if (!ctx) return;
-    latestCtx = ctx;
-    const sf = ctx.sessionManager.getSessionFile() || "";
-    sessionPath = sf;
-    sessionId = resolveSessionId(sf);
-    if (liveModeEnabled && sessionId) doConnect();
-  } catch {
-    /* fail gracefully */
-  }
 }
 
 export function doConnect() {

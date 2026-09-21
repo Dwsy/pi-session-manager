@@ -194,6 +194,86 @@ describe('PsmPluginHost', () => {
     })
   })
 
+  it('prompts for dedicated system prompt permission before exposing history roots', async () => {
+    const requestPermission = vi.fn(async () => true)
+    const setPluginPermissions = vi.fn(async () => config())
+    const host = new PsmPluginHost({
+      builtinEntries: [{
+        source: 'builtin',
+        sourceId: 'extensions/system-prompt-history',
+        async load() {
+          return {
+            manifest: {
+              manifestVersion: 1,
+              id: 'system-prompt-history',
+              name: 'System Prompt History',
+              version: '1.0.0',
+              permissions: ['system-prompts:read'],
+            },
+            activate(ctx: any) {
+              ctx.registerCommand('system-prompt.roots', async () => ctx.psm.fs.roots())
+              ctx.registerCommand('system-prompt.read', async () => ctx.psm.fs.read('system-prompts', 'sessions/demo.json'))
+            },
+          }
+        },
+      }],
+      services: {
+        loadConfig: async () => config({
+          'system-prompt-history': {
+            enabled: true,
+            source: 'builtin',
+            permissionOverrides: { 'system-prompts:read': false },
+          },
+        }),
+        listNpmEntries: async () => [],
+        listPathEntries: async () => [],
+        listDevEntries: async () => [],
+        setPluginPermissions,
+        requestPermission,
+      },
+    })
+
+    await host.reload()
+    vi.mocked(appInvoke).mockResolvedValueOnce([
+      { id: 'system-prompts', path: '/tmp/.pi/system-prompts', read: true },
+    ])
+    await expect(host.executeCommand('system-prompt.roots')).resolves.toEqual([
+      { id: 'system-prompts', path: '/tmp/.pi/system-prompts', read: true },
+    ])
+    expect(requestPermission).toHaveBeenCalledWith({
+      pluginId: 'system-prompt-history',
+      pluginName: 'System Prompt History',
+      permission: 'system-prompts:read',
+    })
+    expect(setPluginPermissions).toHaveBeenCalledWith({
+      pluginId: 'system-prompt-history',
+      permissionOverrides: { 'system-prompts:read': true },
+      source: 'builtin',
+      packageName: null,
+      entryPath: null,
+      projectPath: null,
+    })
+
+    vi.mocked(appInvoke).mockResolvedValueOnce({
+      rootId: 'system-prompts',
+      path: 'sessions/demo.json',
+      content: '{}',
+      encoding: 'utf-8',
+      bytes: 2,
+    })
+    await expect(host.executeCommand('system-prompt.read')).resolves.toMatchObject({ content: '{}' })
+    expect(appInvoke).toHaveBeenLastCalledWith('plugin_fs_read', {
+      rootId: 'system-prompts',
+      path: 'sessions/demo.json',
+      encoding: undefined,
+      maxBytes: undefined,
+      __psm: {
+        pluginId: 'system-prompt-history',
+        permissions: ['system-prompts:read'],
+      },
+    })
+  })
+
   it('prompts for opt-in terminal history permission before reading transcripts', async () => {
     const requestPermission = vi.fn(async () => true)
     const setPluginPermissions = vi.fn(async () => config())

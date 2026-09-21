@@ -44,9 +44,14 @@ fn widgets_root() -> Result<PathBuf, String> {
     dirs::home_dir().map(|home| home.join(".pi").join("widgets")).ok_or_else(|| "Unable to resolve home directory".to_string())
 }
 
+fn system_prompts_root() -> Result<PathBuf, String> {
+    dirs::home_dir().map(|home| home.join(".pi").join("system-prompts")).ok_or_else(|| "Unable to resolve home directory".to_string())
+}
+
 fn root_path(root_id: &str) -> Result<PathBuf, String> {
     match root_id {
         "widgets" => widgets_root(),
+        "system-prompts" => system_prompts_root(),
         _ => Err(format!("Unknown plugin filesystem root: {root_id}")),
     }
 }
@@ -121,7 +126,8 @@ fn mime_type_for(path: &Path) -> Option<String> {
 
 pub fn plugin_fs_roots() -> Result<Vec<PsmFsRootInfo>, String> {
     let widgets = widgets_root()?;
-    Ok(vec![PsmFsRootInfo { id: "widgets".to_string(), path: widgets.to_string_lossy().to_string(), read: true }])
+    let system_prompts = system_prompts_root()?;
+    Ok(vec![PsmFsRootInfo { id: "widgets".to_string(), path: widgets.to_string_lossy().to_string(), read: true }, PsmFsRootInfo { id: "system-prompts".to_string(), path: system_prompts.to_string_lossy().to_string(), read: true }])
 }
 
 pub fn plugin_fs_list(root_id: String, path: Option<String>) -> Result<Vec<PsmFsEntry>, String> {
@@ -177,7 +183,7 @@ pub fn plugin_fs_read(root_id: String, path: String, encoding: Option<String>, m
 
 #[cfg(test)]
 mod tests {
-    use super::validate_relative_path;
+    use super::{plugin_fs_roots, validate_relative_path};
 
     #[test]
     fn rejects_unsafe_relative_paths() {
@@ -190,5 +196,13 @@ mod tests {
     fn accepts_nested_normal_paths() {
         assert!(validate_relative_path("index.json").is_ok());
         assert!(validate_relative_path("nested/widget.html").is_ok());
+    }
+
+    #[test]
+    fn exposes_system_prompt_history_as_a_read_only_root() {
+        let roots = plugin_fs_roots().expect("plugin fs roots");
+        let root = roots.iter().find(|root| root.id == "system-prompts").expect("system-prompts root");
+        assert!(root.read);
+        assert!(root.path.ends_with(".pi/system-prompts"));
     }
 }

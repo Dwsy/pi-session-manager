@@ -11,6 +11,7 @@ export type PsmPermission =
   | "model:invoke"
   | "agent:invoke"
   | "fs:read"
+  | "system-prompts:read"
   | "windows:open"
   | "usage:read"
   | "terminal:read";

@@ -19,6 +19,8 @@ import { pathsEqual } from "@/utils/path";
 type SessionListProps = ComponentProps<typeof SessionList>;
 type ProjectListProps = ComponentProps<typeof ProjectList>;
 
+const NATIVE_PROJECT_SESSION_MODE_ID = "list";
+
 export interface AppDesktopSelectedProjectSummary {
   projectName: string;
   sessionCount: number;
@@ -101,12 +103,23 @@ function AppDesktopSidebarContent({
   const { projectSessionViews } = usePsmPluginUi();
   const projectSessionView = pluginSurfaceData ? (projectSessionViews[0] ?? null) : null;
   const [projectSessionMode, setProjectSessionMode] = useState<string | null>(null);
-  const projectSessionModes = projectSessionView?.modes ?? [];
+  const pluginProjectSessionModes = projectSessionView?.modes ?? [];
+  const projectSessionModes = projectSessionView
+    ? [
+        {
+          id: NATIVE_PROJECT_SESSION_MODE_ID,
+          title: t("project.sessionView.list", "List"),
+        },
+        ...pluginProjectSessionModes.filter(
+          (mode) => mode.id !== NATIVE_PROJECT_SESSION_MODE_ID,
+        ),
+      ]
+    : [];
   const fallbackProjectSessionMode =
     projectSessionView?.defaultMode &&
     projectSessionModes.some((mode) => mode.id === projectSessionView.defaultMode)
       ? projectSessionView.defaultMode
-      : (projectSessionModes[0]?.id ?? null);
+      : (projectSessionView ? NATIVE_PROJECT_SESSION_MODE_ID : null);
   const activeProjectSessionMode =
     projectSessionMode && projectSessionModes.some((mode) => mode.id === projectSessionMode)
       ? projectSessionMode
@@ -153,7 +166,10 @@ function AppDesktopSidebarContent({
             }
           />
           <div className="min-h-0">
-            {projectSessionView && activeProjectSessionMode && pluginSurfaceData ? (
+            {projectSessionView &&
+            activeProjectSessionMode &&
+            activeProjectSessionMode !== NATIVE_PROJECT_SESSION_MODE_ID &&
+            pluginSurfaceData ? (
               <PluginContributionBoundary
                 pluginId={projectSessionView.pluginId}
                 contributionId={projectSessionView.id}

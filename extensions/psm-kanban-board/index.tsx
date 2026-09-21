@@ -225,7 +225,6 @@ export default function activate(ctx: PsmPluginHostContext) {
   ctx.ui.registerProjectSessionView({
     id: 'builtin.kanban-board.project-sessions',
     title: ctx.i18n.t('plugins.kanbanBoard.projectSessions', 'Project session grouping'),
-    defaultMode: 'day',
     modes: [
       { id: 'day', title: ctx.i18n.t('plugins.kanbanBoard.tree.day', 'Day') },
       { id: 'status', title: ctx.i18n.t('plugins.kanbanBoard.tree.status', 'Status') },

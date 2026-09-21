@@ -322,6 +322,10 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
     await invoke('pi_agent_abort', { sessionId })
   }, [])
 
+  useEffect(() => {
+    setConnectionState(isEnabled && sessions.length > 0 ? 'connected' : 'disconnected')
+  }, [isEnabled, sessions.length])
+
   // Listen to events
   useEffect(() => {
     if (!isEnabled || manual) return
@@ -345,22 +349,20 @@ export function usePiLive(options: UsePiLiveOptions = {}): UsePiLiveReturn {
 
       listen<PiLiveSessionDisconnectedPayload>('pi-live:session_disconnected', ({ payload }) => {
         removeSession(payload.sessionId)
-        setConnectionState('disconnected')
         emitPsmRuntimeEvent('pi-live:session_disconnected', payload)
       }).then(f => unsubs.push(f))
 
       listen<PiLiveStateUpdatedPayload>('pi-live:state_updated', ({ payload }) => {
-        patchSession(payload.sessionId, {
-          model: payload.model,
-          availableModels: payload.availableModels,
-          thinkingLevel: payload.thinkingLevel,
-          contextUsage: payload.contextUsage,
-          isStreaming: payload.isStreaming,
-          pendingMessageCount: payload.pendingMessageCount,
-          sessionPath: payload.sessionPath,
-          tags: payload.tags,
-          lastSeen: new Date().toISOString(),
-        })
+        const patch: Partial<PiLiveSession> = { lastSeen: new Date().toISOString() }
+        if (payload.model !== undefined) patch.model = payload.model
+        if (payload.availableModels !== undefined) patch.availableModels = payload.availableModels
+        if (payload.thinkingLevel !== undefined) patch.thinkingLevel = payload.thinkingLevel
+        if (payload.contextUsage !== undefined) patch.contextUsage = payload.contextUsage
+        if (payload.isStreaming !== undefined) patch.isStreaming = payload.isStreaming
+        if (payload.pendingMessageCount !== undefined) patch.pendingMessageCount = payload.pendingMessageCount
+        if (payload.sessionPath !== undefined) patch.sessionPath = payload.sessionPath
+        if (payload.tags !== undefined) patch.tags = payload.tags
+        patchSession(payload.sessionId, patch)
         emitPsmRuntimeEvent('pi-live:state_updated', payload)
       }).then(f => unsubs.push(f))
 

@@ -42,7 +42,26 @@ struct WsResponse {
 use crate::utils::payload::{extract_string, extract_usize};
 
 fn is_pi_live_forward_event(event_type: &str) -> bool {
-    matches!(event_type, "message_start" | "message_update" | "message_end" | "tool_execution_start" | "tool_execution_update" | "tool_execution_end" | "agent_start" | "agent_end" | "turn_start" | "turn_end" | "model_select" | "auto_compaction_start" | "auto_compaction_end" | "queue_update")
+    matches!(
+        event_type,
+        "message_start"
+            | "message_update"
+            | "message_end"
+            | "tool_execution_start"
+            | "tool_execution_update"
+            | "tool_execution_end"
+            | "tool_call"
+            | "tool_result"
+            | "agent_start"
+            | "agent_end"
+            | "turn_start"
+            | "turn_end"
+            | "model_select"
+            | "thinking_level_select"
+            | "auto_compaction_start"
+            | "auto_compaction_end"
+            | "queue_update"
+    )
 }
 
 fn should_emit_pi_live_to_tauri(event_type: &str) -> bool {
@@ -112,6 +131,7 @@ impl WsAdapter {
         let (rpc_cmd_tx, mut rpc_cmd_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let (rpc_resp_tx, _) = tokio::sync::broadcast::channel::<serde_json::Value>(16);
         let mut registered_session_id: Option<String> = None;
+        let mut registered_connection_id: Option<u64> = None;
 
         loop {
             tokio::select! {
@@ -150,11 +170,11 @@ impl WsAdapter {
                                         );
 
                                         // Register RPC connection channels
-                                        self.app_state.pi_agent_registry.register_connection(
+                                        registered_connection_id = Some(self.app_state.pi_agent_registry.register_connection(
                                             session_id.to_string(),
                                             rpc_cmd_tx.clone(),
                                             rpc_resp_tx.clone(),
-                                        );
+                                        ));
                                         registered_session_id = Some(session_id.to_string());
 
                                         // Broadcast to WS clients
@@ -178,6 +198,11 @@ impl WsAdapter {
                                     let session_id = live_event["sessionId"].as_str().unwrap_or("");
                                     if !session_id.is_empty() {
                                         self.app_state.pi_agent_registry.record_entry(session_id, event_type);
+                                        if event_type == "queue_update" {
+                                            let steering = live_event["steering"].as_array().map(|items| items.iter().filter_map(|item| item.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                                            let follow_up = live_event["followUp"].as_array().map(|items| items.iter().filter_map(|item| item.as_str().map(str::to_string)).collect()).unwrap_or_default();
+                                            self.app_state.pi_agent_registry.update_queue_state(session_id, steering, follow_up);
+                                        }
 
                                         log::info!("[WS] Pi live event: session={session_id}, event={event_type}");
                                         let _ = self.app_state.event_tx.send(WsEvent {
@@ -220,12 +245,20 @@ impl WsAdapter {
                                             .cloned();
                                         let thinking_level = state_msg["payload"]["thinkingLevel"].as_str().map(|s| s.to_string());
                                         let context_usage = state_msg["payload"]["contextUsage"].clone();
+                                        let is_streaming = state_msg["payload"]["isStreaming"].as_bool();
+                                        let session_path = state_msg["payload"]["sessionPath"].as_str().map(str::to_string);
+                                        let tags = state_msg["payload"]["tags"].as_array().cloned();
                                         self.app_state.pi_agent_registry.update_session_state(
                                             session_id,
-                                            if model.is_null() { None } else { Some(model) },
-                                            available_models,
-                                            thinking_level,
-                                            if context_usage.is_null() { None } else { Some(context_usage) },
+                                            crate::pi_agent_registry::PiLiveSessionStateUpdate {
+                                                model: if model.is_null() { None } else { Some(model) },
+                                                available_models,
+                                                thinking_level,
+                                                context_usage: if context_usage.is_null() { None } else { Some(context_usage) },
+                                                is_streaming,
+                                                session_path,
+                                                tags,
+                                            },
                                         );
                                         // Also broadcast session_state to frontend
                                         let ws_event = WsEvent {
@@ -334,13 +367,13 @@ impl WsAdapter {
         }
 
         // Cleanup: remove RPC connection on disconnect
-        if let Some(sid) = &registered_session_id {
-            log::info!("[WS] Pi agent disconnected: session={sid}");
-            self.app_state.pi_agent_registry.remove(sid);
-
-            let ws_event = WsEvent { event_type: "event".to_string(), event: "pi-live:session_disconnected".to_string(), payload: serde_json::json!({ "sessionId": sid }) };
-            let _ = self.app_state.event_tx.send(ws_event.clone());
-            let _ = self.app_state.app_handle.emit("pi-live:session_disconnected", &ws_event.payload);
+        if let (Some(sid), Some(connection_id)) = (&registered_session_id, registered_connection_id) {
+            if self.app_state.pi_agent_registry.remove_if_connection(sid, connection_id) {
+                log::info!("[WS] Pi agent disconnected: session={sid}");
+                let ws_event = WsEvent { event_type: "event".to_string(), event: "pi-live:session_disconnected".to_string(), payload: serde_json::json!({ "sessionId": sid }) };
+                let _ = self.app_state.event_tx.send(ws_event.clone());
+                let _ = self.app_state.app_handle.emit("pi-live:session_disconnected", &ws_event.payload);
+            }
         }
 
         Ok(())

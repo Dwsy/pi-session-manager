@@ -168,7 +168,7 @@ function settingsFor(manifest: PsmPluginManifest, entry: PsmPluginConfigEntry): 
 }
 
 function isOptInPermission(permission: PsmPermission) {
-  return permission === 'fs:read' || permission === 'usage:read' || permission === 'terminal:read'
+  return permission === 'fs:read' || permission === 'system-prompts:read' || permission === 'usage:read' || permission === 'terminal:read'
 }
 
 function permissionStatusesFor(manifest: PsmPluginManifest, entry: PsmPluginConfigEntry) {
@@ -668,15 +668,15 @@ export class PsmPluginHost {
     configEntry: PsmPluginConfigEntry,
     permissions: PsmPermissionContext,
   ): PsmTransport {
-    const ensureForCommand = async (command: string) => {
-      for (const permission of requiredRuntimeRequestPermissions(command)) {
+    const ensureForCommand = async (command: string, payload?: Record<string, unknown>) => {
+      for (const permission of requiredRuntimeRequestPermissions(command, payload, manifest.permissions ?? [])) {
         await this.ensureRuntimePermission(manifest, configEntry, permissions, permission)
       }
     }
 
     return {
       async invoke<T>(command: string, payload?: Record<string, unknown>): Promise<T> {
-        await ensureForCommand(command)
+        await ensureForCommand(command, payload)
         return appPsmTransport.invoke<T>(command, payloadWithCurrentPermissions(payload, permissions))
       },
       stream<TEvent, TResult>(command: string, payload: Record<string, unknown> | undefined, handlers: { onEvent?: (event: TEvent) => void; onError?: (error: string) => void }) {

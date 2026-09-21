@@ -1,0 +1,9 @@
+{
+  "ts": "2026-09-10T01:41:24.092Z",
+  "kind": "delta",
+  "delta": {
+    "updated_at": "2026-09-10T01:41:24.092Z",
+    "notes": "目标版本已由用户修正为 @earendil-works/pi-coding-agent 最新版；2026-09-10 registry latest=0.85.1。生成器创建时 objective 中的 0.75.5 为历史初始值，当前任务目标与验收以 task.md / Workhub Issue 为准。"
+  },
+  "event": "target-version-updated"
+}

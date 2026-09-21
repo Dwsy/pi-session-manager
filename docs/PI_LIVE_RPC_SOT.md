@@ -1,6 +1,6 @@
 # Pi Live vs Pi RPC — Single Source of Truth (Research Report)
 
-> Status: research snapshot based on local repository state and the locally installed `@mariozechner/pi-coding-agent` package.
+> Status: implementation-aligned snapshot based on the current repository and `@earendil-works/pi-coding-agent` latest release line (0.85.1 as verified on 2026-09-10).
 >
 > Purpose: capture the current Pi Live bridge architecture, compare it with real Pi RPC / JSON event stream semantics, document known gaps, and provide a migration reference for future work.
 
@@ -22,11 +22,7 @@ That bridge is already fairly close to Pi RPC for the core live control surface:
 - `set_model`
 - `set_thinking_level`
 
-However, it is **not lossless-equivalent** to native Pi RPC. The largest mismatch is **slash command behavior**:
-
-- native `AgentSession.prompt("/cmd")` goes through extension command handling, skill expansion, and prompt template expansion
-- extension-side `pi.sendUserMessage("/cmd")` intentionally does **not**
-- therefore a bridge built on extension APIs must emulate slash behavior explicitly if it wants to behave like TUI / RPC
+It is still **not lossless-equivalent** to native Pi RPC because the bridge exposes a deliberately smaller command/state surface and transports events over PSM's WebSocket protocol. On current Pi 0.85.1, however, `ExtensionAPI.sendUserMessage(..., { expandPromptTemplates: true })` can dispatch extension commands and expand skill commands/prompt templates, so the earlier slash-command gap no longer applies to the bridge prompt path.
 
 The bridge is best understood as:
 
@@ -88,7 +84,8 @@ Characteristics:
 ### Pi side
 
 - `extensions/pi-session-bridge/src/index.ts`
-- `extensions/pi-session-bridge/src/ws-bridge.ts`
+- `extensions/pi-session-bridge/src/connection-manager.ts`
+- `extensions/pi-session-bridge/src/bridge-connection.ts`
 
 Responsibilities:
 
@@ -644,13 +641,13 @@ The current bridge is not native RPC, but it is now close enough in the **right 
 
 ### Pi docs
 
-- `~/.local/share/nvm/v23.11.1/lib/node_modules/@mariozechner/pi-coding-agent/docs/rpc.md`
-- `~/.local/share/nvm/v23.11.1/lib/node_modules/@mariozechner/pi-coding-agent/docs/sdk.md`
-- `~/.local/share/nvm/v23.11.1/lib/node_modules/@mariozechner/pi-coding-agent/docs/extensions.md`
-- `~/.local/share/nvm/v23.11.1/lib/node_modules/@mariozechner/pi-coding-agent/docs/json.md`
-- `~/.local/share/nvm/v23.11.1/lib/node_modules/@mariozechner/pi-coding-agent/docs/prompt-templates.md`
-- `~/.local/share/nvm/v23.11.1/lib/node_modules/@mariozechner/pi-coding-agent/docs/skills.md`
-- `~/.local/share/nvm/v23.11.1/lib/node_modules/@mariozechner/pi-coding-agent/docs/tui.md`
+- `node_modules/@earendil-works/pi-coding-agent/docs/rpc.md`
+- `node_modules/@earendil-works/pi-coding-agent/docs/sdk.md`
+- `node_modules/@earendil-works/pi-coding-agent/docs/extensions.md`
+- `node_modules/@earendil-works/pi-coding-agent/docs/json.md`
+- `node_modules/@earendil-works/pi-coding-agent/docs/prompt-templates.md`
+- `node_modules/@earendil-works/pi-coding-agent/docs/skills.md`
+- `node_modules/@earendil-works/pi-coding-agent/docs/tui.md`
 
 ### Pi runtime implementation
 
@@ -668,7 +665,8 @@ The current bridge is not native RPC, but it is now close enough in the **right 
 ### Current PSM implementation
 
 - `extensions/pi-session-bridge/src/index.ts`
-- `extensions/pi-session-bridge/src/ws-bridge.ts`
+- `extensions/pi-session-bridge/src/connection-manager.ts`
+- `extensions/pi-session-bridge/src/bridge-connection.ts`
 - `src-tauri/src/pi_agent_registry.rs`
 - `src-tauri/src/server/ws.rs`
 - `src-tauri/src/server/http/realtime.rs`

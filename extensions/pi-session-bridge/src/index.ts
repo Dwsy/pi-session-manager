@@ -18,7 +18,7 @@
  *   tools          — LLM-callable tools (search, context, recall, status, labels)
  *   commands       — single /psm panel
  */
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as connMgr from "./connection-manager.js";
@@ -60,6 +60,4 @@ export default async function (pi: ExtensionAPI) {
     connMgr.shutdown();
   });
 
-  // ── Mid-session init (for extensions loaded after session_start) ──
-  connMgr.tryMidSessionInit(pi as unknown as { getCurrentContext?: () => ExtensionContext; context?: ExtensionContext });
 }

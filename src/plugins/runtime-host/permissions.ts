@@ -49,6 +49,10 @@ export const PSM_PERMISSION_META: Record<PsmPermission, { label: string; descrip
     label: 'Files',
     description: 'Read files through declared restricted roots',
   },
+  'system-prompts:read': {
+    label: 'System prompts',
+    description: 'Read recorded Pi system prompt history',
+  },
   'windows:open': {
     label: 'Windows',
     description: 'Open host-managed popup windows',
@@ -71,13 +75,20 @@ export function permissionDescription(permission: PsmPermission) {
   return PSM_PERMISSION_META[permission]?.description ?? permission
 }
 
-export function requiredRuntimeRequestPermissions(command: string): PsmPermission[] {
+export function requiredRuntimeRequestPermissions(
+  command: string,
+  payload?: Record<string, unknown>,
+  declaredPermissions: PsmPermission[] = [],
+): PsmPermission[] {
   switch (command) {
     case 'plugin_fs_roots':
+      return declaredPermissions.includes('system-prompts:read') && !declaredPermissions.includes('fs:read')
+        ? ['system-prompts:read']
+        : ['fs:read']
     case 'plugin_fs_list':
     case 'plugin_fs_read':
     case 'plugin_fs_stat':
-      return ['fs:read']
+      return [payload?.rootId === 'system-prompts' || payload?.root_id === 'system-prompts' ? 'system-prompts:read' : 'fs:read']
     case 'plugin_window_open':
     case 'plugin_window_close':
       return ['windows:open']

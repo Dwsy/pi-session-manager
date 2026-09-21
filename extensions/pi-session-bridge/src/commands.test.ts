@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-
-vi.mock("@earendil-works/pi-tui", () => ({
-  visibleWidth: (text: string) => text.replace(/\u001b\[[0-9;]*m/g, "").length,
-}));
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const openPsmSession = vi.fn();
 const getSessionId = vi.fn();
@@ -45,12 +41,17 @@ vi.mock("./kanban-store.js", () => ({
 
 function makePi() {
   const handlers = new Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>();
+  const completions = new Map<string, ((prefix: string) => { value: string; label: string }[]) | undefined>();
   const pi = {
-    registerCommand(name: string, opts: { handler: (args: string, ctx: ExtensionContext) => Promise<void> }) {
+    registerCommand(name: string, opts: {
+      handler: (args: string, ctx: ExtensionContext) => Promise<void>;
+      getArgumentCompletions?: (prefix: string) => { value: string; label: string }[];
+    }) {
       handlers.set(name, opts.handler);
+      completions.set(name, opts.getArgumentCompletions);
     },
   } as ExtensionAPI;
-  return { pi, handlers };
+  return { pi, handlers, completions };
 }
 
 describe("pi-session-bridge commands", () => {
@@ -128,13 +129,105 @@ describe("pi-session-bridge commands", () => {
 
   it("rejects /kanban outside TUI mode", async () => {
     const { pi, handlers } = makePi();
-    const ctx = { mode: "headless", ui: { notify: vi.fn() } } as unknown as ExtensionContext;
+    const ctx = { hasUI: false, ui: { notify: vi.fn() } } as unknown as ExtensionContext;
     const { registerAll } = await import("./commands.js");
     registerAll(pi);
 
     await handlers.get("kanban")!("", ctx);
 
     expect(ctx.ui.notify).toHaveBeenCalledWith("/kanban requires TUI mode", "error");
+  });
+
+  it("provides kanban argument completions for subcommands, statuses, and labels", async () => {
+    const { pi, completions } = makePi();
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+
+    const complete = completions.get("kanban")!;
+    expect(complete("")).toEqual([
+      { value: "status ", label: "status" },
+      { value: "label ", label: "label" },
+    ]);
+
+    // Cache is refreshed asynchronously on first call.
+    complete("status ");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(complete("status ")).toEqual([{ value: "status Todo", label: "Todo" }]);
+    expect(complete("label ")).toEqual([{ value: "label backend", label: "backend" }]);
+    expect(complete("bogus ")).toEqual([]);
+  });
+
+  it("marks the session's current status and assigned labels in completions", async () => {
+    const { pi, completions } = makePi();
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+
+    const complete = completions.get("kanban")!;
+    complete("status ");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(complete("status ")).toEqual([{ value: "status Todo", label: "Todo" }]);
+    expect(complete("label ")).toEqual([{ value: "label backend", label: "backend" }]);
+
+    getSessionStatus.mockResolvedValue({ id: "tag-1", name: "Todo", color: "info", sort_order: 0, is_builtin: false, created_at: "", parent_id: null });
+    getAllSessionLabels.mockResolvedValue([{ session_id: "sid", label_id: "label-1" }]);
+    complete("status ");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(complete("status ")).toEqual([{ value: "status Todo", label: "Todo — current" }]);
+    expect(complete("label ")).toEqual([{ value: "label backend", label: "backend — assigned" }]);
+  });
+
+  it("sets status via /kanban status <name> without TUI mode", async () => {
+    const { pi, handlers } = makePi();
+    const ctx = { mode: "headless", ui: { notify: vi.fn() } } as unknown as ExtensionContext;
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+
+    await handlers.get("kanban")!("status Todo", ctx);
+
+    expect(setSessionStatus).toHaveBeenCalledWith("sid", "tag-1", 0);
+    expect(notifyPsmStatusChange).toHaveBeenCalledWith("sid");
+    expect(ctx.ui.notify).toHaveBeenCalledWith("Status: Todo", "info");
+  });
+
+  it("reports unknown status names from /kanban status", async () => {
+    const { pi, handlers } = makePi();
+    const ctx = { mode: "headless", ui: { notify: vi.fn() } } as unknown as ExtensionContext;
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+
+    await handlers.get("kanban")!("status Nope", ctx);
+
+    expect(setSessionStatus).not.toHaveBeenCalled();
+    expect(ctx.ui.notify).toHaveBeenCalledWith("Unknown status: Nope. Available: Todo", "error");
+  });
+
+  it("toggles labels via /kanban label <name>", async () => {
+    const { pi, handlers } = makePi();
+    const ctx = { mode: "headless", ui: { notify: vi.fn() } } as unknown as ExtensionContext;
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+
+    await handlers.get("kanban")!("label backend", ctx);
+    expect(assignLabel).toHaveBeenCalledWith("sid", "label-1");
+    expect(ctx.ui.notify).toHaveBeenCalledWith("Label added: backend", "info");
+
+    getAllSessionLabels.mockResolvedValue([{ session_id: "sid", label_id: "label-1" }]);
+    await handlers.get("kanban")!("label backend", ctx);
+    expect(removeLabel).toHaveBeenCalledWith("sid", "label-1");
+    expect(ctx.ui.notify).toHaveBeenCalledWith("Label removed: backend", "info");
+  });
+
+  it("rejects unknown /kanban subcommands", async () => {
+    const { pi, handlers } = makePi();
+    const ctx = { mode: "headless", ui: { notify: vi.fn() } } as unknown as ExtensionContext;
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+
+    await handlers.get("kanban")!("bogus", ctx);
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith("Usage: /kanban [status <name> | label <name>]", "error");
   });
 
   it("sets the selected Kanban Status from the custom TUI popup", async () => {
@@ -165,7 +258,7 @@ describe("pi-session-bridge commands", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     const ctx = {
-      mode: "tui",
+      hasUI: true,
       ui: { notify: vi.fn(), input: vi.fn(), custom },
     } as unknown as ExtensionContext;
     const { registerAll } = await import("./commands.js");

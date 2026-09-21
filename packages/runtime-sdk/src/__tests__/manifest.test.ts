@@ -77,6 +77,17 @@ describe('runtime-sdk manifest contract', () => {
     expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
   })
 
+  it('accepts dedicated system prompt history permission', () => {
+    const manifest: PsmPluginManifest = {
+      id: 'local.system-prompt-history',
+      name: 'System Prompt History',
+      version: '0.1.0',
+      permissions: ['system-prompts:read'],
+    }
+
+    expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
+  })
+
   it('accepts agent usage permissions', () => {
     const manifest: PsmPluginManifest = {
       id: 'builtin.agent-usage',

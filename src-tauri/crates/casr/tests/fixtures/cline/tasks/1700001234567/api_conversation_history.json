@@ -1,0 +1,44 @@
+[
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Review Cline parser behavior."
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "I reviewed it and found one edge case."
+      }
+    ],
+    "modelInfo": {
+      "modelId": "claude-sonnet-4-5-20250929"
+    }
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "Please patch and add tests."
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "Patched and added tests."
+      }
+    ],
+    "modelInfo": {
+      "modelId": "claude-sonnet-4-5-20250929"
+    }
+  }
+]

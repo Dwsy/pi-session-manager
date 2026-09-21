@@ -53,7 +53,6 @@ const projectSessionView = {
   id: "test.project-sessions",
   pluginId: "test.plugin",
   title: "Project grouping",
-  defaultMode: "day",
   modes: [
     { id: "day", title: "Day" },
     { id: "status", title: "Status" },
@@ -109,7 +108,7 @@ afterEach(() => {
 });
 
 describe("AppDesktopSidebarContent project session view", () => {
-  it("places the mode selector in the project header and forwards project pagination to the plugin view", () => {
+  it("keeps the native session list as the default and forwards pagination to Tree modes", () => {
     projectViewRenderSpy.mockImplementation((props: any) => (
       <div data-testid="project-session-tree">{props.mode}</div>
     ));
@@ -125,8 +124,19 @@ describe("AppDesktopSidebarContent project session view", () => {
     expect(headerRoot?.className).not.toContain("bg-background/");
     expect(selector.className).toContain("bg-background");
     expect(selector.className).not.toContain("bg-background/");
-    expect(screen.getByTestId("project-session-tree").textContent).toBe("day");
+    expect(Array.from((selector as HTMLSelectElement).options).map((option) => option.value)).toEqual([
+      "list",
+      "day",
+      "status",
+      "label",
+    ]);
+    expect((selector as HTMLSelectElement).value).toBe("list");
+    expect(screen.getByTestId("fallback-session-list")).toBeTruthy();
+    expect(projectViewRenderSpy).not.toHaveBeenCalled();
 
+    fireEvent.change(selector, { target: { value: "day" } });
+    expect(screen.queryByTestId("fallback-session-list")).toBeNull();
+    expect(screen.getByTestId("project-session-tree").textContent).toBe("day");
     expect(projectViewRenderSpy).toHaveBeenLastCalledWith(
       expect.objectContaining({
         projectPath: "/tmp/project",
@@ -146,5 +156,9 @@ describe("AppDesktopSidebarContent project session view", () => {
     expect(projectViewRenderSpy).toHaveBeenLastCalledWith(
       expect.objectContaining({ mode: "status" }),
     );
+
+    fireEvent.change(selector, { target: { value: "list" } });
+    expect(screen.getByTestId("fallback-session-list")).toBeTruthy();
+    expect(screen.queryByTestId("project-session-tree")).toBeNull();
   });
 });

@@ -3,9 +3,7 @@
  *
  * /psm owns connection/liveness. /kanban owns workflow metadata.
  */
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import type { ThemeColor } from "@earendil-works/pi-coding-agent";
-import { visibleWidth } from "@earendil-works/pi-tui";
+import type { ExtensionAPI, ExtensionContext, ThemeColor } from "@earendil-works/pi-coding-agent";
 import * as connMgr from "./connection-manager.js";
 import * as kanbanStore from "./kanban-store.js";
 import { openPsmSession } from "./open-psm.js";
@@ -32,11 +30,25 @@ type KanbanItem =
 
 const KANBAN_POPUP_WIDTH = 76;
 
-interface CommandDef { name: string; description: string; handler: CommandHandler }
+function visibleWidth(text: string): number {
+  return text.replace(/\u001b\[[0-9;]*m/g, "").length;
+}
+
+interface CommandDef {
+  name: string;
+  description: string;
+  handler: CommandHandler;
+  getArgumentCompletions?: (prefix: string) => { value: string; label: string }[];
+}
 const commandDefs: CommandDef[] = [];
 
-function register(name: string, description: string, handler: CommandHandler) {
-  commandDefs.push({ name, description, handler });
+function register(
+  name: string,
+  description: string,
+  handler: CommandHandler,
+  getArgumentCompletions?: CommandDef["getArgumentCompletions"],
+) {
+  commandDefs.push({ name, description, handler, getArgumentCompletions });
 }
 
 export function registerAll(pi: ExtensionAPI) {
@@ -44,8 +56,69 @@ export function registerAll(pi: ExtensionAPI) {
     pi.registerCommand(def.name, {
       description: def.description,
       handler: def.handler,
+      ...(def.getArgumentCompletions ? { getArgumentCompletions: def.getArgumentCompletions } : {}),
     });
   }
+}
+
+/** Completion cache — the host getArgumentCompletions API is sync, store reads are async. */
+let completionNames: {
+  statuses: string[];
+  labels: string[];
+  currentStatus: string | null;
+  assignedLabels: Set<string>;
+} = { statuses: [], labels: [], currentStatus: null, assignedLabels: new Set() };
+
+function refreshCompletionNames(): void {
+  const sid = connMgr.getSessionId();
+  void Promise.all([
+    kanbanStore.getAllStatuses(),
+    kanbanStore.getAllLabels(),
+    sid ? kanbanStore.getSessionStatus(sid) : Promise.resolve(null),
+    sid ? kanbanStore.getAllSessionLabels() : Promise.resolve([]),
+  ])
+    .then(([statuses, labels, currentStatus, sessionLabels]) => {
+      const labelNames = new Map(labels.map((label) => [label.id, label.name]));
+      completionNames = {
+        statuses: statuses.map((status) => status.name),
+        labels: labels.map((label) => label.name),
+        currentStatus: currentStatus?.name ?? null,
+        assignedLabels: new Set(
+          sessionLabels
+            .map((assignment) => labelNames.get(assignment.label_id))
+            .filter((name): name is string => Boolean(name)),
+        ),
+      };
+    })
+    .catch(() => {});
+}
+
+export function kanbanCompletions(prefix: string): { value: string; label: string }[] {
+  refreshCompletionNames();
+  const spaceIndex = prefix.indexOf(" ");
+  if (spaceIndex === -1) {
+    const subcommands = ["status ", "label "];
+    return subcommands.filter((value) => value.startsWith(prefix)).map((value) => ({ value, label: value.trim() }));
+  }
+  const sub = prefix.slice(0, spaceIndex);
+  const rest = prefix.slice(spaceIndex + 1);
+  if (sub === "status") {
+    return completionNames.statuses
+      .filter((name) => name.startsWith(rest))
+      .map((name) => ({
+        value: `status ${name}`,
+        label: name === completionNames.currentStatus ? `${name} — current` : name,
+      }));
+  }
+  if (sub === "label") {
+    return completionNames.labels
+      .filter((name) => name.startsWith(rest))
+      .map((name) => ({
+        value: `label ${name}`,
+        label: completionNames.assignedLabels.has(name) ? `${name} — assigned` : name,
+      }));
+  }
+  return [];
 }
 
 function statusLines(): string[] {
@@ -332,6 +405,55 @@ async function showKanbanPanel(ctx: ExtensionContext, sid: string): Promise<Kanb
   }, { overlay: true }) as Promise<KanbanPanelResult>;
 }
 
+/** Arg-mode actions work in any mode; only the interactive panel requires TUI. */
+async function runKanbanArgs(args: string, ctx: ExtensionContext, sid: string): Promise<void> {
+  const spaceIndex = args.indexOf(" ");
+  const sub = spaceIndex === -1 ? args : args.slice(0, spaceIndex);
+  const name = spaceIndex === -1 ? "" : args.slice(spaceIndex + 1).trim();
+
+  if (sub !== "status" && sub !== "label") {
+    ctx.ui.notify("Usage: /kanban [status <name> | label <name>]", "error");
+    return;
+  }
+  if (!name) {
+    ctx.ui.notify(`Usage: /kanban ${sub} <name>`, "error");
+    return;
+  }
+
+  try {
+    if (sub === "status") {
+      const statuses = await kanbanStore.getAllStatuses();
+      const status = statuses.find((item) => item.name === name);
+      if (!status) {
+        ctx.ui.notify(`Unknown status: ${name}. Available: ${statuses.map((item) => item.name).join(", ") || "none"}`, "error");
+        return;
+      }
+      await kanbanStore.setSessionStatus(sid, status.id, 0);
+      connMgr.notifyPsmStatusChange(sid);
+      ctx.ui.notify(`Status: ${status.name}`, "info");
+      return;
+    }
+
+    const labels = await kanbanStore.getAllLabels();
+    const label = labels.find((item) => item.name === name);
+    if (!label) {
+      ctx.ui.notify(`Unknown label: ${name}. Available: ${labels.map((item) => item.name).join(", ") || "none"}`, "error");
+      return;
+    }
+    const assignments = await kanbanStore.getAllSessionLabels();
+    const assigned = assignments.some((item) => item.session_id === sid && item.label_id === label.id);
+    if (assigned) {
+      await kanbanStore.removeLabel(sid, label.id);
+      ctx.ui.notify(`Label removed: ${label.name}`, "info");
+    } else {
+      await kanbanStore.assignLabel(sid, label.id);
+      ctx.ui.notify(`Label added: ${label.name}`, "info");
+    }
+  } catch (err) {
+    ctx.ui.notify(`Kanban error: ${err}`, "error");
+  }
+}
+
 async function openInPsmCommand(args: string, ctx: ExtensionContext) {
   const sid = getActiveSessionId(ctx);
   if (!sid) {
@@ -374,13 +496,20 @@ register("psm", "PSM bridge connection panel", async (_args, ctx) => {
   }
 });
 
-register("kanban", "Manage current session Kanban Status and Labels", async (_args, ctx) => {
+register("kanban", "Manage current session Kanban Status and Labels", async (args, ctx) => {
   const sid = getActiveSessionId(ctx);
   if (!sid) {
     ctx.ui.notify("No session", "error");
     return;
   }
-  if ((ctx as { mode?: string }).mode !== "tui") {
+
+  const trimmed = args.trim();
+  if (trimmed) {
+    await runKanbanArgs(trimmed, ctx, sid);
+    return;
+  }
+
+  if (!ctx.hasUI) {
     ctx.ui.notify("/kanban requires TUI mode", "error");
     return;
   }
@@ -396,6 +525,7 @@ register("kanban", "Manage current session Kanban Status and Labels", async (_ar
         const status = await kanbanStore.createStatus(name, "info");
         await kanbanStore.setSessionStatus(sid, status.id, 0);
         connMgr.notifyPsmStatusChange(sid);
+        refreshCompletionNames();
         ctx.ui.notify(`Created status: ${status.name}`, "info");
       } catch (err) {
         ctx.ui.notify(`Failed to create status: ${err}`, "error");
@@ -411,10 +541,11 @@ register("kanban", "Manage current session Kanban Status and Labels", async (_ar
     try {
       const label = await kanbanStore.createLabel(name, colorValue, description);
       await kanbanStore.assignLabel(sid, label.id);
+      refreshCompletionNames();
       ctx.ui.notify(`Created label: ${label.name}`, "info");
     } catch (err) {
       ctx.ui.notify(`Failed to create label: ${err}`, "error");
       return;
     }
   }
-});
+}, kanbanCompletions);

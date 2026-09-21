@@ -1,4 +1,5 @@
 allowBuilds:
+  esbuild: set this to true or false
   protobufjs: true
 
 overrides:

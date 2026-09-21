@@ -222,12 +222,12 @@ export async function getSessionStatus(sessionId: string): Promise<StatusItem | 
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   let current: SessionStatusItem | null = null;
   let currentIndex = -1;
-  assignments.forEach((assignment, index) => {
-    if (assignment.session_id !== sessionId || !statusById.has(assignment.status_id)) return;
+  for (const [index, assignment] of assignments.entries()) {
+    if (assignment.session_id !== sessionId || !statusById.has(assignment.status_id)) continue;
     if (!current) {
       current = assignment;
       currentIndex = index;
-      return;
+      continue;
     }
     const currentTime = Date.parse(current.assigned_at) || 0;
     const nextTime = Date.parse(assignment.assigned_at) || 0;
@@ -235,7 +235,7 @@ export async function getSessionStatus(sessionId: string): Promise<StatusItem | 
       current = assignment;
       currentIndex = index;
     }
-  });
+  }
   return current ? statusById.get(current.status_id) ?? null : null;
 }
 

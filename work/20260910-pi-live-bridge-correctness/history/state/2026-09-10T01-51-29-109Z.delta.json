@@ -1,0 +1,134 @@
+{
+  "ts": "2026-09-10T01:51:29.109Z",
+  "kind": "delta",
+  "delta": {
+    "pdca": {
+      "stage": "act",
+      "stages": [
+        {
+          "id": "plan",
+          "label": "Plan",
+          "status": "completed"
+        },
+        {
+          "id": "do",
+          "label": "Do",
+          "status": "completed"
+        },
+        {
+          "id": "check",
+          "label": "Check",
+          "status": "completed"
+        },
+        {
+          "id": "act",
+          "label": "Act",
+          "status": "in_progress"
+        }
+      ]
+    },
+    "current_phase": "P3",
+    "updated_at": "2026-09-10T01:51:29.109Z",
+    "phases": [
+      {
+        "id": "P0",
+        "name": "frame objective and constraints",
+        "pdca_stage": "plan",
+        "status": "completed"
+      },
+      {
+        "id": "P1",
+        "name": "execute first tracer path",
+        "pdca_stage": "do",
+        "status": "completed"
+      },
+      {
+        "id": "D1",
+        "name": "choose implementation route",
+        "pdca_stage": "check",
+        "status": "completed",
+        "type": "decision"
+      },
+      {
+        "id": "P2",
+        "name": "validate evidence and regressions",
+        "pdca_stage": "check",
+        "status": "completed"
+      },
+      {
+        "id": "D2",
+        "name": "decide continue, pivot, or close",
+        "pdca_stage": "act",
+        "status": "completed",
+        "type": "decision"
+      },
+      {
+        "id": "P3",
+        "name": "act on learning and hand off",
+        "pdca_stage": "act",
+        "status": "in_progress"
+      }
+    ],
+    "decision_points": [
+      {
+        "id": "D1",
+        "phase": "D1",
+        "question": "Which route should the next implementation take?",
+        "status": "decided",
+        "options": [
+          {
+            "id": "direct",
+            "label": "Direct implementation",
+            "next_phase": "P2",
+            "criteria": "Scope is clear, blast radius is small, and validation path is known."
+          },
+          {
+            "id": "research",
+            "label": "Research first",
+            "next_phase": "P0",
+            "criteria": "Domain facts, dependencies, or ownership are still unclear."
+          },
+          {
+            "id": "split",
+            "label": "Split into slices",
+            "next_phase": "P1",
+            "criteria": "The work is valid but too broad for one safe change."
+          }
+        ],
+        "selected_option_id": "split",
+        "rationale": "Pi Live 正确性跨 bridge/Pi API 与 PSM realtime/registry/frontend 两个独立文件和测试边界，按两条 slice 并行审计可降低 blast radius，并符合用户允许的 2-agent 协作约束。",
+        "decided_at": "2026-09-10T01:51:00.590Z"
+      },
+      {
+        "id": "D2",
+        "phase": "D2",
+        "question": "After Check, should this cycle close, pivot, or continue?",
+        "status": "decided",
+        "options": [
+          {
+            "id": "close",
+            "label": "Close cycle",
+            "next_phase": "P3",
+            "criteria": "Acceptance evidence is complete and no important risk remains."
+          },
+          {
+            "id": "continue",
+            "label": "Continue same cycle",
+            "next_phase": "P1",
+            "criteria": "Core direction is right but more execution is required."
+          },
+          {
+            "id": "pivot",
+            "label": "Pivot plan",
+            "next_phase": "P0",
+            "criteria": "Validation changed the problem or invalidated current assumptions."
+          }
+        ],
+        "selected_option_id": "close",
+        "rationale": "Earendil 0.85.1 API/event semantics have been personally verified; bridge, frontend and Rust regression suites plus typecheck/fmt/check/build/diff hygiene all pass; remaining warnings are pre-existing/non-blocking and no acceptance gap remains.",
+        "decided_at": "2026-09-10T01:51:29.109Z"
+      }
+    ]
+  },
+  "event": "d2-close-selected"
+}

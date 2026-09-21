@@ -93,6 +93,7 @@ function permissionLabel(permission: PsmPermission, t: (key: string, defaultValu
     "model:invoke": "Models",
     "agent:invoke": "Agent",
     "fs:read": "Files",
+    "system-prompts:read": "System prompts",
     "windows:open": "Windows",
     "usage:read": "Agent usage",
     "terminal:read": "Terminal history",
@@ -115,6 +116,7 @@ function permissionDescription(permission: PsmPermission, t: (key: string, defau
     "model:invoke": "Invoke host-managed model calls",
     "agent:invoke": "Create and run host-managed agent sessions",
     "fs:read": "Read-only access to specific project path files",
+    "system-prompts:read": "Read recorded Pi system prompt history",
     "windows:open": "Request host to open window dialogs",
     "usage:read": "Read local agent credentials and fetch read-only subscription usage",
     "terminal:read": "Read persisted PSM terminal transcripts without terminal control access",
@@ -500,7 +502,7 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
     const permissionOverrides = Object.fromEntries(
       (plugin.permissions ?? [])
         .map((item) => [item.permission, item.permission === permission ? granted : item.granted] as const)
-        .filter(([itemPermission, enabled]) => !enabled || ((itemPermission === "fs:read" || itemPermission === "usage:read") && enabled)),
+        .filter(([itemPermission, enabled]) => !enabled || ((itemPermission === "fs:read" || itemPermission === "system-prompts:read" || itemPermission === "usage:read") && enabled)),
     ) as Partial<Record<PsmPermission, boolean>>;
     try {
       await setPsmPluginPermissions({

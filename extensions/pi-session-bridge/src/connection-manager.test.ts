@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 const bridge = vi.hoisted(() => ({
   send: vi.fn(),
@@ -21,8 +21,10 @@ vi.mock("./bridge-connection.js", () => ({
 }));
 
 function makeContext(sessionFile: string, entries: unknown[] = [], overrides: Record<string, unknown> = {}): ExtensionContext {
+  const sessionId = sessionFile.match(/_([^/_]+)\.jsonl$/)?.[1] ?? "session-id";
   return {
     sessionManager: {
+      getSessionId: () => sessionId,
       getSessionFile: () => sessionFile,
       getEntries: () => entries,
     },
@@ -41,7 +43,6 @@ function makeContext(sessionFile: string, entries: unknown[] = [], overrides: Re
           ? { provider, id: modelId, name: "Claude Sonnet" }
           : undefined,
     },
-    thinkingLevel: "high",
     isIdle: () => true,
     abort: vi.fn(),
     hasPendingMessages: () => false,
@@ -70,34 +71,30 @@ describe("pi-session-bridge connection manager session identity", () => {
     expect(connMgr.getSessionPath()).toBe(ctx.sessionManager.getSessionFile());
   });
 
-  it("falls back to the uuid suffix from timestamped pi session filenames", async () => {
+  it("uses SessionManager's canonical id even when it differs from the filename", async () => {
     const connMgr = await import("./connection-manager.js");
     const ctx = makeContext(
-      "/Users/me/.pi/agent/sessions/project/2026-05-31T10-10-37-968Z_019e7d83-9d10-7554-a0e1-3238c9151aba.jsonl",
+      "/Users/me/.pi/agent/sessions/project/legacy-name.jsonl",
       [],
+      {
+        sessionManager: {
+          getSessionId: () => "canonical-session-id",
+          getSessionFile: () => "/Users/me/.pi/agent/sessions/project/legacy-name.jsonl",
+          getEntries: () => [],
+        },
+      },
     );
 
     connMgr.initSession(ctx);
 
-    expect(connMgr.getSessionId()).toBe("019e7d83-9d10-7554-a0e1-3238c9151aba");
-  });
-
-  it("refreshes identity during mid-session init even when live mode is off", async () => {
-    const connMgr = await import("./connection-manager.js");
-    const ctx = makeContext(
-      "/Users/me/.pi/agent/sessions/project/2026-05-31T10-10-37-968Z_019e7d83-9d10-7554-a0e1-3238c9151aba.jsonl",
-      [{ type: "session", id: "019e7d83-9d10-7554-a0e1-3238c9151aba" }],
-    );
-
-    connMgr.tryMidSessionInit({ getCurrentContext: () => ctx });
-
-    expect(connMgr.getSessionId()).toBe("019e7d83-9d10-7554-a0e1-3238c9151aba");
+    expect(connMgr.getSessionId()).toBe("canonical-session-id");
   });
 
   it("serves real session state, models, commands, and RPC actions", async () => {
     const connMgr = await import("./connection-manager.js");
     const abort = vi.fn();
     let thinkingLevel = "high";
+    let idle = true;
     const sendUserMessage = vi.fn();
     const setThinkingLevel = vi.fn((level: string) => { thinkingLevel = level; });
     const setModel = vi.fn(async () => true);
@@ -118,7 +115,7 @@ describe("pi-session-bridge connection manager session identity", () => {
     const ctx = makeContext(
       "/Users/me/.pi/agent/sessions/project/2026-05-31T10-10-37-968Z_019e7d83-9d10-7554-a0e1-3238c9151aba.jsonl",
       [],
-      { abort },
+      { abort, isIdle: () => idle },
     );
 
     connMgr.init(pi);
@@ -136,6 +133,7 @@ describe("pi-session-bridge connection manager session identity", () => {
 
     const stateResponse = await rpc({ type: "get_state", id: "state-1" });
     expect(stateResponse).toMatchObject({
+      id: "state-1",
       success: true,
       data: {
         model: { provider: "openai", id: "gpt-5", name: "GPT-5" },
@@ -158,6 +156,7 @@ describe("pi-session-bridge connection manager session identity", () => {
     });
 
     await rpc({ type: "prompt", id: "prompt-1", message: "/kanban" });
+    // Pi 0.85.1+ can dispatch extension commands and expand skills/templates from ExtensionAPI.
     expect(sendUserMessage).toHaveBeenLastCalledWith("/kanban", { expandPromptTemplates: true });
     await rpc({
       type: "prompt",
@@ -175,6 +174,13 @@ describe("pi-session-bridge connection manager session identity", () => {
     await rpc({ type: "steer", id: "steer-1", message: "change direction" });
     expect(sendUserMessage).toHaveBeenLastCalledWith("change direction", { deliverAs: "steer", expandPromptTemplates: true });
 
+    idle = false;
+    const sendCount = sendUserMessage.mock.calls.length;
+    const busyResponse = await rpc({ type: "prompt", id: "busy-1", message: "queued?" });
+    expect(sendUserMessage).toHaveBeenCalledTimes(sendCount);
+    expect(busyResponse).toMatchObject({ success: false, error: "Agent is busy; streamingBehavior must be steer or followUp" });
+    idle = true;
+
     const modelResponse = await rpc({ type: "set_model", id: "model-1", provider: "anthropic", modelId: "claude-sonnet" });
     expect(setModel).toHaveBeenCalledWith({ provider: "anthropic", id: "claude-sonnet", name: "Claude Sonnet" });
     expect(modelResponse).toMatchObject({ success: true, data: { status: "set" } });
@@ -182,6 +188,8 @@ describe("pi-session-bridge connection manager session identity", () => {
     const thinkingResponse = await rpc({ type: "set_thinking_level", id: "thinking-1", level: "medium" });
     expect(setThinkingLevel).toHaveBeenCalledWith("medium");
     expect(thinkingResponse).toMatchObject({ success: true, data: { status: "set", level: "medium" } });
+    const invalidThinkingResponse = await rpc({ type: "set_thinking_level", id: "thinking-bad", level: "turbo" });
+    expect(invalidThinkingResponse).toMatchObject({ success: false, error: "Invalid or missing thinking level" });
 
     const abortResponse = await rpc({ type: "abort", id: "abort-1" });
     expect(abort).toHaveBeenCalledOnce();

@@ -96,6 +96,7 @@ export class BridgeConnection {
       if (Date.now() - this.lastPongAt > HB_TIMEOUT) {
         this.setState("disconnected");
         this.cleanup();
+        if (!this.intentionallyClosed) this.scheduleReconnect();
         return;
       }
       this.ping();
@@ -134,9 +135,11 @@ export class BridgeConnection {
 
     // Node.js built-in WebSocket uses onopen/onmessage/onclose/onerror
     this.ws.onopen = () => {
-      this.reconnectAttempts = 0;
+      const completedAttempts = this.reconnectAttempts;
       this.lastPongAt = Date.now();
-      this.setState("connected");
+      this._state = "connected";
+      this.cb.onState("connected", completedAttempts);
+      this.reconnectAttempts = 0;
     };
 
     this.ws.onmessage = (ev: MessageEvent) => {
