@@ -487,7 +487,10 @@ pub async fn run() -> Result<()> {
             }
         },
         Some(Commands::Search { query }) => {
-            let data = request_command(&client, &base_url, "search_sessions_fts", json!({ "query": query })).await?;
+            // The legacy session-level FTS table (`sessions_fts`) is no longer created: message-level
+            // FTS is the primary index, so `search_sessions_fts` always fails with
+            // "no such table: sessions_fts". Query the current index instead.
+            let data = request_command(&client, &base_url, "full_text_search", json!({ "query": query, "role_filter": "all", "page": 0, "page_size": 20 })).await?;
             println!("{}", serde_json::to_string_pretty(&data)?.green());
         }
         None => {
