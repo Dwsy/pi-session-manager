@@ -303,13 +303,28 @@ fn format_reqwest_error(e: &reqwest::Error, url: &str) -> String {
 }
 
 async fn request_status(client: &Client, base_url: &str) -> Result<Value> {
-    let url = format!("{base_url}/health");
-    let resp = client.get(&url).send().await.map_err(|e| anyhow!(format_reqwest_error(&e, &url)))?;
-    if !resp.status().is_success() {
-        return Err(anyhow!("服务端返回 HTTP {}", resp.status()));
+    // The HTTP server does not expose a JSON /health route (it serves the SPA there), so probe the
+    // first endpoint that answers with JSON.
+    let mut last_error: Option<String> = None;
+    for path in ["/health", "/v1/observability/summary"] {
+        let url = format!("{base_url}{path}");
+        let resp = match client.get(&url).send().await {
+            Ok(resp) => resp,
+            Err(e) => {
+                last_error = Some(format_reqwest_error(&e, &url));
+                continue;
+            }
+        };
+        if !resp.status().is_success() {
+            last_error = Some(format!("服务端返回 HTTP {}", resp.status()));
+            continue;
+        }
+        match resp.json::<Value>().await {
+            Ok(body) => return Ok(body),
+            Err(e) => last_error = Some(format_reqwest_error(&e, &url)),
+        }
     }
-    let body: Value = resp.json().await.map_err(|e| anyhow!(format_reqwest_error(&e, &url)))?;
-    Ok(body)
+    Err(anyhow!(last_error.unwrap_or_else(|| format!("无法获取服务端状态: {base_url}"))))
 }
 
 async fn request_command(client: &Client, base_url: &str, command: &str, payload: Value) -> Result<Value> {
