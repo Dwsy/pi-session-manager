@@ -60,6 +60,18 @@ vi.mock('@/plugins/runtime-host', () => ({
           </button>
         ),
       },
+      {
+        id: 'test.system-prompt.toolbar',
+        pluginId: 'test.plugin',
+        title: 'System Prompt Override',
+        panelId: 'test.system-prompt.panel',
+        hostSlot: 'system-prompt-tools',
+        render: (props: any) => (
+          <button type="button" onClick={props.togglePanel} data-testid="system-prompt-override">
+            system prompt override
+          </button>
+        ),
+      },
     ],
     panels: [
       {
@@ -72,12 +84,26 @@ vi.mock('@/plugins/runtime-host', () => ({
           return <div data-testid="plugin-panel">{props.activeEntryId ?? 'none'}</div>
         },
       },
+      ...Array.from({ length: 5 }, (_, index) => ({
+        id: `test.filler.panel.${index + 1}`,
+        pluginId: 'test.plugin',
+        title: `Filler ${index + 1}`,
+        side: 'right' as const,
+        render: () => null,
+      })),
       {
         id: 'test.bottom.panel',
         pluginId: 'test.plugin',
         title: 'Test Bottom',
         side: 'bottom',
         render: (props: any) => <div data-testid="plugin-bottom-panel">{props.activeEntryId ?? 'none'}</div>,
+      },
+      {
+        id: 'test.system-prompt.panel',
+        pluginId: 'test.plugin',
+        title: 'System Prompt Override',
+        side: 'right',
+        render: () => <div data-testid="system-prompt-panel">history</div>,
       },
     ],
     treeViews: [],
@@ -102,6 +128,7 @@ vi.mock('@/components/SessionViewer', () => ({
     return (
       <div>
         {slots?.right}
+        {slots?.systemPromptTools}
         {mainViewSlot}
         {layoutSlots?.right}
         {layoutSlots?.bottom}
@@ -131,6 +158,17 @@ afterEach(() => {
 })
 
 describe('AppSessionViewerPane', () => {
+  it('routes a system prompt host-slot contribution directly into the native toolbar location', async () => {
+    render(<AppSessionViewerPane session={testSession} onExport={() => {}} slots={{}} />)
+
+    const override = await screen.findByTestId('system-prompt-override')
+    expect(screen.queryByRole('button', { name: 'System Prompt Override' })).toBeNull()
+
+    fireEvent.click(override)
+
+    expect(await screen.findByTestId('system-prompt-panel')).not.toBeNull()
+  })
+
   it('passes activeEntryId into plugin session panel render props', async () => {
     panelRenderSpy.mockClear()
 

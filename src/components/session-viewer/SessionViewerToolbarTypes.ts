@@ -6,6 +6,8 @@ export interface SessionViewerToolbarSlots {
   left?: ReactNode;
   /** Custom content rendered on the right side of the toolbar, before action buttons */
   right?: ReactNode;
+  /** Plugin-owned replacement for the built-in System Prompt & Tools control. */
+  systemPromptTools?: ReactNode;
 }
 
 export interface SessionViewerLayoutSlots {

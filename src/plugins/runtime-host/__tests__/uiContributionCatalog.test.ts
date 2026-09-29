@@ -88,6 +88,31 @@ describe('PsmPluginUiContributionCatalog', () => {
     ).toEqual({ registered: false })
   })
 
+  it('allows only one plugin to take over a named host toolbar slot', () => {
+    const catalog = new PsmPluginUiContributionCatalog()
+
+    expect(
+      catalog.registerSessionToolbarItem('plugin.first', {
+        id: 'toolbar.first',
+        title: 'First',
+        hostSlot: 'system-prompt-tools',
+        render,
+      }),
+    ).toEqual({ registered: true })
+
+    expect(
+      catalog.registerSessionToolbarItem('plugin.second', {
+        id: 'toolbar.second',
+        title: 'Second',
+        hostSlot: 'system-prompt-tools',
+        render,
+      }),
+    ).toEqual({
+      registered: false,
+      duplicateMessage: 'Session toolbar host slot already registered: system-prompt-tools (toolbar.first)',
+    })
+  })
+
   it('removes every contribution owned by one plugin without touching another', () => {
     const catalog = new PsmPluginUiContributionCatalog()
     const failedPlugin = 'plugin.failed'

@@ -321,6 +321,8 @@ Use command and tool registrations for plugin behavior that should appear in the
 | `ctx.ui.registerSessionTreeView(...)` | Add a tree-style session view |
 | `ctx.ui.registerToolRenderer(...)` | Customize tool-call rendering |
 
+`registerSessionToolbarItem(...)` also supports the narrow `hostSlot` takeover contract for host-owned controls. Setting `hostSlot: 'system-prompt-tools'` replaces the built-in **System Prompt & Tools** control with the plugin's `render(...)` result while preserving the normal `panelId`/`togglePanel` render props. Only one active plugin may occupy a named host slot; later registrations are rejected with a diagnostic.
+
 App views can be bound to sidebars with `appViewId`. Tool renderers can match by exact name, regular expression, or predicate.
 
 ### Session list columns

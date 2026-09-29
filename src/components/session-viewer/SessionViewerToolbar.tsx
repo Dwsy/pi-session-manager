@@ -223,20 +223,22 @@ export default function SessionViewerToolbar({
                       <ListTree className="h-3.5 w-3.5" />
                     </button>
                   </KbdTooltip>
-                  <button
-                    onClick={onOpenSystemPromptDialog}
-                    className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
-                    title={t(
-                      "session.systemPromptAndTools",
-                      "System prompt & tools",
-                    )}
-                    aria-label={t(
-                      "session.systemPromptAndTools",
-                      "System prompt & tools",
-                    )}
-                  >
-                    <Bot className="h-3.5 w-3.5" />
-                  </button>
+                  {slots?.systemPromptTools ?? (
+                    <button
+                      onClick={onOpenSystemPromptDialog}
+                      className="p-1.5 text-xs rounded border border-border/70 bg-secondary hover:bg-secondary-hover active:bg-secondary-hover transition-colors"
+                      title={t(
+                        "session.systemPromptAndTools",
+                        "System prompt & tools",
+                      )}
+                      aria-label={t(
+                        "session.systemPromptAndTools",
+                        "System prompt & tools",
+                      )}
+                    >
+                      <Bot className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </>
               )}
               {!previewMode && (
@@ -405,16 +407,22 @@ export default function SessionViewerToolbar({
                 </button>
               </>
             )}
-            <button
-              onClick={() => {
-                onOpenSystemPromptDialog();
-                closeMobileMenu();
-              }}
-              className={mobileSheetItemClass}
-            >
-              <Bot className="h-4 w-4 text-muted-foreground" />
-              {t("session.systemPromptAndTools", "System prompt & tools")}
-            </button>
+            {slots?.systemPromptTools ? (
+              <div className="w-full" onClickCapture={closeMobileMenu}>
+                {slots.systemPromptTools}
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  onOpenSystemPromptDialog();
+                  closeMobileMenu();
+                }}
+                className={mobileSheetItemClass}
+              >
+                <Bot className="h-4 w-4 text-muted-foreground" />
+                {t("session.systemPromptAndTools", "System prompt & tools")}
+              </button>
+            )}
             {isScrollMarkersFeatureEnabled && onToggleScrollMarkers && (
               <button
                 onClick={() => {

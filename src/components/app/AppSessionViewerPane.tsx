@@ -220,14 +220,30 @@ function AppSessionViewerPane({
     });
   }, [activeBottomPanelId]);
 
-  const rightPanels = useMemo(
-    () => panels.filter((panel) => (panel.side ?? "right") === "right").slice(0, SESSION_PANEL_ITEM_LIMIT),
-    [panels],
+  const hostSlotPanelIds = useMemo(
+    () => new Set(
+      toolbarItems
+        .filter((item) => item.hostSlot && item.panelId)
+        .map((item) => item.panelId as string),
+    ),
+    [toolbarItems],
   );
-  const bottomPanels = useMemo(
-    () => panels.filter((panel) => panel.side === "bottom").slice(0, SESSION_PANEL_ITEM_LIMIT),
-    [panels],
-  );
+  const rightPanels = useMemo(() => {
+    const candidates = panels.filter((panel) => (panel.side ?? "right") === "right");
+    const regular = candidates
+      .filter((panel) => !hostSlotPanelIds.has(panel.id))
+      .slice(0, SESSION_PANEL_ITEM_LIMIT);
+    const hostOwned = candidates.filter((panel) => hostSlotPanelIds.has(panel.id));
+    return [...regular, ...hostOwned];
+  }, [hostSlotPanelIds, panels]);
+  const bottomPanels = useMemo(() => {
+    const candidates = panels.filter((panel) => panel.side === "bottom");
+    const regular = candidates
+      .filter((panel) => !hostSlotPanelIds.has(panel.id))
+      .slice(0, SESSION_PANEL_ITEM_LIMIT);
+    const hostOwned = candidates.filter((panel) => hostSlotPanelIds.has(panel.id));
+    return [...regular, ...hostOwned];
+  }, [hostSlotPanelIds, panels]);
   const activePanel = useMemo(
     () => rightPanels.find((panel) => panel.id === activePanelId) ?? null,
     [activePanelId, rightPanels],
@@ -258,17 +274,25 @@ function AppSessionViewerPane({
     () => new Set(bottomPanels.map((panel) => panel.id)),
     [bottomPanels],
   );
+  const systemPromptToolsItem = useMemo(
+    () => toolbarItems.find((item) => item.hostSlot === "system-prompt-tools") ?? null,
+    [toolbarItems],
+  );
+  const regularToolbarItems = useMemo(
+    () => toolbarItems.filter((item) => !item.hostSlot),
+    [toolbarItems],
+  );
   const rightPanelToolbarItems = useMemo(
-    () => toolbarItems.filter((item) => item.panelId && rightPanelIds.has(item.panelId)).slice(0, SESSION_PANEL_ITEM_LIMIT),
-    [rightPanelIds, toolbarItems],
+    () => regularToolbarItems.filter((item) => item.panelId && rightPanelIds.has(item.panelId)).slice(0, SESSION_PANEL_ITEM_LIMIT),
+    [regularToolbarItems, rightPanelIds],
   );
   const bottomPanelToolbarItems = useMemo(
-    () => toolbarItems.filter((item) => item.panelId && bottomPanelIds.has(item.panelId)).slice(0, SESSION_PANEL_ITEM_LIMIT),
-    [bottomPanelIds, toolbarItems],
+    () => regularToolbarItems.filter((item) => item.panelId && bottomPanelIds.has(item.panelId)).slice(0, SESSION_PANEL_ITEM_LIMIT),
+    [bottomPanelIds, regularToolbarItems],
   );
   const toolbarSlotItems = useMemo(
-    () => toolbarItems.filter((item) => !item.panelId || (!rightPanelIds.has(item.panelId) && !bottomPanelIds.has(item.panelId))),
-    [bottomPanelIds, rightPanelIds, toolbarItems],
+    () => regularToolbarItems.filter((item) => !item.panelId || (!rightPanelIds.has(item.panelId) && !bottomPanelIds.has(item.panelId))),
+    [bottomPanelIds, regularToolbarItems, rightPanelIds],
   );
   const openPanelDescription = t("session.toolbar.openPanel", "Open panel");
   const terminalTitle = t("terminal.title", "Terminal");
@@ -737,9 +761,13 @@ function AppSessionViewerPane({
       })} />
     </PluginContributionBoundary>
   ) : null), [activeEntryId, activeMainView, closeMainView, session, viewerController]);
+  const systemPromptToolsSlot = useMemo(
+    () => (systemPromptToolsItem ? renderToolbarItem(systemPromptToolsItem) : slots?.systemPromptTools),
+    [renderToolbarItem, slots?.systemPromptTools, systemPromptToolsItem],
+  );
   const mergedSlots = useMemo(
-    () => ({ ...slots, right: sessionToolbarSlot }),
-    [sessionToolbarSlot, slots],
+    () => ({ ...slots, right: sessionToolbarSlot, systemPromptTools: systemPromptToolsSlot }),
+    [sessionToolbarSlot, slots, systemPromptToolsSlot],
   );
   const layoutSlots = useMemo(
     () => ({

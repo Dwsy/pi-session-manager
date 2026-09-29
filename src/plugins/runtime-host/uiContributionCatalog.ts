@@ -143,6 +143,15 @@ export class PsmPluginUiContributionCatalog {
     if (this.sessionToolbarItems.has(item.id)) {
       return { registered: false, duplicateMessage: `Session toolbar item already registered: ${item.id}` }
     }
+    if (item.hostSlot) {
+      const occupied = Array.from(this.sessionToolbarItems.values()).find((entry) => entry.hostSlot === item.hostSlot)
+      if (occupied) {
+        return {
+          registered: false,
+          duplicateMessage: `Session toolbar host slot already registered: ${item.hostSlot} (${occupied.id})`,
+        }
+      }
+    }
     this.sessionToolbarItems.set(item.id, { ...item, pluginId })
     return { registered: true }
   }

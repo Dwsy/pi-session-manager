@@ -368,11 +368,19 @@ export interface PsmSessionTreeViewRegistration {
   render(props: PsmSessionTreeViewRenderProps): unknown;
 }
 
+export type PsmSessionToolbarHostSlot = "system-prompt-tools";
+
 export interface PsmSessionToolbarItemRegistration {
   id: string;
   title: string;
   panelId?: string;
   mainViewId?: string;
+  /**
+   * Replace a host-owned toolbar control instead of rendering as a generic
+   * plugin toolbar contribution. Host slots are intentionally narrow and
+   * stable so external plugins do not depend on app-internal components.
+   */
+  hostSlot?: PsmSessionToolbarHostSlot;
   render(props: PsmSessionUiRenderProps): unknown;
 }
 
