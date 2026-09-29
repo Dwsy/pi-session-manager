@@ -2,6 +2,20 @@
 
 All notable changes to Pi Session Manager will be documented in this file.
 
+## [0.8.7] - 2026-09-29
+
+### Added
+
+- Plugin SDK: `registerSessionToolbarItem(...)` now accepts a narrow `hostSlot`, letting a plugin take over a host-owned toolbar control instead of only appending a generic contribution. The first slot is `system-prompt-tools`, which replaces the built-in System Prompt & Tools control; only one plugin may occupy a named slot, and later registrations are rejected with a diagnostic.
+
+### Fixed
+
+- `pi-session-cli search` now queries the `message_fts` index through `full_text_search` instead of the removed `sessions_fts` table, which made the command always fail with `no such table: sessions_fts`.
+- `pi-session-cli status` falls back to `/v1/observability/summary` when `/health` does not answer with JSON (the server serves the SPA there), instead of failing with a version-mismatch error.
+- Scanner: deduplicated Pi session copies discovered under custom roots and copied session trees.
+- Search: providers are filtered before ranking so external providers no longer outrank local matches.
+- Stats: indexed message totals are reconciled with the fallback path.
+
 ## [0.8.5] - 2026-09-04
 
 ### Added
