@@ -14,7 +14,44 @@ env:
   CARGO_NET_RETRY: 10
 
 jobs:
+  # Resolve (or create) the single draft release up front.
+  #
+  # Previously every `build-desktop` matrix job asked tauri-action to find-or-create
+  # the release by tag. They start at the same second, so several of them missed on
+  # lookup and each created its own draft — splitting assets across two releases that
+  # share one tag. `finalize-release` then downloaded whichever `latest.json` it found
+  # first and failed the platform validation.
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.resolve.outputs.release_id }}
+
+    steps:
+      - name: Resolve draft release id
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          id=$(gh api "repos/${REPOSITORY}/releases/tags/${TAG}" --jq '.id' 2>/dev/null || true)
+          if [ -z "${id}" ]; then
+            id=$(gh api -X POST "repos/${REPOSITORY}/releases" \
+              -f "tag_name=${TAG}" \
+              -f "target_commitish=${GITHUB_SHA}" \
+              -f "name=Pi Session Manager ${TAG}" \
+              -F "draft=true" \
+              -F "prerelease=${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}" \
+              --jq '.id')
+            echo "Created draft release ${id} for ${TAG}"
+          else
+            echo "Reusing existing release ${id} for ${TAG}"
+          fi
+          echo "release_id=${id}" >> "$GITHUB_OUTPUT"
+
   build-desktop:
+    needs: [prepare-release]
     strategy:
       fail-fast: false
       matrix:
@@ -94,6 +131,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          # Pins every matrix job to one release so they can never fork the draft.
+          releaseId: ${{ needs.prepare-release.outputs.release_id }}
           tagName: ${{ github.ref_name }}
           releaseName: "Pi Session Manager ${{ github.ref_name }}"
           releaseBody: ""
@@ -205,7 +244,7 @@ jobs:
 
   # ── Finalize Release ─────────────────────────────────────
   finalize-release:
-    needs: [build-desktop, build-cli]
+    needs: [prepare-release, build-desktop, build-cli]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
 
@@ -230,15 +269,44 @@ jobs:
             fi
           done
 
+      # Clean up drafts left behind by older runs; two releases sharing one tag would
+      # make every tag-scoped API call below pick an arbitrary one.
+      - name: Remove duplicate draft releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          RELEASE_ID: ${{ needs.prepare-release.outputs.release_id }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${REPOSITORY}/releases" --slurp \
+            --jq ".[][] | select(.tag_name == \"${TAG}\" and .id != (${RELEASE_ID})) | .id" \
+            | while read -r id; do
+                if [ -z "${id}" ]; then continue; fi
+                echo "Deleting duplicate draft release ${id} for ${TAG}"
+                gh api -X DELETE "repos/${REPOSITORY}/releases/${id}" >/dev/null
+              done
+
+      # Fetch latest.json by release id, not by tag, so a stray draft cannot win.
       - name: Download updater metadata
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          RELEASE_ID: ${{ needs.prepare-release.outputs.release_id }}
         run: |
+          set -euo pipefail
           mkdir -p release-metadata
-          gh release download "$GITHUB_REF_NAME" \
-            --repo "${{ github.repository }}" \
-            --pattern latest.json \
-            --dir release-metadata
+          asset_id=$(gh api "repos/${REPOSITORY}/releases/${RELEASE_ID}/assets" \
+            --jq '.[] | select(.name == "latest.json") | .id')
+          if [ -z "${asset_id}" ]; then
+            echo "::error::latest.json not found on release ${RELEASE_ID}"
+            exit 1
+          fi
+          curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/octet-stream" \
+            "https://api.github.com/repos/${REPOSITORY}/releases/assets/${asset_id}" \
+            -o release-metadata/latest.json
           cp release-metadata/latest.json release-metadata/updater.json
 
       - name: Validate updater platforms
