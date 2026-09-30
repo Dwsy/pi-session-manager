@@ -14,6 +14,11 @@ export const components = {
     copyCommand: 'Copy command',
     commandCopied: 'Copied command',
     bashStatus: 'Bash: {{status}}',
+    script: 'Script',
+    nestedCalls: 'Nested calls',
+    calls: 'calls',
+    modelCalls: 'Model calls',
+    fullOutput: 'Full output',
   },
   branchMap: {
     copyOutput: 'Copy output',

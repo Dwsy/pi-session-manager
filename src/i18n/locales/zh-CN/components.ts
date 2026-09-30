@@ -14,6 +14,11 @@ export const components = {
     copyCommand: '复制命令',
     commandCopied: '已复制命令',
     bashStatus: 'Bash：{{status}}',
+    script: '脚本',
+    nestedCalls: '嵌套调用',
+    calls: '次调用',
+    modelCalls: '模型调用',
+    fullOutput: '完整输出',
   },
   branchMap: {
     copyOutput: '复制输出',

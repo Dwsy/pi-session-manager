@@ -1,19 +1,22 @@
 import { toolRenderRegistry } from '@/plugins/tools-render/registry'
-import { bashToolPlugin } from './bash'
+import { bashToolPlugin, powershellToolPlugin } from './bash'
 import { readToolPlugin } from './read'
 import { writeToolPlugin } from './write'
 import { editToolPlugin } from './edit'
+import { codemodeToolPlugin } from './codemode'
 import { genericToolPlugin } from './generic'
 
 /**
  * Core built-in tool plugins
- * Simple, stable tools: bash, read, write, edit, generic
+ * Simple, stable tools: bash, powershell, read, write, edit, codemode, generic
  */
 const BUILTIN_PLUGINS = [
   bashToolPlugin,
+  powershellToolPlugin,
   readToolPlugin,
   writeToolPlugin,
   editToolPlugin,
+  codemodeToolPlugin,
 ]
 
 /**
@@ -38,8 +41,10 @@ export function registerBuiltinToolPlugins(): void {
 // Export core plugins for individual use
 export {
   bashToolPlugin,
+  powershellToolPlugin,
   readToolPlugin,
   writeToolPlugin,
   editToolPlugin,
+  codemodeToolPlugin,
   genericToolPlugin,
 }

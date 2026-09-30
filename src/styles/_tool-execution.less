@@ -575,13 +575,17 @@ html.tool-call-style-disabled {
 }
 
 // Bash Command Highlight
-.tool-header-bash {
+.tool-header-bash,
+.tool-header-powershell {
   align-items: center;
 }
 
 .tool-header-bash .tool-detail,
 .tool-header-bash .tool-status,
-.tool-header-bash .bash-inline-copy-button {
+.tool-header-bash .bash-inline-copy-button,
+.tool-header-powershell .tool-detail,
+.tool-header-powershell .tool-status,
+.tool-header-powershell .bash-inline-copy-button {
   flex-shrink: 0;
 }
 
@@ -988,4 +992,141 @@ button.tool-header-toggle:focus-visible,
 .session-viewer .conversation-preview-process .tool-command-detail,
 .session-viewer .conversation-preview-process .tool-expand-content.expanded {
   background: rgb(var(--color-surface) / 0.16);
+}
+
+// === Codemode (script that orchestrates nested tool calls) ===
+
+.tool-header-codemode {
+  align-items: center;
+}
+
+.tool-header-codemode .codemode-call-count,
+.tool-header-codemode .codemode-wall-time,
+.tool-header-codemode .tool-status {
+  flex-shrink: 0;
+}
+
+.codemode-icon {
+  color: var(--accent);
+}
+
+.codemode-script-preview {
+  min-width: 60px;
+  flex: 1 1 220px;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codemode-call-count {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+}
+
+.codemode-wall-time {
+  color: rgb(var(--color-muted-foreground));
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+}
+
+// Nested call list
+
+.codemode-calls {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+}
+
+.codemode-call {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.75);
+  line-height: 1.5;
+}
+
+.codemode-call-status {
+  width: 1em;
+  flex: 0 0 1em;
+  text-align: center;
+  font-weight: 700;
+}
+
+.codemode-call-ok .codemode-call-status {
+  color: rgb(var(--color-success));
+}
+
+.codemode-call-error .codemode-call-status {
+  color: rgb(var(--color-destructive));
+}
+
+.codemode-call-running .codemode-call-status {
+  color: rgb(var(--color-warning));
+}
+
+.codemode-call-cancelled .codemode-call-status {
+  color: rgb(var(--color-muted-foreground));
+}
+
+.codemode-call-name {
+  flex: 0 0 auto;
+  color: var(--toolTitle, var(--accent));
+  font-weight: 600;
+}
+
+.codemode-call-args {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: rgb(var(--color-muted-foreground));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codemode-call-duration,
+.codemode-call-cost {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+}
+
+.codemode-call-error {
+  flex: 1 1 100%;
+  margin: 2px 0 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgb(var(--color-destructive) / 0.08);
+  color: rgb(var(--color-destructive));
+  font-family: inherit;
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.codemode-calls-total {
+  padding: 4px 12px 8px;
+  color: var(--muted);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+}
+
+.codemode-full-output {
+  padding: 6px 12px;
+  color: rgb(var(--color-muted-foreground));
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  overflow-wrap: anywhere;
 }
