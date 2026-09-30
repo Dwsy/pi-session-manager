@@ -35,7 +35,16 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          id=$(gh api "repos/${REPOSITORY}/releases/tags/${TAG}" --jq '.id' 2>/dev/null || true)
+          # Draft releases are not reachable through /releases/tags/{tag} (the tag
+          # only binds once the draft is published), so search the release list.
+          # The result must be numeric: gh prints 404/error bodies to stdout, and a
+          # garbage id here silently breaks every step that consumes release_id.
+          ids=$(gh api --paginate "repos/${REPOSITORY}/releases" \
+            --jq ".[] | select(.tag_name == \"${TAG}\") | .id" 2>/dev/null || true)
+          id=$(printf '%s\n' "${ids}" | head -n1)
+          case "${id}" in
+            ''|*[!0-9]*) id="" ;;
+          esac
           if [ -z "${id}" ]; then
             id=$(gh api -X POST "repos/${REPOSITORY}/releases" \
               -f "tag_name=${TAG}" \
@@ -279,8 +288,17 @@ jobs:
           RELEASE_ID: ${{ needs.prepare-release.outputs.release_id }}
         run: |
           set -euo pipefail
-          gh api --paginate "repos/${REPOSITORY}/releases" --slurp \
-            --jq ".[][] | select(.tag_name == \"${TAG}\" and .id != (${RELEASE_ID})) | .id" \
+          case "${RELEASE_ID}" in
+            ''|*[!0-9]*)
+              echo "::error::prepare-release did not produce a numeric release id: ${RELEASE_ID}"
+              exit 1
+              ;;
+          esac
+          # --slurp cannot be combined with --jq on the runner's gh release; --jq is
+          # applied per page, which is all we need. Only drafts are ever deleted —
+          # a published release sharing the tag must survive.
+          gh api --paginate "repos/${REPOSITORY}/releases" \
+            --jq ".[] | select(.tag_name == \"${TAG}\" and .draft == true and .id != ${RELEASE_ID}) | .id" \
             | while read -r id; do
                 if [ -z "${id}" ]; then continue; fi
                 echo "Deleting duplicate draft release ${id} for ${TAG}"
