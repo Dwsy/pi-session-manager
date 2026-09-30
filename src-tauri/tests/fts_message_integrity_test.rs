@@ -12,14 +12,22 @@ lazy_static! {
     static ref FTS_DB_LOCK: Mutex<()> = Mutex::new(());
 }
 
-/// Helper: create a minimal session file content as JSONL
+/// Helper: create a minimal session file content as JSONL.
+///
+/// Timestamps are generated relative to now: sessions parsed from these files
+/// carry the timestamps into `sessions.modified`, and the message_entries
+/// backfill only considers sessions modified within the last 30 days. A
+/// hardcoded date would silently fall out of that window and break the
+/// backfill assertions over time.
 fn make_session_file(id: &str, cwd: &str, messages: &[(&str, &str)]) -> String {
-    let header = format!(r#"{{"type":"session","version":3,"id":"{id}","timestamp":"2026-02-10T22:00:00Z","cwd":"{cwd}"}}"#);
+    let base = Utc::now() - chrono::Duration::seconds(60);
+    let ts = |offset: i64| (base + chrono::Duration::seconds(offset)).format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let header = format!(r#"{{"type":"session","version":3,"id":"{id}","timestamp":"{0}","cwd":"{cwd}"}}"#, ts(0));
     let mut lines = vec![header];
     for (i, (role, text)) in messages.iter().enumerate() {
         // Use globally unique message IDs by combining session id and index
         let entry_id = format!("{id}-msg{i}");
-        let msg = format!(r#"{{"type":"message","id":"{}","parentId":null,"timestamp":"2026-02-10T22:00:{:02}Z","message":{{"role":"{}","content":[{{"type":"text","text":"{}"}}]}}}}"#, entry_id, i, role, text.replace('"', "\\\""));
+        let msg = format!(r#"{{"type":"message","id":"{}","parentId":null,"timestamp":"{}","message":{{"role":"{}","content":[{{"type":"text","text":"{}"}}]}}}}"#, entry_id, ts(i as i64 + 1), role, text.replace('"', "\\\""));
         lines.push(msg);
     }
     lines.join("\n")
