@@ -203,6 +203,7 @@ mod tests {
         let roots = plugin_fs_roots().expect("plugin fs roots");
         let root = roots.iter().find(|root| root.id == "system-prompts").expect("system-prompts root");
         assert!(root.read);
-        assert!(root.path.ends_with(".pi/system-prompts"));
+        // Component-wise comparison: Path::display renders '\' separators on Windows.
+        assert!(std::path::Path::new(&root.path).ends_with(".pi/system-prompts"));
     }
 }

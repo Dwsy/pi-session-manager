@@ -1382,8 +1382,12 @@ mod tests {
         let _env_lock = crate::paths::acquire_test_env_lock();
         let temp = tempfile::tempdir().expect("tempdir");
         let old_home = std::env::var_os("HOME");
+        let old_test_home = std::env::var_os("PPM_TEST_HOME");
         let old_test_db = std::env::var_os("PPM_TEST_DB");
+        // HOME alone is not enough: paths::home_dir() ignores it on Windows, where
+        // PPM_TEST_HOME is the sanctioned all-platform test override.
         std::env::set_var("HOME", temp.path());
+        std::env::set_var("PPM_TEST_HOME", temp.path());
         std::env::set_var("PPM_TEST_DB", temp.path().join("sessions.db"));
 
         let canonical = temp.path().join(".pi/agent/sessions/project");
@@ -1408,6 +1412,11 @@ mod tests {
             std::env::set_var("HOME", value);
         } else {
             std::env::remove_var("HOME");
+        }
+        if let Some(value) = old_test_home {
+            std::env::set_var("PPM_TEST_HOME", value);
+        } else {
+            std::env::remove_var("PPM_TEST_HOME");
         }
         if let Some(value) = old_test_db {
             std::env::set_var("PPM_TEST_DB", value);
