@@ -75,6 +75,8 @@ fn setup_test_db(sessions: &[(&str, &str, &[(&str, &str)])]) -> tempfile::TempDi
     // Set HOME so config uses temp dir for DB
     let original_home = env::var("HOME").ok();
     env::set_var("HOME", temp_dir.path());
+    // paths::home_dir() ignores HOME on Windows; PPM_TEST_HOME is the override it honors.
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
 
     let config = Config::default();
     let mut conn = sqlite_cache::init_db_with_config(&config).unwrap();
@@ -100,6 +102,8 @@ fn setup_test_db_from_raw_sessions(sessions: &[(&str, &str)]) -> tempfile::TempD
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
     env::set_var("HOME", temp_dir.path());
+    // paths::home_dir() ignores HOME on Windows; PPM_TEST_HOME is the override it honors.
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
 
     let config = Config::default();
     let mut conn = sqlite_cache::init_db_with_config(&config).unwrap();
@@ -264,6 +268,8 @@ async fn test_full_text_search_excludes_external_sessions_by_default() {
     let temp_dir = tempdir().unwrap();
     let home = temp_dir.path();
     std::env::set_var("HOME", home);
+    // paths::home_dir() ignores HOME on Windows; PPM_TEST_HOME is the override it honors.
+    std::env::set_var("PPM_TEST_HOME", home);
 
     let pi_dir = home.join(".pi").join("agent").join("sessions").join("local");
     std::fs::create_dir_all(&pi_dir).unwrap();
@@ -619,6 +625,8 @@ async fn test_full_text_search_ignores_tool_result_entries_during_upsert() {
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
     env::set_var("HOME", temp_dir.path());
+    // paths::home_dir() ignores HOME on Windows; PPM_TEST_HOME is the override it honors.
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
 
     let config = Config::default();
     let mut conn = sqlite_cache::init_db_with_config(&config).unwrap();
@@ -653,6 +661,8 @@ async fn test_full_text_search_thinking_toggle() {
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
     env::set_var("HOME", temp_dir.path());
+    // paths::home_dir() ignores HOME on Windows; PPM_TEST_HOME is the override it honors.
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
 
     write_app_settings(false);
     let config = Config::default();
@@ -710,6 +720,8 @@ async fn test_full_text_search_includes_codex_when_external_search_enabled() {
     let _lock = TEST_DB_LOCK.lock().unwrap();
     let temp_dir = tempdir().unwrap();
     env::set_var("HOME", temp_dir.path());
+    // paths::home_dir() ignores HOME on Windows; PPM_TEST_HOME is the override it honors.
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
     let codex_dir = temp_dir.path().join(".codex/sessions/2026/04/11");
     fs::create_dir_all(&codex_dir).unwrap();
     let codex_path = codex_dir.join("codex-enabled.jsonl");
@@ -735,6 +747,8 @@ async fn test_full_text_search_excludes_external_sessions_when_search_disabled()
 
     let temp_dir = tempdir().unwrap();
     env::set_var("HOME", temp_dir.path());
+    // paths::home_dir() ignores HOME on Windows; PPM_TEST_HOME is the override it honors.
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
 
     let pi_sessions_dir = temp_dir.path().join(".pi").join("agent").join("sessions").join("project");
     let codex_sessions_dir = temp_dir.path().join(".codex").join("sessions").join("2026").join("04").join("11");
@@ -778,6 +792,8 @@ async fn test_full_text_search_ignores_legacy_enable_fts5_flag() {
     let sessions_dir = temp_dir.path().join("sessions");
     fs::create_dir_all(&sessions_dir).unwrap();
     env::set_var("HOME", temp_dir.path());
+    // paths::home_dir() ignores HOME on Windows; PPM_TEST_HOME is the override it honors.
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
 
     let path = sessions_dir.join("legacy-fts-flag.jsonl");
     fs::write(&path, make_session_file("legacy-fts-flag", "/workspace/legacy-fts", &[("user", "这里的默认识别系统语言是中文界面")])).unwrap();

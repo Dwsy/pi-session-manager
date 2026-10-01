@@ -188,7 +188,10 @@ fn test_fts_vtable_corruption_triggers_database_recreation() {
 
     let temp_dir = tempdir().unwrap();
     let original_home = env::var("HOME").ok();
+    let original_test_home = env::var("PPM_TEST_HOME").ok();
     env::set_var("HOME", temp_dir.path());
+    // paths::home_dir() ignores HOME on Windows; PPM_TEST_HOME is the override it honors.
+    env::set_var("PPM_TEST_HOME", temp_dir.path());
 
     // Clear any PPM_TEST_DB override from other tests to avoid interference
     env::remove_var("PPM_TEST_DB");
@@ -287,6 +290,11 @@ fn test_fts_vtable_corruption_triggers_database_recreation() {
     } else {
         env::remove_var("HOME");
     }
+    if let Some(home) = original_test_home {
+        env::set_var("PPM_TEST_HOME", home);
+    } else {
+        env::remove_var("PPM_TEST_HOME");
+    }
 }
 
 #[test]
@@ -356,7 +364,10 @@ fn test_init_db_upgrades_legacy_message_entries_before_new_indexes() {
     let _guard = MIGRATION_LOCK.lock().unwrap();
     let temp_dir = tempdir().unwrap();
     let original_home = std::env::var("HOME").ok();
+    let original_test_home = std::env::var("PPM_TEST_HOME").ok();
     std::env::set_var("HOME", temp_dir.path());
+    // paths::home_dir() ignores HOME on Windows; PPM_TEST_HOME is the override it honors.
+    std::env::set_var("PPM_TEST_HOME", temp_dir.path());
 
     let db_path = sqlite_cache::get_db_path().unwrap();
     let conn = Connection::open(&db_path).unwrap();
@@ -414,5 +425,10 @@ fn test_init_db_upgrades_legacy_message_entries_before_new_indexes() {
         std::env::set_var("HOME", home);
     } else {
         std::env::remove_var("HOME");
+    }
+    if let Some(home) = original_test_home {
+        std::env::set_var("PPM_TEST_HOME", home);
+    } else {
+        std::env::remove_var("PPM_TEST_HOME");
     }
 }
