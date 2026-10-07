@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 
 import i18n from '../../i18n'
@@ -144,7 +144,6 @@ function CommandMenuHarness({
   const [selectedResult, setSelectedResult] = useState<SearchPluginResult | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('all')
   const [mode, setMode] = useState<CommandPaletteMode>('search')
-  const registryRef = useRef<any>(null)
 
   return (
     <I18nextProvider i18n={i18n}>
@@ -163,7 +162,6 @@ function CommandMenuHarness({
         setFtsOptions={setFtsOptions}
         selectedResult={selectedResult}
         setSelectedResult={setSelectedResult}
-        registryRef={registryRef}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         mode={mode}
@@ -619,5 +617,153 @@ describe('CommandMenu source filter wiring', () => {
     )
     expect(screen.getByText('中文测试会话')).not.toBeNull()
     expect(screen.getByText('这是一个内置默认的测试句子')).not.toBeNull()
+  })
+})
+
+describe('CommandMenu keyboard navigation', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.clearAllMocks()
+    mockIntersectionObservers.length = 0
+    vi.stubGlobal('IntersectionObserver', vi.fn(function IntersectionObserverMock(
+      callback: IntersectionObserverCallback,
+    ) {
+      const observer = {
+        active: true,
+        callback,
+      }
+      mockIntersectionObservers.push(observer)
+
+      return {
+        observe: vi.fn(),
+        unobserve: vi.fn(),
+        disconnect: vi.fn(() => {
+          observer.active = false
+        }),
+        takeRecords: vi.fn(() => []),
+      }
+    }))
+    mockSearch.mockResolvedValue([])
+    mockPluginSearch.mockResolvedValue([])
+    mockPluginSearchPage.mockResolvedValue(createPageResult([]))
+    mockPluginIsEnabled.mockReturnValue(true)
+    vi.mocked(useSearchPlugins).mockReturnValue({
+      registry: createRegistry() as any,
+      search: mockSearch,
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  async function renderWithResults() {
+    mockSearch.mockResolvedValue([
+      createMessageResult({ id: 'r1', title: 'Alpha' }),
+      createMessageResult({ id: 'r2', title: 'Beta' }),
+    ])
+    render(<CommandMenuHarness />)
+    fireEvent.change(screen.getAllByRole('textbox')[0], {
+      target: { value: 'alpha' },
+    })
+    await flushSearchDebounce()
+    expect(screen.getByText('Alpha')).not.toBeNull()
+  }
+
+  function selectedResultText(): string | null {
+    const selected = document.querySelector('[data-result-selected="true"]')
+    return selected?.textContent ?? null
+  }
+
+  it('moves result selection with ArrowDown/ArrowUp while typing', async () => {
+    await renderWithResults()
+    const input = screen.getAllByRole('textbox')[0] as HTMLInputElement
+
+    expect(selectedResultText()).toBeNull()
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    expect(selectedResultText()).toContain('Alpha')
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    expect(selectedResultText()).toContain('Beta')
+
+    fireEvent.keyDown(input, { key: 'ArrowUp' })
+    expect(selectedResultText()).toContain('Alpha')
+
+    fireEvent.keyDown(input, { key: 'ArrowUp' })
+    expect(selectedResultText()).toContain('Beta')
+  })
+
+  it('opens the selected result with Enter from the input', async () => {
+    await renderWithResults()
+    const input = screen.getAllByRole('textbox')[0] as HTMLInputElement
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(mockPluginOnSelect).toHaveBeenCalledTimes(1)
+    expect(mockPluginOnSelect.mock.calls[0][0]).toMatchObject({ id: 'r1' })
+  })
+
+  it('opens the selected result with Enter when focus sits on a result item', async () => {
+    await renderWithResults()
+
+    const betaItem = screen.getByText('Beta').closest('[role="option"]') as HTMLElement
+    fireEvent.click(betaItem)
+    fireEvent.keyDown(betaItem, { key: 'Enter' })
+
+    expect(mockPluginOnSelect).toHaveBeenCalledTimes(1)
+    expect(mockPluginOnSelect.mock.calls[0][0]).toMatchObject({ id: 'r2' })
+  })
+
+  it('switches tabs with Alt+1..5', async () => {
+    render(<CommandMenuHarness />)
+    const input = screen.getAllByRole('textbox')[0] as HTMLInputElement
+
+    fireEvent.change(input, { target: { value: 'auth' } })
+    await flushSearchDebounce()
+    // Alt+3 → third tab = Messages (content_only source filter)
+    fireEvent.keyDown(window, { key: '3', code: 'Digit3', altKey: true })
+    await flushSearchDebounce()
+
+    expect(mockPluginSearchPage).toHaveBeenCalledWith(
+      'auth',
+      expect.anything(),
+      expect.objectContaining({ sourceFilter: 'content_only' }),
+    )
+
+    // Alt+1 → back to the All tab (registry search, no pagination)
+    fireEvent.keyDown(window, { key: '1', code: 'Digit1', altKey: true })
+    await flushSearchDebounce()
+
+    expect(mockSearch).toHaveBeenLastCalledWith(
+      'auth',
+      expect.objectContaining({
+        cacheKeyParts: expect.arrayContaining(['all']),
+      }),
+    )
+  })
+
+  it('does not hijack Enter on interactive elements outside the results list', async () => {
+    await renderWithResults()
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Hide' }), { key: 'Enter' })
+
+    expect(mockPluginOnSelect).not.toHaveBeenCalled()
+  })
+
+  it('leaves keys to the IME while composition is in progress', async () => {
+    await renderWithResults()
+    const input = screen.getAllByRole('textbox')[0] as HTMLInputElement
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    expect(selectedResultText()).toContain('Alpha')
+
+    // Enter during IME composition commits the composition — it must not
+    // open the selected result.
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    expect(mockPluginOnSelect).not.toHaveBeenCalled()
   })
 })

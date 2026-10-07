@@ -1,12 +1,12 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
-import { useCommandMenu } from '@/hooks/useCommandMenu'
+import { useCommandMenu, PALETTE_ANIMATION_MS } from '@/hooks/useCommandMenu'
+import { useTranslation } from 'react-i18next'
 import type { SearchContext, SearchPluginResult } from '@/plugins/types'
 import CommandMenu from './CommandMenu'
 import type { MessageSearchPluginOptions } from '@/plugins/message/MessageSearchPlugin'
 import type { FullTextSearchSourceFilter } from '@/types'
 import type { CommandPaletteMode } from './commandActions'
 import type { TabType } from './utils'
-import type { PluginRegistry } from '@/plugins/registry'
 
 interface CommandPaletteProps {
   context: SearchContext
@@ -15,12 +15,15 @@ interface CommandPaletteProps {
 const COMMAND_SEARCH_PAGE_SIZE = 20
 
 export default function CommandPalette({ context }: CommandPaletteProps) {
+  const { t } = useTranslation()
   const { isOpen, open, close, query, setQuery, results, setResults, isSearching, setIsSearching } = useCommandMenu()
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [visible, setVisible] = useState(false)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const enterFrameRef = useRef<number | null>(null)
   const enterFrame2Ref = useRef<number | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null)
 
   const [searchCurrentProjectOnly, setSearchCurrentProjectOnly] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType>('all')
@@ -37,9 +40,6 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
 
   // Two-panel layout state: selected result for preview
   const [selectedResult, setSelectedResult] = useState<SearchPluginResult | null>(null)
-
-  // Store registry reference from CommandMenu for keyboard shortcut handling
-  const registryRef = useRef<PluginRegistry | null>(null)
 
   const enhancedContext = useMemo<SearchContext>(() => ({
     ...context,
@@ -77,7 +77,7 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
     closeTimerRef.current = setTimeout(() => {
       setShouldRender(false)
       closeTimerRef.current = null
-    }, 320)
+    }, PALETTE_ANIMATION_MS)
 
     return () => {
       if (enterFrameRef.current !== null) {
@@ -95,15 +95,12 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
     }
   }, [isOpen])
 
+  // Toggle bindings. Cmd+P deliberately matches with or without Shift (editor
+  // convention); Cmd+K and F1 are additional aliases. Escape closes when open.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase()
-      if ((e.metaKey || e.ctrlKey) && key === 'p') {
-        e.preventDefault()
-        e.stopPropagation()
-        isOpen ? close() : open()
-      }
-      if ((e.metaKey || e.ctrlKey) && key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && (key === 'p' || key === 'k')) {
         e.preventDefault()
         e.stopPropagation()
         isOpen ? close() : open()
@@ -127,17 +124,30 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open, close, isOpen])
 
+  // Focus the input on every open (RAF so the freshly mounted tree is queried),
+  // and restore focus to wherever the user was before opening.
   useEffect(() => {
     if (isOpen) {
-      // Delay to ensure DOM is ready and avoid race conditions
+      previouslyFocusedRef.current = document.activeElement as HTMLElement | null
       const frameId = requestAnimationFrame(() => {
-        const input = document.querySelector('[cmdk-input]') as HTMLInputElement
+        const input = document.querySelector('[data-cmdk-input]') as HTMLInputElement | null
         if (input && document.contains(input)) {
           input.focus()
         }
       })
       return () => cancelAnimationFrame(frameId)
     }
+
+    const previous = previouslyFocusedRef.current
+    previouslyFocusedRef.current = null
+    if (previous && document.contains(previous)) {
+      previous.focus()
+    }
+  }, [isOpen])
+
+  // Align with the query reset on close: reopening starts in search mode.
+  useEffect(() => {
+    if (isOpen) setMode('search')
   }, [isOpen])
 
   // Preserve the current preview when pagination appends results.
@@ -154,39 +164,31 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
     })
   }, [results])
 
-  // Navigate to selected session
-  const handleNavigate = useCallback(() => {
-    if (!selectedResult || !registryRef.current) return
-    const plugin = registryRef.current.get(selectedResult.pluginId)
-    if (plugin) {
-      plugin.onSelect(selectedResult, enhancedContext)
-      close()
+  // Keep Tab cycling inside the palette dialog. The search input skips this:
+  // its own Tab handler cycles palette modes.
+  const handlePanelKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab') return
+    const target = e.target as HTMLElement | null
+    if (target?.hasAttribute('data-cmdk-input')) return
+    const container = panelRef.current
+    if (!container) return
+    const focusables = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    )
+    if (focusables.length === 0) return
+    const first = focusables[0]
+    const last = focusables[focusables.length - 1]
+    const containsTarget = target ? container.contains(target) : false
+    if (e.shiftKey && (target === first || !containsTarget)) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && (target === last || !containsTarget)) {
+      e.preventDefault()
+      first.focus()
     }
-  }, [selectedResult, enhancedContext, close])
-
-  // Action keyboard shortcuts (only when palette is open)
-  useEffect(() => {
-    if (!isOpen) return
-    const handleActionKeys = (e: KeyboardEvent) => {
-      // Don't intercept if typing in search input or path input
-      const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' && target.getAttribute('type') !== 'search') return
-
-      if (!selectedResult) return
-
-      // Enter → navigate (when not in an input)
-      if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
-        // Only handle if target is not a cmdk input
-        const isCmdkInput = target.hasAttribute('cmdk-input') || target.closest('[cmdk-input-wrapper]')
-        if (!isCmdkInput) {
-          e.preventDefault()
-          handleNavigate()
-        }
-      }
-    }
-    window.addEventListener('keydown', handleActionKeys)
-    return () => window.removeEventListener('keydown', handleActionKeys)
-  }, [isOpen, selectedResult, handleNavigate])
+  }, [])
 
   if (!shouldRender) return null
 
@@ -196,8 +198,13 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
       onClick={close}
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('command.paletteLabel', 'Command palette')}
         className={`w-full max-w-[1380px] h-[80vh] bg-background/98 border border-border/80 rounded-xl shadow-[0_24px_80px_rgba(15,23,42,0.18)] overflow-hidden motion-overlay-surface flex flex-col min-h-0 ${visible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-[0.985] opacity-0'}`}
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={handlePanelKeyDown}
       >
         <CommandMenu
           query={query}
@@ -214,7 +221,6 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
           setFtsOptions={setFtsOptions}
           selectedResult={selectedResult}
           setSelectedResult={setSelectedResult}
-          registryRef={registryRef}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           mode={mode}

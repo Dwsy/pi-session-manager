@@ -23,7 +23,7 @@ export default function ForkDialog({ session, onFork, onClose }: ForkDialogProps
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+    <div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center">
       <div role="dialog" aria-modal="true" aria-labelledby="fork-dialog-title" className={`rounded-lg border border-border bg-background p-6 ${isMobile ? 'w-[95vw]' : 'w-96'}`}>
         <div className="flex items-center gap-2 mb-2">
           <Copy className="h-5 w-5 text-primary" />

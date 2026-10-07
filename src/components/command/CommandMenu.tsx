@@ -24,8 +24,7 @@ import CommandDevPanel from "./CommandDevPanel";
 import SessionPreviewPanel from "./SessionPreviewPanel";
 import type { CommandActionItem, CommandPaletteMode } from "./commandActions";
 import { useCommandSearch } from "./hooks/useCommandSearch";
-import { TABS, type TabType } from "./utils";
-import type { PluginRegistry } from "@/plugins/registry";
+import { TABS, groupResultsByPlugin, type TabType } from "./utils";
 
 interface CommandMenuProps {
   query: string;
@@ -42,7 +41,6 @@ interface CommandMenuProps {
   setFtsOptions: (options: MessageSearchPluginOptions) => void;
   selectedResult: SearchPluginResult | null;
   setSelectedResult: (result: SearchPluginResult | null) => void;
-  registryRef: React.MutableRefObject<PluginRegistry | null>;
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
   mode: CommandPaletteMode;
@@ -65,7 +63,6 @@ export default memo(function CommandMenu({
   setFtsOptions,
   selectedResult,
   setSelectedResult,
-  registryRef,
   activeTab,
   setActiveTab,
   mode,
@@ -82,10 +79,6 @@ export default memo(function CommandMenu({
   const togglePreview = useCallback(() => {
     setPreviewCollapsed((prev) => !prev);
   }, []);
-
-  useEffect(() => {
-    registryRef.current = registry;
-  }, [registry, registryRef]);
 
   const currentProjectName = context.selectedProject
     ? getPathBasename(context.selectedProject)
@@ -133,16 +126,7 @@ export default memo(function CommandMenu({
     );
   }, [query, supportsMessageFilters]);
 
-  const groupedResults = useMemo(() => {
-    return results.reduce(
-      (acc: Record<string, SearchPluginResult[]>, r) => {
-        if (!acc[r.pluginId]) acc[r.pluginId] = [];
-        acc[r.pluginId].push(r);
-        return acc;
-      },
-      {} as Record<string, SearchPluginResult[]>,
-    );
-  }, [results]);
+  const groupedResults = useMemo(() => groupResultsByPlugin(results), [results]);
 
   const commandContext = useMemo(() => ({
     selectedProject: context.selectedProject,
@@ -226,6 +210,16 @@ export default memo(function CommandMenu({
     );
   }, [activeTab, groupedResults, results.length]);
 
+  // Results in visual display order — drives keyboard navigation.
+  const visibleResults = useMemo(() => {
+    if (mode !== 'search') return []
+    if (activeTab !== 'all') {
+      const pluginId = TABS.find((tab) => tab.id === activeTab)?.pluginId
+      return pluginId ? results.filter((result) => result.pluginId === pluginId) : []
+    }
+    return Object.values(groupResultsByPlugin(results)).flat()
+  }, [mode, activeTab, results]);
+
   const selectedPlugin = selectedResult
     ? registry.get(selectedResult.pluginId)
     : null;
@@ -285,8 +279,38 @@ export default memo(function CommandMenu({
     setCommandError(null);
   }, [setMode]);
 
+  const moveToAdjacentResult = useCallback(
+    (delta: 1 | -1) => {
+      if (visibleResults.length === 0) return;
+      const currentIndex = selectedResult
+        ? visibleResults.findIndex(
+            (result) => result.id === selectedResult.id && result.pluginId === selectedResult.pluginId,
+          )
+        : -1;
+      const nextIndex = (currentIndex + delta + visibleResults.length) % visibleResults.length;
+      setSelectedResult(visibleResults[nextIndex] ?? null);
+    },
+    [selectedResult, setSelectedResult, visibleResults],
+  );
+
+  const moveToAdjacentAction = useCallback(
+    (delta: 1 | -1) => {
+      if (commandActions.length === 0) return;
+      const currentIndex = selectedAction
+        ? commandActions.findIndex((action) => action.id === selectedAction.id)
+        : -1;
+      const nextIndex = (currentIndex + delta + commandActions.length) % commandActions.length;
+      setSelectedAction(nextIndex >= 0 ? commandActions[nextIndex] : null);
+    },
+    [commandActions, selectedAction],
+  );
+
   const handleInputKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLInputElement>) => {
+      // Let the IME own the keyboard while composing (candidate navigation,
+      // Enter to commit) — never hijack keys mid-composition.
+      if (event.nativeEvent.isComposing) return
+
       if (
         mode === 'search' &&
         sourceFilterSuggestions.length > 0 &&
@@ -303,29 +327,62 @@ export default memo(function CommandMenu({
         return;
       }
 
+      if (mode === 'search') {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          if (visibleResults.length === 0) return;
+          event.preventDefault();
+          moveToAdjacentResult(event.key === 'ArrowDown' ? 1 : -1);
+          return;
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          handleSelect();
+          return;
+        }
+        return;
+      }
+
       if (mode === 'commands' && (event.key === 'Enter' || event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
         event.preventDefault();
         if (event.key === 'Enter') {
           void handleRunCommand();
           return;
         }
-        const currentIndex = selectedAction
-          ? commandActions.findIndex((action) => action.id === selectedAction.id)
-          : -1;
-        const delta = event.key === 'ArrowDown' ? 1 : -1;
-        const nextIndex = commandActions.length === 0
-          ? -1
-          : (currentIndex + delta + commandActions.length) % commandActions.length;
-        setSelectedAction(nextIndex >= 0 ? commandActions[nextIndex] : null);
+        moveToAdjacentAction(event.key === 'ArrowDown' ? 1 : -1);
       }
     },
-    [applySuggestedSourceFilter, commandActions, cycleMode, handleRunCommand, mode, selectedAction, sourceFilterSuggestions],
+    [
+      applySuggestedSourceFilter,
+      cycleMode,
+      handleRunCommand,
+      handleSelect,
+      mode,
+      moveToAdjacentAction,
+      moveToAdjacentResult,
+      sourceFilterSuggestions,
+    ],
   );
 
+  // Window-level fallback so arrows/Enter still work after focus moves off the
+  // input (e.g. after clicking a result or a segmented control). Inputs keep
+  // their own handling via handleInputKeyDown.
   useEffect(() => {
-    if (mode !== 'commands') return;
+    if (mode !== 'commands' && mode !== 'search') return;
 
     const handleWindowKeyDown = (event: KeyboardEvent) => {
+      // Alt+1..5 switches search tabs; safe to honor even while typing.
+      if (mode === 'search' && event.altKey && !event.metaKey && !event.ctrlKey) {
+        const digitMatch = /^Digit([1-5])$/.exec(event.code);
+        if (digitMatch) {
+          const tab = TABS[Number(digitMatch[1]) - 1];
+          if (tab) {
+            event.preventDefault();
+            handleActiveTabChange(tab.id);
+          }
+          return;
+        }
+      }
+
       const target = event.target as HTMLElement | null;
       if (
         target &&
@@ -336,26 +393,51 @@ export default memo(function CommandMenu({
         return;
       }
 
+      if (mode === 'search') {
+        // Buttons/links keep native activation (footer actions, preview toolbar).
+        // Otherwise only respond when focus is neutral or inside the results
+        // list, so keyboard scrolling in the preview stays untouched.
+        const interactive =
+          target &&
+          (target.tagName === 'BUTTON' || target.tagName === 'A' || target.tagName === 'SELECT');
+        const navigable =
+          !interactive &&
+          (!target ||
+            target.tagName === 'BODY' ||
+            Boolean(target.closest?.('#search-results-wrapper')));
+        if (!navigable) return;
+
+        if (event.key === 'Enter' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          if (event.key === 'Enter') {
+            handleSelect();
+            return;
+          }
+          moveToAdjacentResult(event.key === 'ArrowDown' ? 1 : -1);
+        }
+        return;
+      }
+
       if (event.key === 'Enter' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
         if (event.key === 'Enter') {
           handleRunCommand();
           return;
         }
-        const currentIndex = selectedAction
-          ? commandActions.findIndex((action) => action.id === selectedAction.id)
-          : -1;
-        const delta = event.key === 'ArrowDown' ? 1 : -1;
-        const nextIndex = commandActions.length === 0
-          ? -1
-          : (currentIndex + delta + commandActions.length) % commandActions.length;
-        setSelectedAction(nextIndex >= 0 ? commandActions[nextIndex] : null);
+        moveToAdjacentAction(event.key === 'ArrowDown' ? 1 : -1);
       }
     };
 
     window.addEventListener('keydown', handleWindowKeyDown);
     return () => window.removeEventListener('keydown', handleWindowKeyDown);
-  }, [commandActions, handleRunCommand, mode, selectedAction]);
+  }, [
+    handleActiveTabChange,
+    handleRunCommand,
+    handleSelect,
+    mode,
+    moveToAdjacentAction,
+    moveToAdjacentResult,
+  ]);
 
   return (
     <div className="w-full h-full min-h-0 flex flex-col overflow-hidden bg-background">

@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
+import { commandPaletteStore } from "@/hooks/useCommandMenu";
 import type { AppSidebarViewMode } from "./useSidebarSessions";
 
 export interface UseDesktopSidebarActionsOptions {
@@ -46,9 +47,7 @@ export function useDesktopSidebarActions({
   }, [setActiveAppViewId, setSelectedProject, setViewMode, navigateToProjects]);
 
   const onOpenCommandPalette = useCallback(() => {
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "p", metaKey: true }),
-    );
+    commandPaletteStore.open();
   }, []);
 
   const onToggleTerminal = useCallback(() => {

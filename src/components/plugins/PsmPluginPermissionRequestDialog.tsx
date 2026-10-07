@@ -12,7 +12,7 @@ export default function PsmPluginPermissionRequestDialog() {
   const description = permissionDescription(request.permission)
 
   return (
-    <div className="fixed inset-0 z-[240] flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4">
       <div role="alertdialog" aria-modal="true" aria-labelledby="plugin-permission-title" className="w-full max-w-md overflow-hidden rounded-lg border border-border bg-background shadow-xl">
         <div className="flex items-start gap-3 border-b border-border px-4 py-3">
           <div className="mt-0.5 text-muted-foreground">

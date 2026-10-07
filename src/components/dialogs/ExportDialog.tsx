@@ -22,7 +22,7 @@ export default function ExportDialog({ session, onExport, onClose }: ExportDialo
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4">
       <div role="dialog" aria-modal="true" aria-labelledby="export-dialog-title" className={`rounded-md border border-border bg-background p-5 shadow-xl ${isMobile ? 'w-[95vw] max-w-md' : 'w-[28rem]'}`}>
         {/* Header */}
         <div className="flex items-center justify-between mb-4">

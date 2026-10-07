@@ -81,7 +81,7 @@ export default function VersionDowngradeDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4">
       <div role="dialog" aria-modal="true" aria-labelledby="version-downgrade-title" className="max-h-[92vh] w-[32rem] max-w-full overflow-y-auto rounded-lg border border-border bg-background shadow-xl">
         {/* Warning Header */}
         <div className="border-b border-border px-5 py-4">

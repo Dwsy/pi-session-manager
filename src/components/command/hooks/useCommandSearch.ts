@@ -43,6 +43,8 @@ const EMPTY_PAGINATION: MessageSearchPagination = {
   hasMore: false,
 }
 
+const SEARCH_TIMEOUT_MS = 15000
+
 function hasMessageSearchOptions(
   plugin: SearchPlugin | undefined,
 ): plugin is MessageSearchPluginWithOptions {
@@ -79,8 +81,8 @@ export function useCommandSearch({
   context,
 }: UseCommandSearchParams) {
   const debounceRef = useRef<NodeJS.Timeout>()
-  const abortControllerRef = useRef<AbortController>()
   const requestIdRef = useRef(0)
+  const pendingTimeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set())
   const ftsOptionsRef = useRef(ftsOptions)
   const resultsRef = useRef(results)
   const contextRef = useRef(context)
@@ -239,12 +241,12 @@ export function useCommandSearch({
     [setFtsOptions, setQuery],
   )
 
-  // Main search effect
+  // Main search effect. Stale runs are dropped via requestIdRef — each effect
+  // run invalidates all previous runs, so no abort plumbing is needed.
   useEffect(() => {
     requestIdRef.current += 1
     const currentRequestId = requestIdRef.current
 
-    if (abortControllerRef.current) abortControllerRef.current.abort()
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
     const requestPage = sourceFilterPaginationEnabled ? (ftsOptions.page || 0) : 0
@@ -266,16 +268,19 @@ export function useCommandSearch({
       setSearchError(undefined)
     }
 
-    debounceRef.current = setTimeout(async () => {
-      const controller = new AbortController()
-      abortControllerRef.current = controller
+    const clearPendingTimeouts = () => {
+      for (const id of pendingTimeoutsRef.current) clearTimeout(id)
+      pendingTimeoutsRef.current.clear()
+    }
 
+    debounceRef.current = setTimeout(async () => {
       try {
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(
-            () => reject(new Error('Search timeout after 15 seconds')),
-            15000,
-          )
+          const timeoutId = setTimeout(() => {
+            pendingTimeoutsRef.current.delete(timeoutId)
+            reject(new Error(`Search timeout after ${SEARCH_TIMEOUT_MS / 1000} seconds`))
+          }, SEARCH_TIMEOUT_MS)
+          pendingTimeoutsRef.current.add(timeoutId)
         })
 
         const messagePlugin = registry.get('message-search')
@@ -334,11 +339,7 @@ export function useCommandSearch({
           ])
         }
 
-        if (
-          controller.signal.aborted ||
-          currentRequestId !== requestIdRef.current
-        )
-          return
+        if (currentRequestId !== requestIdRef.current) return
 
         if (sourceFilterPaginationEnabled) {
           setHasMore(pagination.hasMore)
@@ -357,11 +358,7 @@ export function useCommandSearch({
           isInitialSearchingRef.current = false
         }
       } catch (error) {
-        if (
-          controller.signal.aborted ||
-          currentRequestId !== requestIdRef.current
-        )
-          return
+        if (currentRequestId !== requestIdRef.current) return
         console.error('[CommandMenu] Search error:', error)
         if (isLoadMore) {
           const message = getErrorMessage(error)
@@ -372,10 +369,8 @@ export function useCommandSearch({
           return
         }
 
-        if (error instanceof Error && error.name !== 'AbortError') {
-          setSearchError(getErrorMessage(error))
-          setResults([])
-        }
+        setSearchError(getErrorMessage(error))
+        setResults([])
         resetPagination()
         setIsSearching(false)
         isInitialSearchingRef.current = false
@@ -384,6 +379,7 @@ export function useCommandSearch({
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
+      clearPendingTimeouts()
     }
   }, [
     normalizedQuery,

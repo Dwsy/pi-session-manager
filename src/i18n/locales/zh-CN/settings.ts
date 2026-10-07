@@ -77,6 +77,8 @@ export const settings = {
     title: "快捷键",
     description:
       "查看所有可用的键盘快捷键。在 macOS 上使用 Cmd，在 Windows/Linux 上使用 Ctrl。",
+    commandPalette: "打开命令面板",
+    commandPaletteAlternative: "打开命令面板（备用）",
     devtools: "开发者工具",
     categories: {
       search: "搜索",

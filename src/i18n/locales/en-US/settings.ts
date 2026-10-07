@@ -78,6 +78,8 @@ export const settings = {
     title: "Keyboard Shortcuts",
     description:
       "All available keyboard shortcuts. Use Cmd on macOS and Ctrl on Windows/Linux.",
+    commandPalette: "Open command palette",
+    commandPaletteAlternative: "Open command palette (alternative)",
     devtools: "Developer Tools",
     categories: {
       search: "Search",

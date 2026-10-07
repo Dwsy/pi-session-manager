@@ -437,7 +437,7 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   return (
     <div
-      className={`settings-modal-no-press fixed inset-0 z-50 flex items-center justify-center ${
+      className={`settings-modal-no-press fixed inset-0 z-[10000] flex items-center justify-center ${
         heavyOverlay ? "bg-black/60" : "bg-background/60"
       } ${visible ? "opacity-100" : "opacity-0"}`}
     >

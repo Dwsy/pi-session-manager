@@ -1,8 +1,23 @@
 import { useTranslation } from 'react-i18next'
 import type { FullTextSearchSourceFilter } from '@/types'
+import type { SearchPluginResult } from '@/plugins/types'
 import { Search, MessageSquare, FileText, FolderOpen, Tag } from 'lucide-react'
 
 export type TabType = 'all' | 'labels' | 'message' | 'session' | 'project'
+
+/** Group results by pluginId, preserving first-appearance order of each plugin. */
+export function groupResultsByPlugin(
+  results: SearchPluginResult[],
+): Record<string, SearchPluginResult[]> {
+  return results.reduce(
+    (acc: Record<string, SearchPluginResult[]>, result) => {
+      if (!acc[result.pluginId]) acc[result.pluginId] = []
+      acc[result.pluginId].push(result)
+      return acc
+    },
+    {},
+  )
+}
 
 export const TABS: {
   id: TabType

@@ -1,4 +1,5 @@
 export const command = {
+  paletteLabel: 'Command palette',
   placeholder: 'Search sessions, projects, messages...',
   empty: 'No results found',
   emptyHint: 'Try searching with different keywords',
@@ -114,7 +115,7 @@ export const command = {
     sessionExample2: '"today" - Search recent sessions',
     navigate: 'Use ↑↓ to navigate',
     select: 'Press Enter to select',
-    switchTab: 'Alt + 1/2/3/4 to switch tabs',
+    switchTab: 'Alt + 1-5 to switch tabs',
     scopeToggle: 'Click project button to toggle search scope',
   },
 } as const

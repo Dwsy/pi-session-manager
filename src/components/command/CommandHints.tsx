@@ -66,7 +66,7 @@ export default function CommandHints() {
           <span>{t('command.hints.select', 'Press Enter to select')}</span>
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground/80">
-          <span>{t('command.hints.switchTab', 'Alt + 1/2/3/4 to switch categories')}</span>
+          <span>{t('command.hints.switchTab', 'Alt + 1-5 to switch tabs')}</span>
           <span>{t('command.hints.scopeToggle', 'Click project button to switch search scope')}</span>
         </div>
       </div>

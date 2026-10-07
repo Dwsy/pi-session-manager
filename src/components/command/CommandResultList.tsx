@@ -8,7 +8,7 @@ import CommandError from './CommandError'
 import CommandEmpty from './CommandEmpty'
 import CommandHints from './CommandHints'
 import CommandResultItem from './CommandResultItem'
-import { TABS } from './utils'
+import { TABS, groupResultsByPlugin } from './utils'
 
 interface CommandResultListProps {
   results: SearchPluginResult[]
@@ -49,16 +49,7 @@ export default function CommandResultList({
   const wrapperRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
 
-  const groupedResults = useMemo(() => {
-    return results.reduce(
-      (acc: Record<string, SearchPluginResult[]>, r) => {
-        if (!acc[r.pluginId]) acc[r.pluginId] = []
-        acc[r.pluginId].push(r)
-        return acc
-      },
-      {} as Record<string, SearchPluginResult[]>,
-    )
-  }, [results])
+  const groupedResults = useMemo(() => groupResultsByPlugin(results), [results])
 
   useEffect(() => {
     const wrapper = wrapperRef.current
@@ -92,6 +83,14 @@ export default function CommandResultList({
   }, [hasMore, isLoadingMore, isSearching, loadMore, loadMoreError, sourceFilterPaginationEnabled])
 
   const hasQuery = !!normalizedQuery.trim() || isLabelsBrowseMode
+
+  // Keep the keyboard-selected result visible while navigating with ↑↓.
+  useEffect(() => {
+    if (!selectedResult) return
+    wrapperRef.current
+      ?.querySelector('[data-result-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [selectedResult?.id, selectedResult?.pluginId])
   const showPagination = sourceFilterPaginationEnabled
   const remaining = Math.max(0, totalHits - results.length)
   const showLoadMore = showPagination && hasMore && !searchError && results.length > 0

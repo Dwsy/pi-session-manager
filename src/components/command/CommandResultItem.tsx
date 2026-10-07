@@ -43,6 +43,7 @@ export default function CommandResultItem({
       tabIndex={0}
       role="option"
       aria-selected={isSelected}
+      data-result-selected={isSelected ? "true" : "false"}
       className={[
         "group relative rounded-2xl border motion-context",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-info/30 focus-visible:ring-offset-0",

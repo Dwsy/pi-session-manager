@@ -1,5 +1,34 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useSyncExternalStore } from 'react'
 import type { SearchPluginResult } from '@/plugins/types'
+
+/** Overlay enter/exit animation duration; state resets wait for it to finish. */
+export const PALETTE_ANIMATION_MS = 320
+
+type PaletteListener = () => void
+
+// Module-level open state so any caller (sidebar button, future menus) can
+// open the palette without synthesizing keyboard events.
+let paletteOpen = false
+const paletteListeners = new Set<PaletteListener>()
+
+function setPaletteOpen(next: boolean) {
+  if (paletteOpen === next) return
+  paletteOpen = next
+  for (const listener of paletteListeners) listener()
+}
+
+export const commandPaletteStore = {
+  isOpen: () => paletteOpen,
+  open: () => setPaletteOpen(true),
+  close: () => setPaletteOpen(false),
+  toggle: () => setPaletteOpen(!paletteOpen),
+  subscribe(listener: PaletteListener) {
+    paletteListeners.add(listener)
+    return () => {
+      paletteListeners.delete(listener)
+    }
+  },
+}
 
 interface UseCommandMenuReturn {
   isOpen: boolean
@@ -12,21 +41,22 @@ interface UseCommandMenuReturn {
   setResults: (results: SearchPluginResult[]) => void
   isSearching: boolean
   setIsSearching: (isSearching: boolean) => void
-  selectedIndex: number
-  setSelectedIndex: (index: number) => void
   reset: () => void
 }
 
 /**
- * Command menu state management hook
+ * Command menu state management hook.
+ * Open state is backed by the shared module-level store; query/results live
+ * in the hook instance (only CommandPalette mounts it) and are reset after
+ * the close animation when no one reopens within PALETTE_ANIMATION_MS.
  */
 export function useCommandMenu(): UseCommandMenuReturn {
-  const [isOpen, setIsOpen] = useState(false)
+  const isOpen = useSyncExternalStore(commandPaletteStore.subscribe, commandPaletteStore.isOpen)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchPluginResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [selectedIndex, setSelectedIndex] = useState(0)
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevOpenRef = useRef(false)
 
   const clearResetTimer = useCallback(() => {
     if (resetTimerRef.current) {
@@ -35,40 +65,47 @@ export function useCommandMenu(): UseCommandMenuReturn {
     }
   }, [])
 
-  const open = useCallback(() => {
+  const scheduleReset = useCallback(() => {
     clearResetTimer()
-    setIsOpen(true)
-  }, [clearResetTimer])
-
-  const close = useCallback(() => {
-    clearResetTimer()
-    setIsOpen(false)
-    // Delay state reset, wait for close animation to complete
     resetTimerRef.current = setTimeout(() => {
       setQuery('')
       setResults([])
-      setSelectedIndex(0)
       setIsSearching(false)
       resetTimerRef.current = null
-    }, 320)
+    }, PALETTE_ANIMATION_MS)
   }, [clearResetTimer])
 
+  const open = useCallback(() => {
+    commandPaletteStore.open()
+  }, [])
+
+  const close = useCallback(() => {
+    commandPaletteStore.close()
+  }, [])
+
   const toggle = useCallback(() => {
-    setIsOpen(prev => !prev)
+    commandPaletteStore.toggle()
   }, [])
 
   const reset = useCallback(() => {
     clearResetTimer()
     setQuery('')
     setResults([])
-    setSelectedIndex(0)
     setIsSearching(false)
   }, [clearResetTimer])
 
-  // Reset selected index when results change
+  // React to any open/close source (keyboard, sidebar button) the same way:
+  // reopening cancels the pending reset; closing schedules it.
   useEffect(() => {
-    setSelectedIndex(0)
-  }, [results])
+    const sync = () => {
+      const now = commandPaletteStore.isOpen()
+      if (now && !prevOpenRef.current) clearResetTimer()
+      if (!now && prevOpenRef.current) scheduleReset()
+      prevOpenRef.current = now
+    }
+    sync()
+    return commandPaletteStore.subscribe(sync)
+  }, [clearResetTimer, scheduleReset])
 
   useEffect(() => {
     return () => {
@@ -87,8 +124,6 @@ export function useCommandMenu(): UseCommandMenuReturn {
     setResults,
     isSearching,
     setIsSearching,
-    selectedIndex,
-    setSelectedIndex,
     reset
   }
 }

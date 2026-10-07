@@ -41,6 +41,8 @@ export default function CommandSearchInput({
       <div className="relative flex-1">
         <input
           type="text"
+          data-cmdk-input="true"
+          aria-label={inputPlaceholder}
           value={inputValue}
           onChange={handleChange}
           onCompositionStart={handleCompositionStart}
@@ -48,7 +50,6 @@ export default function CommandSearchInput({
           onKeyDown={onKeyDown}
           placeholder={inputPlaceholder}
           className="w-full bg-transparent border-0 outline-none text-[15px] font-medium text-foreground placeholder:text-muted-foreground/70"
-          autoFocus
         />
         {sourceFilterSuggestions.length > 0 && (
           <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-border/80 bg-background shadow-xl">

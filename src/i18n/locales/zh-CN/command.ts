@@ -1,4 +1,5 @@
 export const command = {
+  paletteLabel: '命令面板',
   placeholder: '搜索会话、项目、消息...',
   empty: '未找到结果',
   emptyHint: '尝试使用不同的关键词搜索',
@@ -114,7 +115,7 @@ export const command = {
     sessionExample2: '"今天" - 搜索最近会话',
     navigate: '使用 ↑↓ 导航',
     select: '按 Enter 选择',
-    switchTab: 'Alt + 1/2/3/4 切换分类',
+    switchTab: 'Alt + 1-5 切换分类',
     scopeToggle: '点击项目按钮切换搜索范围',
   },
 } as const

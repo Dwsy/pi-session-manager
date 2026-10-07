@@ -12,6 +12,18 @@ interface ShortcutItem {
 
 const shortcuts: ShortcutItem[] = [
   {
+    keys: 'Cmd+K',
+    labelKey: 'settings.shortcuts.commandPalette',
+    fallback: 'Open command palette',
+    category: 'search',
+  },
+  {
+    keys: 'F1',
+    labelKey: 'settings.shortcuts.commandPaletteAlternative',
+    fallback: 'Open command palette (alternative)',
+    category: 'search',
+  },
+  {
     keys: 'Cmd+P',
     labelKey: 'app.shortcuts.quickOpen',
     fallback: 'Quick Open (Search all)',
