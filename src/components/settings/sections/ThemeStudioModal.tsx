@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, Copy, AlertCircle, Palette, Wand2, Sliders, Code, X, Save } from 'lucide-react'
+import { useEscapeToClose } from '@/components/dialogs/useEscapeToClose'
 import {
   type PiThemeFile,
   getBuiltInBase46Themes,
@@ -187,8 +188,11 @@ export default function ThemeStudioModal({
     onClose()
   }
 
-  if (!isOpen) return null
+  // Consume Escape here (capture phase) so it closes only the studio,
+  // not the whole settings panel behind it.
+  useEscapeToClose(onClose, isOpen)
 
+  if (!isOpen) return null
   const builtInBase46List = getBuiltInBase46Themes()
 
   return (

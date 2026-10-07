@@ -24,7 +24,11 @@ import type {
   SettingsSections,
   SettingsUpdateHandler,
 } from "./SettingsPanelTypes";
-import { getSettingsSectionMeta, renderSettingsSection } from "./settingsRegistry";
+import {
+  getSettingsSaveHint,
+  getSettingsSectionMeta,
+  renderSettingsSection,
+} from "./settingsRegistry";
 import { searchSettings, type SettingsSearchResult } from "./settingsSearchIndex";
 
 interface MobileSettingsProps {
@@ -435,10 +439,10 @@ export default function MobileSettings({
             <div className="safe-area-bottom flex flex-shrink-0 items-center justify-between gap-3 border-t border-border bg-background px-4 py-3">
               <span className="min-w-0 text-xs text-muted-foreground">
                 {activeSaveMode === "inline"
-                  ? t(
-                      "settings.inlineSaveHint",
-                      "This page saves changes in its own controls.",
-                    )
+                  ? (() => {
+                      const hint = getSettingsSaveHint(activeSection);
+                      return t(hint.key, hint.fallback);
+                    })()
                   : t("settings.readOnlyHint", "This page is read-only.")}
               </span>
               <button

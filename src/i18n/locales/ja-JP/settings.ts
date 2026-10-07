@@ -6,7 +6,7 @@ export const settings = {
   searchResults: '設定項目',
   saved: '保存済み',
   reset: '設定をリセット',
-  confirmReset: 'すべての設定をリセットしますか？',
+  confirmReset: 'アプリの設定をデフォルトに戻しますか？外観、言語、ターミナル、セッション表示などのアプリ設定がリセットされます。モデル、Pi リソース、プラグイン設定には影響しません。',
   openConfigFolder: '設定フォルダを開く',
   themeStudio: {
     title: 'テーマスタジオ',

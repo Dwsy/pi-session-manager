@@ -6,6 +6,7 @@ import SettingsCard from "@/components/settings/SettingsCard";
 import SettingsSliderField from "@/components/settings/SettingsSliderField";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
 import type { AdvancedSettingsProps } from "@/components/settings/types";
+import { askConfirm } from "@/utils/confirmDialog";
 import { invoke } from "@/transport";
 import APITestSettings from "./APITestSettings";
 
@@ -21,14 +22,14 @@ export default function DiagnosticsMaintenanceSettings({
   const { t } = useTranslation();
 
   const handleClearCache = async () => {
-    if (
-      !confirm(
-        t(
-          "settings.advanced.clearCacheConfirm",
-          "Are you sure you want to clear all cache data? This will delete all session cache but keep favorites.",
-        ),
-      )
-    ) {
+    const confirmed = await askConfirm(
+      t(
+        "settings.advanced.clearCacheConfirm",
+        "Are you sure you want to clear all cache data? This will delete all session cache but keep favorites.",
+      ),
+      t("settings.advanced.clearCache", "Clear cache"),
+    );
+    if (!confirmed) {
       return;
     }
     try {

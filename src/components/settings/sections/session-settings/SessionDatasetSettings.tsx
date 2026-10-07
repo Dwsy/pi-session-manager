@@ -269,6 +269,7 @@ export default function SessionDatasetSettings({
               "settings.session.sourceModeHelp",
               "Switch between local sessions and imported dataset snapshots",
             )}
+            searchKey="session-sourceMode"
           >
             <div className="space-y-4">
               <SettingsRadioCardGroup

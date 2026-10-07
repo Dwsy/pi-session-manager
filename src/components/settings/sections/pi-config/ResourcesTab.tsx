@@ -18,6 +18,7 @@ import {
 import SettingsTabs from "@/components/settings/SettingsTabs";
 import MarkdownContent from "@/components/ui/MarkdownContent";
 import CompositionInput from "@/components/ui/CompositionInput";
+import { useEscapeToClose } from "@/components/dialogs/useEscapeToClose";
 import { invoke } from "@/transport";
 import type {
   ProjectResourceTrust,
@@ -841,13 +842,9 @@ function ResourceViewerModal({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  // Consume Escape (capture phase) so this preview closes without also
+  // dismissing the whole settings panel.
+  useEscapeToClose(onClose);
 
   const markdown = item.path.endsWith(".md");
   return createPortal(

@@ -3,7 +3,7 @@ export const settings = {
   subtitle: 'Personaliza tu experiencia',
   saved: 'Guardado',
   reset: 'Restablecer ajustes',
-  confirmReset: '¿Seguro que quieres restablecer todos los ajustes?',
+  confirmReset: '¿Restablecer las preferencias de la app a los valores predeterminados? Se restablecerán la apariencia, el idioma, la terminal, el visor de sesiones y otros ajustes. La configuración de modelos, recursos Pi y plugins no se ve afectada.',
   shortcuts: {
     title: 'Atajos de teclado',
     description: 'Todos los atajos de teclado disponibles. Usa Cmd en macOS y Ctrl en Windows/Linux.',

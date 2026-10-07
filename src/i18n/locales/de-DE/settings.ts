@@ -3,7 +3,7 @@ export const settings = {
   subtitle: 'Passen Sie Ihr Erlebnis an',
   saved: 'Gespeichert',
   reset: 'Einstellungen zurücksetzen',
-  confirmReset: 'Möchten Sie wirklich alle Einstellungen zurücksetzen?',
+  confirmReset: 'App-Einstellungen auf Standardwerte zurücksetzen? Erscheinungsbild, Sprache, Terminal, Sitzungsansicht und andere App-Einstellungen werden zurückgesetzt. Modell-, Pi-Ressourcen- und Plugin-Konfigurationen bleiben unverändert.',
   openConfigFolder: 'Konfigurationsordner öffnen',
   themeStudio: {
     title: 'Theme-Studio',

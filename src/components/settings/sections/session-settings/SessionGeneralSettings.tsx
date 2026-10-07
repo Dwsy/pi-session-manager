@@ -27,6 +27,7 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
               onChange={(checked) =>
                 onUpdate("session", "autoRefresh", checked)
               }
+              searchKey="session-autoRefresh"
             />
 
             {settings.session.autoRefresh && (
@@ -35,6 +36,7 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
                   "settings.session.refreshInterval",
                   "Refresh interval",
                 )}
+                searchKey="session-refreshInterval"
               >
                 <div className="flex items-center gap-3">
                   <input
@@ -61,6 +63,7 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
 
             <SettingsField
               label={t("settings.session.defaultViewMode", "Default view mode")}
+              searchKey="session-defaultViewMode"
             >
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {(["list", "directory", "project"] as const).map((mode) => (
@@ -93,11 +96,13 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
                 onUpdate("session", "showMessagePreview", checked)
               }
               className="items-start pt-4 border-t border-border/60"
+              searchKey="session-showMessagePreview"
             />
 
             {settings.session.showMessagePreview && (
               <SettingsField
                 label={t("settings.session.previewLines", "Preview lines")}
+                searchKey="session-previewLines"
               >
                 <div className="flex items-center gap-3">
                   <input
@@ -135,6 +140,7 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
                 onUpdate("session", "colorizeToolCalls", checked)
               }
               className="items-start pt-4 border-t border-border/60"
+              searchKey="session-colorizeToolCalls"
             />
 
             <SettingsToggleRow

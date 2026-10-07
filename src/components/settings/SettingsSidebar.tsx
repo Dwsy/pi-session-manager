@@ -326,9 +326,10 @@ export default function SettingsSidebar({
           onClick={onReset}
           aria-label={t("settings.reset", "Reset Settings")}
           title={t("settings.reset", "Reset Settings")}
-          className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded motion-color focus-ring"
+          className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-red-400 rounded motion-color focus-ring"
         >
           <RefreshCw className="h-3.5 w-3.5" />
+          <span>{t("settings.reset", "Reset Settings")}</span>
         </button>
       </div>
     </div>

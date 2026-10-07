@@ -230,6 +230,7 @@ export default function APITestSettings() {
         icon={<Activity className="h-5 w-5" />}
         title={t('settings.apiTest.title', 'Invoke Connection Test')}
         description={t('settings.apiTest.description', 'Test the current runtime invoke transport and command response structure')}
+        searchKey="invoke-test"
       >
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">

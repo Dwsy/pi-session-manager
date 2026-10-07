@@ -186,6 +186,11 @@ export default function ExternalSessionsSettings({
             ? "Default target CLI for resume commands."
             : "Scan supported local coding-agent sessions and choose the default resume target.",
         )}
+        searchKey={
+          mode === "resume"
+            ? "external-sessions-defaultResumeTarget"
+            : "session-scanOtherAgentJsonl"
+        }
         contentClassName="p-4"
       >
         <div className="space-y-3">

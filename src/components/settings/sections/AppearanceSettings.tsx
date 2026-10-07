@@ -21,6 +21,7 @@ import {
   toCodexSelection,
 } from '@/utils/piTheme'
 import ThemeStudioModal from '@/components/settings/sections/ThemeStudioModal'
+import { useEscapeToClose } from '@/components/dialogs/useEscapeToClose'
 import { CODE_THEMES, MONOSPACE_FONTS } from '@/utils/codeThemes'
 import { listAllSystemFonts, listSystemMonospaceFonts, type DetectedFont } from '@/utils/fontDetection'
 import { renderCodeHtmlWithTheme } from '@/utils/markdown'
@@ -274,18 +275,14 @@ function PickerDialog({
   children: React.ReactNode
 }) {
   const { t } = useTranslation()
+  // Capture-phase Escape: closes the picker without dismissing the
+  // settings panel, regardless of where focus sits.
+  useEscapeToClose(onClose)
   return (
     <div
       className="fixed inset-0 z-[95] flex items-center justify-center bg-black/60 p-4"
       role="dialog"
       aria-modal="true"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          event.preventDefault()
-          event.stopPropagation()
-          onClose()
-        }
-      }}
     >
       <div className="max-h-[80vh] w-[min(720px,calc(100vw-32px))] overflow-hidden rounded-lg border border-border bg-popover shadow-xl">
         <div className="border-b border-border px-5 py-4">

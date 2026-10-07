@@ -5,6 +5,7 @@ import SettingsCard from "@/components/settings/SettingsCard";
 import SettingsInput from "@/components/settings/SettingsInput";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
 import type { AppSettings } from "@/components/settings/types";
+import { askConfirm } from "@/utils/confirmDialog";
 import ExternalSessionsSettings from "./ExternalSessionsSettings";
 import SessionSettings from "./SessionSettings";
 
@@ -40,15 +41,14 @@ export default function DataSourcesSettings({
     onUpdate("advanced", "sessionDirs", buildSessionDirs(includeDefaultDir, nextDirs));
   };
 
-  const setIncludeDefaultDir = (checked: boolean) => {
-    if (
-      !window.confirm(
-        t(
-          "settings.advanced.defaultSessionDirRebuildConfirm",
-          "Changing the default Pi session directory setting will clear and rebuild the session cache. Continue?",
-        ),
-      )
-    ) {
+  const setIncludeDefaultDir = async (checked: boolean) => {
+    const confirmed = await askConfirm(
+      t(
+        "settings.advanced.defaultSessionDirRebuildConfirm",
+        "Changing the default Pi session directory setting will clear and rebuild the session cache. Continue?",
+      ),
+    );
+    if (!confirmed) {
       return;
     }
     onUpdate("advanced", "includeDefaultPiSessionDir", checked);

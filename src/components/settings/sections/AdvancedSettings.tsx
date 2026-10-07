@@ -1,5 +1,5 @@
 /**
- * Advanced settings component
+ * Server & Access settings section (server, auth and remote tabs).
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -7,87 +7,51 @@ import { useTranslation } from "react-i18next";
 import {
   Key,
   Server,
-  FolderOpen,
   Wifi,
 } from "lucide-react";
 import { invoke, isTauri } from "@/transport";
 import SettingsTabs from "@/components/settings/SettingsTabs";
+import { askConfirm } from "@/utils/confirmDialog";
 import ApiKeysSettingsTab from "./advanced-settings/ApiKeysSettingsTab";
 import ServerAccessSettingsTab from "./advanced-settings/ServerAccessSettingsTab";
 import RemoteConnectionTab from "./advanced-settings/RemoteConnectionTab";
-import StorageSettingsTab from "./advanced-settings/StorageSettingsTab";
 import type { AdvancedSettingsMode, AdvancedTab, ServerSettings, TokenInfo } from "./advanced-settings/advancedSettingsTypes";
 import type { AdvancedSettingsProps } from "@/components/settings/types";
 import { useClipboard } from "@/hooks/useClipboard";
-
-interface ClearCacheResult {
-  sessions_deleted: number;
-  details_deleted: number;
-}
 
 interface AdvancedSettingsSectionProps extends AdvancedSettingsProps {
   mode?: AdvancedSettingsMode;
 }
 
-export default function AdvancedSettings({
-  settings,
-  onUpdate,
-  mode = "all",
-}: AdvancedSettingsSectionProps) {
+export default function AdvancedSettings(
+  _props: AdvancedSettingsSectionProps,
+) {
   const { t } = useTranslation();
   const tabItems: Array<{
     id: AdvancedTab;
     label: string;
     icon: React.ReactNode;
-  }> =
-    mode === "server-access"
-      ? [
-          {
-            id: "server",
-            label: t("settings.advanced.tabs.server", "Server"),
-            icon: <Server className="h-3.5 w-3.5" />,
-          },
-          {
-            id: "auth",
-            label: t("settings.advanced.tabs.auth", "Auth"),
-            icon: <Key className="h-3.5 w-3.5" />,
-          },
-          ...(isTauri()
-            ? [
-                {
-                  id: "remote" as const,
-                  label: t("settings.advanced.tabs.remote", "Remote"),
-                  icon: <Wifi className="h-3.5 w-3.5" />,
-                },
-              ]
-            : []),
-        ]
-      : [
-          {
-            id: "server",
-            label: t("settings.advanced.tabs.server", "Server"),
-            icon: <Server className="h-3.5 w-3.5" />,
-          },
-          {
-            id: "auth",
-            label: t("settings.advanced.tabs.auth", "Auth"),
-            icon: <Key className="h-3.5 w-3.5" />,
-          },
-          ...(isTauri()
-            ? [
-                {
-                  id: "remote" as const,
-                  label: t("settings.advanced.tabs.remote", "Remote"),
-                  icon: <Wifi className="h-3.5 w-3.5" />,
-                },
-              ]
-            : []),
-          {
-            id: "storage",
-            label: t("settings.advanced.tabs.storage", "Storage"),
-            icon: <FolderOpen className="h-3.5 w-3.5" />,
-          },
-        ];
+  }> = [
+      {
+        id: "server",
+        label: t("settings.advanced.tabs.server", "Server"),
+        icon: <Server className="h-3.5 w-3.5" />,
+      },
+      {
+        id: "auth",
+        label: t("settings.advanced.tabs.auth", "Auth"),
+        icon: <Key className="h-3.5 w-3.5" />,
+      },
+      ...(isTauri()
+        ? [
+            {
+              id: "remote" as const,
+              label: t("settings.advanced.tabs.remote", "Remote"),
+              icon: <Wifi className="h-3.5 w-3.5" />,
+            },
+          ]
+        : []),
+    ];
   const [activeTab, setActiveTab] = useState<AdvancedTab>("server");
   const [serverSettings, setServerSettings] = useState<ServerSettings | null>(
     null,
@@ -126,25 +90,6 @@ export default function AdvancedSettings({
       setActiveTab(tabItems[0].id);
     }
   }, [activeTab, tabItems]);
-
-  // Lightweight mode (minimize-to-tray on close)
-  const [lightweightMode, setLightweightMode] = useState(false);
-
-  useEffect(() => {
-    invoke<boolean>("get_lightweight_mode")
-      .then(setLightweightMode)
-      .catch(console.error);
-  }, []);
-
-  const handleToggleLightweightMode = async (enabled: boolean) => {
-    setLightweightMode(enabled);
-    try {
-      await invoke("set_lightweight_mode", { enabled });
-    } catch (e) {
-      console.error("Failed to set lightweight mode:", e);
-      setLightweightMode(!enabled);
-    }
-  };
 
   const updateServer = <K extends keyof ServerSettings>(
     key: K,
@@ -201,15 +146,14 @@ export default function AdvancedSettings({
   };
 
   const handleRevokeKey = async (keyPreview: string) => {
-    if (
-      !confirm(
-        t(
-          "settings.advanced.revokeKeyConfirm",
-          "Are you sure you want to revoke this key? This action cannot be undone.",
-        ),
-      )
-    )
-      return;
+    const confirmed = await askConfirm(
+      t(
+        "settings.advanced.revokeKeyConfirm",
+        "Are you sure you want to revoke this key? This action cannot be undone.",
+      ),
+      t("settings.advanced.tabs.auth", "Auth"),
+    );
+    if (!confirmed) return;
     try {
       await invoke("revoke_api_key", { keyPreview });
       await loadApiKeys();
@@ -220,35 +164,6 @@ export default function AdvancedSettings({
 
   const copyToClipboard = (text: string) => {
     copyText(text).catch(console.error);
-  };
-
-  const handleClearCache = async () => {
-    if (
-      !confirm(
-        t(
-          "settings.advanced.clearCacheConfirm",
-          "Are you sure you want to clear all cache data? This will delete all session cache but keep favorites.",
-        ),
-      )
-    ) {
-      return;
-    }
-    try {
-      const result = await invoke<ClearCacheResult>("clear_cache");
-      alert(
-        t(
-          "settings.advanced.cacheClearedDetail",
-          "Cache cleared: {{sessions}} sessions, {{details}} details cache",
-          {
-            sessions: result.sessions_deleted,
-            details: result.details_deleted,
-          },
-        ),
-      );
-    } catch (error) {
-      console.error("Failed to clear cache:", error);
-      alert(t("settings.advanced.cacheClearFailed", "Failed to clear cache"));
-    }
   };
 
   const isRemoteBind = serverSettings?.bind_addr === "0.0.0.0";
@@ -264,14 +179,11 @@ export default function AdvancedSettings({
       {activeTab === "server" && serverSettings && (
         <ServerAccessSettingsTab
           serverSettings={serverSettings}
-          mode={mode}
-          lightweightMode={lightweightMode}
           serverDirty={serverDirty}
           inputAccentClass={inputAccentClass}
           selectAccentClass={selectAccentClass}
           isRemoteBind={isRemoteBind}
           onUpdateServer={updateServer}
-          onToggleLightweightMode={handleToggleLightweightMode}
           onSaveServerSettings={saveServerSettings}
         />
       )}
@@ -299,15 +211,6 @@ export default function AdvancedSettings({
 
       {activeTab === "remote" && (
         <RemoteConnectionTab />
-      )}
-
-      {activeTab === "storage" && (
-        <StorageSettingsTab
-          settings={settings}
-          onUpdate={onUpdate}
-          inputAccentClass={inputAccentClass}
-          onClearCache={handleClearCache}
-        />
       )}
     </div>
   );

@@ -6,7 +6,7 @@ import type {
   SettingsSections,
   SettingsUpdateHandler,
 } from "./SettingsPanelTypes";
-import { renderSettingsSection } from "./settingsRegistry";
+import { getSettingsSaveHint, renderSettingsSection } from "./settingsRegistry";
 
 interface SettingsContentProps {
   menuItems: SettingsSections;
@@ -41,16 +41,8 @@ export default function SettingsContent({
     : t("settings.savedJustNow", "Saved");
   const isFullBleedSection =
     activeSection === "models" || activeSection === "pi-resources";
-  const inlineSaveHint =
-    activeSection === "models"
-      ? t(
-          "settings.modelConfigCenter.status.manualSaveHint",
-          "Manual save required. Click Save Config to persist changes.",
-        )
-      : t(
-          "settings.inlineSaveHint",
-          "This page saves changes in its own controls.",
-        );
+  const saveHint = getSettingsSaveHint(activeSection);
+  const inlineSaveHint = t(saveHint.key, saveHint.fallback);
 
   return (
     <div className="flex-1 flex flex-col bg-surface-dark/20">
@@ -112,6 +104,9 @@ export default function SettingsContent({
           </div>
         ) : (
           <div
+            // Section-level search anchor: lets search results that point at
+            // a whole section (rather than a single field) scroll & flash.
+            data-settings-search={activeSection}
             className={
               isFullBleedSection
                 ? "h-full min-h-0 w-full max-w-none"

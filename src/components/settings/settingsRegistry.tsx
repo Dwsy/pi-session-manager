@@ -1,13 +1,21 @@
 import type { ReactNode } from "react";
 import {
   Activity,
+  Archive,
+  Blocks,
   Bot,
   Brain,
+  Code2,
+  Cpu,
   Database,
   Download,
+  FileCog,
+  FolderInput,
   FolderOpen,
   Globe,
+  HeartPulse,
   Keyboard,
+  ListTree,
   Palette,
   MessageCircleQuestion,
   Puzzle,
@@ -15,8 +23,10 @@ import {
   Search,
   Server,
   Settings2,
+  Store,
   Tags,
   Terminal,
+  Wrench,
 } from "lucide-react";
 
 import { isStandaloneDatasetRuntime } from "@/browser-dataset";
@@ -190,7 +200,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     id: "session-viewer",
     area: "preferences",
     group: "viewing",
-    icon: <Database className="h-4 w-4" />,
+    icon: <ListTree className="h-4 w-4" />,
     labelKey: "settings.sections.sessionViewer",
     fallbackLabel: "Session Viewer",
     descriptionKey: "settings.sectionDescriptions.sessionViewer",
@@ -302,7 +312,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     id: "models",
     area: "config-center",
     group: "agent",
-    icon: <Bot className="h-4 w-4" />,
+    icon: <Cpu className="h-4 w-4" />,
     labelKey: "settings.sections.models",
     fallbackLabel: "Models",
     descriptionKey: "settings.sectionDescriptions.models",
@@ -325,7 +335,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     id: "pi-runtime",
     area: "config-center",
     group: "agent",
-    icon: <Settings2 className="h-4 w-4" />,
+    icon: <FileCog className="h-4 w-4" />,
     labelKey: "settings.sections.piRuntime",
     fallbackLabel: "Pi Runtime",
     descriptionKey: "settings.sectionDescriptions.piRuntime",
@@ -358,7 +368,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     id: "psm-plugins",
     area: "plugins",
     group: "management",
-    icon: <Puzzle className="h-4 w-4" />,
+    icon: <Blocks className="h-4 w-4" />,
     labelKey: "settings.sections.psmPlugins",
     fallbackLabel: "PSM Plugins",
     descriptionKey: "settings.sectionDescriptions.psmPlugins",
@@ -369,7 +379,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     id: "psm-plugin-marketplace",
     area: "plugins",
     group: "distribution",
-    icon: <Download className="h-4 w-4" />,
+    icon: <Store className="h-4 w-4" />,
     labelKey: "settings.sections.psmPluginMarketplace",
     fallbackLabel: "Marketplace",
     descriptionKey: "settings.sectionDescriptions.psmPluginMarketplace",
@@ -380,7 +390,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     id: "psm-plugin-sources",
     area: "plugins",
     group: "distribution",
-    icon: <FolderOpen className="h-4 w-4" />,
+    icon: <FolderInput className="h-4 w-4" />,
     labelKey: "settings.sections.psmPluginSources",
     fallbackLabel: "Local Sources",
     descriptionKey: "settings.sectionDescriptions.psmPluginSources",
@@ -391,7 +401,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     id: "psm-plugin-dev",
     area: "plugins",
     group: "development",
-    icon: <Terminal className="h-4 w-4" />,
+    icon: <Code2 className="h-4 w-4" />,
     labelKey: "settings.sections.psmPluginDev",
     fallbackLabel: "Dev Mode",
     descriptionKey: "settings.sectionDescriptions.psmPluginDev",
@@ -402,7 +412,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     id: "psm-plugin-diagnostics",
     area: "plugins",
     group: "health",
-    icon: <Activity className="h-4 w-4" />,
+    icon: <HeartPulse className="h-4 w-4" />,
     labelKey: "settings.sections.psmPluginDiagnostics",
     fallbackLabel: "Diagnostics",
     descriptionKey: "settings.sectionDescriptions.psmPluginDiagnostics",
@@ -424,7 +434,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     id: "backup-restore",
     area: "config-center",
     group: "maintenance",
-    icon: <Download className="h-4 w-4" />,
+    icon: <Archive className="h-4 w-4" />,
     labelKey: "settings.sections.backupRestore",
     fallbackLabel: "Backup & Restore",
     descriptionKey: "settings.sectionDescriptions.backupRestore",
@@ -435,7 +445,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     id: "diagnostics-maintenance",
     area: "config-center",
     group: "maintenance",
-    icon: <Activity className="h-4 w-4" />,
+    icon: <Wrench className="h-4 w-4" />,
     labelKey: "settings.sections.diagnosticsMaintenance",
     fallbackLabel: "Diagnostics & Maintenance",
     descriptionKey: "settings.sectionDescriptions.diagnosticsMaintenance",
@@ -479,6 +489,7 @@ export const SETTINGS_GROUPS: SettingsGroupMeta[] = [
     labelKey: "settings.groups.sources",
     fallbackLabel: "Sessions",
     sections: [
+      "data-sources",
       "local-session-paths",
       "external-agent-sessions",
       "resume-targets",
@@ -534,6 +545,40 @@ export const SETTINGS_GROUPS: SettingsGroupMeta[] = [
     sections: ["backup-restore", "diagnostics-maintenance"],
   },
 ];
+
+export interface SettingsSaveHint {
+  key: string;
+  fallback: string;
+}
+
+/**
+ * Inline sections save in their own controls, but two of them behave
+ * differently and need accurate copy: Models requires an explicit
+ * "Save Config" click, and Server & Access mixes manual server settings
+ * with immediate key/remote actions.
+ */
+const SECTION_SAVE_HINTS: Partial<Record<SettingsSection, SettingsSaveHint>> = {
+  models: {
+    key: "settings.modelConfigCenter.status.manualSaveHint",
+    fallback: "Manual save required. Click Save Config to persist changes.",
+  },
+  "server-access": {
+    key: "settings.saveHints.serverAccess",
+    fallback:
+      "Server settings need Save below; API keys and remote access apply immediately.",
+  },
+};
+
+export function getSettingsSaveHint(
+  section: SettingsSection,
+): SettingsSaveHint {
+  return (
+    SECTION_SAVE_HINTS[section] ?? {
+      key: "settings.inlineSaveHint",
+      fallback: "Changes on this page save automatically as you adjust them.",
+    }
+  );
+}
 
 const STANDALONE_DATASET_SECTION_IDS: SettingsSection[] = [
   "appearance",

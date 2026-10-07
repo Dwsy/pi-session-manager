@@ -7,10 +7,14 @@ export const settings = {
   saved: "已保存",
   savedJustNow: "已保存",
   saving: "保存中…",
-  inlineSaveHint: "此页面通过自身控件独立保存。",
+  inlineSaveHint: "此页面的修改会随调整自动保存。",
   readOnlyHint: "此页面仅供查看。",
   reset: "重置设置",
-  confirmReset: "确定要重置所有设置吗？",
+  confirmReset:
+    "将应用偏好设置恢复为默认值？外观、语言、终端、会话浏览等应用设置会被重置；模型、Pi 资源与插件配置不受影响。",
+  saveHints: {
+    serverAccess: "服务器设置需点击下方保存；API 密钥与远程访问即时生效。",
+  },
   openConfigFolder: "打开配置文件夹",
   themeStudio: {
     open: "打开工作室",

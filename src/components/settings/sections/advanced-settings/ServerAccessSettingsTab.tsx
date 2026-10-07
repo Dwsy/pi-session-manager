@@ -6,31 +6,25 @@ import SettingsField from "@/components/settings/SettingsField";
 import SettingsInput from "@/components/settings/SettingsInput";
 import SettingsSelect from "@/components/settings/SettingsSelect";
 import SettingsToggleRow from "@/components/settings/SettingsToggleRow";
-import type { AdvancedSettingsMode, ServerSettings } from "./advancedSettingsTypes";
+import type { ServerSettings } from "./advancedSettingsTypes";
 
 interface ServerAccessSettingsTabProps {
   serverSettings: ServerSettings;
-  mode: AdvancedSettingsMode;
-  lightweightMode: boolean;
   serverDirty: boolean;
   inputAccentClass: string;
   selectAccentClass: string;
   isRemoteBind: boolean;
   onUpdateServer: <K extends keyof ServerSettings>(key: K, value: ServerSettings[K]) => void;
-  onToggleLightweightMode: (enabled: boolean) => void;
   onSaveServerSettings: () => void;
 }
 
 export default function ServerAccessSettingsTab({
   serverSettings,
-  mode,
-  lightweightMode,
   serverDirty,
   inputAccentClass,
   selectAccentClass,
   isRemoteBind,
   onUpdateServer,
-  onToggleLightweightMode,
   onSaveServerSettings,
 }: ServerAccessSettingsTabProps) {
   const { t } = useTranslation();
@@ -43,6 +37,7 @@ export default function ServerAccessSettingsTab({
             "WebSocket, HTTP API and authentication configuration",
           )}
           icon={<Server className="h-4 w-4" />}
+          searchKey="advanced-serverSection"
         >
           <div className="space-y-5">
             <SettingsField
@@ -147,21 +142,6 @@ export default function ServerAccessSettingsTab({
               descriptionClassName="text-xs text-muted-foreground mt-0.5"
               searchKey="advanced-auth"
             />
-
-            {mode === "all" && (
-              <SettingsToggleRow
-                title={t("settings.advanced.lightweightMode", "Lightweight mode")}
-                description={t(
-                  "settings.advanced.lightweightModeDesc",
-                  "When enabled, closing the window minimizes to system tray instead of quitting. Tray menu: Show / Open Web / Quit",
-                )}
-                checked={lightweightMode}
-                onChange={onToggleLightweightMode}
-                className="items-start py-2 border-t border-border/60"
-                descriptionClassName="text-xs text-muted-foreground mt-0.5"
-                searchKey="advanced-lightweightMode"
-              />
-            )}
 
             {serverDirty && (
               <div className="flex flex-wrap items-center gap-3 pt-2">

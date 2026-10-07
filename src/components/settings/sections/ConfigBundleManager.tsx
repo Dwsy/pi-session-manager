@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { useTranslation } from 'react-i18next';
+import { useEscapeToClose } from '@/components/dialogs/useEscapeToClose';
 import { invoke } from '@/transport';
 import SettingsCard from '@/components/settings/SettingsCard';
 import {
@@ -74,6 +75,11 @@ export function ConfigBundleManager() {
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+
+  // Nested overlays: consume Escape (capture phase) so closing them never
+  // also dismisses the whole settings panel.
+  useEscapeToClose(() => setConfirmDialog(null), !!confirmDialog);
+  useEscapeToClose(() => setShowPreview(false), showPreview);
 
   // Load import history from localStorage on mount
   useEffect(() => {
@@ -306,6 +312,7 @@ export function ConfigBundleManager() {
         title={t('settings.importExport.exportSection.title', 'Export Configuration')}
         description={t('settings.importExport.exportSection.description', 'Package all configuration files into a ZIP archive')}
         icon={<Package className="h-4 w-4" />}
+        searchKey="import-export"
       >
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">

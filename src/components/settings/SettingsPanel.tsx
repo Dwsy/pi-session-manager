@@ -2,10 +2,10 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useTranslation } from "react-i18next";
-import { ask as askNative } from "@tauri-apps/plugin-dialog";
 import type { AppSettings, SettingsArea, SettingsSection } from "./types";
 import { defaultSettings } from "./types";
 import { loadAppSettings, saveAppSettings } from "@/utils/settingsApi";
+import { askConfirm } from "@/utils/confirmDialog";
 import { applyPiChatTheme, resolvePiThemeColorScheme } from "@/utils/piTheme";
 import { useSettings as useAppSettingsContext } from "@/hooks/useSettings";
 import {
@@ -390,21 +390,12 @@ export default function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
   const resetSettings = async () => {
     const message = t(
       "settings.confirmReset",
-      "Are you sure you want to reset all settings?",
+      "Reset app preferences to defaults? Appearance, language, terminal, session viewer and other app settings will be reset. Model, Pi resource and plugin configurations are not affected.",
     );
-    let confirmed = false;
-    if (standaloneDatasetRuntime) {
-      confirmed = window.confirm(message);
-    } else {
-      try {
-        confirmed = await askNative(message, {
-          title: t("settings.reset", "Reset Settings"),
-          kind: "warning",
-        });
-      } catch {
-        confirmed = window.confirm(message);
-      }
-    }
+    const confirmed = await askConfirm(
+      message,
+      t("settings.reset", "Reset Settings"),
+    );
     if (!confirmed) {
       return;
     }

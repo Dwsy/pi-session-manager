@@ -3,7 +3,7 @@ export const settings = {
   subtitle: 'Personnalisez votre expérience',
   saved: 'Enregistré',
   reset: 'Réinitialiser les paramètres',
-  confirmReset: 'Êtes-vous sûr de vouloir réinitialiser tous les paramètres ?',
+  confirmReset: 'Réinitialiser les préférences de l’application par défaut ? L’apparence, la langue, le terminal, la visionneuse de sessions et d’autres paramètres seront réinitialisés. Les configurations des modèles, ressources Pi et plugins ne sont pas affectées.',
   openConfigFolder: 'Ouvrir le dossier de configuration',
   themeStudio: {
     title: 'Studio de thèmes',

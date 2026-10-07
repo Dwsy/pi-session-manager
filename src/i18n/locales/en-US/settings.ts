@@ -7,10 +7,15 @@ export const settings = {
   saved: "Saved",
   savedJustNow: "Saved",
   saving: "Saving…",
-  inlineSaveHint: "This page saves changes in its own controls.",
+  inlineSaveHint: "Changes on this page save automatically as you adjust them.",
   readOnlyHint: "This page is read-only.",
   reset: "Reset Settings",
-  confirmReset: "Are you sure you want to reset all settings?",
+  confirmReset:
+    "Reset app preferences to defaults? Appearance, language, terminal, session viewer and other app settings will be reset. Model, Pi resource and plugin configurations are not affected.",
+  saveHints: {
+    serverAccess:
+      "Server settings need Save below; API keys and remote access apply immediately.",
+  },
   openConfigFolder: "Open Config Folder",
   themeStudio: {
     open: "Open Studio",
