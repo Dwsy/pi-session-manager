@@ -98,7 +98,6 @@
 .session-tree-search {
   flex-shrink: 0;
   padding: 8px 10px;
-  border-bottom: 1px solid rgb(var(--color-border) / 0.65);
   background: rgb(var(--color-background));
 }
 
@@ -124,22 +123,27 @@
 
 .session-tree-search .search-input {
   width: 100%;
-  height: 30px;
+  height: 32px;
   padding: 5px 28px;
-  border: 1px solid rgb(var(--color-border) / 0.72);
-  border-radius: 6px;
-  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: rgb(var(--color-secondary) / 0.55);
   color: rgb(var(--color-foreground));
   font-family: inherit;
-  font-size: calc(var(--font-size-base, 16px) * 0.75);
+  font-size: 12px;
   transition:
     border-color var(--motion-duration-fast) var(--motion-ease-standard),
-    box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
+    box-shadow var(--motion-duration-fast) var(--motion-ease-standard),
+    background-color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.session-tree-search .search-input:hover {
+  background: rgb(var(--color-secondary) / 0.85);
 }
 
 .session-tree-search .search-input:focus {
   outline: none;
-  border-color: rgb(var(--color-ring) / 0.62);
+  border-color: rgb(var(--color-ring) / 0.55);
   background: rgb(var(--color-background));
   box-shadow: 0 0 0 2px rgb(var(--color-ring) / 0.14);
 }

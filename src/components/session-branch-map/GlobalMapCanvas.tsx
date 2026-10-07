@@ -1034,14 +1034,7 @@ function drawCanvas(
     projection.layout.model.terminalSegments,
     { accent: colors.accent, branches: colors.branchPalette },
   );
-  drawBackground(
-    ctx,
-    projection.layout,
-    transform,
-    colors,
-    branchColors,
-    state.mode,
-  );
+  drawBackground(ctx, projection.layout, transform, colors, state.mode);
   drawSegmentRails(
     ctx,
     projection.layout,
@@ -1087,7 +1080,6 @@ function drawBackground(
   layout: TopologyLayout,
   transform: CanvasTransform,
   colors: ColorSet,
-  branchColors: ReadonlyMap<string, string>,
   mode: "overview" | "atlas",
 ): void {
   ctx.fillStyle = colors.panel;
@@ -1111,10 +1103,7 @@ function drawBackground(
     const item = layout.segmentByUid.get(segment.uid);
     if (!item) continue;
     const x = transform.toScreen({ x: item.x, y: transform.worldTop }).x;
-    ctx.strokeStyle = alpha(
-      branchColors.get(segment.uid) ?? colors.borderStrong,
-      0.34,
-    );
+    ctx.strokeStyle = alpha(colors.border, mode === "atlas" ? 0.6 : 0.44);
     ctx.beginPath();
     ctx.moveTo(x + 0.5, transform.plotTop);
     ctx.lineTo(x + 0.5, transform.plotTop + transform.plotHeight);
@@ -1175,37 +1164,41 @@ function drawSegmentRails(
     ctx.stroke();
 
     if (state.settings.showSegmentLabels) {
+      const atlas = state.mode === "atlas";
+      const pillHeight = atlas ? 17 : 14;
       const labelY = clamp(
-        start.y - (state.mode === "atlas" ? 15 : 12),
+        start.y - (atlas ? 16 : 13),
         transform.plotTop + 3,
-        transform.plotTop + transform.plotHeight - 13,
+        transform.plotTop + transform.plotHeight - pillHeight - 3,
       );
       const label = item.segment.code;
-      ctx.font = `700 ${state.mode === "atlas" ? 9 : 7}px ${fontMono()}`;
-      const width = ctx.measureText(label).width + 10;
+      ctx.font = `700 ${atlas ? 10.5 : 9}px ${fontMono()}`;
+      const width = ctx.measureText(label).width + 12;
       const x = clamp(
         start.x - width / 2,
         transform.plotLeft,
         transform.plotLeft + transform.plotWidth - width,
       );
-      roundedRect(ctx, x, labelY, width, state.mode === "atlas" ? 15 : 12, 4);
+      roundedRect(ctx, x, labelY, width, pillHeight, 5);
       ctx.fillStyle = active
         ? alpha(colors.accent, 0.17)
-        : alpha(branchColor, 0.12);
+        : alpha(colors.panel, 0.88);
       ctx.fill();
       ctx.strokeStyle = active
         ? alpha(colors.accent, 0.78)
-        : alpha(branchColor, 0.7);
+        : selected
+          ? alpha(colors.text, 0.42)
+          : alpha(branchColor, 0.36);
       ctx.lineWidth = 1;
       ctx.stroke();
-      ctx.fillStyle = active ? colors.accentStrong : branchColor;
+      ctx.fillStyle = active
+        ? colors.accentStrong
+        : selected
+          ? colors.text
+          : colors.muted;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(
-        label,
-        x + width / 2,
-        labelY + (state.mode === "atlas" ? 7.5 : 6),
-      );
+      ctx.fillText(label, x + width / 2, labelY + pillHeight / 2);
       ctx.textAlign = "start";
       ctx.textBaseline = "alphabetic";
       rectHits.push({
@@ -1213,7 +1206,7 @@ function drawSegmentRails(
         x,
         y: labelY,
         width,
-        height: state.mode === "atlas" ? 15 : 12,
+        height: pillHeight,
         segment: item.segment,
       });
     }
@@ -1283,17 +1276,19 @@ function drawForks(
     });
 
     if (state.settings.showForkLabels) {
-      ctx.font = `800 ${state.mode === "atlas" ? 9 : 7}px ${fontMono()}`;
-      ctx.fillStyle = active ? colors.accentStrong : colors.warning;
+      ctx.font = `700 ${state.mode === "atlas" ? 10.5 : 9}px ${fontMono()}`;
       const spread = mapLayoutSpread(
         transform,
         state.mode,
         state.settings.smartMapLayout,
       );
-      ctx.fillText(
+      drawLabelWithHalo(
+        ctx,
         fork.code,
         p.x + (radius + 4 * spread),
         p.y - (radius + 2 * spread),
+        active ? colors.accentStrong : alpha(colors.warning, 0.85),
+        colors.panel,
       );
     }
   }
@@ -1324,16 +1319,18 @@ function drawForks(
       priority: active ? 10 : 5,
     });
 
-    ctx.font = `800 ${state.mode === "atlas" ? 9 : 7}px ${fontMono()}`;
+    ctx.font = `700 ${state.mode === "atlas" ? 10.5 : 9}px ${fontMono()}`;
     ctx.textAlign = "center";
-    ctx.fillStyle = active ? colors.accentStrong : branchColor;
-    ctx.fillText(
+    drawLabelWithHalo(
+      ctx,
       `L${index + 1}`,
       p.x,
       Math.min(
         transform.height - 4,
         p.y + radius + (state.mode === "atlas" ? 14 : 11),
       ),
+      active ? colors.accentStrong : alpha(branchColor, selected ? 0.95 : 0.78),
+      colors.panel,
     );
     ctx.textAlign = "start";
   });
@@ -1513,16 +1510,16 @@ function drawNotes(
         return;
       }
 
-      ctx.font = `700 ${state.mode === "atlas" ? 9 : 7}px ${fontMono()}`;
+      ctx.font = `700 ${state.mode === "atlas" ? 10.5 : 9}px ${fontMono()}`;
       const label =
         state.mode === "atlas"
           ? `${noteTypeAbbreviation(note.type)} · ${note.shortLabel}`
           : `${noteTypeAbbreviation(note.type)} ${note.shortLabel}`;
       const textWidth = Math.min(
-        state.mode === "atlas" ? 180 : 125,
+        state.mode === "atlas" ? 200 : 140,
         ctx.measureText(label).width + 14,
       );
-      const height = state.mode === "atlas" ? 18 : 15;
+      const height = state.mode === "atlas" ? 20 : 17;
       const calloutGap = 8 * spread;
       let x = side > 0 ? glyphX + calloutGap : glyphX - textWidth - calloutGap;
       let y = glyphY - height / 2;
@@ -1594,7 +1591,7 @@ function drawAxis(
   colors: ColorSet,
   mode: "overview" | "atlas",
 ): void {
-  ctx.font = `600 ${mode === "atlas" ? 9 : 7}px ${fontMono()}`;
+  ctx.font = `600 ${mode === "atlas" ? 10 : 8.5}px ${fontMono()}`;
   ctx.fillStyle = colors.muted;
   ctx.textBaseline = "middle";
   const count = mode === "atlas" ? 5 : 2;
@@ -1607,18 +1604,28 @@ function drawAxis(
       layout.axis === "sequence"
         ? `#${formatNumber(axisValue.sequence)}`
         : formatTimestamp(axisValue.timeMs).slice(mode === "atlas" ? 0 : -8);
-    ctx.fillText(label, mode === "atlas" ? 7 : 3, y);
+    drawLabelWithHalo(
+      ctx,
+      label,
+      mode === "atlas" ? 7 : 3,
+      y,
+      colors.muted,
+      colors.panel,
+    );
   }
   ctx.textBaseline = "alphabetic";
 
   if (mode === "overview") {
     ctx.textAlign = "right";
-    ctx.fillText(
+    drawLabelWithHalo(
+      ctx,
       layout.axis === "sequence"
         ? "sequence"
         : formatDuration(layout.maxTime - layout.minTime),
       transform.width - 5,
       transform.height - 5,
+      colors.muted,
+      colors.panel,
     );
     ctx.textAlign = "start";
   }
@@ -1632,15 +1639,15 @@ function drawSemanticBadge(
   mode: "overview" | "atlas",
 ): void {
   const label = `${formatNumber(model.segments.length)} linear segments · ${formatNumber(model.forks.length)} forks · level ${formatNumber(model.maxBranchLevel)}`;
-  ctx.font = `700 ${mode === "atlas" ? 9 : 7}px ${fontMono()}`;
+  ctx.font = `600 ${mode === "atlas" ? 10 : 8.5}px ${fontMono()}`;
   const width = ctx.measureText(label).width + 14;
-  const height = mode === "atlas" ? 18 : 14;
+  const height = mode === "atlas" ? 20 : 16;
   const x = transform.plotLeft + 4;
   const y = transform.plotTop + 4;
-  roundedRect(ctx, x, y, width, height, 5);
+  roundedRect(ctx, x, y, width, height, 6);
   ctx.fillStyle = alpha(colors.panel2, 0.94);
   ctx.fill();
-  ctx.strokeStyle = alpha(colors.accent, 0.35);
+  ctx.strokeStyle = alpha(colors.accent, 0.28);
   ctx.stroke();
   ctx.fillStyle = colors.textSecondary;
   ctx.textBaseline = "middle";
@@ -1950,12 +1957,13 @@ function readColors(): ColorSet {
     purple: rgbToken("--color-purple", accent),
     cyan: rgbToken("--color-info", accent),
     branchPalette: [
-      accent,
-      rgbToken("--color-info", accent),
-      rgbToken("--color-success", accent),
-      rgbToken("--color-purple", accent),
-      rgbToken("--color-warning", accent),
-      rgbToken("--color-cyan", rgbToken("--color-info", accent)),
+      raw("--branch-palette-0") || accent,
+      raw("--branch-palette-1") || rgbToken("--color-info", accent),
+      raw("--branch-palette-2") || rgbToken("--color-success", accent),
+      raw("--branch-palette-3") || rgbToken("--color-purple", accent),
+      raw("--branch-palette-4") || rgbToken("--color-warning", accent),
+      raw("--branch-palette-5") ||
+        rgbToken("--color-cyan", rgbToken("--color-info", accent)),
     ],
   };
 }
@@ -1975,6 +1983,23 @@ function alpha(color: string, opacity: number): string {
     return `rgba(${Number.parseInt(hex.slice(0, 2), 16)}, ${Number.parseInt(hex.slice(2, 4), 16)}, ${Number.parseInt(hex.slice(4, 6), 16)}, ${opacity})`;
   }
   return color;
+}
+
+/** Canvas text with a panel-colored halo so labels stay legible over rails. */
+function drawLabelWithHalo(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  fill: string,
+  panel: string,
+): void {
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = alpha(panel, 0.85);
+  ctx.lineWidth = 3;
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
 }
 
 function fontMono(): string {

@@ -48,7 +48,7 @@ import SessionTreeSearch, {
   type SessionTreeSearchRef,
 } from "./SessionTreeSearch";
 
-const ROW_HEIGHT = 36;
+const ROW_HEIGHT = 40;
 const OVERSCAN = 10;
 const MAP_COLLAPSED_STORAGE_KEY = "pi-session-manager:branch-map-collapsed";
 const FILTERS: Array<{
@@ -936,6 +936,7 @@ function EntryRow({
 }) {
   const { t } = useTranslation();
   const { node } = item;
+  // Plain linear rows are the default; labelling every one of them is noise.
   const relationLabel =
     node.relation === "branch-start"
       ? t(
@@ -949,10 +950,7 @@ function EntryRow({
               "components.branchMap.entry.relation.forkAnchor",
               "Fork anchor",
             )
-          : t(
-              "components.branchMap.entry.relation.linear",
-              "Linear continuation",
-            );
+          : null;
   return (
     <div
       className={[
@@ -997,7 +995,8 @@ function EntryRow({
           <span>{truncate(node.summary, 180)}</span>
         </div>
         <small>
-          {relationLabel} · {node.id} · {formatTimestamp(node.timestampMs).slice(-8)}
+          {relationLabel ? `${relationLabel} · ` : ""}
+          {node.id} · {formatTimestamp(node.timestampMs).slice(-8)}
         </small>
       </div>
       {item.isForkAnchor ? (
