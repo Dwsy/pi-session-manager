@@ -902,7 +902,7 @@ export const settings = {
     demoModeHelp: "查看演示数据以探索所有功能",
     lightweightMode: "关闭时最小化到托盘",
     lightweightModeDesc:
-      "开启后，关闭窗口将最小化到系统托盘而非退出。托盘菜单：显示 / 打开网页版 / 退出",
+      "开启后，关闭窗口将最小化到系统托盘而非退出。也可以在托盘右键菜单中直接勾选切换。",
     clearCache: "清除缓存",
     cacheCleared: "缓存已清除",
     clearCacheConfirm:

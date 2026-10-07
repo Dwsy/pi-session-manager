@@ -272,7 +272,7 @@ export const settings = {
     demoMode: 'Demo-Modus',
     demoModeHelp: 'Demo-Daten anzeigen, um alle Funktionen zu erkunden',
     lightweightMode: 'Beim Schließen in den Systemabschnitt minimieren',
-    lightweightModeDesc: 'Wenn aktiviert, wird das Fenster beim Schließen in den Systemabschnitt minimiert statt beendet. Tray-Menü: Anzeigen / Web öffnen / Beenden',
+    lightweightModeDesc: 'Wenn aktiviert, wird das Fenster beim Schließen in den Systemabschnitt minimiert statt beendet. Auch über das Rechtsklick-Menü des Trays umschaltbar',
     clearCache: 'Cache leeren',
     cacheCleared: 'Cache geleert',
     clearCacheConfirm: 'Möchten Sie wirklich alle zwischengespeicherten Daten löschen? Alle Sitzungs-Caches werden gelöscht, Favoriten bleiben erhalten.',

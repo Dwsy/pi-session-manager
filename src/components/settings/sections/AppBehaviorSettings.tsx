@@ -12,7 +12,7 @@ import {
   type DashboardRecapAutoPeriod,
 } from "@/components/dashboard/dashboardRecap";
 import type { RecapPeriodKind } from "@/components/dashboard/recap/recapTypes";
-import { invoke } from "@/transport";
+import { invoke, listen } from "@/transport";
 
 const RECAP_KINDS: { kind: RecapPeriodKind; key: string; fallback: string }[] = [
   { kind: "week", key: "settings.appBehavior.openWeekRecap", fallback: "This week" },
@@ -64,6 +64,13 @@ export default function AppBehaviorSettings(_: UpdateSettingsProps) {
     invoke<boolean>("get_lightweight_mode")
       .then(setLightweightMode)
       .catch(console.error);
+    // Keep the toggle in sync when the setting is changed from the tray menu.
+    const unlisten = listen<boolean>("lightweight-mode-changed", ({ payload }) => {
+      setLightweightMode(payload);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
   }, []);
 
   const handleToggleLightweightMode = async (enabled: boolean) => {

@@ -958,7 +958,7 @@ export const settings = {
     demoModeHelp: "View demo data to explore all features",
     lightweightMode: "Minimize to tray on close",
     lightweightModeDesc:
-      "When enabled, closing the window minimizes to system tray instead of quitting. Tray menu: Show / Open Web / Quit",
+      "When enabled, closing the window minimizes to system tray instead of quitting. Also toggleable from the tray right-click menu.",
     clearCache: "Clear Cache",
     cacheCleared: "Cache cleared",
     clearCacheConfirm:

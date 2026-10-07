@@ -490,6 +490,7 @@ fn main() {
             pi_session_manager::download_and_install_app_update,
             pi_session_manager::get_lightweight_mode,
             pi_session_manager::set_lightweight_mode,
+            pi_session_manager::set_tray_language,
             pi_session_manager::open_session_in_terminal,
             pi_session_manager::update_macos_dock_recent_sessions,
             pi_session_manager::list_available_terminals,

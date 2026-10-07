@@ -275,7 +275,7 @@ export const settings = {
     demoMode: 'デモモード',
     demoModeHelp: 'デモデータで全機能を体験',
     lightweightMode: '閉じるときにトレイへ最小化',
-    lightweightModeDesc: '有効にすると、ウィンドウを閉じても終了せずシステムトレイに最小化されます。トレイメニュー: 表示 / ウェブを開く / 終了',
+    lightweightModeDesc: '有効にすると、ウィンドウを閉じても終了せずシステムトレイに最小化されます。トレイの右クリックメニューからも切り替えできます',
     clearCache: 'キャッシュをクリア',
     cacheCleared: 'キャッシュをクリアしました',
     clearCacheConfirm: 'すべてのキャッシュデータをクリアしますか？セッションキャッシュは削除されますが、お気に入りは保持されます。',

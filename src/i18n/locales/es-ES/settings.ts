@@ -225,7 +225,7 @@ export const settings = {
     demoMode: 'Modo demo',
     demoModeHelp: 'Ver datos de demostración para explorar todas las funciones',
     lightweightMode: 'Minimizar a la bandeja al cerrar',
-    lightweightModeDesc: 'Al activar, cerrar la ventana minimiza a la bandeja del sistema en lugar de salir. Menú de bandeja: Mostrar / Abrir web / Salir',
+    lightweightModeDesc: 'Al activar, cerrar la ventana minimiza a la bandeja del sistema en lugar de salir. También se puede cambiar desde el menú contextual de la bandeja',
     clearCache: 'Limpiar caché',
     cacheCleared: 'Caché limpiada',
     clearCacheConfirm: '¿Seguro que quieres limpiar todos los datos en caché? Se eliminarán todas las cachés de sesión pero se conservarán los favoritos.',

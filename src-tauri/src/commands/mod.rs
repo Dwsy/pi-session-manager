@@ -113,6 +113,16 @@ pub async fn get_lightweight_mode() -> Result<bool, String> {
 #[tauri::command]
 pub async fn set_lightweight_mode(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
     crate::settings_store::set("lightweight_mode", &enabled)?;
+    crate::tray::sync_lightweight_item(&app, enabled);
     crate::tray::emit_lightweight_mode_changed(&app, enabled);
+    Ok(())
+}
+
+/// Rebuild the tray menu with labels for `lang` (called when the UI language
+/// changes in the frontend).
+#[cfg(feature = "gui")]
+#[tauri::command]
+pub async fn set_tray_language(app: tauri::AppHandle, lang: String) -> Result<(), String> {
+    crate::tray::set_tray_language(&app, &lang);
     Ok(())
 }

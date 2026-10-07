@@ -1,6 +1,7 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
+import { invoke, isTauri } from '@/transport'
 import { enUS } from './locales/en-US/index'
 import { zhCN } from './locales/zh-CN/index'
 import { jaJP } from './locales/ja-JP/index'
@@ -49,5 +50,16 @@ i18n
       lookupLocalStorage: 'app-language',
     },
   })
+
+// Keep the native tray menu language in sync (desktop app only).
+function syncTrayLanguage(lang: string) {
+  if (!isTauri()) return
+  invoke('set_tray_language', { lang }).catch(() => {
+    // No tray in CLI/remote backends; safe to ignore.
+  })
+}
+
+i18n.on('languageChanged', (lang) => syncTrayLanguage(lang))
+syncTrayLanguage(i18n.language)
 
 export default i18n
