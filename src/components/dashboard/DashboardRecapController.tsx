@@ -4,6 +4,8 @@ import { getRuntimeStats } from '@/runtime-data/sessionSource'
 import { useRecapEasterEgg } from '@/hooks/useRecapEasterEgg'
 import DashboardRecapModal from './DashboardRecapModal'
 import { filterSessionsByPeriod } from './dashboardInsights'
+import { getPreviousRecapPeriod } from './recap/recapPeriods'
+import type { RecapPreviousData } from './recap/recapReport'
 import {
   DASHBOARD_RECAP_EVENT,
   DASHBOARD_RECAP_SETTINGS_EVENT,
@@ -29,6 +31,7 @@ export default function DashboardRecapController({ sessions }: DashboardRecapCon
   const [request, setRequest] = useState<DashboardRecapRequest | null>(null)
   const [periodSessions, setPeriodSessions] = useState<SessionInfo[]>([])
   const [stats, setStats] = useState<SessionStats | null>(null)
+  const [previous, setPrevious] = useState<RecapPreviousData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const openedAutomaticCycleRef = useRef<string | null>(null)
@@ -39,6 +42,7 @@ export default function DashboardRecapController({ sessions }: DashboardRecapCon
     setRequest(nextRequest)
     setPeriodSessions(matchingSessions)
     setStats(null)
+    setPrevious(null)
     setError(null)
     if (nextRequest.source === 'automatic') {
       openedAutomaticCycleRef.current = cycleKey
@@ -49,7 +53,17 @@ export default function DashboardRecapController({ sessions }: DashboardRecapCon
     }
     setLoading(true)
     try {
-      setStats(await getRuntimeStats(matchingSessions))
+      const previousPeriod = getPreviousRecapPeriod(nextRequest.period)
+      const previousSessions = filterSessionsByPeriod(sessions, previousPeriod.start, previousPeriod.end)
+      const [currentStats, previousStats] = await Promise.all([
+        getRuntimeStats(matchingSessions),
+        // The comparison is best-effort: a failure here must never block the recap itself.
+        previousSessions.length > 0
+          ? getRuntimeStats(previousSessions).catch(() => null)
+          : Promise.resolve(null),
+      ])
+      setStats(currentStats)
+      setPrevious(previousStats ? { sessions: previousSessions, stats: previousStats } : null)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
@@ -112,6 +126,7 @@ export default function DashboardRecapController({ sessions }: DashboardRecapCon
       request={request}
       sessions={periodSessions}
       stats={stats}
+      previous={previous}
       loading={loading}
       error={error}
       onRetry={handleRetry}
