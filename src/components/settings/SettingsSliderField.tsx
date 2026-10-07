@@ -53,7 +53,7 @@ export default function SettingsSliderField({
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className={`flex-1 h-2 bg-secondary rounded-lg appearance-none accent-info ${sliderClassName}`}
+          className={`flex-1 settings-accent-color ${sliderClassName}`}
         />
         <span className={`text-sm text-muted-foreground text-right ${valueClassName}`}>
           {valueText ?? value}

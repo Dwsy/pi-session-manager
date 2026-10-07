@@ -212,6 +212,13 @@
     border-color: color-mix(in srgb, var(--accent, rgb(var(--color-info))) 72%, transparent);
   }
 
+  // Native controls (range slider, checkbox, radio): paint fill/thumb with the
+  // active accent instead of the engine default.
+  .theme-accent-color,
+  .settings-accent-color {
+    accent-color: var(--accent, rgb(var(--color-info)));
+  }
+
   // Native-feel section label: replaces uppercase + 0.12em tracking heading
   // pattern that telegraphs Web/SaaS design.
   .settings-section-label {

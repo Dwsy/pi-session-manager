@@ -841,7 +841,7 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
               type="button"
               disabled={disabled}
               onClick={() => void updatePluginSetting(plugin, definition.key, !Boolean(value))}
-              className={`inline-flex h-8 min-w-[84px] items-center justify-center rounded-md border px-2.5 text-xs font-medium ${Boolean(value) ? "border-info/35 bg-info/12 text-foreground" : "border-border bg-background/70 text-muted-foreground"}`}
+              className={`inline-flex h-8 min-w-[84px] items-center justify-center rounded-md border px-2.5 text-xs font-medium ${Boolean(value) ? "settings-accent-bg-soft settings-accent-ring settings-accent-fg border-transparent" : "border-border bg-background/70 text-muted-foreground"}`}
             >
               {Boolean(value) ? t("settings.psmPlugins.enabled", "Enabled") : t("settings.psmPlugins.disabled", "Disabled")}
             </button>

@@ -285,12 +285,12 @@ export default function ExternalSessionsSettings({
                           }
                           className={`inline-flex min-w-[124px] items-center justify-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
                             resumeChecked
-                              ? "border-info/40 bg-info/15 text-foreground"
+                              ? "settings-accent-bg-soft settings-accent-ring settings-accent-fg border-transparent"
                               : "border-border/60 bg-background/40 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
                           }`}
                         >
                           {resumeChecked ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-info" />
+                            <CheckCircle2 className="h-3.5 w-3.5 settings-accent-fg" />
                           ) : (
                             <Circle className="h-3.5 w-3.5" />
                           )}

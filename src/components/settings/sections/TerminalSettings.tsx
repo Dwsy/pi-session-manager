@@ -345,7 +345,7 @@ export default function TerminalSettings({
                       }
                       className={`px-4 py-2 rounded-lg border text-sm motion-surface motion-color focus-ring ${
                         settings.terminal.defaultShell === shell.path
-                          ? "border-info bg-info/10 text-foreground"
+                          ? "settings-accent-bg-soft settings-accent-ring settings-accent-fg border-transparent font-medium"
                           : "border-border text-muted-foreground hover:border-border-hover hover:text-foreground"
                       }`}
                     >
@@ -409,7 +409,7 @@ export default function TerminalSettings({
                   }
                   className={`relative p-3 rounded-lg border text-left motion-surface motion-color focus-ring ${
                     settings.terminal.defaultTerminal === term.id
-                      ? "border-info bg-info/10"
+                      ? "settings-accent-bg-soft settings-accent-ring border-transparent"
                       : "border-border hover:border-border-hover"
                   }`}
                 >

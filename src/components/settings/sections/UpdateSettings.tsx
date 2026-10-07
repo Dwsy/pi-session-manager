@@ -228,7 +228,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
           {status.kind === 'installing' && (
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full bg-primary motion-width"
+                className="h-full rounded-full settings-accent-bg-strong motion-width"
                 style={{ width: `${Math.max(Math.min(status.progress, 100), 4)}%` }}
               />
             </div>

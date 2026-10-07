@@ -163,7 +163,7 @@ function TagNodeContent({
           </div>
           {rules.map((rule, i) => (
             <div key={i} className="flex items-center gap-2">
-              <input type="checkbox" checked={rule.enabled} onChange={e => { const next = [...rules]; next[i] = { ...rule, enabled: e.target.checked }; saveRules(tag.id, next) }} className="h-3.5 w-3.5 rounded" />
+              <input type="checkbox" checked={rule.enabled} onChange={e => { const next = [...rules]; next[i] = { ...rule, enabled: e.target.checked }; saveRules(tag.id, next) }} className="h-3.5 w-3.5 settings-accent-color rounded" />
               <input value={rule.pattern} onChange={e => { const next = [...rules]; next[i] = { ...rule, pattern: e.target.value }; saveRules(tag.id, next) }} placeholder={t('tags.autoRules.pattern')} className={`flex-1 px-2 py-1 bg-surface border rounded text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-info ${rule.pattern && !isValidRegex(rule.pattern) ? 'border-red-500' : 'border-border'}`} />
               <input value={rule.description || ''} onChange={e => { const next = [...rules]; next[i] = { ...rule, description: e.target.value }; saveRules(tag.id, next) }} placeholder={t('tags.autoRules.description')} className="w-28 px-2 py-1 bg-surface border border-border rounded text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-info" />
               <button onClick={() => saveRules(tag.id, rules.filter((_, j) => j !== i))} className="p-0.5 text-muted-foreground/40 hover:text-red-500"><Trash2 className="h-3 w-3" /></button>

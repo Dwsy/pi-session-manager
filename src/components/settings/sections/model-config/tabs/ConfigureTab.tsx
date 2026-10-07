@@ -797,7 +797,7 @@ export function ConfigureTab({
                             authHeader: e.target.checked,
                           }))
                         }
-                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+                        className="h-4 w-4 rounded border-border settings-accent-color"
                       />
                       <span>
                         {t(

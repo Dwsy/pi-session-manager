@@ -145,7 +145,7 @@ export default function SessionDatasetSettings({
                             onClick={() => onApplyStandaloneDataset(dataset.id)}
                             className={`w-full rounded-lg border px-4 py-3 text-left transition-colors ${
                               isCurrent
-                                ? "border-info bg-info/10"
+                                ? "settings-accent-bg-soft settings-accent-ring border-transparent"
                                 : "border-border bg-background/60 hover:border-border-hover"
                             }`}
                           >
@@ -187,7 +187,7 @@ export default function SessionDatasetSettings({
                               <div
                                 className={`mt-0.5 h-4 w-4 rounded-full border ${
                                   isCurrent
-                                    ? "border-info bg-info"
+                                    ? "settings-accent-bg-strong settings-accent-border"
                                     : "border-border"
                                 }`}
                               />
@@ -325,7 +325,7 @@ export default function SessionDatasetSettings({
                         key={dataset.id}
                         className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-3 motion-color ${
                           checked
-                            ? "border-info bg-info/10"
+                            ? "settings-accent-bg-soft settings-accent-ring border-transparent"
                             : "border-border bg-background/50 hover:border-border-hover"
                         }`}
                       >
@@ -358,7 +358,7 @@ export default function SessionDatasetSettings({
                               e.target.checked,
                             )
                           }
-                          className="mt-1 h-4 w-4 accent-info"
+                          className="mt-1 h-4 w-4 settings-accent-color"
                         />
                       </label>
                     );

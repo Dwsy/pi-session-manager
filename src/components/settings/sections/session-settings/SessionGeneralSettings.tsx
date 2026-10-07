@@ -50,7 +50,7 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
                         parseInt(e.target.value),
                       )
                     }
-                    className="flex-1 h-2 bg-secondary rounded-lg appearance-none accent-info"
+                    className="flex-1 settings-accent-color"
                   />
                   <span className="w-16 text-right text-sm text-muted-foreground">
                     {settings.session.refreshInterval}s
@@ -69,7 +69,7 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
                     onClick={() => onUpdate("session", "defaultViewMode", mode)}
                     className={`rounded-lg border py-2 text-sm motion-context ${
                       settings.session.defaultViewMode === mode
-                        ? "border-info bg-info/10 text-foreground"
+                        ? "settings-accent-bg-soft settings-accent-ring settings-accent-fg border-transparent font-medium"
                         : "border-border text-muted-foreground hover:border-border-hover"
                     }`}
                   >
@@ -112,7 +112,7 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
                         parseInt(e.target.value),
                       )
                     }
-                    className="flex-1 h-2 bg-secondary rounded-lg appearance-none accent-info"
+                    className="flex-1 settings-accent-color"
                   />
                   <span className="w-8 text-right text-sm text-muted-foreground">
                     {settings.session.previewLines}
@@ -271,7 +271,7 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
                     }
                     className={`rounded-lg border py-2 text-sm motion-context ${
                       settings.session.openPosition === position
-                        ? "border-info bg-info/10 text-foreground"
+                        ? "settings-accent-bg-soft settings-accent-ring settings-accent-fg border-transparent font-medium"
                         : "border-border text-muted-foreground hover:border-border-hover"
                     }`}
                   >
