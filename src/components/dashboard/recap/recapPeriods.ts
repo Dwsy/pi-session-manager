@@ -144,6 +144,21 @@ export function getRecapPeriod(kind: RecapPeriodKind, anchor: Date): RecapPeriod
   return buildYearPeriod(anchor)
 }
 
+/** The period of the same kind immediately before `period` (or the same half/year a year earlier). */
+export function getPreviousRecapPeriod(period: RecapPeriod): RecapPeriod {
+  const { start } = period
+  if (period.kind === 'week') {
+    return getRecapPeriod('week', new Date(start.getFullYear(), start.getMonth(), start.getDate() - 7))
+  }
+  if (period.kind === 'month') {
+    return getRecapPeriod('month', new Date(start.getFullYear(), start.getMonth() - 1, 1))
+  }
+  if (period.kind === 'quarter') {
+    return getRecapPeriod('quarter', new Date(start.getFullYear(), start.getMonth() - 3, 1))
+  }
+  return getRecapPeriod(period.kind, new Date(start.getFullYear() - 1, 0, 1))
+}
+
 export function getAutomaticRecapPeriod(now: Date): RecapPeriod | null {
   const year = now.getFullYear()
   const monthIndex = now.getMonth()
