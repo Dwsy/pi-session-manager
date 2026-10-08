@@ -33,6 +33,15 @@ function message(id: string, role: string, text: string): SessionEntry {
   };
 }
 
+function stringContentMessage(id: string, role: string, content: string): SessionEntry {
+  return {
+    type: "message",
+    id,
+    timestamp: "2026-05-19T00:00:00.000Z",
+    message: { role, content },
+  } as unknown as SessionEntry;
+}
+
 function toolCall(id: string, name: string): SessionEntry {
   return {
     type: "message",
@@ -88,6 +97,34 @@ describe("buildConversationPreviewTurns", () => {
       dispatchEvent: vi.fn(),
     }));
   });
+  it("groups and renders entries with string content without crashing", () => {
+    const entries = [
+      stringContentMessage("system-1", "system", ""),
+      stringContentMessage("user-1", "user", "Search prompt"),
+      stringContentMessage("assistant-1", "assistant", "Search response"),
+      stringContentMessage("assistant-empty", "assistant", ""),
+    ];
+
+    expect(() => buildConversationPreviewTurns(entries)).not.toThrow();
+    expect(() => buildToolCallPreviewSegments(entries)).not.toThrow();
+
+    render(
+      <Providers>
+        <ConversationPreviewMessages
+          entries={entries}
+          toolResultByCallId={new Map()}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+        />
+      </Providers>,
+    );
+
+    expect(screen.getByText("Search prompt")).toBeTruthy();
+    expect(screen.getByText("Search response")).toBeTruthy();
+  });
+
   it("starts a visible turn from a developer message", () => {
     const turns = buildConversationPreviewTurns([
       message("dev-1", "developer", "Continue active goal"),

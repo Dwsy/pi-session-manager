@@ -4,7 +4,8 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionEntry } from "@/types";
 import { useSessionViewerData } from "./useSessionViewerData";
-import { listen } from "@/transport";
+import { invoke, listen } from "@/transport";
+import { psmRuntimeEventBus } from "@/plugins/runtime-host/eventBus";
 import {
   getPreviewEntriesFromDB,
   readRuntimeSessionChunk,
@@ -42,8 +43,71 @@ function sessionEntry(): SessionEntry {
 describe("useSessionViewerData", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    psmRuntimeEventBus.clear();
     vi.mocked(listen).mockResolvedValue(() => undefined);
     vi.mocked(shouldListenRuntimeSessionEvents).mockReturnValue(false);
+  });
+
+  it("normalizes string content in get_pi_agent_entries responses", async () => {
+    vi.mocked(invoke).mockResolvedValue([
+      { type: "message", id: "system-1", message: { role: "system", content: "" } },
+      { type: "message", id: "assistant-1", message: { role: "assistant", content: "hi" } },
+    ]);
+
+    const isAtBottomRef = { current: true };
+    const { result } = renderHook(() => useSessionViewerData({
+      sessionPath: "/tmp/.pi/agent/sessions/live-1.jsonl",
+      loadErrorMessage: "failed",
+      isAtBottomRef,
+      isLive: true,
+    }));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(readRuntimeSessionChunk).not.toHaveBeenCalled();
+    expect(result.current.entries[0].message?.content).toEqual([]);
+    expect(result.current.entries[1].message?.content).toEqual([{ type: "text", text: "hi" }]);
+  });
+
+  it("normalizes reconnect and realtime message content", async () => {
+    const subscribeSpy = vi.spyOn(psmRuntimeEventBus, "subscribe");
+    vi.mocked(shouldListenRuntimeSessionEvents).mockReturnValue(true);
+    vi.mocked(readRuntimeSessionChunk).mockResolvedValue({
+      content: "",
+      next_offset: 0,
+      file_size: 0,
+      has_more: false,
+    });
+
+    const isAtBottomRef = { current: true };
+    const { result } = renderHook(() => useSessionViewerData({
+      sessionPath: "/tmp/.pi/agent/sessions/realtime.jsonl",
+      loadErrorMessage: "failed",
+      isAtBottomRef,
+    }));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(subscribeSpy).toHaveBeenCalledWith("message_start", expect.any(Function)));
+
+    act(() => psmRuntimeEventBus.emit("pi-live:session_registered", {
+      sessionId: "realtime",
+      entries: [{ type: "message", id: "system-1", message: { role: "system", content: "" } }],
+    }));
+    expect(result.current.entries[0].message?.content).toEqual([]);
+
+    act(() => psmRuntimeEventBus.emit("message_start", {
+      sessionId: "realtime",
+      message: { id: "user-1", role: "user", content: "hello" },
+    }));
+    expect(result.current.entries.find(e => e.id === "user-1")?.message?.content)
+      .toEqual([{ type: "text", text: "hello" }]);
+
+    act(() => psmRuntimeEventBus.emit("turn_end", {
+      sessionId: "realtime",
+      message: { id: "assistant-1", role: "assistant", content: "done" },
+    }));
+    expect(result.current.entries.find(e => e.id === "assistant-1")?.message?.content)
+      .toEqual([{ type: "text", text: "done" }]);
+    subscribeSpy.mockRestore();
   });
 
   it("falls back to JSONL preview when DB preview has no messages", async () => {

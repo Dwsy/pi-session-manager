@@ -1,7 +1,38 @@
 import { describe, it, expect } from 'vitest';
 
 import { buildActivePathIds } from './session-tree';
-import { findToolResult, getSessionSourceSlug, getSessionSourceTag, parseSessionEntriesWithLineCount } from './session';
+import { findToolResult, getSessionSourceSlug, getSessionSourceTag, normalizePiContent, normalizePiMessageEntries, parseSessionEntriesWithLineCount } from './session';
+
+describe('Pi content normalization', () => {
+  it('coerces unexpected content values while preserving arrays', () => {
+    const parts = [{ type: 'text', text: 'ready' }];
+    expect(normalizePiContent(parts)).toBe(parts);
+    expect(normalizePiContent('hello')).toEqual([{ type: 'text', text: 'hello' }]);
+    expect(normalizePiContent('')).toEqual([]);
+    expect(normalizePiContent(null)).toEqual([]);
+    expect(normalizePiContent(undefined)).toEqual([]);
+    expect(normalizePiContent({ type: 'thinking', thinking: 'wait' })).toEqual([
+      { type: 'thinking', thinking: 'wait' },
+    ]);
+  });
+
+  it('normalizes externally supplied entries without mutating the source', () => {
+    const raw = [
+      { type: 'message', id: 'system', message: { role: 'system', content: '' } },
+      { type: 'message', id: 'user', message: { role: 'user', content: 'hello' } },
+      { type: 'message', id: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'ok' }] } },
+      { type: 'session', id: 'start' },
+    ];
+    const entries = normalizePiMessageEntries(raw as any);
+
+    expect(entries[0].message?.content).toEqual([]);
+    expect(entries[1].message?.content).toEqual([{ type: 'text', text: 'hello' }]);
+    expect(entries[2]).toBe(raw[2]);
+    expect(entries[3]).toBe(raw[3]);
+    expect(raw[0].message.content).toBe('');
+    expect(raw[1].message.content).toBe('hello');
+  });
+});
 
 describe('parseSessionEntriesWithLineCount', () => {
   it('preserves raw Pi tree-advancing entries and their parent chain', () => {
