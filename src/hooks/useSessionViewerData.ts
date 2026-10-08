@@ -13,6 +13,8 @@ import { trimMarkdownCacheOnSessionSwitch } from "@/utils/markdown";
 import { getCachedSettings } from "@/utils/settingsApi";
 import {
   getSessionSourceSlug,
+  normalizePiContent,
+  normalizePiMessageEntries,
   parseSessionEntriesWithLineCount,
 } from "@/utils/session";
 import { getPathBasename, pathsEqual, stripJsonlExt } from "@/utils/path";
@@ -358,7 +360,7 @@ export function useSessionViewerData({
         if (previewMode) {
           let dbEntries: SessionEntry[] | null = null;
           try {
-            dbEntries = await getPreviewEntriesFromDB(sessionPath);
+            dbEntries = normalizePiMessageEntries(await getPreviewEntriesFromDB(sessionPath));
             if (cancelled) return;
 
             if (hasMessageEntries(dbEntries)) {
@@ -419,7 +421,7 @@ export function useSessionViewerData({
                 stripJsonlExt(getPathBasename(sessionPath)) || sessionPath,
             });
             if (liveEntries && liveEntries.length > 0) {
-              setEntries(liveEntries);
+              setEntries(normalizePiMessageEntries(liveEntries as SessionEntry[]));
               setLineCount(liveEntries.length);
               setLoading(false);
               return;
@@ -588,7 +590,7 @@ export function useSessionViewerData({
           isLiveRef.current = true;
           // When bridge connects/reconnects, it sends the full entries list. Sync it!
           if (Array.isArray(payload.entries) && payload.entries.length > 0) {
-            setEntries(payload.entries as SessionEntry[]);
+            setEntries(normalizePiMessageEntries(payload.entries as SessionEntry[]));
           }
         }
       });
@@ -692,14 +694,13 @@ export function useSessionViewerData({
             if (!messageId) return prev;
 
             const existingIndex = prev.findIndex((e) => e.id === messageId);
-            let nextContent = Array.isArray(rawMessage?.content)
-              ? [...rawMessage.content]
-              : [];
+            let nextContent = [...normalizePiContent(rawMessage?.content)];
 
             // Delta merging if applicable
             if (raw.assistantMessageEvent && existingIndex !== -1) {
-              const existingContent =
-                prev[existingIndex].message?.content || [];
+              const existingContent = normalizePiContent(
+                prev[existingIndex].message?.content,
+              );
               if (
                 nextContent.length === 0 ||
                 (nextContent.length === 1 && nextContent[0].text === "")
@@ -740,7 +741,7 @@ export function useSessionViewerData({
                   nextContent.length > 0
                     ? nextContent
                     : existingIndex !== -1
-                      ? prev[existingIndex].message?.content
+                      ? normalizePiContent(prev[existingIndex].message?.content)
                       : [],
               },
             };
@@ -763,7 +764,7 @@ export function useSessionViewerData({
                   // Keep existing content if new content is empty (prevent wipeouts)
                   content: liveEntry.message?.content?.length
                     ? liveEntry.message.content
-                    : (next[existingIndex].message?.content ?? []),
+                    : normalizePiContent(next[existingIndex].message?.content),
                 },
               };
             }
@@ -804,6 +805,7 @@ export function useSessionViewerData({
           const m = raw.message;
           const mid = m.id || m.responseId || m.response_id;
           if (mid) {
+            const completedContent = normalizePiContent(m.content);
             setEntries((prev) => {
               const existingIdx = prev.findIndex((e) => e.id === mid);
               if (existingIdx === -1) {
@@ -813,7 +815,7 @@ export function useSessionViewerData({
                     type: "message",
                     id: mid,
                     timestamp: m.timestamp || new Date().toISOString(),
-                    message: { ...m },
+                    message: { ...m, content: completedContent },
                   },
                 ];
               }
@@ -824,10 +826,9 @@ export function useSessionViewerData({
                 message: {
                   ...next[existingIdx].message,
                   ...m,
-                  content:
-                    m.content?.length > 0
-                      ? m.content
-                      : next[existingIdx].message?.content,
+                  content: completedContent.length > 0
+                    ? completedContent
+                    : normalizePiContent(next[existingIdx].message?.content),
                 },
               };
               return next;
@@ -846,7 +847,7 @@ export function useSessionViewerData({
                 (e) =>
                   e.type === "message" &&
                   e.message?.role === "assistant" &&
-                  e.message.content?.some(
+                  normalizePiContent(e.message.content).some(
                     (c: any) =>
                       c.type === "toolCall" &&
                       (c.id === toolCallId || c.toolCallId === toolCallId),
@@ -857,7 +858,7 @@ export function useSessionViewerData({
 
               const next = [...prev];
               const msg = { ...next[msgIdx] };
-              const content = [...(msg.message?.content || [])];
+              const content = [...normalizePiContent(msg.message?.content)];
               const toolIdx = content.findIndex(
                 (c: any) =>
                   c.type === "toolCall" &&
@@ -894,7 +895,7 @@ export function useSessionViewerData({
                     role: "toolResult",
                     toolCallId,
                     isError: !!raw.isError,
-                    content: resultData.content || [],
+                    content: normalizePiContent(resultData.content),
                   },
                 };
                 const resIdx = next.findIndex(
@@ -923,9 +924,9 @@ export function useSessionViewerData({
                 role: "toolResult",
                 toolCallId,
                 isError: !!raw.isError,
-                content: raw.result?.content || [
-                  { type: "text", text: resultText },
-                ],
+                content: raw.result?.content
+                  ? normalizePiContent(raw.result.content)
+                  : [{ type: "text", text: resultText }],
               },
             };
 
