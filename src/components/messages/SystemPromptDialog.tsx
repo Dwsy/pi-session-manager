@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { X, Terminal, Wrench } from 'lucide-react';
 import MarkdownContent from '@/components/ui/MarkdownContent';
 import type { SessionEntry } from '@/types';
+import { normalizePiContent } from '@/utils/session';
 
 interface SystemPromptDialogProps {
   isOpen: boolean;
@@ -35,7 +36,7 @@ const SystemPromptDialog: React.FC<SystemPromptDialogProps> = ({ isOpen, onClose
 
     for (const entry of entries) {
       if (entry.type === 'message' && entry.message?.role === 'assistant') {
-        const content = entry.message.content || [];
+        const content = normalizePiContent(entry.message.content);
         for (const block of content) {
           if (block.type === 'toolCall' && block.name) {
             toolMap.set(block.name, (toolMap.get(block.name) || 0) + 1);

@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import type { SessionEntry } from "@/types";
+import { normalizePiContent } from "@/utils/session";
 
 export interface TimelineNavItem {
   entryId: string;
@@ -26,7 +27,7 @@ export function useSessionTimelineNav({
 }: UseSessionTimelineNavOptions): UseSessionTimelineNavResult {
   const getMessagePreview = useCallback(
     (entry: SessionEntry): string => {
-      const content = entry.message?.content || [];
+      const content = normalizePiContent(entry.message?.content);
       const text = content
         .filter((item) => item.type === "text" && item.text)
         .map((item) => item.text)

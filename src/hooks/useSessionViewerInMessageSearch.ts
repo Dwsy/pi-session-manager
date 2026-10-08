@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Content, SessionEntry } from '@/types'
 import { parseMarkdown } from '@/utils/markdown'
+import { normalizePiContent } from '@/utils/session'
 import { getAssistantDisplayedBlocks } from '@/utils/assistantContent'
 import {
   getSearchableToolCallRenderedHtmlSegments,
@@ -105,7 +106,7 @@ function getCachedUserSegments(
     return []
   }
 
-  const segments = getUserSearchSegments(entry.message.content)
+  const segments = getUserSearchSegments(normalizePiContent(entry.message.content))
   cached.userSegments = segments
   return segments
 }
@@ -132,7 +133,7 @@ function getCachedAssistantTextSegments(
   }
 
   const { thinkingBlocks, textBlocks } = getAssistantDisplayedBlocks(
-    entry.message.content,
+    normalizePiContent(entry.message.content),
   )
   const visibleBlocks = [
     ...(showThinking ? thinkingBlocks : []),
@@ -244,7 +245,7 @@ function getAssistantSearchMatches(
     return textMatches
   }
 
-  const toolMatches = entry.message.content
+  const toolMatches = normalizePiContent(entry.message.content)
     .filter((item) => item.type === 'toolCall')
     .flatMap((toolCall, index) => {
       // Use plugin system to resolve entryId

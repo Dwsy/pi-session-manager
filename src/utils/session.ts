@@ -156,7 +156,7 @@ export function computeStats(entries: SessionEntry[]): LegacySessionStats {
             stats.cost.cacheWrite += msg.usage.cost.cacheWrite || 0
           }
         }
-        stats.toolCalls += msg.content.filter(c => c.type === 'toolCall').length
+        stats.toolCalls += normalizePiContent(msg.content).filter(c => c.type === 'toolCall').length
       }
       if (msg.role === 'toolResult') stats.toolResults++
     } else if (entry.type === 'model_change') {
@@ -187,7 +187,7 @@ export function findToolResult(
     e.message?.role === 'toolResult' &&
     (
       e.message.toolCallId === toolCallId ||
-      e.message.content.some((c: any) => c.id === toolCallId || c.toolCallId === toolCallId)
+      normalizePiContent(e.message.content).some((c: any) => c.id === toolCallId || c.toolCallId === toolCallId)
     )
   ) || null
 }
@@ -214,12 +214,10 @@ function generateFallbackId(prefix: string): string {
  * Coerce a Pi message body into content parts.
  *
  * Pi stores most messages as a `Content[]`, but it also writes some roles
- * (e.g. `system` / `developer`) with a plain string body. Every consumer of
- * `entry.message.content` (renderers, previews, stats) assumes an array, so
- * non-array payloads are coerced once at the parse boundary instead of being
- * defended against in each consumer.
+ * (e.g. `system` / `developer`) with a plain string body. Use this at data
+ * boundaries and when consuming entries from paths that bypass JSONL parsing.
  */
-function normalizePiContent(value: unknown): Content[] {
+export function normalizePiContent(value: unknown): Content[] {
   if (Array.isArray(value)) return value as Content[]
 
   if (typeof value === 'string') {
@@ -243,10 +241,20 @@ function normalizePiMessageEntry(raw: any): SessionEntry {
   const message = raw?.message
 
   if (message && typeof message === 'object' && !Array.isArray(message.content)) {
-    message.content = normalizePiContent(message.content)
+    return {
+      ...raw,
+      message: { ...message, content: normalizePiContent(message.content) },
+    } as SessionEntry
   }
 
   return raw as SessionEntry
+}
+
+/** Normalize Pi Live and other externally supplied entries without mutating them. */
+export function normalizePiMessageEntries(entries: SessionEntry[]): SessionEntry[] {
+  return entries.map((entry) =>
+    entry.type === 'message' ? normalizePiMessageEntry(entry) : entry
+  )
 }
 
 function normalizeSessionEntry(raw: any): SessionEntry | null {
@@ -446,7 +454,7 @@ function mergeUsage(
 type AssistantFragmentKind = 'toolCalls' | 'thinking' | 'text' | 'other'
 
 function classifyAssistantEntry(entry: SessionEntry): AssistantFragmentKind {
-  const content = entry.message?.content ?? []
+  const content = normalizePiContent(entry.message?.content)
   const hasText = content.some((c) => c.type === 'text' && (c.text ?? '').trim().length > 0)
   const hasToolCall = content.some((c) => c.type === 'toolCall')
   const hasThinking = content.some((c) => c.type === 'thinking')

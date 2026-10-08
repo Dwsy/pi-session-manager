@@ -9,6 +9,7 @@ import { measureElement, useVirtualizer } from '@tanstack/react-virtual'
 import type { Virtualizer } from '@tanstack/react-virtual'
 
 import type { SessionEntry } from '@/types'
+import { normalizePiContent } from '@/utils/session'
 
 type ScrollAlignment = 'auto' | 'center' | 'end' | 'start'
 
@@ -33,7 +34,7 @@ function estimateSessionEntrySize(
   let height: number
   switch (entry.type) {
     case 'message': {
-      const content = entry.message?.content ?? []
+      const content = normalizePiContent(entry.message?.content)
       const role = entry.message?.role
       if (previewMode) {
         // In previewMode, tool calls are stripped from rendering —

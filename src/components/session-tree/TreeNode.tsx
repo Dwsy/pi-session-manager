@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { SessionEntry } from '@/types'
+import { normalizePiContent } from '@/utils/session'
 
 interface TreeNodeProps {
   entry: SessionEntry
@@ -21,7 +22,7 @@ function TreeNodeDisplay({ entry }: { entry: SessionEntry }) {
   const { t } = useTranslation()
   if (entry.type === 'message' && entry.message) {
     const role = entry.message.role
-    const content = entry.message.content || []
+    const content = normalizePiContent(entry.message.content)
 
     const textItems = content.filter(c => c.type === 'text')
     const text = textItems.map(c => c.text).join(' ').substring(0, 100)

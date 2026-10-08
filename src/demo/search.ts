@@ -1,6 +1,6 @@
 import type { FullTextSearchHit, Match, SearchResult, SessionEntry, SessionInfo } from '@/types'
 import { filterSessionsBySearchQuery } from '@/utils/sessionFilters'
-import { getSessionIdMatchKind } from '@/utils/session'
+import { getSessionIdMatchKind, normalizePiContent } from '@/utils/session'
 import { parseQuotedQuery } from '@/utils/search'
 
 import type {
@@ -103,7 +103,7 @@ function extractMessageText(entry: SessionEntry, includeThinking = true): string
 
   const pieces: string[] = []
 
-  for (const item of entry.message.content) {
+  for (const item of normalizePiContent(entry.message.content)) {
     if (item.type === 'text' && item.text) {
       pieces.push(item.text)
       continue

@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { invoke } from '@/transport'
 import { X, Bot, Clock, Cpu, Wrench, AlertCircle, CheckCircle2, FileText, Eye, EyeOff, ChevronsUpDown } from 'lucide-react'
 import type { SubagentResult, SessionEntry } from '@/types'
-import { parseSessionEntries } from '@/utils/session'
+import { normalizePiContent, parseSessionEntries } from '@/utils/session'
 import { formatTokens } from '@/utils/format'
 import UserMessage from '@/components/messages/UserMessage'
 import AssistantMessage from '@/components/messages/AssistantMessage'
@@ -308,7 +308,7 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
         if (role === 'user') {
           return (
             <UserMessage
-              content={entry.message.content}
+              content={normalizePiContent(entry.message.content)}
               timestamp={entry.timestamp}
               id={entry.id}
             />
@@ -316,7 +316,7 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
         } else if (role === 'assistant') {
           return (
             <AssistantMessage
-              content={entry.message.content}
+              content={normalizePiContent(entry.message.content)}
               timestamp={entry.timestamp}
               entryId={entry.id}
               toolResultByCallId={toolResultByCallId}

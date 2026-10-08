@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { buildCopyResumeCommand } from "@/utils/sessionResume";
+import { normalizePiContent } from "@/utils/session";
 
 import {
   SessionViewProvider,
@@ -85,7 +86,7 @@ function findToolCallRowEntryId(
       continue;
     }
 
-    const hasToolCall = entry.message.content?.some(
+    const hasToolCall = normalizePiContent(entry.message.content).some(
       (item: any) =>
         item.type === "toolCall" &&
         (item.id === toolCallId || item.toolCallId === toolCallId),

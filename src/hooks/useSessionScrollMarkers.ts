@@ -8,6 +8,7 @@ import {
 } from "react";
 import type { PointerEvent, RefObject } from "react";
 import type { SessionEntry } from "@/types";
+import { normalizePiContent } from "@/utils/session";
 
 const MAX_MARKERS_DESKTOP = 180;
 const MAX_MARKERS_MOBILE = 120;
@@ -250,7 +251,7 @@ export function useSessionScrollMarkers({
         return summary.length > 80 ? `${summary.slice(0, 80)}…` : summary;
       }
 
-      const content = entry.message?.content || [];
+      const content = normalizePiContent(entry.message?.content);
       const text = content
         .filter((item) => item.type === "text" && item.text)
         .map((item) => item.text)

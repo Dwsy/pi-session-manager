@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SessionEntry } from "@/types";
+import { normalizePiContent } from "@/utils/session";
 import { requestToolReview } from "@/contexts/toolReviewBus";
 import SessionEntryRenderer from "./SessionEntryRenderer";
 
@@ -46,7 +47,7 @@ function isAssistantMessage(entry: SessionEntry): boolean {
 
 function hasAssistantText(entry: SessionEntry): boolean {
   if (!isAssistantMessage(entry)) return false;
-  return (entry.message?.content ?? []).some(
+  return normalizePiContent(entry.message?.content).some(
     (item) => item.type === "text" && Boolean(item.text?.trim()),
   );
 }
@@ -101,7 +102,7 @@ function getEntrySummaryKeys(entry: SessionEntry, fallback: string): string[] {
   if (entry.type === "message") {
     const role = entry.message?.role;
     if (role === "assistant") {
-      const keys = (entry.message?.content ?? []).flatMap((item) => {
+      const keys = normalizePiContent(entry.message?.content).flatMap((item) => {
         if (item.type === "toolCall" && item.name) return [`tool:${item.name}`];
         if (item.type === "thinking") return ["thinking"];
         return [];
@@ -344,7 +345,7 @@ function CollapsedProcessSummary({
 
 function getProcessEntryKind(entry: SessionEntry): "tool" | "thinking" | "event" {
   if (entry.type !== "message" || entry.message?.role !== "assistant") return "event";
-  const content = entry.message.content ?? [];
+  const content = normalizePiContent(entry.message.content);
   if (content.some((item) => item.type === "toolCall")) return "tool";
   if (content.some((item) => item.type === "thinking")) return "thinking";
   return "event";
@@ -376,7 +377,7 @@ function getToolGroupRunStep(
   if (role === "toolResult") return "transparent";
   if (role !== "assistant") return "break";
 
-  const content = entry.message?.content ?? [];
+  const content = normalizePiContent(entry.message?.content);
   const hasVisibleText = content.some(
     (item) => item.type === "text" && Boolean(item.text?.trim()),
   );
