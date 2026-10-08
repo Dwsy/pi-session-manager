@@ -2,6 +2,21 @@
 
 All notable changes to Pi Session Manager will be documented in this file.
 
+## [0.8.9] - 2026-10-08
+
+### Fixed
+
+- Fixed [Issue #70](https://github.com/Dwsy/pi-session-manager/issues/70): Pi messages with string or empty-string `message.content` no longer crash in-session search, conversation previews, session trees, virtualized scrolling, timeline markers, subagent views, or auxiliary session consumers.
+- Normalized non-array message content from database previews, Pi Live initial loads and reconnections, streaming messages, and tool results without mutating source entries. Added targeted regression coverage for these paths.
+- Improved command-palette keyboard behavior, nested overlays, and settings navigation, saving, reset, and dialog interactions.
+- Aligned interactive settings controls with the selected accent color.
+
+### Changed
+
+- Expanded recap reports with previous-period comparisons and improved scheduling indicators.
+- Refined Branch Atlas labels and terminal-route colors.
+- Localized the tray menu and added minimize-to-tray controls.
+
 ## [0.8.7] - 2026-09-29
 
 ### Added
