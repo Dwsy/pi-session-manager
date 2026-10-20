@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import MarkdownContent from './MarkdownContent'
+import { enableMarkdownTableResize } from '@/utils/markdownTableResize'
 
 const invokeMock = vi.fn()
 const isTauriMock = vi.fn(() => true)
@@ -166,5 +167,96 @@ quadrantChart
 
     expect(container.querySelectorAll('.katex').length).toBeGreaterThanOrEqual(2)
     expect(container.querySelector('.katex-display')).not.toBeNull()
+  })
+})
+
+describe('MarkdownContent table resize enhancement', () => {
+  it('wraps tables with drag handles for columns and height', () => {
+    const content = `| Name | Value |
+| --- | --- |
+| a | 1 |`
+    const { container } = render(<MarkdownContent content={content} />)
+
+    const wrapper = container.querySelector('.markdown-table-resize')
+    expect(wrapper).not.toBeNull()
+    expect(wrapper?.querySelector('.markdown-table-scroll table')).not.toBeNull()
+    expect(wrapper?.querySelectorAll('.md-table-col-handle')).toHaveLength(2)
+    expect(wrapper?.querySelector('.md-table-height-handle')).not.toBeNull()
+  })
+
+  it('does not enhance tables without rows', () => {
+    const { container } = render(<MarkdownContent content="plain text only" />)
+
+    expect(container.querySelector('.markdown-table-resize')).toBeNull()
+  })
+})
+
+describe('table size memoization (markdownTableResize)', () => {
+  const tableHtml = '<table><tr><th>Name</th><th>Value</th></tr><tr><td>a</td><td>1</td></tr></table>'
+
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  function makeRoot(): HTMLElement {
+    const root = document.createElement('div')
+    root.innerHTML = tableHtml
+    document.body.appendChild(root)
+    return root
+  }
+
+  it('does not touch localStorage by default', () => {
+    const root = makeRoot()
+    enableMarkdownTableResize(root)
+
+    const handle = root.querySelector<HTMLElement>('.md-table-col-handle')!
+    fireEvent.pointerDown(handle, { pointerId: 1, clientX: 0 })
+    fireEvent.pointerUp(handle, { pointerId: 1 })
+
+    expect(Object.keys(localStorage)).toHaveLength(0)
+  })
+
+  it('persists and restores column widths for identical content', () => {
+    const root = makeRoot()
+    enableMarkdownTableResize(root, { memoize: true })
+
+    const handle = root.querySelector<HTMLElement>('.md-table-col-handle')!
+    fireEvent.pointerDown(handle, { pointerId: 1, clientX: 0 })
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 60 })
+    fireEvent.pointerUp(handle, { pointerId: 1 })
+
+    const savedKeys = Object.keys(localStorage).filter((k) => k.startsWith('psm:md-table-resize:'))
+    expect(savedKeys).toHaveLength(1)
+    const saved = JSON.parse(localStorage.getItem(savedKeys[0])!)
+    expect(saved.cols[0]).toBe(108) // 48 (min, jsdom) + 60 delta
+
+    // Fresh root with identical content restores widths eagerly.
+    const root2 = makeRoot()
+    enableMarkdownTableResize(root2, { memoize: true })
+
+    const table = root2.querySelector('table')!
+    expect(table.style.tableLayout).toBe('fixed')
+    const cols = table.querySelectorAll('col')
+    expect((cols[0] as HTMLElement).style.width).toBe('108px')
+  })
+
+  it('ignores saved sizes when column count differs', () => {
+    const root = makeRoot()
+    enableMarkdownTableResize(root, { memoize: true })
+    const handle = root.querySelector<HTMLElement>('.md-table-col-handle')!
+    fireEvent.pointerDown(handle, { pointerId: 1, clientX: 0 })
+    fireEvent.pointerUp(handle, { pointerId: 1 })
+
+    const changed = document.createElement('div')
+    changed.innerHTML = '<table><tr><th>A</th><th>B</th><th>C</th></tr><tr><td>1</td><td>2</td><td>3</td></tr></table>'
+    document.body.appendChild(changed)
+    enableMarkdownTableResize(changed, { memoize: true })
+
+    const table = changed.querySelector('table')!
+    expect(table.style.tableLayout).toBe('')
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
   })
 })

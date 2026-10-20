@@ -1,6 +1,7 @@
-import { memo, useCallback, useMemo } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 import 'katex/dist/katex.min.css'
 import { parseMarkdown } from '@/utils/markdown'
+import { enableMarkdownTableResize } from '@/utils/markdownTableResize'
 import {
   classifyMarkdownLink,
   getMarkdownLinkConfirmationMessage,
@@ -28,6 +29,15 @@ function MarkdownContent({ content, className = '', searchQuery = '' }: Markdown
     }
     return parsed
   }, [content, searchQuery])
+
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Enhance rendered tables with drag handles after each HTML update.
+  useEffect(() => {
+    if (containerRef.current) {
+      enableMarkdownTableResize(containerRef.current)
+    }
+  }, [html])
 
   const handleClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const targetElement = event.target as HTMLElement | null
@@ -83,6 +93,7 @@ function MarkdownContent({ content, className = '', searchQuery = '' }: Markdown
 
   return (
     <div
+      ref={containerRef}
       className={`markdown-content ${className}`}
       onClickCapture={handleClick}
       dangerouslySetInnerHTML={{ __html: html }}
