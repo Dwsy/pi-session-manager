@@ -2,6 +2,15 @@
 
 All notable changes to Pi Session Manager will be documented in this file.
 
+## [0.9.0] - 2026-10-20
+
+### Added
+
+- **Multi-tab session viewer**: sessions opened from the sidebar, command palette, deep links, or the dock are kept as tabs directly under the toolbar for quick switching. The strip stays hidden until at least two sessions are open (and on mobile), supports middle-click and close-button closing, live-session dots, horizontal overflow, and window dragging from empty tab space. Configurable via Settings -> Session Viewer -> Multi-tab viewer (on by default, localized in 6 languages).
+- **Per-tab state memory**: scroll position and tool expand/collapse state are remembered per session and restored when switching tabs or reopening a session; explicit entry jumps still take priority.
+- Session context menu: tag lists and kanban status lists are now collapsible sections with a compact toggle header.
+- Markdown tables: columns and table height can be resized with drag handles; sizes are persisted per table content.
+
 ## [0.8.9] - 2026-10-08
 
 ### Fixed
