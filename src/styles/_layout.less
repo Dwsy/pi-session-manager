@@ -473,6 +473,45 @@
   background: rgb(var(--color-border) / 0.64);
 }
 
+.session-context-menu__section-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.session-context-menu__section-toggle:hover,
+.session-context-menu__section-toggle:focus-visible {
+  background: rgb(var(--color-secondary) / 0.7);
+  color: rgb(var(--color-foreground));
+  outline: none;
+}
+
+.session-context-menu__section-chevron {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.session-context-menu__section-toggle[aria-expanded="true"] .session-context-menu__section-chevron {
+  transform: rotate(90deg);
+}
+
 .session-context-menu__icon {
   display: inline-flex;
   width: 14px;

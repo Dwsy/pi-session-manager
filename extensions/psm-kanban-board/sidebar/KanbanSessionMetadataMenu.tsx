@@ -5,6 +5,7 @@ import type { PsmSessionContextMenuActionRenderProps } from "@pi-session-manager
 
 import { useOptionalAppPluginSurfaceData } from "@/components/app/AppPluginSurfaceData";
 import TagBadge from "@/components/tags/TagBadge";
+import CollapsibleMenuSection from "@/components/session-viewer/CollapsibleMenuSection";
 import { getSessionStatusId } from "../board/kanbanBoardModel";
 import KanbanLabelBadge from "../labels/KanbanLabelBadge";
 import {
@@ -47,88 +48,93 @@ export default function KanbanSessionMetadataMenu({
 
   return (
     <>
-      <div className="session-context-menu__label" role="presentation">
-        <span className="inline-flex items-center gap-1">
-          <CircleDot className="h-3 w-3" />
-          {t("plugins.kanbanBoard.status", "Status")}
-        </span>
-      </div>
-      <button
-        type="button"
-        role="menuitemradio"
-        aria-checked={currentStatusId === null}
-        className="session-context-menu__item"
-        onClick={() => {
-          const current = currentStatusId;
-          if (!current) return;
-          surface.onClearSessionStatus(session.id, current);
-        }}
+      <CollapsibleMenuSection
+        label={
+          <span className="inline-flex items-center gap-1">
+            <CircleDot className="h-3 w-3" />
+            {t("plugins.kanbanBoard.status", "Status")}
+          </span>
+        }
       >
-        <span className="session-context-menu__text text-muted-foreground">
-          {t("plugins.kanbanBoard.noStatus", "No status")}
-        </span>
-        {currentStatusId === null ? (
-          <Check className="session-context-menu__check text-primary" />
-        ) : null}
-      </button>
-      {surface.tags.map((status) => (
         <button
-          key={status.id}
           type="button"
           role="menuitemradio"
-          aria-checked={currentStatusId === status.id}
+          aria-checked={currentStatusId === null}
           className="session-context-menu__item"
           onClick={() => {
-            if (currentStatusId === status.id) return;
-            surface.onMoveSession(session.id, currentStatusId, status.id, 0);
+            const current = currentStatusId;
+            if (!current) return;
+            surface.onClearSessionStatus(session.id, current);
           }}
         >
-          <span className="session-context-menu__text inline-flex items-center gap-2">
-            <TagBadge tag={status} compact />
-            <span className="truncate">{status.name}</span>
+          <span className="session-context-menu__text text-muted-foreground">
+            {t("plugins.kanbanBoard.noStatus", "No status")}
           </span>
-          {currentStatusId === status.id ? (
+          {currentStatusId === null ? (
             <Check className="session-context-menu__check text-primary" />
           ) : null}
         </button>
-      ))}
-
-      <div className="session-context-menu__separator" role="separator" />
-      <div className="session-context-menu__label" role="presentation">
-        <span className="inline-flex items-center gap-1">
-          <Tag className="h-3 w-3" />
-          {t("plugins.kanbanBoard.labels", "Labels")}
-        </span>
-      </div>
-      {labelsSnapshot.labels.length === 0 ? (
-        <div className="px-3 py-1.5 text-[11px] text-muted-foreground">
-          {t("plugins.kanbanBoard.labelsEmpty", "No labels")}
-        </div>
-      ) : (
-        labelsSnapshot.labels.map((label) => {
-          const assigned = assignedLabels.some((item) => item.id === label.id);
-          return (
-            <button
-              key={label.id}
-              type="button"
-              role="menuitemcheckbox"
-              aria-checked={assigned}
-              className="session-context-menu__item"
-              title={label.description || label.name}
-              onClick={() =>
-                void labelsStore.toggleLabel(session.id, label.id, !assigned)
-              }
-            >
-              <span className="session-context-menu__text">
-                <KanbanLabelBadge label={label} compact />
-              </span>
-              {assigned ? (
-                <Check className="session-context-menu__check text-primary" />
-              ) : null}
-            </button>
-          );
-        })
-      )}
+        {surface.tags.map((status) => (
+          <button
+            key={status.id}
+            type="button"
+            role="menuitemradio"
+            aria-checked={currentStatusId === status.id}
+            className="session-context-menu__item"
+            onClick={() => {
+              if (currentStatusId === status.id) return;
+              surface.onMoveSession(session.id, currentStatusId, status.id, 0);
+            }}
+          >
+            <span className="session-context-menu__text inline-flex items-center gap-2">
+              <TagBadge tag={status} compact />
+              <span className="truncate">{status.name}</span>
+            </span>
+            {currentStatusId === status.id ? (
+              <Check className="session-context-menu__check text-primary" />
+            ) : null}
+          </button>
+        ))}
+        <div className="session-context-menu__separator" role="separator" />
+        <CollapsibleMenuSection
+          label={
+            <span className="inline-flex items-center gap-1">
+              <Tag className="h-3 w-3" />
+              {t("plugins.kanbanBoard.labels", "Labels")}
+            </span>
+          }
+        >
+          {labelsSnapshot.labels.length === 0 ? (
+            <div className="px-3 py-1.5 text-[11px] text-muted-foreground">
+              {t("plugins.kanbanBoard.labelsEmpty", "No labels")}
+            </div>
+          ) : (
+            labelsSnapshot.labels.map((label) => {
+              const assigned = assignedLabels.some((item) => item.id === label.id);
+              return (
+                <button
+                  key={label.id}
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={assigned}
+                  className="session-context-menu__item"
+                  title={label.description || label.name}
+                  onClick={() =>
+                    void labelsStore.toggleLabel(session.id, label.id, !assigned)
+                  }
+                >
+                  <span className="session-context-menu__text">
+                    <KanbanLabelBadge label={label} compact />
+                  </span>
+                  {assigned ? (
+                    <Check className="session-context-menu__check text-primary" />
+                  ) : null}
+                </button>
+              );
+            })
+          )}
+        </CollapsibleMenuSection>
+      </CollapsibleMenuSection>
     </>
   );
 }

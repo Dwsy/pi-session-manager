@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import type { Tag } from '@/types'
 import { getColorClass, getColorStyle } from '@/components/tags/TagBadge'
+import CollapsibleMenuSection from './CollapsibleMenuSection'
 
 const CONFIRM_TIMEOUT_MS = 3000
 const MENU_WIDTH = 220
@@ -206,36 +207,35 @@ export default function SessionContextMenu({
     >
       {tags.length > 0 ? (
         <>
-          <div className="session-context-menu__label" role="presentation">
-            {t('tags.contextMenu.labels')}
-          </div>
-          <div className="session-context-menu__tags" role="group" aria-label={t('tags.contextMenu.labels')}>
-            {tags.map((tag) => {
-              const assigned = sessionTagIds.includes(tag.id)
-              const isHex = tag.color.startsWith('#')
-              return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  role="menuitemcheckbox"
-                  aria-checked={assigned}
-                  className="session-context-menu__item"
-                  onClick={() => onToggleTag(tag.id, assigned)}
-                >
-                  <span
-                    className={`session-context-menu__tag-dot ${isHex ? '' : getColorClass(tag.color)}`}
-                    style={getColorStyle(tag.color)}
-                    aria-hidden="true"
-                  />
-                  <span className="session-context-menu__text">{tag.name}</span>
-                  {assigned ? <Check className="session-context-menu__check text-primary" /> : null}
-                </button>
-              )
-            })}
-          </div>
-          {hasLaunchActions || hasPluginActions || hasSessionActions ? (
-            <div className="session-context-menu__separator" role="separator" />
-          ) : null}
+          <CollapsibleMenuSection label={t('tags.contextMenu.labels')}>
+            <div className="session-context-menu__tags" role="group" aria-label={t('tags.contextMenu.labels')}>
+              {tags.map((tag) => {
+                const assigned = sessionTagIds.includes(tag.id)
+                const isHex = tag.color.startsWith('#')
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={assigned}
+                    className="session-context-menu__item"
+                    onClick={() => onToggleTag(tag.id, assigned)}
+                  >
+                    <span
+                      className={`session-context-menu__tag-dot ${isHex ? '' : getColorClass(tag.color)}`}
+                      style={getColorStyle(tag.color)}
+                      aria-hidden="true"
+                    />
+                    <span className="session-context-menu__text">{tag.name}</span>
+                    {assigned ? <Check className="session-context-menu__check text-primary" /> : null}
+                  </button>
+                )
+              })}
+            </div>
+            {hasLaunchActions || hasPluginActions || hasSessionActions ? (
+              <div className="session-context-menu__separator" role="separator" />
+            ) : null}
+          </CollapsibleMenuSection>
         </>
       ) : null}
 
