@@ -145,6 +145,8 @@ export const settings = {
     autoRefreshHelp: '新しいセッションを自動検出',
     refreshInterval: '更新間隔',
     defaultViewMode: 'デフォルト表示モード',
+    multiTabEnabled: 'マルチタブ表示',
+    multiTabEnabledHelp: '開いたセッションをツールバー下のタブとして保持し、素早く切り替えます',
     viewModes: {
       list: 'リスト',
       directory: 'ディレクトリ',

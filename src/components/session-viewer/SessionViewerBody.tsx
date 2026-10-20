@@ -23,6 +23,7 @@ import SessionViewerSearchBar, {
 } from "@/components/session-viewer/SessionViewerSearchBar";
 import SessionViewerSidebar from "@/components/session-viewer/SessionViewerSidebar";
 import SessionViewerToolbar from "@/components/session-viewer/SessionViewerToolbar";
+import SessionViewerTabs, { type SessionViewerTabsProps } from "@/components/session-viewer/SessionViewerTabs";
 import type { SessionViewerToolbarProps, SessionViewerLayoutSlots } from "@/components/session-viewer/SessionViewerToolbarTypes";
 import type { SessionPreviewVariant } from "@/components/session-viewer/previewTypes";
 import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
@@ -103,6 +104,8 @@ export interface SessionViewerBodyProps {
   session: SessionInfo;
   entries: SessionEntry[];
   toolbarProps: SessionViewerToolbarProps;
+  /** Multi-tab strip rendered directly below the toolbar; undefined when disabled. */
+  sessionTabs?: Omit<SessionViewerTabsProps, "isMobile">;
   layoutSlots?: SessionViewerLayoutSlots;
   mainViewSlot?: ReactNode;
   forkedFromLabel: string;
@@ -124,6 +127,7 @@ export default function SessionViewerBody({
   session,
   entries,
   toolbarProps,
+  sessionTabs,
   layoutSlots,
   mainViewSlot,
   forkedFromLabel,
@@ -177,6 +181,9 @@ export default function SessionViewerBody({
 
         {layoutSlots?.top}
         <SessionViewerToolbar {...toolbarProps} />
+        {!previewMode && sessionTabs && (
+          <SessionViewerTabs {...sessionTabs} isMobile={isMobile} />
+        )}
 
         {session.parent_session_path && (
           <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border bg-secondary/30 flex items-center gap-1.5">

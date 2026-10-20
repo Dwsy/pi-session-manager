@@ -1,6 +1,10 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react'
 import { useSettings as useAppSettings } from '@/contexts/SettingsContext'
 import { saveAppSettings } from '@/utils/settingsApi'
+import {
+  getSessionExpansion,
+  saveSessionExpansion,
+} from '@/utils/sessionViewStateMemory'
 
 interface SessionViewContextType {
   showThinking: boolean
@@ -16,6 +20,13 @@ interface SessionViewContextType {
   restoreSearchExpandedTools: () => void
   isToolExpanded: (id: string) => boolean
   resetToolExpansionOverrides: () => void
+  /**
+   * Save the current expand/collapse snapshot under the previous session and
+   * restore the snapshot for the given session (multi-tab memory).
+   */
+  switchSessionMemory: (sessionPath: string) => void
+  /** Persist the current snapshot under the active session path. */
+  flushSessionMemory: () => void
 }
 
 const SessionViewContext = createContext<SessionViewContextType | undefined>(undefined)
@@ -31,6 +42,10 @@ export function SessionViewProvider({ children }: { children: ReactNode }) {
   // When toolsExpanded=false, store tools manually expanded here
   const [expandedToolIds, setExpandedToolIds] = useState<Set<string>>(new Set())
   const searchExpandedToolIdsRef = useRef<Set<string>>(new Set())
+  // Stable accessors for session-memory flush (avoid identity churn loops).
+  const expansionStateRef = useRef({ toolsExpanded, expandedToolIds })
+  expansionStateRef.current = { toolsExpanded, expandedToolIds }
+  const currentSessionPathRef = useRef<string | null>(null)
 
   const clearSearchExpandedToolIds = useCallback(() => {
     searchExpandedToolIdsRef.current = new Set()
@@ -75,6 +90,29 @@ export function SessionViewProvider({ children }: { children: ReactNode }) {
     setExpandedToolIds(new Set())
     clearSearchExpandedToolIds()
   }, [clearSearchExpandedToolIds])
+
+  const flushSessionMemory = useCallback(() => {
+    const path = currentSessionPathRef.current
+    if (!path) return
+    const { toolsExpanded: expanded, expandedToolIds: ids } =
+      expansionStateRef.current
+    saveSessionExpansion(path, {
+      toolsExpanded: expanded,
+      expandedToolIds: Array.from(ids),
+    })
+  }, [])
+
+  const switchSessionMemory = useCallback(
+    (sessionPath: string) => {
+      flushSessionMemory()
+      currentSessionPathRef.current = sessionPath
+      const snapshot = getSessionExpansion(sessionPath)
+      setToolsExpanded(snapshot?.toolsExpanded ?? false)
+      setExpandedToolIds(new Set(snapshot?.expandedToolIds ?? []))
+      clearSearchExpandedToolIds()
+    },
+    [clearSearchExpandedToolIds, flushSessionMemory],
+  )
 
   const toggleToolExpanded = useCallback((id: string) => {
     searchExpandedToolIdsRef.current.delete(id)
@@ -149,6 +187,8 @@ export function SessionViewProvider({ children }: { children: ReactNode }) {
         restoreSearchExpandedTools,
         isToolExpanded,
         resetToolExpansionOverrides,
+        switchSessionMemory,
+        flushSessionMemory,
       }}
     >
       {children}

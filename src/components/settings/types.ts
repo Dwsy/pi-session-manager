@@ -116,6 +116,8 @@ export interface AppSettings {
     autoRefresh: boolean;
     refreshInterval: number;
     defaultViewMode: "list" | "directory" | "project";
+    /** Multi-tab session viewer: keep opened sessions as tabs below the toolbar */
+    multiTabEnabled: boolean;
     conversationModeEnabled: boolean;
     conversationFoldMode: "wholeTurn" | "toolGroups";
     sourceMode: "local" | "dataset";
@@ -223,6 +225,7 @@ export const defaultSettings: AppSettings = {
     autoRefresh: true,
     refreshInterval: 30,
     defaultViewMode: "project",
+    multiTabEnabled: true,
     conversationModeEnabled: true,
     conversationFoldMode: "toolGroups",
     sourceMode: "local",

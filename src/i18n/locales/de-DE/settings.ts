@@ -142,6 +142,8 @@ export const settings = {
     autoRefreshHelp: 'Neue Sitzungen automatisch erkennen',
     refreshInterval: 'Aktualisierungsintervall',
     defaultViewMode: 'Standard-Ansichtsmodus',
+    multiTabEnabled: 'Multitab-Ansicht',
+    multiTabEnabledHelp: 'Geöffnete Sitzungen als Tabs unter der Symbolleiste behalten',
     viewModes: {
       list: 'Liste',
       directory: 'Verzeichnis',

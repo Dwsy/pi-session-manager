@@ -34,6 +34,7 @@ export interface AppSessionViewerPaneProps extends Pick<
   | "customCommand"
   | "resumeCommand"
   | "slots"
+  | "sessionTabs"
   | "initialEntryId"
 > {
   terminalFeatureEnabled?: boolean;
@@ -57,6 +58,7 @@ function AppSessionViewerPane({
   resumeCommand,
   initialEntryId,
   slots,
+  sessionTabs,
   terminalFeatureEnabled = false,
   terminalFeatureOpen = false,
   onToggleTerminalFeature,
@@ -801,6 +803,7 @@ function AppSessionViewerPane({
           : "none"
       }
       slots={mergedSlots}
+      sessionTabs={sessionTabs}
       layoutSlots={layoutSlots}
       mainViewSlot={mainViewSlot}
       pluginTreeViews={treeViews}

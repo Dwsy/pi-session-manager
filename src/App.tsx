@@ -27,6 +27,7 @@ import { useAppSettings } from "./hooks/useAppSettings";
 import { useSessionActions } from "./hooks/useSessionActions";
 import { useAppearance } from "./hooks/useAppearance";
 import { useSettings } from "./hooks/useSettings";
+import { useSessionTabs } from "./hooks/useSessionTabs";
 import { useToolStyles } from "./hooks/useToolStyles";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useClipboard } from "./hooks/useClipboard";
@@ -224,7 +225,9 @@ function App() {
     getDescendantIds,
     loadTags,
   } = useTags();
-  const { loading: settingsLoading } = useSettings();
+  const { loading: settingsLoading, session: sessionSettings } = useSettings();
+  // Multi-tab viewer mode: on by default, can be turned off in Session settings.
+  const multiTabEnabled = sessionSettings.multiTabEnabled !== false;
   useAppearance();
   useToolStyles();
   const { liveSessionIds: runtimeLiveSessionIds } = usePiLive();
@@ -538,6 +541,24 @@ function App() {
     },
     [setSelectedSession, navigateToSession, clearBadge],
   );
+
+  const { tabs: sessionTabsData, closeTab } = useSessionTabs({
+    sessions,
+    selectedSession,
+    enabled: multiTabEnabled,
+    onSelectSession: handleSelectSession,
+    // Mirrors the toolbar back action: route root clears the selection.
+    onCloseViewer: navigateToSessions,
+  });
+  const sessionTabsProps = sessionTabsData
+    ? {
+        tabs: sessionTabsData.tabs,
+        activeTabId: sessionTabsData.activeTabId,
+        liveSessionIds,
+        onSelect: handleSelectSession,
+        onClose: closeTab,
+      }
+    : undefined;
 
   const handleSelectProject = useCallback(
     (projectPath: string | null) => {
@@ -1429,6 +1450,7 @@ function App() {
       customCommand={standaloneDatasetRuntime ? undefined : customCommand}
       resumeCommand={standaloneDatasetRuntime ? undefined : resumeCommand}
       initialEntryId={pendingScrollEntryId || undefined}
+      sessionTabs={sessionTabsProps}
       terminalFeatureEnabled={!standaloneDatasetRuntime && terminalConfig.enabled}
       terminalFeatureOpen={showTerminal && activeTerminalScopeKey === currentTerminalScope.key}
       onToggleTerminalFeature={toggleCurrentTerminalScope}

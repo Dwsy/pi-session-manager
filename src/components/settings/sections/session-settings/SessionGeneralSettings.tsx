@@ -84,6 +84,22 @@ export default function SessionGeneralSettings({ settings, onUpdate }: SessionSe
 
             <SettingsToggleRow
               title={t(
+                "settings.session.multiTabEnabled",
+                "Multi-tab viewer",
+              )}
+              description={t(
+                "settings.session.multiTabEnabledHelp",
+                "Keep opened sessions as tabs below the toolbar for quick switching",
+              )}
+              checked={settings.session.multiTabEnabled !== false}
+              onChange={(checked) =>
+                onUpdate("session", "multiTabEnabled", checked)
+              }
+              searchKey="session-multiTabEnabled"
+            />
+
+            <SettingsToggleRow
+              title={t(
                 "settings.session.showMessagePreview",
                 "Show message preview",
               )}

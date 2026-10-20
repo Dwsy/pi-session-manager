@@ -9,6 +9,10 @@ export const session = {
   scrollToTop: '先頭へスクロール',
   scrollToBottom: '末尾へスクロール',
   systemPromptAndTools: 'システムプロンプトとツール',
+  tabs: {
+    close: 'タブを閉じる',
+    live: 'ライブ',
+  },
   toolbar: {
     outline: 'アウトライン',
     thinking: '思考',

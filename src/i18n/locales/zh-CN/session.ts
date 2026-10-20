@@ -50,6 +50,10 @@ export const session = {
     hintAutocomplete: 'Tab 自动补全斜杠命令',
     hintStop: 'Esc 停止',
   },
+  tabs: {
+    close: '关闭标签页',
+    live: '在线',
+  },
   toolbar: {
     outline: '大纲',
     thinking: '思考',

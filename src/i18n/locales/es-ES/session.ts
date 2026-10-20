@@ -9,6 +9,10 @@ export const session = {
   scrollToTop: 'Ir al inicio',
   scrollToBottom: 'Ir al final',
   systemPromptAndTools: 'Prompt del sistema y herramientas',
+  tabs: {
+    close: 'Cerrar pestaña',
+    live: 'En vivo',
+  },
   toolbar: {
     outline: 'Esquema',
     thinking: 'Pensamiento',

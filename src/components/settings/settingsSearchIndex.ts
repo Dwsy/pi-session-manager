@@ -225,6 +225,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     keywords: ["view", "mode", "list", "directory", "project", "app"],
   },
   {
+    id: "session-multiTabEnabled",
+    section: "session-viewer",
+    labelKey: "settings.session.multiTabEnabled",
+    fallbackLabel: "Multi-tab viewer",
+    extraKeys: ["settings.session.multiTabEnabledHelp"],
+    keywords: ["tab", "tabs", "multi", "multi-tab", "session", "switch"],
+  },
+  {
     id: "session-sourceMode",
     section: "local-session-paths",
     labelKey: "settings.session.sourceMode",

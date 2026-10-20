@@ -95,6 +95,8 @@ export const settings = {
     autoRefreshHelp: 'Detectar nuevas sesiones automáticamente',
     refreshInterval: 'Intervalo de actualización',
     defaultViewMode: 'Modo de vista predeterminado',
+    multiTabEnabled: 'Vista de varias pestañas',
+    multiTabEnabledHelp: 'Mantener las sesiones abiertas como pestañas bajo la barra de herramientas',
     viewModes: {
       list: 'Lista',
       directory: 'Directorio',

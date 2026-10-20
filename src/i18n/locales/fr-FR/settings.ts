@@ -142,6 +142,8 @@ export const settings = {
     autoRefreshHelp: 'Détecter automatiquement les nouvelles sessions',
     refreshInterval: 'Intervalle d\'actualisation',
     defaultViewMode: 'Mode d\'affichage par défaut',
+    multiTabEnabled: 'Affichage multi-onglets',
+    multiTabEnabledHelp: 'Conserver les sessions ouvertes en onglets sous la barre d\'outils',
     viewModes: {
       list: 'Liste',
       directory: 'Répertoire',

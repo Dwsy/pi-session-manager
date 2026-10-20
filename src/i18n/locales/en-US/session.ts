@@ -50,6 +50,10 @@ export const session = {
     hintAutocomplete: 'Tab autocomplete slash command',
     hintStop: 'Esc stop',
   },
+  tabs: {
+    close: 'Close tab',
+    live: 'Live',
+  },
   toolbar: {
     outline: 'Outline',
     thinking: 'Thinking',

@@ -33,7 +33,12 @@ import type {
   SessionViewerToolbarSlots,
   SessionViewerLayoutSlots,
 } from "./session-viewer/SessionViewerToolbarTypes";
+import type { SessionViewerTabsProps } from "./session-viewer/SessionViewerTabs";
 import type { SessionPreviewVariant } from "./session-viewer/previewTypes";
+import {
+  getSessionScrollTop,
+  saveSessionScrollTop,
+} from "@/utils/sessionViewStateMemory";
 import type {
   PsmSessionRevealOptions,
   PsmSessionToolRevealOptions,
@@ -59,6 +64,8 @@ interface SessionViewerProps {
   previewVariant?: SessionPreviewVariant;
   /** Slots for custom content injection into the toolbar */
   slots?: SessionViewerToolbarSlots;
+  /** Multi-tab strip rendered below the toolbar (multi-tab mode) */
+  sessionTabs?: Omit<SessionViewerTabsProps, "isMobile">;
   /** Layout extension slots around the main session viewer body */
   layoutSlots?: SessionViewerLayoutSlots;
   mainViewSlot?: ReactNode;
@@ -117,6 +124,7 @@ function SessionViewerContent({
   previewMode = false,
   previewVariant = "conversation",
   slots,
+  sessionTabs,
   layoutSlots,
   mainViewSlot,
   pluginTreeViews,
@@ -133,6 +141,8 @@ function SessionViewerContent({
     expandedToolIds,
     resetToolExpansionOverrides,
     restoreSearchExpandedTools,
+    switchSessionMemory,
+    flushSessionMemory,
   } = useSessionView();
   const isMobile = useIsMobile();
   const { copyText } = useClipboard();
@@ -164,6 +174,9 @@ function SessionViewerContent({
   // measured against the real layout (and stay aligned when turns collapse).
   const scrollMarkersContainerRef = useRef<HTMLDivElement>(null);
   const scrollMarkersContentRef = useRef<HTMLDivElement>(null);
+  // Session the scroll memory currently belongs to (tab switch tracking).
+  const scrollMemoryPathRef = useRef(session.path);
+  scrollMemoryPathRef.current = session.path;
 
   const handleResume = useCallback(() => {
     if (onResumeSession) {
@@ -174,9 +187,63 @@ function SessionViewerContent({
   }, [onResumeSession, onWebResume, session]);
   const hasResumeAction = Boolean(onResumeSession || onWebResume);
 
+  // Per-tab memory: snapshot expand/collapse state per session instead of
+  // wiping it on every switch. Preview mode keeps the old reset behavior.
   useEffect(() => {
-    resetToolExpansionOverrides();
-  }, [resetToolExpansionOverrides, session.path]);
+    if (previewMode) {
+      resetToolExpansionOverrides();
+      return;
+    }
+    switchSessionMemory(session.path);
+    return () => {
+      flushSessionMemory();
+    };
+  }, [session.path, previewMode, resetToolExpansionOverrides, switchSessionMemory, flushSessionMemory]);
+
+  // Per-tab memory: track scroll position of the current session. The scroll
+  // container element is stable across session switches, so attach once.
+  useEffect(() => {
+    if (previewMode) return;
+
+    let disposed = false;
+    let attached: HTMLDivElement | null = null;
+    let saveRaf = 0;
+    let lastSavedTop = -1;
+
+    const persist = (top: number) => {
+      if (top === lastSavedTop) return;
+      lastSavedTop = top;
+      const path = scrollMemoryPathRef.current;
+      if (path) saveSessionScrollTop(path, top);
+    };
+
+    const handleScroll = () => {
+      if (saveRaf) return;
+      saveRaf = requestAnimationFrame(() => {
+        saveRaf = 0;
+        if (attached) persist(attached.scrollTop);
+      });
+    };
+
+    const attachTimer = window.setInterval(() => {
+      if (disposed) return;
+      const el = scrollMarkersContainerRef.current;
+      if (!el) return;
+      window.clearInterval(attachTimer);
+      attached = el;
+      el.addEventListener("scroll", handleScroll, { passive: true });
+    }, 250);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(attachTimer);
+      if (saveRaf) cancelAnimationFrame(saveRaf);
+      if (attached) {
+        persist(attached.scrollTop);
+        attached.removeEventListener("scroll", handleScroll);
+      }
+    };
+  }, [previewMode]);
 
   const {
     entries,
@@ -200,6 +267,39 @@ function SessionViewerContent({
     isLive,
     previewMode,
   });
+
+  // Per-tab memory: restore the saved scroll position once the session data
+  // has finished loading for this path (loading true -> false edge). Memory
+  // wins over the open-position default but not over explicit entry jumps.
+  const wasLoadingRef = useRef(true);
+  useEffect(() => {
+    const wasLoading = wasLoadingRef.current;
+    wasLoadingRef.current = loading;
+    if (previewMode || loading || !wasLoading) return;
+    if (initialEntryId) return;
+
+    const savedTop = getSessionScrollTop(session.path);
+    if (savedTop == null) return;
+
+    // Memory wins over "open at bottom" for this switch only.
+    pendingScrollToBottomRef.current = false;
+
+    let frames = 0;
+    let rafId = 0;
+    const attempt = () => {
+      const container = scrollMarkersContainerRef.current;
+      if (!container) return;
+      container.scrollTop = savedTop;
+      frames += 1;
+      // Virtualized rows settle their measured heights over a few frames;
+      // keep re-applying until the position sticks or we give up.
+      if (Math.abs(container.scrollTop - savedTop) > 1.5 && frames < 60) {
+        rafId = requestAnimationFrame(attempt);
+      }
+    };
+    rafId = requestAnimationFrame(attempt);
+    return () => cancelAnimationFrame(rafId);
+  }, [loading, previewMode, initialEntryId, session.path, pendingScrollToBottomRef]);
 
   const {
     showSidebar,
@@ -443,6 +543,7 @@ function SessionViewerContent({
       session={session}
       entries={entries}
       toolbarProps={toolbarProps}
+      sessionTabs={sessionTabs}
       layoutSlots={layoutSlots}
       mainViewSlot={mainViewSlot}
       forkedFromLabel={t("session.forkedFrom")}

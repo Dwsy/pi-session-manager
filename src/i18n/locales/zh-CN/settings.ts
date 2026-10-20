@@ -705,6 +705,8 @@ export const settings = {
       failed: "失败",
     },
     defaultViewMode: "默认视图模式",
+    multiTabEnabled: "多标签浏览",
+    multiTabEnabledHelp: "将打开的会话保留为工具栏下方的标签页，便于快速切换",
     viewModes: {
       list: "列表",
       directory: "目录",

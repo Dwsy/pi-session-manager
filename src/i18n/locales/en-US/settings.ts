@@ -742,6 +742,9 @@ export const settings = {
       failed: "Failed",
     },
     defaultViewMode: "Default View Mode",
+    multiTabEnabled: "Multi-tab viewer",
+    multiTabEnabledHelp:
+      "Keep opened sessions as tabs below the toolbar for quick switching",
     viewModes: {
       list: "List",
       directory: "Directory",

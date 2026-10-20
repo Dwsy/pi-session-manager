@@ -9,6 +9,10 @@ export const session = {
   scrollToTop: 'Nach oben scrollen',
   scrollToBottom: 'Nach unten scrollen',
   systemPromptAndTools: 'System-Prompt & Tools',
+  tabs: {
+    close: 'Tab schließen',
+    live: 'Aktiv',
+  },
   toolbar: {
     outline: 'Gliederung',
     thinking: 'Denken',
