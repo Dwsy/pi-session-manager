@@ -22,7 +22,14 @@ custom-protocol = ["tauri?/custom-protocol"]
 tauri = { version = "2.10.1", features = ["devtools", "image-png", "tray-icon", "webview-data-url"], optional = true }
 tauri-plugin-shell = { version = "2.3.5", optional = true }
 tauri-plugin-dialog = { version = "2.6.0", optional = true }
-tauri-plugin-deep-link = { version = "2", optional = true }
+# Pinned exactly: 2.6.2 (2026-10-14) breaks fresh Linux builds — its
+# load_desktop_ini builds ini::ParseOption as a 2-field struct literal, but
+# rust-ini 0.21.3 added enabled_indented_mutiline_value /
+# enabled_preserve_key_leading_whitespace (E0063). This repo gitignores
+# Cargo.lock, so CI resolves the newest matching version on every run.
+# 2.6.1 is the last release proven by the v0.8.9 Linux release job.
+# Relax the pin once upstream ships a fix newer than 2.6.2.
+tauri-plugin-deep-link = { version = "=2.6.1", optional = true }
 tauri-plugin-notification = { version = "2", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
