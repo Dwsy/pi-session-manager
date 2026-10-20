@@ -2,6 +2,13 @@
 
 All notable changes to Pi Session Manager will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **Mermaid diagrams render as SVG**: code fences tagged `mermaid` are now compiled by [Ondine](https://ondine.sh) (Rust/WASM) into real SVG instead of the previous Unicode box drawing, so every supported diagram type — flowchart, sequence, class, state, ER, pie, gantt, git, quadrant, mindmap and more — shows a proper diagram. The Rendered/Mermaid toolbar toggle is unchanged, and a diagram that fails to compile (unknown type or syntax error) still falls back to the highlighted source block. Diagrams inherit the active light/dark theme through `--ondine-*` tokens, so no recompilation is needed on theme switch.
+- Dropped the `lovely-mermaid` dependency; the size-optimised Ondine compiler ships as base64 WebAssembly in its own `diagram-vendor` bundle chunk.
+
 ## [0.9.0] - 2026-10-20
 
 ### Added

@@ -79,10 +79,20 @@
 
 .mermaid-block {
   margin: 1em 0;
-  overflow-x: auto;
   border: 1px solid var(--mdCodeBlockBorder);
   border-radius: 6px;
   background: var(--bg-subtle);
+
+  // Ondine diagrams read their palette from these tokens on any ancestor, so the same compiled SVG
+  // follows the active theme without a recompile.
+  --ondine-bg: rgba(var(--foreground-rgb), 0.05);
+  --ondine-fg: var(--text);
+  --ondine-border: var(--borderMuted);
+  --ondine-line: var(--text-secondary);
+  --ondine-muted: var(--thinkingText);
+  --ondine-accent: var(--accent);
+  --ondine-radius: 4px;
+  --ondine-font: var(--font-family-mono, ui-monospace, monospace);
 }
 
 .mermaid-toolbar {
@@ -110,7 +120,22 @@
   color: var(--text);
 }
 
-.markdown-content .mermaid-art,
+.mermaid-rendered-view {
+  padding: 12px 14px;
+  overflow-x: auto;
+}
+
+.markdown-content .mermaid-svg {
+  display: flex;
+  justify-content: center;
+}
+
+.markdown-content .mermaid-svg svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
 .markdown-content .mermaid-source {
   width: max-content;
   min-width: 100%;
@@ -120,46 +145,10 @@
   font-family: var(--font-family-mono, ui-monospace, monospace);
 }
 
-.markdown-content .mermaid-art code {
-  font-size: 0.85em;
-  line-height: 1.35;
-  white-space: pre;
-}
-
 .markdown-content .mermaid-source code {
   font-size: 0.85em;
   line-height: 1.55;
   white-space: pre;
-}
-
-.mermaid-border,
-.mermaid-none {
-  color: var(--thinkingText);
-}
-
-.mermaid-text,
-.mermaid-title {
-  color: var(--text);
-}
-
-.mermaid-edge {
-  color: var(--accent);
-}
-
-.mermaid-edgeLabel {
-  color: var(--text-secondary);
-}
-
-.mermaid-link {
-  color: inherit;
-  text-decoration: none;
-}
-
-.mermaid-warnings {
-  margin-bottom: 4px;
-  color: rgb(var(--color-warning));
-  font-family: var(--font-family-mono, ui-monospace, monospace);
-  font-size: 11px;
 }
 
 .markdown-content blockquote {

@@ -226,6 +226,8 @@ export default defineConfig(({ mode }) => {
               ],
               "terminal-vendor": ["@xterm/xterm", "@xterm/addon-fit"],
               "chart-vendor": ["recharts"],
+              // Size-optimized diagram compiler inlined as base64 WebAssembly.
+              "diagram-vendor": ["ondine"],
               "markdown-vendor": [
                 "marked",
                 "@shikijs/core",

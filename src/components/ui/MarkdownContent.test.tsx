@@ -117,7 +117,7 @@ After XML
     expect(code?.textContent).toContain('- [file1](file:///path/to/file1)')
   })
 
-  it('renders mermaid code blocks as themed Unicode diagrams', () => {
+  it('renders mermaid code blocks as inline SVG diagrams', () => {
     const content = `\`\`\`mermaid
 flowchart LR
   A[Start] --> B[Done]
@@ -126,6 +126,7 @@ flowchart LR
 
     const diagram = container.querySelector('.mermaid-block')
     expect(diagram).not.toBeNull()
+    expect(diagram?.querySelector('svg.ondine.ondine-flowchart')).not.toBeNull()
     expect(diagram?.textContent).toContain('Start')
     expect(diagram?.textContent).toContain('Done')
     expect(container.querySelector('.markdown-code-block')).toBeNull()
@@ -144,13 +145,13 @@ flowchart LR
 
   it('falls back to the regular code block for unsupported mermaid diagrams', () => {
     const content = `\`\`\`mermaid
-quadrantChart
-  x-axis Low --> High
+zzzDiagram
+  title A type no diagram engine knows
 \`\`\``
     const { container } = render(<MarkdownContent content={content} />)
 
     expect(container.querySelector('.mermaid-block')).toBeNull()
-    expect(container.querySelector('.markdown-code-block code')?.textContent).toContain('quadrantChart')
+    expect(container.querySelector('.markdown-code-block code')?.textContent).toContain('zzzDiagram')
   })
 
   it('renders inline and block LaTeX with KaTeX', () => {

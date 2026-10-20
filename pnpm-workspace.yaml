@@ -2,5 +2,8 @@ allowBuilds:
   esbuild: true
   protobufjs: true
 
+minimumReleaseAgeExclude:
+  - ondine@0.0.3
+
 overrides:
   "@earendil-works/pi-ai>@google/genai": "-"
