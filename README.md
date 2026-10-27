@@ -51,7 +51,7 @@ curl -fsSL https://raw.githubusercontent.com/dwsy/pi-session-manager/main/script
 Windows PowerShell:
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
 ```
 
 The installers download the latest `pi-session-cli`, verify SHA256 when available, configure the install path, and handle platform quarantine metadata.

@@ -38,16 +38,16 @@ curl -fsSL https://raw.githubusercontent.com/dwsy/pi-session-manager/main/script
 ### Windows
 ```powershell
 # CLI 一键安装（引导式，自动语言）
-iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
 
 # CLI 非交互安装
-$env:PSM_INSTALL_YES="1"; iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+$env:PSM_INSTALL_YES="1"; irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
 
 # CLI 指定语言和安装路径
-$env:PSM_INSTALL_LANG="zh"; $env:PSM_INSTALL_PREFIX="C:\Tools"; iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+$env:PSM_INSTALL_LANG="zh"; $env:PSM_INSTALL_PREFIX="C:\Tools"; irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
 
 # 通用安装（默认安装 CLI + GUI）
-iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install.ps1 | iex
 
 # 仅安装 GUI
 .\install.ps1 -Mode gui
@@ -73,3 +73,4 @@ iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts
 3. **macOS CLI 首次运行**: `install-cli.sh` 会默认执行 `xattr -dr com.apple.quarantine`，避免 Gatekeeper quarantine 阻止运行
 4. **Windows CLI 首次运行**: `install-cli.ps1` 会默认执行 `Unblock-File`，避免 Mark-of-the-Web 阻止运行
 5. **首次运行**: CLI 默认端口 52131，打开浏览器访问 http://localhost:52131
+6. **Windows 一键安装请用 `irm` 而不是 `iwr | iex`**: Windows PowerShell 5.1 里 `iwr -useb <url> | iex` 会把 `Invoke-WebRequest` 返回的**响应对象**（而不是字符串）转成字符串，转换时按 ASCII 解码原始字节，脚本里的中文提示会全部变成 `?`（例如 `[OK] 平台: windows-x64` 变成 `[OK] ??????: windows-x64`）。安装本身没错，只是提示乱码。`irm <url> | iex` 拿到的是已按 `charset=utf-8` 正确解码的字符串，PowerShell 5.1 / 7 都正常。等价写法还有 `$r = iwr -useb <url>; iex $r.Content`，或先 `iwr -OutFile` 落盘再 `iex (Get-Content <file> -Raw -Encoding UTF8)`。
