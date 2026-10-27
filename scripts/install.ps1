@@ -1,6 +1,9 @@
 # Pi Session Manager - Windows Installer
 # Usage: .\install.ps1 [-Mode <cli|gui|default>] [-Prefix <path>]
-#        iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install.ps1 | iex
+#        irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install.ps1 | iex
+#
+# NOTE: use `irm ... | iex` rather than `iwr -useb ... | iex`; see scripts/install-cli.ps1 header
+# for why (PowerShell 5.1 mangles non-ASCII text when the response object is piped to iex).
 
 param(
     [ValidateSet("cli", "gui", "default")]

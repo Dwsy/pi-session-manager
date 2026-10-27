@@ -81,7 +81,7 @@ curl -fsSL https://raw.githubusercontent.com/dwsy/pi-session-manager/main/script
 Windows PowerShell：
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
 ```
 
 安装器会下载最新 `pi-session-cli`、在可用时校验 SHA256、配置安装路径，并处理平台隔离标记。

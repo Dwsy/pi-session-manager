@@ -1,6 +1,13 @@
 # Pi Session Manager CLI installer for Windows
-# Usage: iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
-#        $env:PSM_INSTALL_YES="1"; iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+#        $env:PSM_INSTALL_YES="1"; irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+#
+# NOTE: use `irm ... | iex`, NOT `iwr -useb ... | iex`. In Windows PowerShell 5.1,
+# `iwr -useb <url> | iex` pipes the response *object* into Invoke-Expression, which turns it
+# into a string by decoding the raw bytes as ASCII - every non-ASCII byte (3 per CJK char)
+# becomes "?", so all localized messages look like "[OK] ??????: windows-x64".
+# `irm` returns a string already decoded with the response charset (utf-8), so it is safe
+# on both PowerShell 5.1 and 7. Equivalent: `$r = iwr -useb <url>; iex $r.Content`.
 
 param(
     [string]$Prefix = $env:PSM_INSTALL_PREFIX,
@@ -51,10 +58,10 @@ function Text($Key) {
   -Help             显示帮助
 
 curl / PowerShell 一键安装:
-  iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+  irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
 
 非交互安装:
-  `$env:PSM_INSTALL_YES="1"; iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+  `$env:PSM_INSTALL_YES="1"; irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
 
 环境变量:
   PSM_INSTALL_YES=1
@@ -101,10 +108,10 @@ Options:
   -Help             Show help
 
 curl / PowerShell one-line install:
-  iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+  irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
 
 Non-interactive install:
-  `$env:PSM_INSTALL_YES="1"; iwr -useb https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+  `$env:PSM_INSTALL_YES="1"; irm https://raw.githubusercontent.com/dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
 
 Environment variables:
   PSM_INSTALL_YES=1

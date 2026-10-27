@@ -227,7 +227,7 @@ pi-session-cli update install --force
 > script instead:
 >
 > ```powershell
-> iwr -useb https://raw.githubusercontent.com/Dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
+> irm https://raw.githubusercontent.com/Dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex
 > ```
 
 ## Troubleshooting
