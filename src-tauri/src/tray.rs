@@ -5,6 +5,7 @@ use tauri::{
     menu::{CheckMenuItem, Menu, MenuBuilder, MenuItemBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Listener, Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    PhysicalPosition, Position, LogicalPosition,
 };
 
 const TRAY_ID: &str = "main";
@@ -82,7 +83,7 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
             let id = event.id.as_ref();
             match id {
                 MENU_SHOW => {
-                    show_or_create_window(app);
+                    show_or_create_window(app, None);
                 }
                 MENU_OPEN_WEB => {
                     open_web(app);
@@ -97,9 +98,15 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
             }
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                position,
+                ..
+            } = event
+            {
                 let app = tray.app_handle();
-                show_or_create_window(app);
+                show_or_create_window(app, Some(position));
             }
         })
         .build(app)
@@ -138,7 +145,10 @@ pub fn install_lightweight_close_handler<R: Runtime>(window: &WebviewWindow<R>) 
 ///
 /// When lightweight mode is enabled, closing the window destroys it (freeing memory).
 /// This function recreates it from scratch.
-pub fn show_or_create_window<R: Runtime>(app: &AppHandle<R>) {
+/// `click_position` is the physical screen coordinates of the tray icon click (if available),
+/// used to determine which monitor to open the window on (multi-monitor support).
+/// If `None`, falls back to the current mouse position or primary monitor.
+pub fn show_or_create_window<R: Runtime>(app: &AppHandle<R>, click_position: Option<PhysicalPosition<f64>>) {
     // If window already exists, just show and focus it
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -146,22 +156,67 @@ pub fn show_or_create_window<R: Runtime>(app: &AppHandle<R>) {
         return;
     }
 
-    // Window was destroyed (lightweight mode) — recreate it
-    if let Err(e) = create_main_window(app) {
+    // Window was destroyed (lightweight mode) — recreate it on the monitor where the tray was clicked
+    if let Err(e) = create_main_window(app, click_position) {
         log::error!("Failed to recreate main window: {e}");
     }
 }
 
 /// Create the main application window with proper sizing and platform styling.
-fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
-    let monitor = app.primary_monitor().ok().flatten();
+/// `click_position` is the physical screen coordinates of the tray icon click (if available).
+/// The window will be centered on the monitor containing this position, or the current
+/// mouse position / primary monitor as fallback.
+fn create_main_window<R: Runtime>(app: &AppHandle<R>, click_position: Option<PhysicalPosition<f64>>) -> Result<(), String> {
+    // Determine the target position: click position > current mouse position > primary monitor
+    let target_position = click_position.or_else(|| get_current_mouse_position(app));
+
+    // Find the monitor containing the target position (multi-monitor support)
+    let monitor = target_position
+        .and_then(|pos| app.monitor_from_point(pos.x, pos.y).ok().flatten())
+        .or_else(|| app.primary_monitor().ok().flatten());
+
     let ((w, h), (min_w, min_h)) = crate::resolve_window_dimensions(monitor.as_ref());
 
-    let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into())).title("Pi Session Manager").inner_size(w, h).min_inner_size(min_w, min_h).center().resizable(true).fullscreen(false).zoom_hotkeys_enabled(true);
+    // Calculate window position to center on the target monitor (in logical pixels)
+    let (pos_x, pos_y) = if let Some(ref monitor) = monitor {
+        let scale = monitor.scale_factor();
+        let work_area = monitor.work_area();
+        // work_area is in physical pixels; convert to logical
+        let work_area_x = work_area.position.x as f64 / scale;
+        let work_area_y = work_area.position.y as f64 / scale;
+        let work_area_w = work_area.size.width as f64 / scale;
+        let work_area_h = work_area.size.height as f64 / scale;
+        (
+            work_area_x + (work_area_w - w) / 2.0,
+            work_area_y + (work_area_h - h) / 2.0,
+        )
+    } else {
+        // Fallback: let Tauri center on primary monitor
+        (0.0, 0.0)
+    };
+
+    let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+        .title("Pi Session Manager")
+        .inner_size(w, h)
+        .min_inner_size(min_w, min_h)
+        .resizable(true)
+        .fullscreen(false)
+        .zoom_hotkeys_enabled(true);
+
+    // Set explicit position if we calculated one (non-zero), otherwise let .center() handle it
+    if pos_x != 0.0 || pos_y != 0.0 {
+        builder = builder.position(pos_x, pos_y);
+    } else {
+        builder = builder.center();
+    }
 
     #[cfg(target_os = "macos")]
     {
-        builder = builder.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true).traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 22.0)));
+        builder = builder
+            .decorations(true)
+            .title_bar_style(tauri::TitleBarStyle::Overlay)
+            .hidden_title(true)
+            .traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 22.0)));
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -193,6 +248,24 @@ fn create_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     });
 
     Ok(())
+}
+/// Get the current mouse cursor position in physical screen coordinates.
+/// Uses Core Graphics on macOS; returns None on other platforms.
+fn get_current_mouse_position<R: Runtime>(_app: &AppHandle<R>) -> Option<PhysicalPosition<f64>> {
+    #[cfg(target_os = "macos")]
+    {
+        use core_graphics::event::CGEvent;
+        use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+
+        let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState).ok()?;
+        let event = CGEvent::new(source).ok()?;
+        let location = event.location();
+        Some(PhysicalPosition::new(location.x, location.y))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        None
+    }
 }
 
 fn open_web<R: Runtime>(_app: &AppHandle<R>) {

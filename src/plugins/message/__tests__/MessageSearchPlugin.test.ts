@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render } from '@testing-library/react'
 
 import i18n from '../../../i18n'
 import { MessageSearchPlugin } from '../MessageSearchPlugin'
@@ -98,5 +99,34 @@ describe('MessageSearchPlugin', () => {
       totalHits: 3,
       hasMore: false,
     })
+  })
+
+  it('displays HTML-like search hits as text instead of executing markup', async () => {
+    const content = 'Important <meta http-equiv="refresh" content="0;url=/en-US"> <img src=x onerror="alert(1)"> & <b>literal</b>'
+    mockFullTextSearchRuntime.mockResolvedValueOnce({
+      hits: [{
+        session_id: 'session-1',
+        entry_id: 'entry-1',
+        session_path: '/tmp/project/session.jsonl',
+        session_name: 'Alpha',
+        role: 'user',
+        content,
+        timestamp: '2026-04-09T10:00:00Z',
+        score: 42,
+        match_reason: 'content',
+      }],
+      total_hits: 1,
+      has_more: false,
+    })
+
+    const plugin = new MessageSearchPlugin()
+    const { results } = await plugin.searchPage('Important', createContext(), {
+      sourceFilter: 'content_only',
+    })
+    const { container } = render(plugin.renderItem(results[0]))
+
+    expect(container.textContent).toContain(content)
+    expect(container.querySelectorAll('mark')).toHaveLength(1)
+    expect(container.querySelector('meta, img, b')).toBeNull()
   })
 })

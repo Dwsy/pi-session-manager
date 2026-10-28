@@ -605,7 +605,7 @@ fn main() {
         .run(|app_handle, event| {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { has_visible_windows: false, .. } = event {
-                pi_session_manager::tray::show_or_create_window(app_handle);
+                pi_session_manager::tray::show_or_create_window(app_handle, None);
             }
 
             // ── Prevent app exit when lightweight mode is active ──

@@ -69,6 +69,7 @@ const MAX_SESSION_PREFETCH = 12;
 const MAX_SNIPPET_LINES = 3;
 const MAX_SNIPPET_LINE_LENGTH = 180;
 const HIGHLIGHT_CACHE_MAX_ENTRIES = 500;
+const MAX_HIGHLIGHT_TERMS = 64;
 
 /**
  * Message search plugin
@@ -92,8 +93,8 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
   // FTS mode state
   private ftsOptions: MessageSearchPluginOptions = {};
 
-  // Memoization cache for highlighted HTML
-  private highlightCache = new Map<string, string>();
+  // Cached React nodes, never raw HTML from untrusted session content.
+  private highlightCache = new Map<string, ReactNode>();
 
   get name(): string {
     return (
@@ -234,33 +235,40 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
     const uniqueTerms = Array.from(
       new Set(terms.map((term) => term.toLowerCase())),
     )
-      .filter(Boolean)
-      .sort((a, b) => b.length - a.length);
+      .filter((term) => term.length > 0 && term.length <= MAX_SNIPPET_LINE_LENGTH)
+      .sort((a, b) => b.length - a.length)
+      .slice(0, MAX_HIGHLIGHT_TERMS);
 
     if (!uniqueTerms.length) {
       return text;
     }
 
-    // Use cached highlighted HTML
+    // React escapes text nodes. Search hits can contain literal HTML/Markdown;
+    // parsing them as HTML could execute markup and navigate the whole app.
     const cacheKey = `${text}|${uniqueTerms.join("|")}`;
-    let highlightedHtml = this.highlightCache.get(cacheKey);
+    let highlighted = this.highlightCache.get(cacheKey);
 
-    if (highlightedHtml === undefined) {
+    if (highlighted === undefined) {
       const pattern = new RegExp(
         `(${uniqueTerms.map((term) => this.escapeRegExp(term)).join("|")})`,
         "gi",
       );
-      const parts = text.split(pattern);
-
-      highlightedHtml = parts
-        .map((part) => {
-          const isMatch = uniqueTerms.includes(part.toLowerCase());
-          if (!isMatch) {
-            return part;
-          }
-          return `<mark class="rounded bg-warning/35 text-foreground px-0.5 font-semibold">${part}</mark>`;
-        })
-        .join("");
+      highlighted = (
+        <span>
+          {text.split(pattern).map((part, index) =>
+            uniqueTerms.includes(part.toLowerCase()) ? (
+              <mark
+                key={index}
+                className="rounded bg-warning/35 text-foreground px-0.5 font-semibold"
+              >
+                {part}
+              </mark>
+            ) : (
+              part
+            ),
+          )}
+        </span>
+      );
 
       // Cache with LRU eviction
       if (this.highlightCache.size >= HIGHLIGHT_CACHE_MAX_ENTRIES) {
@@ -269,11 +277,10 @@ export class MessageSearchPlugin extends BaseSearchPlugin {
           this.highlightCache.delete(oldestKey);
         }
       }
-      this.highlightCache.set(cacheKey, highlightedHtml);
+      this.highlightCache.set(cacheKey, highlighted);
     }
 
-    // Convert HTML string to React nodes
-    return <span dangerouslySetInnerHTML={{ __html: highlightedHtml }} />;
+    return highlighted;
   }
 
   private getRoleLabel(role: string): string {

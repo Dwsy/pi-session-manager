@@ -36,7 +36,7 @@ pub fn handle_deep_link_payload<R: Runtime>(app: &AppHandle<R>, state: &DeepLink
 }
 
 fn handle_deep_link_payload_now<R: Runtime>(app: &AppHandle<R>, state: &DeepLinkState, payload: &str) {
-    crate::tray::show_or_create_window(app);
+    crate::tray::show_or_create_window(app, None);
     for url in parse_deep_link_payload(payload) {
         emit_or_queue(app, state, url);
     }
