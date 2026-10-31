@@ -301,7 +301,8 @@ function normalizeSessionEntry(raw: any): SessionEntry | null {
     type === 'custom' ||
     type === 'custom_message' ||
     type === 'compaction' ||
-    type === 'branch_summary'
+    type === 'branch_summary' ||
+    type === 'context_edit'
   ) {
     return raw as SessionEntry
   }
