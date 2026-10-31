@@ -1,4 +1,4 @@
-import type { PsmSessionJsonlEntry, PsmToolResolvedData } from '@pi-session-manager/plugin-sdk'
+import type { PsmSessionJsonlEntry, PsmToolCallContent, PsmToolResolvedData } from '@pi-session-manager/plugin-sdk'
 
 export const GROK_PI_TOOL_NAMES = new Set([
   'bash',
@@ -40,6 +40,15 @@ const SUBAGENT_V2_TOOLS = new Set([
 ])
 
 const TASK_TOOLS = new Set(['get_task_output', 'wait_tasks', 'kill_task'])
+
+/** Native Pi and Grok Pi both call their shell tool `bash`. Grok's replacement
+ * requires a task_name; leave native Pi calls to the built-in Bash renderer. */
+export function matchesGrokPiTool(toolCall: PsmToolCallContent): boolean {
+  const name = toolCall.name || ''
+  if (!GROK_PI_TOOL_NAMES.has(name)) return false
+  if (name !== 'bash') return true
+  return typeof toolCall.arguments?.task_name === 'string' && toolCall.arguments.task_name.trim().length > 0
+}
 
 export type GrokPiToolKind = 'bash' | 'eval' | 'task' | 'todo' | 'subagent'
 

@@ -4,6 +4,13 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-31
+
+### Fixed
+
+- Preserve Pi `context_edit` entries during session parsing, keeping the active parent chain intact after context edits (thanks to @snowgoat-io in PR #72).
+- Keep native Pi `bash` calls on the built-in Bash renderer when Grok Pi TUI is enabled; use the Grok renderer only for enhanced Bash calls with `task_name`.
+
 ### Changed
 
 - **Mermaid diagrams render as SVG**: code fences tagged `mermaid` are now compiled by [Ondine](https://ondine.sh) (Rust/WASM) into real SVG instead of the previous Unicode box drawing, so every supported diagram type — flowchart, sequence, class, state, ER, pie, gantt, git, quadrant, mindmap and more — shows a proper diagram. The Rendered/Mermaid toolbar toggle is unchanged, and a diagram that fails to compile (unknown type or syntax error) still falls back to the highlighted source block. Diagrams inherit the active light/dark theme through `--ondine-*` tokens, so no recompilation is needed on theme switch.

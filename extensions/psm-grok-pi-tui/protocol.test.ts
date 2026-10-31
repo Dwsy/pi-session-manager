@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PsmToolResolvedData } from '@pi-session-manager/plugin-sdk'
 
-import { resolveGrokPiToolPresentation, transformGrokPiEntries } from './protocol'
+import { matchesGrokPiTool, resolveGrokPiToolPresentation, transformGrokPiEntries } from './protocol'
 
 function tool(name: string, args: Record<string, unknown>, details?: Record<string, unknown>): PsmToolResolvedData {
   return {
@@ -42,6 +42,25 @@ describe('resolveGrokPiToolPresentation', () => {
   it('distinguishes Subagents v1 and v2 tools', () => {
     expect(resolveGrokPiToolPresentation(tool('spawn_subagent', { description: 'Inspect protocol' })).version).toBe('v1')
     expect(resolveGrokPiToolPresentation(tool('spawn_team_agent', { task_name: 'reviewer' })).version).toBe('v2')
+  })
+})
+
+describe('matchesGrokPiTool', () => {
+  it('does not intercept native Pi bash calls', () => {
+    expect(matchesGrokPiTool({ type: 'toolCall', name: 'bash', arguments: { command: 'pwd' } })).toBe(false)
+    expect(matchesGrokPiTool({ type: 'toolCall', name: 'bash', arguments: { command: 'pwd', timeout: 10 } })).toBe(false)
+    expect(matchesGrokPiTool({ type: 'toolCall', name: 'bash', arguments: { command: 'pwd', task_name: '  ' } })).toBe(false)
+  })
+
+  it('matches Grok enhanced bash with its required task_name', () => {
+    expect(matchesGrokPiTool({ type: 'toolCall', name: 'bash', arguments: { command: 'pwd', task_name: 'Inspect directory' } })).toBe(true)
+    expect(matchesGrokPiTool({ type: 'toolCall', name: 'bash', arguments: { command: 'sleep 3', task_name: 'Background work', is_background: true } })).toBe(true)
+  })
+
+  it('continues matching Grok-specific tools only', () => {
+    expect(matchesGrokPiTool({ type: 'toolCall', name: 'eval', arguments: { code: '2 + 2' } })).toBe(true)
+    expect(matchesGrokPiTool({ type: 'toolCall', name: 'spawn_team_agent' })).toBe(true)
+    expect(matchesGrokPiTool({ type: 'toolCall', name: 'read', arguments: {} })).toBe(false)
   })
 })
 

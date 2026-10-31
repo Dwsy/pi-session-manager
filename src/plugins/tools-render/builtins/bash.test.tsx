@@ -6,8 +6,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { Content, SessionEntry } from "@/types";
 import type { ToolRenderContext } from "@/plugins/tools-render/types";
 import { toolRenderRegistry } from "@/plugins/tools-render/registry";
+import type { ToolRenderPlugin } from "@/plugins/tools-render/types";
 import { registerBuiltinToolPlugins } from "./index";
 import { bashToolPlugin, powershellToolPlugin } from "./bash";
+import { grokPiToolRenderer } from "../../../../extensions/psm-grok-pi-tui/renderer";
 
 const context: ToolRenderContext = {
   isExpanded: true,
@@ -64,6 +66,21 @@ describe("shell tool registration", () => {
 
     expect(lookup("bash")).toBe("builtin-bash");
     expect(lookup("powershell")).toBe("builtin-powershell");
+  });
+
+  it("keeps native Pi bash on its built-in renderer with Grok Pi TUI enabled", () => {
+    registerBuiltinToolPlugins();
+    toolRenderRegistry.register(grokPiToolRenderer as unknown as ToolRenderPlugin);
+
+    try {
+      const lookup = (args: Record<string, unknown>) =>
+        toolRenderRegistry.findPlugin({ type: "toolCall", name: "bash", arguments: args } as Content).id;
+
+      expect(lookup({ command: "pwd" })).toBe("builtin-bash");
+      expect(lookup({ command: "pwd", task_name: "Inspect directory" })).toBe("builtin-grok-pi-tui");
+    } finally {
+      toolRenderRegistry.unregister(grokPiToolRenderer.id);
+    }
   });
 });
 

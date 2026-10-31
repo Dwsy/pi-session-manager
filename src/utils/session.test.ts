@@ -35,6 +35,35 @@ describe('Pi content normalization', () => {
 });
 
 describe('parseSessionEntriesWithLineCount', () => {
+  it('keeps context_edit records in the active parent chain for JSONL and JSON arrays', () => {
+    const raw = [
+      {
+        type: 'message',
+        id: 'before',
+        parentId: null,
+        message: { role: 'user', content: [{ type: 'text', text: 'Before editing' }] },
+      },
+      {
+        type: 'context_edit',
+        id: 'edit',
+        parentId: 'before',
+        timestamp: '2026-10-30T14:00:00Z',
+      },
+      {
+        type: 'message',
+        id: 'after',
+        parentId: 'edit',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'After editing' }] },
+      },
+    ];
+
+    for (const content of [raw.map((entry) => JSON.stringify(entry)).join('\n'), JSON.stringify(raw)]) {
+      const { entries } = parseSessionEntriesWithLineCount(content);
+      expect(entries.map((entry) => entry.type)).toEqual(['message', 'context_edit', 'message']);
+      expect(buildActivePathIds('after', entries)).toEqual(new Set(['after', 'edit', 'before']));
+    }
+  });
+
   it('preserves raw Pi tree-advancing entries and their parent chain', () => {
     const content = [
       JSON.stringify({

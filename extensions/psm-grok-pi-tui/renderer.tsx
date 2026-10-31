@@ -12,7 +12,7 @@ import ToolSectionHeader from '@/components/tool-calls/ToolSectionHeader'
 import { getToolExecutionClass, getToolRenderStatus, getToolStatusLabel } from '@/plugins/tools-render/utils/status'
 
 import {
-  GROK_PI_TOOL_NAMES,
+  matchesGrokPiTool,
   resolveGrokPiToolPresentation,
   resultDetails,
   type GrokPiToolKind,
@@ -133,7 +133,7 @@ export const grokPiToolRenderer: PsmToolRendererRegistration = {
   id: 'builtin-grok-pi-tui',
   name: 'Grok Pi TUI',
   description: 'Render Grok Pi Bash, Eval v1/v2, Todo v1/v2, Subagents v1/v2, and task tools.',
-  match: (toolCall) => GROK_PI_TOOL_NAMES.has(toolCall.name || ''),
+  match: matchesGrokPiTool,
   priority: 180,
   component: GrokPiToolRenderer,
   getSearchSegments: (_toolCall: PsmToolCallContent, data: PsmToolResolvedData) => [
