@@ -62,9 +62,9 @@ pub struct UpdateInfo {
 }
 
 /// Check whether a newer version is available on the given channel.
-pub async fn check_update(channel: &str) -> Result<UpdateInfo> {
+pub async fn check_update(channel: &str, use_proxy: bool) -> Result<UpdateInfo> {
     let client = build_client()?;
-    let manifest_body = fetch_manifest_body(&client, channel).await?;
+    let manifest_body = fetch_manifest_body(&client, channel, use_proxy).await?;
     let manifest: Manifest = serde_json::from_str(&manifest_body).map_err(|e| anyhow!("Failed to parse update manifest: {e}"))?;
 
     let current = current_version();
@@ -148,8 +148,9 @@ fn channels_config() -> Result<UpdateChannelsConfig> {
     serde_json::from_str(UPDATE_CHANNELS_JSON).map_err(|e| anyhow!("Failed to parse update channel config: {e}"))
 }
 
-/// Build the ordered list of manifest URLs for a channel (direct + proxied).
-fn manifest_urls(channel: &str) -> Result<Vec<String>> {
+/// Build the ordered list of manifest URLs for a channel. Proxied copies are
+/// opt-in (default off): the relay is third-party and sees the client IP (#68).
+fn manifest_urls(channel: &str, use_proxy: bool) -> Result<Vec<String>> {
     let normalized = normalize_channel(channel);
     let config = channels_config()?;
     let entry = config.channels.get(normalized).ok_or_else(|| anyhow!("Unknown update channel: {normalized}"))?;
@@ -157,8 +158,10 @@ fn manifest_urls(channel: &str) -> Result<Vec<String>> {
     let direct = [format!("https://raw.githubusercontent.com/{}/{}/{}/{}", config.owner, config.repo, config.manifest_branch, entry.manifest_path), format!("https://cdn.jsdelivr.net/gh/{}/{}@{}/{}", config.owner, config.repo, config.manifest_branch, entry.manifest_path)];
 
     let mut urls: Vec<String> = direct.to_vec();
-    for u in &direct {
-        urls.push(format!("{JSP_PROXY_ORIGIN}/http/{u}"));
+    if use_proxy {
+        for u in &direct {
+            urls.push(format!("{JSP_PROXY_ORIGIN}/http/{u}"));
+        }
     }
     Ok(urls)
 }
@@ -171,8 +174,8 @@ fn github_proxy_referer() -> String {
 }
 
 /// Fetch the first reachable manifest body across all sources.
-async fn fetch_manifest_body(client: &Client, channel: &str) -> Result<String> {
-    let urls = manifest_urls(channel)?;
+async fn fetch_manifest_body(client: &Client, channel: &str, use_proxy: bool) -> Result<String> {
+    let urls = manifest_urls(channel, use_proxy)?;
     let referer = github_proxy_referer();
     let mut last_err: Option<String> = None;
 
@@ -383,11 +386,16 @@ mod tests {
     }
 
     #[test]
-    fn manifest_urls_include_fallbacks() {
-        let urls = manifest_urls("stable").unwrap();
-        assert!(urls.len() >= 4); // 2 direct + 2 proxied
+    fn manifest_urls_proxy_is_opt_in() {
+        // Default: direct endpoints only, nothing third-party.
+        let urls = manifest_urls("stable", false).unwrap();
+        assert_eq!(urls.len(), 2);
         assert!(urls[0].contains("raw.githubusercontent.com"));
         assert!(urls[1].contains("cdn.jsdelivr.net"));
+
+        // Opt-in appends proxied copies as fallbacks.
+        let urls = manifest_urls("stable", true).unwrap();
+        assert_eq!(urls.len(), 4);
         assert!(urls[2].contains(JSP_PROXY_ORIGIN));
         assert!(urls[3].contains(JSP_PROXY_ORIGIN));
     }

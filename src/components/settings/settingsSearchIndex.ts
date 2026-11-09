@@ -484,6 +484,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
     ],
   },
   {
+    id: "update-use-proxy",
+    section: "updates",
+    labelKey: "settings.update.useProxy",
+    fallbackLabel: "Use update proxy (jsp.dwsy.link)",
+    extraKeys: ["settings.update.useProxyHelp"],
+    keywords: ["update", "proxy", "jsp", "network", "privacy", "github"],
+  },
+  {
     id: "update-channel",
     section: "updates",
     labelKey: "settings.update.channel.title",

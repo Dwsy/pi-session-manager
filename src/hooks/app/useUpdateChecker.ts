@@ -43,11 +43,12 @@ export function useUpdateChecker(options?: UseUpdateCheckerOptions): UseUpdateCh
 
   const channel = normalizeUpdateChannel(settings.update.channel)
   const autoCheck = settings.update.autoCheck !== false
+  const useProxy = settings.update.useProxy === true
 
   useEffect(() => {
     if (loading) return
-    configureUpdateService({ channel, autoCheck })
-  }, [loading, channel, autoCheck])
+    configureUpdateService({ channel, autoCheck, useProxy })
+  }, [loading, channel, autoCheck, useProxy])
 
   const notice = useMemo<UpdateNotice | null>(() => {
     if (status.kind === 'pending-restart') {

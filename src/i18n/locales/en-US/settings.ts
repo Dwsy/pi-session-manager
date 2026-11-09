@@ -870,6 +870,9 @@ export const settings = {
     autoCheck: "Automatic updates",
     autoCheckHelp:
       "Check every 30 minutes and install in the background. A restart applies the update.",
+    useProxy: "Use update proxy (jsp.dwsy.link)",
+    useProxyHelp:
+      "Off by default. Update checks contact raw.githubusercontent.com and cdn.jsdelivr.net only. When enabled, checks may also go through the third-party proxy jsp.dwsy.link, which sees your IP and check cadence; releases are always downloaded from github.com. See SECURITY.md.",
     checkNow: "Check now",
     checking: "Checking for updates...",
     installing: "Installing v{{version}} in the background...",

@@ -160,6 +160,20 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
           />
         </div>
 
+        <div className="px-3 py-3">
+          <SettingsToggleRow
+            title={t('settings.update.useProxy', 'Use update proxy (jsp.dwsy.link)')}
+            description={t(
+              'settings.update.useProxyHelp',
+              'Off by default. Update checks contact raw.githubusercontent.com and cdn.jsdelivr.net only. When enabled, checks may also go through the third-party proxy jsp.dwsy.link, which sees your IP and check cadence; releases are always downloaded from github.com. See SECURITY.md.',
+            )}
+            checked={settings.update.useProxy === true}
+            onChange={(enabled) => onUpdate('update', 'useProxy', enabled)}
+            descriptionClassName="mt-1 text-xs leading-relaxed text-muted-foreground"
+            searchKey="update-use-proxy"
+          />
+        </div>
+
         <div
           className="grid gap-3 px-3 py-3 md:grid-cols-[minmax(0,1fr)_minmax(240px,0.8fr)]"
           data-settings-search="update-channel"

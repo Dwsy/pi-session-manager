@@ -40,7 +40,7 @@ describe('useUpdateChecker', () => {
     localStorage.clear()
     resetUpdateService()
     vi.mocked(useSettings).mockReturnValue({
-      settings: { update: { autoCheck: true, channel: 'stable' } },
+      settings: { update: { autoCheck: true, channel: 'stable', useProxy: false } },
       loading: false,
     } as ReturnType<typeof useSettings>)
     vi.mocked(isTauri).mockReturnValue(true)
@@ -58,7 +58,7 @@ describe('useUpdateChecker', () => {
     const { result } = renderHook(() => useUpdateChecker({ setShowSettings: vi.fn() }))
 
     await waitFor(() => {
-      expect(downloadAndInstallAppUpdate).toHaveBeenCalledWith('stable', expect.any(Function))
+      expect(downloadAndInstallAppUpdate).toHaveBeenCalledWith('stable', false, expect.any(Function))
     })
 
     await waitFor(() => {

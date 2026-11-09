@@ -46,6 +46,7 @@ export type UpdateNotice =
 export interface UpdateServiceConfig {
   channel: UpdateChannel
   autoCheck: boolean
+  useProxy: boolean
 }
 
 interface PendingRestart {
@@ -168,7 +169,7 @@ async function installUpdate(channel: UpdateChannel, update: AvailableUpdateInfo
   setStatus({ kind: 'installing', update, progress: 0 })
 
   try {
-    await downloadAndInstallAppUpdate(channel, ({ progress }) => {
+    await downloadAndInstallAppUpdate(channel, config?.useProxy === true, ({ progress }) => {
       if (snapshot.status.kind !== 'installing') return
       setStatus({ kind: 'installing', update, progress })
     })
@@ -187,7 +188,7 @@ async function executeCheck(channel: UpdateChannel): Promise<void> {
 
   let update: AvailableUpdateInfo | null
   try {
-    update = await checkAppUpdate(channel)
+    update = await checkAppUpdate(channel, config?.useProxy === true)
   } catch (error) {
     patch({
       status: { kind: 'error', message: toMessage(error, 'Update check failed') },
@@ -279,7 +280,7 @@ function rearmSchedule(): void {
 export function configureUpdateService(next: UpdateServiceConfig): void {
   const previous = config
   config = next
-  if (previous && previous.channel === next.channel && previous.autoCheck === next.autoCheck) {
+  if (previous && previous.channel === next.channel && previous.autoCheck === next.autoCheck && previous.useProxy === next.useProxy) {
     return
   }
 

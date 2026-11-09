@@ -270,6 +270,9 @@ enum UpdateCommands {
         /// Update channel (stable or beta)
         #[arg(short, long, default_value = "stable")]
         channel: String,
+        /// Also try the third-party update proxy (jsp.dwsy.link); off by default
+        #[arg(long)]
+        use_proxy: bool,
     },
     /// Download and install the latest CLI binary (self-update)
     Install {
@@ -282,6 +285,9 @@ enum UpdateCommands {
         /// Force reinstall even if already up to date
         #[arg(long)]
         force: bool,
+        /// Also try the third-party update proxy (jsp.dwsy.link); off by default
+        #[arg(long)]
+        use_proxy: bool,
     },
 }
 
@@ -494,11 +500,11 @@ pub async fn run() -> Result<()> {
             }
         },
         Some(Commands::Update { command }) => match command {
-            UpdateCommands::Check { channel } => {
-                handle_update_check(&channel).await?;
+            UpdateCommands::Check { channel, use_proxy } => {
+                handle_update_check(&channel, use_proxy).await?;
             }
-            UpdateCommands::Install { channel, yes, force } => {
-                handle_update_install(&channel, yes, force).await?;
+            UpdateCommands::Install { channel, yes, force, use_proxy } => {
+                handle_update_install(&channel, yes, force, use_proxy).await?;
             }
         },
         Some(Commands::Search { query }) => {
@@ -517,10 +523,10 @@ pub async fn run() -> Result<()> {
 }
 
 /// Handle update check command (standalone — no running server required)
-async fn handle_update_check(channel: &str) -> Result<()> {
+async fn handle_update_check(channel: &str, use_proxy: bool) -> Result<()> {
     println!("{} Checking for updates (channel: {})...", "→".cyan(), channel.yellow());
 
-    let info = match crate::updater::check_update(channel).await {
+    let info = match crate::updater::check_update(channel, use_proxy).await {
         Ok(info) => info,
         Err(e) => {
             println!("{} {}", "✗".red(), format!("Failed to check for updates: {e}").red());
@@ -556,11 +562,11 @@ async fn handle_update_check(channel: &str) -> Result<()> {
 }
 
 /// Handle update install command (self-update — downloads and replaces binary)
-async fn handle_update_install(channel: &str, skip_confirm: bool, force: bool) -> Result<()> {
+async fn handle_update_install(channel: &str, skip_confirm: bool, force: bool, use_proxy: bool) -> Result<()> {
     // Windows: self-update not supported (running exe is locked)
     #[cfg(target_os = "windows")]
     {
-        let _ = (channel, skip_confirm, force);
+        let _ = (channel, skip_confirm, force, use_proxy);
         println!("{}", "✗ Windows 不支持 CLI 自更新（运行中的 exe 文件被系统锁定）".red().bold());
         println!();
         println!("{}", "请使用安装脚本重新安装最新版本：".yellow());
@@ -575,7 +581,7 @@ async fn handle_update_install(channel: &str, skip_confirm: bool, force: bool) -
     {
         println!("{} Checking for updates (channel: {})...", "→".cyan(), channel.yellow());
 
-        let info = crate::updater::check_update(channel).await?;
+        let info = crate::updater::check_update(channel, use_proxy).await?;
 
         if !info.update_available && !force {
             println!("{}", "✓ Already up to date.".green());

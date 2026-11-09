@@ -79,6 +79,8 @@ fn update_channels_config() -> Result<UpdateChannelsConfig, String> {
     serde_json::from_str(UPDATE_CHANNELS_JSON).map_err(|error| format!("Failed to parse shared update channel config: {error}"))
 }
 
+/// Direct manifest endpoints. No third-party host is contacted unless the
+/// user opts into the update proxy (default off, see SECURITY.md / issue #68).
 #[cfg(feature = "gui")]
 fn update_manifest_urls(channel: &str) -> Result<Vec<Url>, String> {
     let normalized = normalize_update_channel(channel);
@@ -87,7 +89,14 @@ fn update_manifest_urls(channel: &str) -> Result<Vec<Url>, String> {
 
     let direct_urls = [format!("https://raw.githubusercontent.com/{}/{}/{}/{}", config.owner, config.repo, config.manifest_branch, entry.manifest_path), format!("https://cdn.jsdelivr.net/gh/{}/{}@{}/{}", config.owner, config.repo, config.manifest_branch, entry.manifest_path)];
 
-    direct_urls.iter().cloned().chain(direct_urls.iter().map(|value| format!("{JSP_PROXY_ORIGIN}/http/{value}"))).map(|value| Url::parse(&value).map_err(|error| format!("Invalid update endpoint {value}: {error}"))).collect()
+    direct_urls.iter().map(|value| Url::parse(value).map_err(|error| format!("Invalid update endpoint {value}: {error}"))).collect()
+}
+
+/// Proxied copies of the direct endpoints: a third-party CORS relay that sees
+/// the client IP and update-check cadence. Opt-in only (issue #68 F1).
+#[cfg(feature = "gui")]
+fn proxied_manifest_urls(direct: &[Url]) -> Result<Vec<Url>, String> {
+    direct.iter().map(|value| Url::parse(&format!("{JSP_PROXY_ORIGIN}/http/{value}")).map_err(|error| format!("Invalid update endpoint {value}: {error}"))).collect()
 }
 
 #[cfg(feature = "gui")]
@@ -102,20 +111,55 @@ fn github_proxy_referer() -> String {
     format!("{JSP_PROXY_ORIGIN}/?{query}")
 }
 
+/// One updater endpoint set with the optional Referer it requires.
 #[cfg(feature = "gui")]
-fn build_channel_updater<R: Runtime>(app: &AppHandle<R>, channel: &str) -> Result<tauri_plugin_updater::Updater, String> {
-    let endpoints = update_manifest_urls(channel)?;
-    let mut headers = HeaderMap::new();
-    headers.insert(REFERER, HeaderValue::from_str(&github_proxy_referer()).map_err(|error| format!("Invalid updater Referer header: {error}"))?);
+struct EndpointAttempt {
+    endpoints: Vec<Url>,
+    referer: Option<String>,
+}
 
-    app.updater_builder().endpoints(endpoints).map_err(|error| format!("Failed to configure updater endpoints: {error}"))?.headers(headers).build().map_err(|error| format!("Failed to build updater: {error}"))
+/// Ordered endpoint attempts. The proxy attempt (opt-in) carries the Referer
+/// the relay requires; the direct attempt is fetched bare so that Referer
+/// never reaches non-proxy hosts (issue #68 F3).
+#[cfg(feature = "gui")]
+fn updater_attempts(channel: &str, use_proxy: bool) -> Result<Vec<EndpointAttempt>, String> {
+    let direct = update_manifest_urls(channel)?;
+    if !use_proxy {
+        return Ok(vec![EndpointAttempt { endpoints: direct, referer: None }]);
+    }
+    Ok(vec![EndpointAttempt { endpoints: proxied_manifest_urls(&direct)?, referer: Some(github_proxy_referer()) }, EndpointAttempt { endpoints: direct, referer: None }])
+}
+
+#[cfg(feature = "gui")]
+fn build_channel_updater<R: Runtime>(app: &AppHandle<R>, endpoints: Vec<Url>, referer: Option<String>) -> Result<tauri_plugin_updater::Updater, String> {
+    let mut builder = app.updater_builder().endpoints(endpoints).map_err(|error| format!("Failed to configure updater endpoints: {error}"))?;
+    if let Some(referer) = referer {
+        let mut headers = HeaderMap::new();
+        headers.insert(REFERER, HeaderValue::from_str(&referer).map_err(|error| format!("Invalid updater Referer header: {error}"))?);
+        builder = builder.headers(headers);
+    }
+    builder.build().map_err(|error| format!("Failed to build updater: {error}"))
+}
+
+/// Check for updates across the endpoint attempts in order.
+#[cfg(feature = "gui")]
+async fn check_update_attempted<R: Runtime>(app: &AppHandle<R>, channel: &str, use_proxy: bool) -> Result<Option<tauri_plugin_updater::Update>, String> {
+    let attempts = updater_attempts(channel, use_proxy)?;
+    let mut last_error = None;
+    for attempt in attempts {
+        let updater = build_channel_updater(app, attempt.endpoints, attempt.referer)?;
+        match updater.check().await {
+            Ok(update) => return Ok(update),
+            Err(error) => last_error = Some(format!("Failed to check for updates: {error}")),
+        }
+    }
+    Err(last_error.unwrap_or_else(|| "Failed to check for updates".to_string()))
 }
 
 #[cfg(feature = "gui")]
 #[tauri::command]
-pub async fn check_app_update(app: AppHandle, channel: Option<String>) -> Result<Option<AppUpdateMetadata>, String> {
-    let updater = build_channel_updater(&app, channel.as_deref().unwrap_or("stable"))?;
-    let update = updater.check().await.map_err(|error| format!("Failed to check for updates: {error}"))?;
+pub async fn check_app_update(app: AppHandle, channel: Option<String>, use_proxy: Option<bool>) -> Result<Option<AppUpdateMetadata>, String> {
+    let update = check_update_attempted(&app, channel.as_deref().unwrap_or("stable"), use_proxy.unwrap_or(false)).await?;
     Ok(update.map(|item| AppUpdateMetadata { current_version: item.current_version.clone(), version: item.version.clone(), date: item.date.map(|value| value.to_string()), body: item.body.clone(), raw_json: item.raw_json.clone() }))
 }
 
@@ -225,9 +269,14 @@ fn install_extracted_appimage(bytes: Vec<u8>, install_root: &std::path::Path) ->
 
 #[cfg(feature = "gui")]
 #[tauri::command]
-pub async fn download_and_install_app_update(app: AppHandle, channel: Option<String>, request_id: String) -> Result<(), String> {
-    let updater = build_channel_updater(&app, channel.as_deref().unwrap_or("stable"))?;
-    let update = updater.check().await.map_err(|error| format!("Failed to check for updates before download: {error}"))?.ok_or_else(|| "No update available for current channel".to_string())?;
+pub async fn download_and_install_app_update(app: AppHandle, channel: Option<String>, request_id: String, use_proxy: Option<bool>) -> Result<(), String> {
+    let mut update = check_update_attempted(&app, channel.as_deref().unwrap_or("stable"), use_proxy.unwrap_or(false)).await?.ok_or_else(|| "No update available for current channel".to_string())?;
+
+    // Release downloads go to the GitHub URLs embedded in the manifest, never
+    // through the proxy: drop the proxy-only Referer so it stays private (#68 F3).
+    if !update.download_url.as_str().starts_with(JSP_PROXY_ORIGIN) {
+        update.headers.remove(REFERER);
+    }
 
     let event_name = format!("app-updater-progress:{request_id}");
     let mut started = false;
@@ -286,6 +335,22 @@ mod tests {
         assert!(beta[0].as_str().contains("/beta/latest.json"));
         assert!(stable[1].as_str().contains("@update-manifests/stable/latest.json"));
         assert!(beta[1].as_str().contains("@update-manifests/beta/latest.json"));
+    }
+
+    #[test]
+    fn proxy_endpoints_are_opt_in() {
+        // Default: direct endpoints only, nothing third-party, no Referer.
+        let attempts = updater_attempts("stable", false).expect("direct attempts");
+        assert_eq!(attempts.len(), 1);
+        assert!(attempts[0].referer.is_none());
+
+        // Opt-in: proxy attempt first with its required Referer, bare direct fallback.
+        let attempts = updater_attempts("stable", true).expect("proxy attempts");
+        assert_eq!(attempts.len(), 2);
+        assert!(attempts[0].endpoints[0].as_str().starts_with(JSP_PROXY_ORIGIN));
+        assert!(attempts[0].referer.as_deref().unwrap_or_default().starts_with(JSP_PROXY_ORIGIN));
+        assert!(attempts[1].endpoints[0].as_str().contains("raw.githubusercontent.com"));
+        assert!(attempts[1].referer.is_none());
     }
 
     #[test]

@@ -1,9 +1,6 @@
 import {
   getGithubLatestReleaseApiUrl,
-  getGithubLatestReleaseProxyApiUrl,
-  getGithubProxyRequestHeaders,
   getGithubReleasesApiUrl,
-  getGithubReleasesProxyApiUrl,
   getReleaseUrl,
   normalizeUpdateChannel,
   getChannelManifestUrls,
@@ -159,15 +156,7 @@ async function fetchJson<T>(url: string, headers?: HeadersInit): Promise<T> {
 }
 
 async function fetchGithubJson<T>(url: string): Promise<T> {
-  const headers: HeadersInit = {
-    Accept: 'application/vnd.github+json',
-  }
-
-  if (url.startsWith('https://jsp.dwsy.link/')) {
-    Object.assign(headers as Record<string, string>, getGithubProxyRequestHeaders())
-  }
-
-  return fetchJson<T>(url, headers)
+  return fetchJson<T>(url, { Accept: 'application/vnd.github+json' })
 }
 
 interface TauriManifest {
@@ -204,43 +193,23 @@ async function fetchReleaseFromManifest(channel: UpdateChannel): Promise<GithubR
 }
 
 async function fetchStableRelease(): Promise<GithubRelease & { tag_name: string }> {
-  try {
-    const payload = await fetchGithubJson<Partial<GithubRelease>>(getGithubLatestReleaseApiUrl())
-    if (!isValidRelease(payload)) {
-      throw new Error('Missing tag_name in GitHub latest release payload')
-    }
-    return payload
-  } catch (error) {
-    const payload = await fetchGithubJson<Partial<GithubRelease>>(getGithubLatestReleaseProxyApiUrl())
-    if (!isValidRelease(payload)) {
-      throw new Error('Missing tag_name in GitHub latest release proxy payload')
-    }
-    return payload
+  const payload = await fetchGithubJson<Partial<GithubRelease>>(getGithubLatestReleaseApiUrl())
+  if (!isValidRelease(payload)) {
+    throw new Error('Missing tag_name in GitHub latest release payload')
   }
+  return payload
 }
 
 async function fetchBetaRelease(): Promise<GithubRelease & { tag_name: string }> {
-  try {
-    const releases = await fetchGithubJson<Array<Partial<GithubRelease>>>(getGithubReleasesApiUrl())
-    const validReleases = releases.filter(isValidRelease)
-    const preferred = validReleases.find(isPreferredBetaRelease)
-    const fallback = validReleases.find((release) => !release.prerelease)
-    const chosen = preferred ?? fallback
-    if (!chosen) {
-      throw new Error('No GitHub releases available for beta channel')
-    }
-    return chosen
-  } catch (error) {
-    const releases = await fetchGithubJson<Array<Partial<GithubRelease>>>(getGithubReleasesProxyApiUrl())
-    const validReleases = releases.filter(isValidRelease)
-    const preferred = validReleases.find(isPreferredBetaRelease)
-    const fallback = validReleases.find((release) => !release.prerelease)
-    const chosen = preferred ?? fallback
-    if (!chosen) {
-      throw new Error('No GitHub releases available for beta channel proxy')
-    }
-    return chosen
+  const releases = await fetchGithubJson<Array<Partial<GithubRelease>>>(getGithubReleasesApiUrl())
+  const validReleases = releases.filter(isValidRelease)
+  const preferred = validReleases.find(isPreferredBetaRelease)
+  const fallback = validReleases.find((release) => !release.prerelease)
+  const chosen = preferred ?? fallback
+  if (!chosen) {
+    throw new Error('No GitHub releases available for beta channel')
   }
+  return chosen
 }
 
 async function fetchReleaseForChannel(channel: UpdateChannel): Promise<GithubRelease & { tag_name: string }> {

@@ -816,6 +816,9 @@ export const settings = {
     description: "管理来自发布通道清单的应用更新",
     autoCheck: "自动更新",
     autoCheckHelp: "每 30 分钟检查一次，在后台静默安装，重启后生效。",
+    useProxy: "使用更新代理（jsp.dwsy.link）",
+    useProxyHelp:
+      "默认关闭。检查更新仅访问 raw.githubusercontent.com 与 cdn.jsdelivr.net；开启后可能经第三方代理 jsp.dwsy.link 中转，代理可见你的 IP 与检查频率；安装包始终从 github.com 下载。详见 SECURITY.md。",
     checkNow: "立即检查",
     checking: "正在检查更新...",
     installing: "正在后台安装 v{{version}}...",

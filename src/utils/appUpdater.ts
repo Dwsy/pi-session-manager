@@ -29,7 +29,7 @@ export interface AppUpdateDownloadState {
   total: number | null
 }
 
-export async function checkAppUpdate(channelInput: UpdateChannel | string): Promise<AvailableUpdateInfo | null> {
+export async function checkAppUpdate(channelInput: UpdateChannel | string, useProxy = false): Promise<AvailableUpdateInfo | null> {
   const channel = normalizeUpdateChannel(channelInput)
   const checkedAt = new Date().toISOString()
 
@@ -40,7 +40,7 @@ export async function checkAppUpdate(channelInput: UpdateChannel | string): Prom
   }
 
   try {
-    const update = await invoke<AppUpdateMetadata | null>('check_app_update', { channel })
+    const update = await invoke<AppUpdateMetadata | null>('check_app_update', { channel, useProxy })
     if (!update) return null
     return {
       channel,
@@ -66,6 +66,7 @@ function createRequestId() {
 
 export async function downloadAndInstallAppUpdate(
   channelInput: UpdateChannel | string,
+  useProxy = false,
   onProgress?: (state: AppUpdateDownloadState) => void,
 ): Promise<void> {
   if (!isTauri()) {
@@ -99,7 +100,7 @@ export async function downloadAndInstallAppUpdate(
   })
 
   try {
-    await invoke('download_and_install_app_update', { channel, requestId })
+    await invoke('download_and_install_app_update', { channel, requestId, useProxy })
   } finally {
     unlisten()
   }

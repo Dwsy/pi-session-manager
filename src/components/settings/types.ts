@@ -161,6 +161,7 @@ export interface AppSettings {
   update: {
     autoCheck: boolean;
     channel: "stable" | "beta";
+    useProxy: boolean;
   };
   onboarding: {
     /** True once the first-launch guide has been finished or dismissed. */
@@ -264,6 +265,7 @@ export const defaultSettings: AppSettings = {
   update: {
     autoCheck: true,
     channel: "stable",
+    useProxy: false,
   },
   onboarding: {
     completed: false,

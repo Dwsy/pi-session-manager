@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { compareVersions, checkForUpdates } from '../updateChecker'
-import {
-  getGithubLatestReleaseProxyApiUrl,
-  getGithubProxyRequestHeaders,
-} from '../updateChannel'
 
 describe('compareVersions', () => {
   it('compares major versions', () => {
@@ -32,15 +28,6 @@ describe('compareVersions', () => {
   it('handles prerelease versions', () => {
     expect(compareVersions('1.0.0-beta.1', '1.0.0-alpha.1')).toBe(1)
     expect(compareVersions('1.0.0', '1.0.0-beta.1')).toBe(1)
-  })
-})
-
-describe('GitHub proxy URL encoding', () => {
-  it('decodes only the proxy prefix and keeps repository path readable', () => {
-    expect(getGithubLatestReleaseProxyApiUrl()).toBe(
-      'https://jsp.dwsy.link/http/https://api.github.com/repos/Dwsy/pi-session-manager/releases/latest',
-    )
-    expect(getGithubProxyRequestHeaders().Referer).toContain('https://jsp.dwsy.link/?')
   })
 })
 
@@ -75,33 +62,7 @@ describe('checkForUpdates - fallback logic', () => {
     expect(result.status).toBe('update')
   })
 
-  it('falls back to proxy when official API fails', async () => {
-    let callCount = 0
-    globalThis.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
-      if (url.includes('/latest.json')) {
-        return Promise.resolve({ ok: false, status: 404 })
-      }
-      callCount++
-      if (url.startsWith('https://api.github.com')) {
-        return Promise.resolve({ ok: false, status: 403 })
-      }
-      expect(url).toContain('https://jsp.dwsy.link/http/https://api.github.com/repos/Dwsy/pi-session-manager/releases/latest')
-      expect(init?.headers).toMatchObject({
-        Accept: 'application/vnd.github+json',
-        Referer: expect.stringContaining('https://jsp.dwsy.link/?'),
-      })
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ tag_name: 'v2.0.0', prerelease: false, draft: false }),
-      })
-    })
-
-    const result = await checkForUpdates('stable', '1.0.0')
-    expect(result.status).toBe('update')
-    expect(callCount).toBe(2)
-  })
-
-  it('returns error when both APIs fail', async () => {
+  it('returns error when manifest and GitHub API fail', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 403,
@@ -112,31 +73,24 @@ describe('checkForUpdates - fallback logic', () => {
   })
 
   it('handles beta channel fallback', async () => {
-    let callCount = 0
-    globalThis.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/latest.json')) {
         return Promise.resolve({ ok: false, status: 404 })
       }
-      callCount++
-      if (url.startsWith('https://api.github.com')) {
-        return Promise.resolve({ ok: false, status: 403 })
-      }
-      expect(url).toContain('https://jsp.dwsy.link/http/https://api.github.com/repos/Dwsy/pi-session-manager/releases?per_page=20')
-      expect(init?.headers).toMatchObject({
-        Accept: 'application/vnd.github+json',
-        Referer: expect.stringContaining('https://jsp.dwsy.link/?'),
-      })
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve([
-          { tag_name: 'v1.5.0-beta.1', prerelease: true, draft: false },
-          { tag_name: 'v1.0.0', prerelease: false, draft: false },
-        ]),
+        json: () =>
+          Promise.resolve([
+            { tag_name: 'v1.5.0-beta.1', prerelease: true, draft: false },
+            { tag_name: 'v1.0.0', prerelease: false, draft: false },
+          ]),
       })
     })
 
     const result = await checkForUpdates('beta', '1.0.0')
     expect(result.status).toBe('update')
-    expect(callCount).toBe(2)
+    if (result.status === 'update') {
+      expect(result.update.latestVersion).toBe('1.5.0-beta.1')
+    }
   })
 })
