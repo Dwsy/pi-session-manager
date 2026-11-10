@@ -355,7 +355,7 @@ const SessionTree = memo(
         else if (event.key === "Home")
           setFocusedUid(visibleEntryUids[0] ?? null);
         else if (event.key === "End")
-          setFocusedUid(visibleEntryUids.at(-1) ?? null);
+          setFocusedUid(visibleEntryUids[visibleEntryUids.length - 1] ?? null);
         else if (event.key === "Enter" && focusedUid) activateNode(focusedUid);
         else if (event.key === " " && focusedUid) setSelectedUid(focusedUid);
         else if (event.key === "ArrowLeft" && focusedUid) {

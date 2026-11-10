@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { openMarkdownLinkTarget } from '@/utils/markdownLinks'
 import { getFallbackCurrentVersion } from '@/utils/appUpdater'
 import {
   canInstallInApp,
@@ -42,6 +43,16 @@ function formatDateTime(value: string | null): string | null {
 
 export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsProps) {
   const { t } = useTranslation()
+  const [linkError, setLinkError] = useState<string | null>(null)
+
+  const openReleaseLink = async (url: string): Promise<void> => {
+    setLinkError(null)
+    try {
+      await openMarkdownLinkTarget({ kind: 'external-url', href: url })
+    } catch (error) {
+      setLinkError(error instanceof Error ? error.message : String(error))
+    }
+  }
   const { status, lastCheckedAt } = useUpdateSnapshot()
   const channel = normalizeUpdateChannel(settings.update.channel)
   const desktopRuntime = canInstallInApp()
@@ -121,7 +132,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
       return (
         <button
           type="button"
-          onClick={() => window.open(status.update.releaseUrl, '_blank', 'noopener,noreferrer')}
+          onClick={() => void openReleaseLink(status.update.releaseUrl)}
           className={className}
         >
           <ArrowUpRight className="h-3.5 w-3.5" />
@@ -228,7 +239,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
               </button>
               <button
                 type="button"
-                onClick={() => window.open(getReleasesPageUrl(), '_blank', 'noopener,noreferrer')}
+                onClick={() => void openReleaseLink(getReleasesPageUrl())}
                 className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-muted-foreground focus-ring motion-color hover:bg-muted hover:text-foreground"
               >
                 <ArrowUpRight className="h-3.5 w-3.5" />
@@ -238,6 +249,7 @@ export default function UpdateSettings({ settings, onUpdate }: UpdateSettingsPro
           </div>
 
           {renderStatusLine()}
+          {linkError && <p role="alert" className="text-xs text-destructive">{linkError}</p>}
 
           {status.kind === 'installing' && (
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">

@@ -8,7 +8,21 @@ interface PiLiveChatInputProps {
   sessionId: string;
   isLive?: boolean;
   onSent?: () => void;
+  /** Explicit Mesh execution: never falls back to Pi Live controls. */
+  binding?: MeshInputBinding;
 }
+
+export interface MeshInputBinding {
+  kind: "mesh";
+  available: boolean;
+  isRunning: boolean;
+  send: (text: string, mode: "steer" | "followUp") => Promise<{ ok: true; disposition?: string }>;
+  cancel: () => Promise<{ ok: true }>;
+}
+
+const meshDrafts = new Map<string, { text: string; revision: number }>();
+const meshModes = new Map<string, "steer" | "followUp">();
+const meshInFlight = new Set<string>();
 
 const MAX_HISTORY = 20;
 
@@ -64,13 +78,19 @@ export default function PiLiveChatInput({
   sessionId,
   isLive: isLiveProp,
   onSent,
+  binding,
 }: PiLiveChatInputProps) {
   const { t } = useTranslation();
+  const meshMode = binding?.kind === "mesh";
   const { sessions, prompt, steer, followUp, abort, getCommands, isEnabled } =
-    usePiLive();
-  const isActive = isEnabled && (isLiveProp ?? true);
+    usePiLive({ manual: meshMode, refreshInterval: meshMode ? 0 : 30000 });
+  const isActive = meshMode || (isEnabled && (isLiveProp ?? true));
 
   const [input, setInput] = useState("");
+  const [meshDeliveryMode, setMeshDeliveryMode] = useState<"steer" | "followUp">("followUp");
+  const [meshError, setMeshError] = useState<string | null>(null);
+  const targetRef = useRef(sessionId);
+  targetRef.current = sessionId;
   const [sending, setSending] = useState(false);
   const [queueExpanded, setQueueExpanded] = useState(false);
   const [commands, setCommands] = useState<PiLiveSlashCommand[]>([]);
@@ -85,14 +105,28 @@ export default function PiLiveChatInput({
   const liveSession = sessions.find((session) =>
     normalizeSessionMatch(session.sessionId, sessionId),
   );
-  const isStreaming = liveSession?.isStreaming ?? false;
-  const steeringQueue = liveSession?.steeringQueue || [];
-  const followUpQueue = liveSession?.followUpQueue || [];
+  const isStreaming = meshMode ? (binding?.isRunning ?? false) : (liveSession?.isStreaming ?? false);
+  const steeringQueue = meshMode ? [] : (liveSession?.steeringQueue || []);
+  const followUpQueue = meshMode ? [] : (liveSession?.followUpQueue || []);
   const pendingQueueCount =
-    liveSession?.pendingMessageCount ??
+    (meshMode ? 0 : liveSession?.pendingMessageCount) ??
     steeringQueue.length + followUpQueue.length;
   const latestSteer = steeringQueue[0] || "";
   const latestFollowUp = followUpQueue[0] || "";
+
+  useEffect(() => {
+    if (!meshMode) return;
+    setInput(meshDrafts.get(sessionId)?.text ?? "");
+    setMeshDeliveryMode(meshModes.get(sessionId) ?? "followUp");
+    setMeshError(null);
+  }, [meshMode, sessionId]);
+
+  const editDraft = useCallback((text: string) => {
+    setInput(text);
+    if (!meshMode) return;
+    const previous = meshDrafts.get(sessionId);
+    meshDrafts.set(sessionId, { text, revision: (previous?.revision ?? 0) + 1 });
+  }, [meshMode, sessionId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -154,7 +188,7 @@ export default function PiLiveChatInput({
   }, [input]);
 
   useEffect(() => {
-    if (!isLiveProp) {
+    if (meshMode || !isLiveProp) {
       setCommands([]);
       return;
     }
@@ -180,7 +214,7 @@ export default function PiLiveChatInput({
     return () => {
       cancelled = true;
     };
-  }, [getCommands, sessionId, isLiveProp]);
+  }, [getCommands, sessionId, isLiveProp, meshMode]);
 
   const slashQuery = useMemo(() => {
     const trimmedStart = input.trimStart();
@@ -227,7 +261,36 @@ export default function PiLiveChatInput({
   const sendMessage = useCallback(
     async (override?: "prompt" | "steer" | "follow_up") => {
       const text = input.trim();
-      if (!text || sending) return;
+      if (!text || sending || (meshMode && (!binding?.available || meshInFlight.has(sessionId)))) return;
+
+      if (meshMode) {
+        // Freeze the target, source (inside binding), mode and current revision.
+        const target = sessionId;
+        const frozen = meshDrafts.get(target) ?? { text: input, revision: 0 };
+        const mode = override === "follow_up" ? "followUp" : meshDeliveryMode;
+        const send = binding!.send;
+        meshInFlight.add(target);
+        setSending(true);
+        setMeshError(null);
+        try {
+          const receipt = await send(text, mode);
+          if (receipt.ok !== true) throw new Error("Mesh did not accept the message");
+          appendHistory(text);
+          const current = meshDrafts.get(target);
+          if (current?.revision === frozen.revision && current.text.trim() === text) {
+            meshDrafts.set(target, { text: "", revision: current.revision + 1 });
+            if (targetRef.current === target) setInput("");
+          }
+          onSent?.();
+        } catch (error) {
+          setMeshError(error instanceof Error ? error.message : String(error));
+          // Rejected or uncertain: draft remains intact; no Live fallback.
+        } finally {
+          meshInFlight.delete(target);
+          setSending(false);
+        }
+        return;
+      }
 
       const slashLike = text.startsWith("/");
 
@@ -256,9 +319,12 @@ export default function PiLiveChatInput({
     },
     [
       appendHistory,
+      binding,
       followUp,
       input,
       isStreaming,
+      meshDeliveryMode,
+      meshMode,
       onSent,
       prompt,
       sending,
@@ -269,11 +335,18 @@ export default function PiLiveChatInput({
 
   const stopStreaming = useCallback(async () => {
     try {
+      if (meshMode) {
+        if (!binding?.available) return;
+        const receipt = await binding.cancel();
+        if (!receipt.ok) throw new Error("Mesh stop was rejected");
+        return;
+      }
       await abort(sessionId);
     } catch (error) {
+      if (meshMode) setMeshError(error instanceof Error ? error.message : String(error));
       console.error("[PiLiveChatInput] abort failed:", error);
     }
-  }, [abort, sessionId]);
+  }, [abort, binding, meshMode, sessionId]);
 
   const navigateHistory = useCallback(
     (direction: "up" | "down") => {
@@ -287,7 +360,7 @@ export default function PiLiveChatInput({
         }
         historyIndexRef.current = nextIndex;
         setHistoryCursor(nextIndex);
-        setInput(history[nextIndex] || input);
+        editDraft(history[nextIndex] || input);
         return;
       }
 
@@ -295,16 +368,16 @@ export default function PiLiveChatInput({
       if (prev <= 0) {
         historyIndexRef.current = -1;
         setHistoryCursor(-1);
-        setInput(historyDraft);
+        editDraft(historyDraft);
         return;
       }
 
       const nextIndex = prev - 1;
       historyIndexRef.current = nextIndex;
       setHistoryCursor(nextIndex);
-      setInput(history[nextIndex] || "");
+      editDraft(history[nextIndex] || "");
     },
-    [history, historyDraft, input],
+    [editDraft, history, historyDraft, input],
   );
 
   const isCaretOnFirstVisualLine = useCallback(() => {
@@ -322,6 +395,7 @@ export default function PiLiveChatInput({
   }, []);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key === "Escape") {
       if (slashMatches.length > 0) {
         event.preventDefault();
@@ -382,7 +456,7 @@ export default function PiLiveChatInput({
     }
 
     if (event.key === "Enter" && event.altKey) {
-      if (isStreaming) {
+      if (isStreaming || meshMode) {
         event.preventDefault();
         void sendMessage("follow_up");
       }
@@ -412,7 +486,7 @@ export default function PiLiveChatInput({
           <Slash className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/70" />
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <span>
-              {isStreaming
+              {meshMode ? "Mesh · Hub delivery" : isStreaming
                 ? t("session.liveInput.live", "Live input")
                 : t("session.liveInput.prompt", "Prompt input")}
             </span>
@@ -429,7 +503,9 @@ export default function PiLiveChatInput({
         {isStreaming && (
           <div className="flex items-center gap-2">
             <div className="rounded-lg border border-border/50 bg-background/35 px-2.5 py-1 text-[11px] text-muted-foreground">
-              {t(
+              {meshMode
+                ? `Enter = ${meshDeliveryMode === "steer" ? "steer" : "follow-up"} · Alt+Enter = follow-up`
+                : t(
                 "session.liveInput.queueShortcut",
                 "Enter = steer · Alt+Enter = follow-up",
               )}
@@ -444,6 +520,20 @@ export default function PiLiveChatInput({
             </button>
           </div>
         )}
+
+        {meshMode && (
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            {(["followUp", "steer"] as const).map((mode) => (
+              <button key={mode} type="button"
+                onClick={() => { setMeshDeliveryMode(mode); meshModes.set(sessionId, mode); }}
+                className={`rounded border px-2 py-1 ${meshDeliveryMode === mode ? "border-primary text-primary" : "border-border text-muted-foreground"}`}>
+                {mode === "followUp" ? "Follow-up" : "Steer"}
+              </button>
+            ))}
+            {!binding?.available && <span role="status" className="text-destructive">Mesh unavailable · draft preserved</span>}
+          </div>
+        )}
+        {meshError && <p role="alert" className="text-xs text-destructive">{meshError}</p>}
 
         {(steeringQueue.length > 0 || followUpQueue.length > 0) && (
           <div className="rounded-lg border border-border/50 bg-background/40 px-3 py-2 text-[11px] text-muted-foreground">
@@ -528,7 +618,7 @@ export default function PiLiveChatInput({
           </div>
         )}
 
-        {slashQuery !== null && (
+        {!meshMode && slashQuery !== null && (
           <div className="rounded-lg border border-border/50 bg-background/40 px-2 py-2">
             <div className="mb-1 flex items-center gap-1.5 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
               <Slash className="h-3 w-3" />
@@ -612,7 +702,7 @@ export default function PiLiveChatInput({
             ref={textareaRef}
             value={input}
             onChange={(event) => {
-              setInput(event.target.value);
+              editDraft(event.target.value);
               historyIndexRef.current = -1;
               setHistoryCursor(-1);
             }}
@@ -632,7 +722,7 @@ export default function PiLiveChatInput({
             <button
               type="button"
               onClick={() => void sendMessage()}
-              disabled={!input.trim() || sending}
+              disabled={!input.trim() || sending || (meshMode && !binding?.available)}
               className="inline-flex h-8 w-8 items-center justify-center rounded-md text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-30"
             >
               <ArrowUp className="h-4 w-4" />
@@ -645,7 +735,7 @@ export default function PiLiveChatInput({
           <span>{t("session.liveInput.hintShiftEnter", "Shift+Enter newline")}</span>
           <span>{t("session.liveInput.hintAltEnter", "Alt+Enter follow-up")}</span>
           <span>{t("session.liveInput.hintRecent", "↑ recent messages when empty")}</span>
-          <span>{t("session.liveInput.hintAutocomplete", "Tab autocomplete slash command")}</span>
+          {!meshMode && <span>{t("session.liveInput.hintAutocomplete", "Tab autocomplete slash command")}</span>}
           <span>{t("session.liveInput.hintStop", "Esc stop")}</span>
         </div>
       </div>

@@ -43,10 +43,11 @@ import type {
   PsmSessionRevealOptions,
   PsmSessionToolRevealOptions,
   PsmSessionViewerController,
-} from "@pi-session-manager/plugin-sdk";
+} from "@dwsy/plugin-sdk";
 
 interface SessionViewerProps {
   session: SessionInfo;
+  suppressLiveInput?: boolean;
   onExport: () => void;
   onConvert?: () => void;
   onRename?: () => void;
@@ -107,6 +108,7 @@ function findToolCallRowEntryId(
 }
 
 function SessionViewerContent({
+  suppressLiveInput = false,
   session,
   onExport,
   onConvert,
@@ -536,6 +538,7 @@ function SessionViewerContent({
 
   return (
     <SessionViewerBody
+      suppressLiveInput={suppressLiveInput}
       showToolExpandIndicator={showToolExpandIndicator}
       previewMode={previewMode}
       previewVariant={previewVariant}

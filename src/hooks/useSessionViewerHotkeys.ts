@@ -37,7 +37,7 @@ export function useSessionViewerHotkeys({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) {
+      if (event.defaultPrevented || document.querySelector('.mermaid-fullscreen')) {
         return
       }
 

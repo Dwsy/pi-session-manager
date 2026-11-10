@@ -89,7 +89,7 @@ export function useAppViewNavigation({
     (view: PsmAppViewRuntimeRegistration) => {
       setSidebarMode("app");
       setActiveAppViewId(view.id);
-      setSelectedSession(null);
+      if (view.mainContent !== "keep") setSelectedSession(null);
       setSelectedProject(null);
       navigateToPath(getAppViewRoute(view));
     },

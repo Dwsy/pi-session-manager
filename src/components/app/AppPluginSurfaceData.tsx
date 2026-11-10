@@ -24,6 +24,8 @@ export interface AppPluginSurfaceData {
   onNewSession?: (cwd: string) => void | Promise<void>;
   onSelectProject?: (projectPath: string) => void;
   terminal?: TerminalType;
+  /** True when the host can open its built-in terminal surface for app plugins. */
+  terminalAvailable?: boolean;
   piPath?: string;
   customCommand?: string;
   resumeCommand?: string;

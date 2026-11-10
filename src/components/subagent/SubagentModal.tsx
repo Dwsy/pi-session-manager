@@ -219,6 +219,7 @@ function SubagentModalContent({ result, onClose }: SubagentModalProps) {
   // before they reach SessionViewer's listener on the parent
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (document.querySelector('.mermaid-fullscreen')) return
       if (e.key === 'Escape') {
         e.stopImmediatePropagation()
         handleClose()

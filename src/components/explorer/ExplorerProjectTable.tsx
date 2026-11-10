@@ -9,6 +9,8 @@ import {
   PluginContributionSlot,
   usePsmPluginSessionUi,
 } from "@/plugins/runtime-host";
+import ProjectIdentityBadge from "@/components/project/ProjectIdentityBadge";
+import { useProjectIdentityResolver } from "@/hooks/useProjectIdentity";
 import { formatShortTime } from "@/utils/sessionDisplay";
 import type { ExplorerProject, ExplorerProjectSortKey, ExplorerSortDirection } from "./explorerModel";
 
@@ -35,6 +37,7 @@ export default function ExplorerProjectTable({
 }: ExplorerProjectTableProps) {
   const { t } = useTranslation();
   const { projectListActions = [] } = usePsmPluginSessionUi();
+  const resolveProjectIdentity = useProjectIdentityResolver();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -125,6 +128,10 @@ export default function ExplorerProjectTable({
             const project = projects[virtualRow.index];
             if (!project) return null;
             const projectLabel = project.name || t("session.list.unknownDirectory");
+            const identity = resolveProjectIdentity({
+              path: project.path,
+              name: projectLabel,
+            });
             const isSelected = selectedProject === project.path;
 
             return (
@@ -146,10 +153,15 @@ export default function ExplorerProjectTable({
               >
                 <td className="px-3 py-2 align-middle">
                   <div className="flex min-w-0 items-center gap-2">
-                    <FolderOpen className="h-3.5 w-3.5 flex-none text-blue-400" aria-hidden="true" />
+                    <ProjectIdentityBadge identity={identity} fallbackIcon="folder" />
                     <span className="truncate text-[12px] font-medium text-foreground">
-                      {projectLabel}
+                      {identity.label}
                     </span>
+                    {identity.subtitle && (
+                      <span className="truncate text-[10px] text-muted-foreground/70">
+                        {identity.subtitle}
+                      </span>
+                    )}
                     {project.liveCount > 0 && (
                       <span className="inline-flex flex-none items-center gap-1 rounded bg-success/10 px-1.5 py-0.5 text-[9px] text-success">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />

@@ -16,6 +16,8 @@ import {
 } from "@/plugins/runtime-host";
 import type { SessionInfo, Tag } from "@/types";
 import { pathsEqual } from "@/utils/path";
+import ProjectIdentityBadge from "@/components/project/ProjectIdentityBadge";
+import { useProjectIdentityResolver } from "@/hooks/useProjectIdentity";
 import { getDirectoryName } from "@/utils/sessionDisplay";
 import ExplorerProjectTable from "./ExplorerProjectTable";
 import ExplorerSessionTable from "./ExplorerSessionTable";
@@ -60,6 +62,7 @@ export default function ExplorerPane({
 }: ExplorerPaneProps) {
   const { t } = useTranslation();
   const { sessionContextMenuActions = [] } = usePsmPluginSessionUi();
+  const resolveProjectIdentity = useProjectIdentityResolver();
   const {
     selectedSession = null,
     onSelectSession,
@@ -79,6 +82,15 @@ export default function ExplorerPane({
     resumeCommand,
     liveSessionIds,
   } = sessionListCommonProps;
+
+  const selectedProjectIdentity = useMemo(
+    () =>
+      resolveProjectIdentity({
+        path: selectedProject ?? "",
+        name: selectedProject ? getDirectoryName(selectedProject) : "",
+      }),
+    [resolveProjectIdentity, selectedProject],
+  );
 
   const [tab, setTab] = useState<ExplorerTab>("sessions");
   const [sessionSort, setSessionSort] = useState<{
@@ -256,9 +268,9 @@ export default function ExplorerPane({
 
           {selectedProject && (
             <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-border/60 bg-secondary/40 px-2 py-0.5 text-[11px] text-muted-foreground">
-              <FolderOpen className="h-3 w-3 flex-none text-blue-400" aria-hidden="true" />
+              <ProjectIdentityBadge identity={selectedProjectIdentity} fallbackIcon="folder" />
               <span className="truncate" title={selectedProject}>
-                {getDirectoryName(selectedProject)}
+                {selectedProjectIdentity.label}
               </span>
               <button
                 type="button"

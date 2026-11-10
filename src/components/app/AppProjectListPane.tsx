@@ -83,6 +83,7 @@ function AppProjectListPane({
           <div className="flex flex-col h-full">
             <SelectedProjectHeader
               projectName={selectedProjectSummary.projectName}
+              projectPath={selectedProject}
               sessionCount={selectedProjectSummary.sessionCount}
               onBack={onBackFromProject}
               backLabel={backLabel}

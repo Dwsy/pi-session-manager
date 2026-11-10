@@ -55,7 +55,9 @@ import {
   psmPluginHost,
   usePsmPluginUi,
 } from "./plugins/runtime-host";
-import { invoke, isTauri } from "./transport";
+import { emitPsmRuntimeEvent } from "./plugins/runtime-host/eventBus";
+import { registerLocalTerminalOwner } from "./plugins/runtime-host/appTransport";
+import { invoke, isTauri, listen } from "./transport";
 import { getCachedSettings } from "./utils/settingsApi";
 import { getSessionSourceSlug } from "./utils/session";
 import { getPathBasename, pathsEqual } from "./utils/path";
@@ -384,7 +386,7 @@ function App() {
     appViews,
   } = usePsmPluginUi();
   const appRoutes = useMemo(
-    () => appViews.map((view) => ({ id: view.id, route: view.route })),
+    () => appViews.map((view) => ({ id: view.id, route: view.route, mainContent: view.mainContent })),
     [appViews],
   );
 
@@ -492,6 +494,50 @@ function App() {
       patchSessions,
       onBuiltinTerminalDisabled: handleBuiltinTerminalDisabled,
     });
+  useEffect(() => {
+    // One root-level Tauri event bridge. The backend independently maintains
+    // exactly one SSE subscription to its own Mesh Hub.
+    let closed = false;
+    const unlisteners: Array<() => void> = [];
+    const attach = async (name: "psm-mesh:changed" | "psm-mesh:availability") => {
+      try {
+        const stop = await listen<Record<string, unknown>>(name, ({ payload }) => {
+          emitPsmRuntimeEvent(name, payload);
+        });
+        if (closed) stop();
+        else unlisteners.push(stop);
+      } catch (error) {
+        console.error("Mesh backend event subscription failed", error);
+      }
+    };
+    void attach("psm-mesh:changed");
+    void attach("psm-mesh:availability");
+    return () => {
+      closed = true;
+      unlisteners.forEach((stop) => stop());
+    };
+  }, []);
+  useEffect(() => registerLocalTerminalOwner({
+    ownerKey: () => `${sidebarMode}:${activeAppViewId ?? ''}:${selectedSession?.path ?? ''}`,
+    accept: ({ pluginId, cwd, label }) => {
+      if (!isTauri() || isMobile || standaloneDatasetRuntime || !terminalConfig.enabled) {
+        throw new Error("PSM terminal is unavailable in this window");
+      }
+      openTerminalScope({
+        key: `plugin:${pluginId}:${cwd}`,
+        cwd,
+        label: label?.trim() || getPathBasename(cwd) || "Terminal",
+      });
+    },
+  }), [
+    isMobile,
+    openTerminalScope,
+    standaloneDatasetRuntime,
+    terminalConfig.enabled,
+    sidebarMode,
+    activeAppViewId,
+    selectedSession?.path,
+  ]);
   const toggleCurrentTerminalScope = useCallback(() => {
     toggleTerminalScope(terminalConfig.enabled);
   }, [terminalConfig.enabled, toggleTerminalScope]);
@@ -541,12 +587,23 @@ function App() {
     },
     [setSelectedSession, navigateToSession, clearBadge],
   );
+  const handleSelectSessionFromMesh = useCallback(
+    (session: SessionInfo) => {
+      if (sidebarMode === "app" && activeAppViewId === "builtin.psm-mesh.view") {
+        setSelectedSession(session);
+        clearBadge(session.id);
+      } else {
+        handleSelectSession(session);
+      }
+    },
+    [activeAppViewId, sidebarMode, setSelectedSession, clearBadge, handleSelectSession],
+  );
 
   const { tabs: sessionTabsData, closeTab } = useSessionTabs({
     sessions,
     selectedSession,
     enabled: multiTabEnabled,
-    onSelectSession: handleSelectSession,
+    onSelectSession: handleSelectSessionFromMesh,
     // Mirrors the toolbar back action: route root clears the selection.
     onCloseViewer: navigateToSessions,
   });
@@ -555,7 +612,7 @@ function App() {
         tabs: sessionTabsData.tabs,
         activeTabId: sessionTabsData.activeTabId,
         liveSessionIds,
-        onSelect: handleSelectSession,
+        onSelect: handleSelectSessionFromMesh,
         onClose: closeTab,
       }
     : undefined;
@@ -1207,7 +1264,7 @@ function App() {
       tags,
       sessionTags,
       selectedSession,
-      onSelectSession: handleSelectSession,
+      onSelectSession: handleSelectSessionFromMesh,
       onMoveSession: moveSession,
       onClearSessionStatus: (sessionId: string, statusId: string) => {
         void removeTagFromSession(sessionId, statusId);
@@ -1228,6 +1285,8 @@ function App() {
       onNewSession: standaloneDatasetRuntime ? undefined : handleNewSession,
       onSelectProject: handleSelectProject,
       terminal: standaloneDatasetRuntime ? undefined : terminal,
+      terminalAvailable:
+        !standaloneDatasetRuntime && !isMobile && terminalConfig.enabled,
       piPath: standaloneDatasetRuntime ? undefined : piPath,
       customCommand: standaloneDatasetRuntime ? undefined : customCommand,
       resumeCommand: standaloneDatasetRuntime ? undefined : resumeCommand,
@@ -1244,7 +1303,7 @@ function App() {
       tags,
       sessionTags,
       selectedSession,
-      handleSelectSession,
+      handleSelectSessionFromMesh,
       moveSession,
       removeTagFromSession,
       getTagsForSession,
@@ -1258,6 +1317,8 @@ function App() {
       requestCopyResumeCommand,
       handleNewSession,
       terminal,
+      isMobile,
+      terminalConfig.enabled,
       piPath,
       customCommand,
       resumeCommand,
@@ -1416,6 +1477,7 @@ function App() {
 
   const renderSessionViewer = () => (
     <AppSessionViewerPane
+      suppressLiveInput={sidebarMode === "app" && activeAppViewId === "builtin.psm-mesh.view"}
       session={selectedSession!}
       onExport={() => setShowExportDialog(true)}
       onConvert={
@@ -1433,9 +1495,9 @@ function App() {
         standaloneDatasetRuntime ? undefined : () => setShowForkDialog(true)
       }
       onBack={() => navigateToSessions()}
-      onResumeSession={standaloneDatasetRuntime ? undefined : requestResumeSession}
+      onResumeSession={standaloneDatasetRuntime || (sidebarMode === "app" && activeAppViewId === "builtin.psm-mesh.view") ? undefined : requestResumeSession}
       onWebResume={
-        standaloneDatasetRuntime
+        standaloneDatasetRuntime || (sidebarMode === "app" && activeAppViewId === "builtin.psm-mesh.view")
           ? undefined
           : () => {
               if (selectedSession) {

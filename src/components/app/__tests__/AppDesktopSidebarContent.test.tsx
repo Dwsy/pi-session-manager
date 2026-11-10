@@ -19,6 +19,7 @@ vi.mock("@/plugins/runtime-host", () => ({
   PluginContributionBoundary: ({ children }: any) => children,
   PluginContributionSlot: ({ render }: any) => render(),
   usePsmPluginUi: usePsmPluginUiMock,
+  usePsmPluginSessionUi: usePsmPluginUiMock,
 }));
 
 vi.mock("@/components/session-list/SessionList", () => ({

@@ -97,6 +97,7 @@ export interface SessionViewerBodyPanelsProps {
 }
 
 export interface SessionViewerBodyProps {
+  suppressLiveInput?: boolean;
   showToolExpandIndicator: boolean;
   previewMode: boolean;
   previewVariant: SessionPreviewVariant;
@@ -120,6 +121,7 @@ export interface SessionViewerBodyProps {
 }
 
 export default function SessionViewerBody({
+  suppressLiveInput = false,
   showToolExpandIndicator,
   previewMode,
   previewVariant,
@@ -246,7 +248,7 @@ export default function SessionViewerBody({
                   previewVariant={previewVariant}
                 />
 
-                {!previewMode && (
+                {!previewMode && !suppressLiveInput && (
                   <ChatInput
                     sessionId={session.id}
                     isLive={isLive}

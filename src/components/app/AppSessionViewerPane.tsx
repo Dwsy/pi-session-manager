@@ -9,7 +9,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { useDeferredPresence } from "@/hooks/useDeferredPresence";
 import { PluginContributionBoundary, PluginContributionSlot, usePsmPluginSessionUi } from "@/plugins/runtime-host";
 import type { PsmSessionToolbarItemRuntimeRegistration } from "@/plugins/runtime-host/types";
-import type { PsmSessionViewerController } from "@pi-session-manager/plugin-sdk";
+import type { PsmSessionViewerController } from "@dwsy/plugin-sdk";
 
 const PANEL_ANIMATION_MS = 180;
 const SESSION_PANEL_ITEM_LIMIT = 5;
@@ -38,6 +38,8 @@ export interface AppSessionViewerPaneProps extends Pick<
   | "initialEntryId"
 > {
   terminalFeatureEnabled?: boolean;
+  /** Mesh owns all control entry points while its app surface is active. */
+  suppressLiveInput?: boolean;
   terminalFeatureOpen?: boolean;
   onToggleTerminalFeature?: () => void;
 }
@@ -60,6 +62,7 @@ function AppSessionViewerPane({
   slots,
   sessionTabs,
   terminalFeatureEnabled = false,
+  suppressLiveInput = false,
   terminalFeatureOpen = false,
   onToggleTerminalFeature,
 }: AppSessionViewerPaneProps) {
@@ -781,6 +784,7 @@ function AppSessionViewerPane({
 
   return (
     <SessionViewer
+      suppressLiveInput={suppressLiveInput}
       session={session}
       onExport={onExport}
       onConvert={onConvert}

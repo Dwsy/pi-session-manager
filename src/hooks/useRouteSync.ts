@@ -32,7 +32,7 @@ interface RouteSyncOptions {
   setShowSettings: (show: boolean) => void;
   setShowTerminal: (show: boolean) => void;
   setActiveAppViewId: (viewId: string | null) => void;
-  appRoutes: Array<{ id: string; route?: string }>;
+  appRoutes: Array<{ id: string; route?: string; mainContent?: string }>;
   appRoutesReady: boolean;
 }
 
@@ -202,7 +202,7 @@ export function useRouteSync({
           break;
         }
 
-        setSelectedSession(null);
+        if (matchingAppRoute.mainContent !== "keep") setSelectedSession(null);
         setSelectedProject(null);
         setActiveAppViewId(matchingAppRoute.id);
         setViewMode('app');
