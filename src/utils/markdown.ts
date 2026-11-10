@@ -194,6 +194,40 @@ const shikiLanguageAliases: Record<string, ShikiLanguage> = {
 
 const loadedShikiLanguages = new Set<string>(shikiHighlighter.getLoadedLanguages())
 
+// Shiki's JavaScript regex engine compiles each language grammar on first use
+// (measured 0.1-0.7s per language for js/css/cpp). Left lazy, that cost lands on
+// the first scroll past a code fence of that language and drops frames. Compile
+// the grammars in idle slices instead so scrolling stays on the render path only.
+let prewarmScheduled = false
+
+function scheduleIdleCallback(fn: () => void): void {
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(() => fn())
+    return
+  }
+  window.setTimeout(fn, 50)
+}
+
+export function scheduleMarkdownHighlightingPrewarm(): void {
+  if (prewarmScheduled || typeof window === 'undefined') return
+  prewarmScheduled = true
+  const languages = [...loadedShikiLanguages]
+  let index = 0
+  const step = () => {
+    const language = languages[index]
+    index += 1
+    if (language !== undefined) {
+      try {
+        shikiHighlighter.codeToHtml('prewarm', { lang: language, theme: getCurrentShikiTheme() })
+      } catch {
+        // Grammars that fail to compile fall back to plain escaped code.
+      }
+    }
+    if (index < languages.length) scheduleIdleCallback(step)
+  }
+  scheduleIdleCallback(step)
+}
+
 function normalizeShikiLanguage(language?: string): ShikiLanguage | undefined {
   const rawLanguage = language?.trim().toLowerCase().replace(/^language-/, '')
   if (!rawLanguage) {
@@ -219,7 +253,7 @@ function stripShikiPreCode(html: string): string {
 
 function renderShikiCodeHtml(code: string, language?: string, themeOverride?: ShikiTheme): string {
   const lang = normalizeShikiLanguage(language)
-  if (!lang) {
+  if (!lang || code.length > SHIKI_MAX_HIGHLIGHT_CHARS) {
     return escapeHtml(code)
   }
 
@@ -376,11 +410,21 @@ marked.setOptions({
   renderer: renderer,
 })
 
-const PARSED_MARKDOWN_CACHE_MAX_ENTRIES = 120
-const PARSED_MARKDOWN_CACHE_MAX_BYTES = 12 * 1024 * 1024
-const PARSED_MARKDOWN_CACHE_TTL_MS = 5 * 60 * 1000
-const PARSED_MARKDOWN_CACHE_MAX_SOURCE_LENGTH = 8 * 1024
-const PARSED_MARKDOWN_CACHE_MAX_HTML_LENGTH = 64 * 1024
+// Cache budget is sized for whole-session replay: long sessions hold thousands
+// of blocks, and the expensive ones (large code fences) produce 100KB+ HTML.
+// Entries beyond the source/html caps are never cached, so those caps must stay
+// above the size of the costly blocks — otherwise every scroll remount re-parses
+// exactly the blocks that hurt the most.
+const PARSED_MARKDOWN_CACHE_MAX_ENTRIES = 600
+const PARSED_MARKDOWN_CACHE_MAX_BYTES = 24 * 1024 * 1024
+const PARSED_MARKDOWN_CACHE_TTL_MS = 30 * 60 * 1000
+const PARSED_MARKDOWN_CACHE_MAX_SOURCE_LENGTH = 256 * 1024
+const PARSED_MARKDOWN_CACHE_MAX_HTML_LENGTH = 1024 * 1024
+
+// Shiki's regex engine costs 10-300ms on very large fences and emits thousands
+// of token spans (expensive to paint while scrolling). Past this size the code
+// stays readable as plain escaped text.
+const SHIKI_MAX_HIGHLIGHT_CHARS = 20_000
 
 const SESSION_SWITCH_KEEP_ENTRIES = 24
 const SESSION_SWITCH_KEEP_BYTES = 2 * 1024 * 1024
@@ -550,6 +594,7 @@ function preprocessXmlBlocks(text: string): string {
 }
 
 export function parseMarkdown(text: string): string {
+  scheduleMarkdownHighlightingPrewarm()
   const now = Date.now()
   const cacheKey = createMarkdownCacheKey(text)
   const cached = getMarkdownCache(cacheKey, now)
