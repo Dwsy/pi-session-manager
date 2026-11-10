@@ -1,4 +1,4 @@
-import type { PsmCapabilityClient } from '@pi-session-manager/plugin-sdk'
+import type { PsmCapabilityClient } from '@dwsy/plugin-sdk'
 
 const SUBAGENT_STATE_SUFFIX = '.subagents.jsonl'
 const READ_CHUNK_BYTES = 256 * 1024

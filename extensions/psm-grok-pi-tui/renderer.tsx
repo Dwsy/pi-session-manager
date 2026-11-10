@@ -4,7 +4,7 @@ import type {
   PsmToolRendererRegistration,
   PsmToolRenderProps,
   PsmToolResolvedData,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 import CodeBlock from '@/components/ui/CodeBlock'
 import ToolHeader from '@/components/tool-calls/ToolHeader'
@@ -77,9 +77,9 @@ function GrokPiToolRenderer({ resolvedData, searchQuery, context }: PsmToolRende
         <div className={`tool-output-wrapper collapsible ${context.isExpanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${context.isExpanded ? 'expanded' : ''}`}>
             {context.isExpanded && (
-              <div className="space-y-3 p-3 text-sm">
+              <div className="tool-sections text-sm">
                 {presentation.code && (
-                  <div className="tool-output">
+                  <div className="tool-section tool-output">
                     <ToolSectionHeader
                       label={presentation.kind === 'bash' ? 'Command' : 'Cell'}
                       text={presentation.code}
@@ -96,19 +96,19 @@ function GrokPiToolRenderer({ resolvedData, searchQuery, context }: PsmToolRende
                   </div>
                 )}
                 {argsText && (
-                  <div className="tool-output">
+                  <div className="tool-section tool-output">
                     <ToolSectionHeader label="Arguments" text={argsText} copyText={context.copyToClipboard} />
                     <pre className="tool-output-plain">{argsText}</pre>
                   </div>
                 )}
                 {detailsText && (
-                  <div className="tool-output">
+                  <div className="tool-section tool-output">
                     <ToolSectionHeader label="State" text={detailsText} copyText={context.copyToClipboard} />
                     <pre className="tool-output-plain">{detailsText}</pre>
                   </div>
                 )}
                 {resolvedData.output && (
-                  <div className="tool-output">
+                  <div className="tool-section tool-output">
                     <ToolSectionHeader label="Output" text={resolvedData.output} copyText={context.copyToClipboard} />
                     <CodeBlock
                       code={resolvedData.output}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { PsmCapabilityClient, PsmSessionReference } from '@pi-session-manager/plugin-sdk'
+import type { PsmCapabilityClient, PsmSessionReference } from '@dwsy/plugin-sdk'
 
 import { buildGrokPiTeamTree, loadGrokPiTeam, type GrokPiTeamTreeNode } from './team'
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PsmToolResolvedData } from '@pi-session-manager/plugin-sdk'
+import type { PsmToolResolvedData } from '@dwsy/plugin-sdk'
 
 import { matchesGrokPiTool, resolveGrokPiToolPresentation, transformGrokPiEntries } from './protocol'
 

@@ -1,4 +1,4 @@
-import type { PsmSessionJsonlEntry, PsmToolCallContent, PsmToolResolvedData } from '@pi-session-manager/plugin-sdk'
+import type { PsmSessionJsonlEntry, PsmToolCallContent, PsmToolResolvedData } from '@dwsy/plugin-sdk'
 
 export const GROK_PI_TOOL_NAMES = new Set([
   'bash',
