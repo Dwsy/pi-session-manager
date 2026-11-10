@@ -1,4 +1,4 @@
-import type { PsmPluginManifest } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginManifest } from '@dwsy/plugin-sdk'
 
 export const manifest: PsmPluginManifest = {
   manifestVersion: 1,

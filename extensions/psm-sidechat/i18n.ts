@@ -1,4 +1,4 @@
-import type { PsmPluginI18nResources } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginI18nResources } from '@dwsy/plugin-sdk'
 
 export const sidechatI18n: PsmPluginI18nResources = {
   'en-US': {

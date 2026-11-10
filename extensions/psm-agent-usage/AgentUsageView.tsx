@@ -1,4 +1,4 @@
-import type { PsmPluginI18nClient } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginI18nClient } from '@dwsy/plugin-sdk'
 
 interface AgentUsageViewProps {
   i18n: PsmPluginI18nClient

@@ -33,6 +33,8 @@ interface ContextMenuProps {
   onResume?: () => void
   onCopyResume?: () => void
   onRename?: () => void
+  extraActions?: React.ReactNode
+  metadataActions?: React.ReactNode
   onSetStatus: (statusId: string | null) => void
   onToggleLabel: (labelId: string, assigned: boolean) => void
   onDelete: (anchorPoint: DeleteSessionAnchorPoint) => void
@@ -53,6 +55,8 @@ export default function KanbanContextMenu({
   onResume,
   onCopyResume,
   onRename,
+  extraActions,
+  metadataActions,
   onSetStatus,
   onToggleLabel,
   onDelete,
@@ -123,6 +127,7 @@ export default function KanbanContextMenu({
       style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
       onClick={(event) => event.stopPropagation()}
     >
+      {extraActions}
       {menuItems.map((item) => (
         <button
           key={item.id}
@@ -139,6 +144,7 @@ export default function KanbanContextMenu({
         </button>
       ))}
 
+      {metadataActions ?? <>
       <div className="my-1 border-t border-border/50" />
       <div className="flex items-center gap-1.5 px-3 pb-1 text-[10px] font-medium text-muted-foreground">
         <CircleDot size={12} />
@@ -205,6 +211,7 @@ export default function KanbanContextMenu({
       </div>
 
       <div className="my-1 border-t border-border/50" />
+      </>}
       {isDeleteConfirming ? (
         <div className="px-2 py-1">
           <div className="flex items-center gap-1">

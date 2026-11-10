@@ -1,4 +1,4 @@
-import type { PsmPluginConfiguration } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginConfiguration } from '@dwsy/plugin-sdk'
 
 export const sessionSummaryConfiguration: PsmPluginConfiguration = {
   title: 'AI Session Summary Settings',

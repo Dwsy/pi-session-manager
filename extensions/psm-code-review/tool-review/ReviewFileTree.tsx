@@ -131,6 +131,7 @@ const reviewTreeStyle = {
 
 function getStatusText(node: ReviewFileNode) {
   if (node.hasError) return "!";
+  if (node.hasPending && !node.status) return "…";
   if (node.status === "added") return "A";
   if (node.status === "deleted") return "D";
   if (node.status === "modified") return "M";

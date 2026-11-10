@@ -3,7 +3,7 @@ import type {
   PsmCapabilityClient,
   PsmSessionJsonlEntry,
   PsmSessionReference,
-} from "@pi-session-manager/plugin-sdk";
+} from "@dwsy/plugin-sdk";
 
 import {
   AtlasDialog,

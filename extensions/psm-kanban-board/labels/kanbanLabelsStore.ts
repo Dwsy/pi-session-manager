@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import type { PsmPluginHostContext } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginHostContext } from '@dwsy/plugin-sdk'
 
 export interface KanbanLabel {
   id: string

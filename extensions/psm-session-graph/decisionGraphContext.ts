@@ -1,4 +1,4 @@
-import type { PsmSessionJsonlEntry } from '@pi-session-manager/plugin-sdk'
+import type { PsmSessionJsonlEntry } from '@dwsy/plugin-sdk'
 
 const MAX_CONTEXT_ENTRIES = 80
 const MAX_CONTEXT_CHARS = 36000

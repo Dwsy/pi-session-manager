@@ -15,7 +15,7 @@ import {
   type PsmModelOption,
   type PsmPluginI18nClient,
   type PsmSessionReference,
-} from "@pi-session-manager/plugin-sdk";
+} from "@dwsy/plugin-sdk";
 import { refreshSessionSummaryWithAgent } from "./agentSummary";
 import ModelSelector, { type RPCModel } from "../../src/components/ModelSelector";
 import {

@@ -6,7 +6,7 @@ import type {
   PsmProjectListActionRenderProps,
   PsmSessionContextMenuActionRenderProps,
   PsmSessionListActionRenderProps,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 import type { AppPluginSurfaceData } from '@/components/app/AppPluginSurfaceData'
 import FavoritesPanel from '@/components/FavoritesPanel'

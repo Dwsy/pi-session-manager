@@ -9,7 +9,7 @@ import type {
   PsmToolRendererRegistration,
   PsmToolRenderProps,
   PsmToolResolvedData,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 type AskQuestion = {
   header?: unknown

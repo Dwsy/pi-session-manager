@@ -30,6 +30,9 @@ export interface FileOperation {
   images?: ReviewImage[];
   args: Record<string, unknown>;
   isError: boolean;
+  /** A tool call without a matching toolResult is an attempt, not proof of a
+   * completed write. Older prebuilt operations may omit this field. */
+  outcome?: "succeeded" | "failed" | "pending";
   timestamp: string;
   preview: string;
   metrics: OperationMetrics;
@@ -423,7 +426,14 @@ export function getReviewStatus(
   hasPatch: boolean,
   hasPrimaryOutput: boolean,
 ) {
-  if (operation.isError) {
+  if (operation.outcome === "pending") {
+    return {
+      labelKey: "components.toolCallReview.status.pending",
+      fallbackLabel: "Awaiting tool result",
+      className: "border-warning/25 bg-warning/10 text-warning",
+    };
+  }
+  if (operation.isError || operation.outcome === "failed") {
     return {
       labelKey: "components.toolCallReview.status.error",
       fallbackLabel: "Needs attention",
@@ -527,7 +537,10 @@ export function extractFileOperations(
         diff: diff || undefined,
         images: images.length > 0 ? images : undefined,
         args,
-        isError: Boolean(resolved.isError),
+        isError: Boolean(resolved.isError || resultEntry?.message?.isError),
+        outcome: !resultEntry
+          ? "pending"
+          : (resolved.isError || resultEntry.message?.isError) ? "failed" : "succeeded",
         timestamp: entry.timestamp,
         preview,
         metrics: buildMetrics(toolName, contentArg, output, diff),

@@ -9,8 +9,8 @@ import KanbanSessionMetadataMenu from "../sidebar/KanbanSessionMetadataMenu";
 import { createKanbanLabelsStore } from "../labels/kanbanLabelsStore";
 import type { KanbanLabelsStore } from "../labels/kanbanLabelsStore";
 import type { Tag } from "@/types";
-import type { PsmSessionContextMenuActionRenderProps } from "@pi-session-manager/plugin-sdk";
-import type { PsmPluginHostContext } from "@pi-session-manager/plugin-sdk";
+import type { PsmSessionContextMenuActionRenderProps } from "@dwsy/plugin-sdk";
+import type { PsmPluginHostContext } from "@dwsy/plugin-sdk";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({

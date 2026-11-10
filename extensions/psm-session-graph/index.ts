@@ -1,5 +1,5 @@
 import { createElement } from "react";
-import type { PsmPluginHostContext } from "@pi-session-manager/plugin-sdk";
+import type { PsmPluginHostContext } from "@dwsy/plugin-sdk";
 
 import SessionGraphView from "./SessionGraphView";
 import { manifest } from "./manifest";

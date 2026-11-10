@@ -3,7 +3,7 @@ import type {
   PsmAppSidebarViewRenderProps,
   PsmAppViewRenderProps,
   PsmPluginHostContext,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 import AgentUsageSidebar from './AgentUsageSidebar'
 import AgentUsageView from './AgentUsageView'

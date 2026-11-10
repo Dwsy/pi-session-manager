@@ -27,6 +27,8 @@ interface KanbanSessionContextMenuProps {
   onResumeSession?: (session: SessionInfo) => void | Promise<void>
   onCopyResumeSession?: (session: SessionInfo) => void | Promise<void>
   onOpenPreviewRenameDialog?: (session: SessionInfo) => void
+  extraActions?: React.ReactNode
+  metadataActions?: React.ReactNode
   terminal?: string
   piPath?: string
   customCommand?: string
@@ -49,6 +51,8 @@ export default function KanbanSessionContextMenu({
   onResumeSession,
   onCopyResumeSession,
   onOpenPreviewRenameDialog,
+  extraActions,
+  metadataActions,
   terminal,
   piPath,
   customCommand,
@@ -68,6 +72,8 @@ export default function KanbanSessionContextMenu({
   return (
     <KanbanContextMenu
       session={session}
+      extraActions={extraActions}
+      metadataActions={metadataActions}
       statuses={statuses}
       currentStatusId={currentStatusId}
       labels={labels}

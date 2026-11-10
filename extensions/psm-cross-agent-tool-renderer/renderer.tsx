@@ -13,7 +13,7 @@ import type {
   PsmToolRenderProps,
   PsmToolResolvedData,
   PsmToolResultEntry,
-} from "@pi-session-manager/plugin-sdk";
+} from "@dwsy/plugin-sdk";
 import ToolHeader from "@/components/tool-calls/ToolHeader";
 import ToolSectionHeader from "@/components/tool-calls/ToolSectionHeader";
 import { getToolExecutionClass, getToolRenderStatus, getToolStatusLabel } from "@/plugins/tools-render/utils/status";
@@ -101,9 +101,9 @@ function CrossAgentToolRenderer({
             className={`tool-expand-content ${context.isExpanded ? "expanded" : ""}`}
           >
             {context.isExpanded && (
-              <div className="space-y-3 p-3 text-sm">
+              <div className="tool-sections text-sm">
                 {hasArgs && (
-                  <div className="tool-output">
+                  <div className="tool-section tool-output">
                     <ToolSectionHeader
                       label={context.t(
                         "components.toolCall.arguments",
@@ -122,7 +122,7 @@ function CrossAgentToolRenderer({
                   </div>
                 )}
                 {output && (
-                  <div className="tool-output">
+                  <div className="tool-section tool-output">
                     <ToolSectionHeader
                       label={context.t("components.toolCall.output", "Output")}
                       text={output}

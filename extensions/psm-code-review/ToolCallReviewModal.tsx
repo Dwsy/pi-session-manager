@@ -74,6 +74,7 @@ function toPierreLineDiffType(type: DiffConfig['lineDiffType']) {
 }
 
 interface ToolCallReviewModalProps {
+  sessionCwd?: string;
   isOpen: boolean;
   onClose: () => void;
   entries: SessionEntry[];
@@ -1215,6 +1216,7 @@ function DetailPanel({
 }
 
 export default function ToolCallReviewModal({
+  sessionCwd,
   isOpen,
   onClose,
   entries,
@@ -1313,8 +1315,8 @@ export default function ToolCallReviewModal({
   }, [filteredOperations, searchQuery]);
 
   const treeModel = useMemo(
-    () => buildReviewTreeModel(searchedOperations),
-    [searchedOperations],
+    () => buildReviewTreeModel(searchedOperations, sessionCwd),
+    [searchedOperations, sessionCwd],
   );
 
   const selectedOperation = useMemo(
@@ -1327,13 +1329,13 @@ export default function ToolCallReviewModal({
     if (isShellView || !selectedOperation || isShellReviewOperation(selectedOperation)) {
       return [];
     }
-    const selectedPath = getReviewTreePath(selectedOperation);
+    const selectedPath = getReviewTreePath(selectedOperation, sessionCwd);
     return searchedOperations.filter(
       (operation) =>
         isFileReviewOperation(operation) &&
-        getReviewTreePath(operation) === selectedPath,
+        getReviewTreePath(operation, sessionCwd) === selectedPath,
     );
-  }, [isShellView, searchedOperations, selectedOperation]);
+  }, [isShellView, searchedOperations, selectedOperation, sessionCwd]);
 
   const codeViewOperations =
     activeFilter === "changes" ? searchedOperations : selectedFileOperations;
@@ -1355,16 +1357,19 @@ export default function ToolCallReviewModal({
 
   const selectedTreePath =
     !isShellView && selectedOperation && isFileReviewOperation(selectedOperation)
-      ? getReviewTreePath(selectedOperation)
+      ? getReviewTreePath(selectedOperation, sessionCwd)
       : null;
 
   const totals = useMemo(() => {
     return allOperations.reduce(
       (acc, operation) => {
-        acc.additions += operation.metrics.additions;
-        acc.deletions += operation.metrics.deletions;
+        // A preview or attempted edit is not a completed filesystem write.
+        if (!operation.outcome || operation.outcome === "succeeded") {
+          acc.additions += operation.metrics.additions;
+          acc.deletions += operation.metrics.deletions;
+          if (isChangeOperation(operation)) acc.changes += 1;
+        }
         if (operation.isError) acc.errors += 1;
-        if (isChangeOperation(operation)) acc.changes += 1;
         return acc;
       },
       { additions: 0, deletions: 0, errors: 0, changes: 0 },
@@ -1510,11 +1515,11 @@ export default function ToolCallReviewModal({
   const handleTreeSelect = useCallback(
     (path: string) => {
       const operation = filteredOperations.find(
-        (candidate) => getReviewTreePath(candidate) === path,
+        (candidate) => getReviewTreePath(candidate, sessionCwd) === path,
       );
       if (operation) setSelectedId(operation.id);
     },
-    [filteredOperations],
+    [filteredOperations, sessionCwd],
   );
 
   const handleToggleCodeViewItem = useCallback((id: string) => {

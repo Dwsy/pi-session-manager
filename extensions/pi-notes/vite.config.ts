@@ -9,7 +9,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(repoRoot, 'src'),
-      '@pi-session-manager/plugin-sdk': path.resolve(repoRoot, 'packages/runtime-sdk/src'),
+      '@dwsy/plugin-sdk': path.resolve(repoRoot, 'packages/runtime-sdk/src'),
     },
   },
   build: {

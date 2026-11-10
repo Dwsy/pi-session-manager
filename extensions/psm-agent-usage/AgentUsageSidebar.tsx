@@ -5,7 +5,7 @@ import type {
   PsmAgentUsageStatus,
   PsmJsonConfigClient,
   PsmPluginI18nClient,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 import { RefreshCw } from 'lucide-react'
 
 import {

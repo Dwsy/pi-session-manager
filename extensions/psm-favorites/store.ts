@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import type { PsmFavoriteItem, PsmFavoritesClient } from '@pi-session-manager/plugin-sdk'
+import type { PsmFavoriteItem, PsmFavoritesClient } from '@dwsy/plugin-sdk'
 
 type Snapshot = { favorites: PsmFavoriteItem[]; loading: boolean }
 

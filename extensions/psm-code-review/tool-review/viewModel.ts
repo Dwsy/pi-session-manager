@@ -4,6 +4,7 @@ import {
   type CodeViewItem,
 } from "@pierre/diffs";
 import type { GitStatusEntry } from "@pierre/trees";
+import { normalizePathSeparators } from "@/utils/path";
 
 import {
   getOperationFileDiff,
@@ -18,6 +19,7 @@ export interface ReviewFileNode {
   additions: number;
   deletions: number;
   hasError: boolean;
+  hasPending: boolean;
   status?: GitStatusEntry["status"];
 }
 
@@ -103,23 +105,62 @@ function getShellTreePath(operation: FileOperation) {
   return `Shell/#${operation.sequence} ${summary || "command"}`;
 }
 
-export function getReviewTreePath(operation: FileOperation) {
+/**
+ * Resolve aliases against the known session cwd. Unlike display-path shortening,
+ * identity must never collapse two independent src/ trees into one file.
+ */
+export function canonicalReviewPath(path: string, cwd: string): string {
+  const normal = normalizePathSeparators(path.trim());
+  if (!normal || normal === "Unknown target") return "";
+  const base = normalizePathSeparators(cwd.trim());
+  if (!base || !/^(\/|[a-zA-Z]:\/)/.test(base)) return normalizeReviewPath(path);
+  const absolute = /^(\/|[a-zA-Z]:\/)/.test(normal);
+  const resolved = absolute ? normal : `${base.replace(/\/+$/, "")}/${normal}`;
+  const segments = (value: string) => {
+    const normalized = normalizePathSeparators(value);
+    const prefix = /^[A-Za-z]:\//.test(normalized) ? normalized.slice(0, 2).toLowerCase() : "/";
+    const body = prefix === "/" ? normalized : normalized.slice(2);
+    const parts: string[] = [];
+    for (const segment of body.split("/")) {
+      if (!segment || segment === ".") continue;
+      if (segment === "..") parts.pop();
+      else parts.push(segment);
+    }
+    return { prefix, parts };
+  };
+  const file = segments(resolved);
+  const project = segments(base);
+  const caseInsensitive = file.prefix !== "/" || project.prefix !== "/";
+  const equal = (a: string, b: string) =>
+    caseInsensitive ? a.toLowerCase() === b.toLowerCase() : a === b;
+  const within = file.prefix === project.prefix
+    && file.parts.length > project.parts.length
+    && project.parts.every((segment, index) => equal(segment, file.parts[index]));
+  return within
+    ? file.parts.slice(project.parts.length).join("/")
+    : `External/${file.prefix === "/" ? "" : file.prefix + "/"}${file.parts.join("/")}`;
+}
+
+export function getReviewTreePath(operation: FileOperation, sessionCwd?: string) {
   if (operation.toolName === "bash") return getShellTreePath(operation);
+  if (sessionCwd) return canonicalReviewPath(operation.filePath, sessionCwd) || `Unknown/#${operation.sequence}`;
   return normalizeReviewPath(operation.filePath) || `Unknown/#${operation.sequence}`;
 }
 
 function getOperationGitStatus(operation: FileOperation): GitStatusEntry["status"] | undefined {
-  if (operation.isError) return "modified";
+  // A failed/pending edit may have a diff preview, but no confirmed filesystem
+  // mutation. Never decorate it as a successful Git-like file change.
+  if (operation.isError || (operation.outcome && operation.outcome !== "succeeded")) return undefined;
   if (operation.toolName === "write") return "added";
   if (operation.toolName === "edit") return "modified";
   return undefined;
 }
 
-export function buildReviewTreeModel(operations: FileOperation[]): ReviewTreeModel {
+export function buildReviewTreeModel(operations: FileOperation[], sessionCwd?: string): ReviewTreeModel {
   const byPath = new Map<string, ReviewFileNode>();
 
   for (const operation of operations) {
-    const path = getReviewTreePath(operation);
+    const path = getReviewTreePath(operation, sessionCwd);
     const existing = byPath.get(path);
     const node = existing ?? {
       path,
@@ -127,14 +168,17 @@ export function buildReviewTreeModel(operations: FileOperation[]): ReviewTreeMod
       additions: 0,
       deletions: 0,
       hasError: false,
+      hasPending: false,
       status: getOperationGitStatus(operation),
     };
 
     node.operations.push(operation);
-    node.additions += operation.metrics.additions;
-    node.deletions += operation.metrics.deletions;
+    if (!operation.isError && (!operation.outcome || operation.outcome === "succeeded")) {
+      node.additions += operation.metrics.additions;
+      node.deletions += operation.metrics.deletions;
+    }
     node.hasError ||= operation.isError;
-    if (operation.isError) node.status = "modified";
+    node.hasPending ||= operation.outcome === "pending";
     if (!node.status) node.status = getOperationGitStatus(operation);
     byPath.set(path, node);
   }

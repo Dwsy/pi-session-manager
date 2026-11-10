@@ -16,7 +16,7 @@ import { useTranslation } from "react-i18next";
 import type {
   PsmCapabilityClient,
   PsmSessionViewerController,
-} from "@pi-session-manager/plugin-sdk";
+} from "@dwsy/plugin-sdk";
 import {
   buildSessionBranchModel,
   formatMoney,

@@ -1,4 +1,4 @@
-import type { PsmAgentUsageMetric, PsmAgentUsageProvider, PsmAgentUsageState } from '@pi-session-manager/plugin-sdk'
+import type { PsmAgentUsageMetric, PsmAgentUsageProvider, PsmAgentUsageState } from '@dwsy/plugin-sdk'
 
 export function stateLabel(state: PsmAgentUsageState): string {
   switch (state) {

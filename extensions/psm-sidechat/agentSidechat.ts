@@ -5,7 +5,7 @@ import type {
   PsmSideChatCitation,
   PsmSideChatResponse,
   PsmSideChatStreamHandlers,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 const DEFAULT_SIDECHAT_LIMIT = 6
 const MAX_SIDECHAT_LIMIT = 12

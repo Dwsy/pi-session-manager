@@ -4,7 +4,7 @@ import type {
   PsmAppViewRenderProps,
   PsmPluginHostContext,
   PsmPluginManifest,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 import {
   AppPluginSidebarBody,

@@ -1,4 +1,4 @@
-import type { PsmPluginHostContext, PsmPluginManifest } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginHostContext, PsmPluginManifest } from '@dwsy/plugin-sdk'
 
 import { subagentToolRenderer } from './SubagentToolRenderer'
 

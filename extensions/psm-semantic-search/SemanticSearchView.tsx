@@ -1,6 +1,6 @@
 import { hostReact } from './host-react'
 import type { ChangeEvent, KeyboardEvent } from 'react'
-import type { PsmAppViewRenderProps, PsmPluginHostContext } from '@pi-session-manager/plugin-sdk'
+import type { PsmAppViewRenderProps, PsmPluginHostContext } from '@dwsy/plugin-sdk'
 import type { AppPluginSurfaceData } from '@/components/app/AppPluginSurfaceData'
 import {
   runSemanticSearchAgent,

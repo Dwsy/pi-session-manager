@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { formatPercent, metricTone, providerSummary, sortProviders } from './format'
-import type { PsmAgentUsageProvider } from '@pi-session-manager/plugin-sdk'
+import type { PsmAgentUsageProvider } from '@dwsy/plugin-sdk'
 
 function provider(partial: Partial<PsmAgentUsageProvider> & Pick<PsmAgentUsageProvider, 'id' | 'name' | 'state'>): PsmAgentUsageProvider {
   return {

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Check, CircleDot, Tag } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { PsmSessionContextMenuActionRenderProps } from "@pi-session-manager/plugin-sdk";
+import type { PsmSessionContextMenuActionRenderProps } from "@dwsy/plugin-sdk";
 
 import { useOptionalAppPluginSurfaceData } from "@/components/app/AppPluginSurfaceData";
 import TagBadge from "@/components/tags/TagBadge";

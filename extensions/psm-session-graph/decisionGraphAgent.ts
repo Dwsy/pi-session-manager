@@ -1,7 +1,7 @@
 import type {
   PsmCapabilityClient,
   PsmSessionJsonlEntry,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 import { buildDecisionGraphContext } from './decisionGraphContext'
 import {

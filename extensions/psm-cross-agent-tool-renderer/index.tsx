@@ -1,4 +1,4 @@
-import type { PsmPluginHostContext } from "@pi-session-manager/plugin-sdk";
+import type { PsmPluginHostContext } from "@dwsy/plugin-sdk";
 import { crossAgentToolRenderer } from "./renderer";
 
 export { manifest } from "./manifest";

@@ -6,7 +6,7 @@ import type {
   PsmToolRendererRegistration,
   PsmToolRenderProps,
   PsmToolResolvedData,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 import { escapeHtml } from '@/utils/markdown'
 import { highlightSearchInHTML } from '@/utils/search'
 import { getCachedSettings } from '@/utils/settingsApi'

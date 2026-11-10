@@ -7,7 +7,7 @@ This is a PSM plugin sample with pi-flavored construction. It is not a Pi runtim
 The sample uses the published PSM plugin SDK host context type:
 
 ```ts
-import type { PsmPluginHostContext, PsmPluginManifest } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginHostContext, PsmPluginManifest } from '@dwsy/plugin-sdk'
 ```
 
 ## Record

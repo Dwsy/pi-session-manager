@@ -1,7 +1,7 @@
 import type {
   PluginRecord,
   PsmSessionJsonlEntry,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 export const DECISION_GRAPH_PLUGIN_ID = 'builtin.session-graph'
 export const DECISION_GRAPH_RECORD_TYPE = 'session.decision_graph'

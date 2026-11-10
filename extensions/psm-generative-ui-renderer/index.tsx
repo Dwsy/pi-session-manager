@@ -24,7 +24,7 @@ import type {
   PsmWidgetHtml,
   PsmWidgetsClient,
   PsmWindowsClient,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 let widgetsClient: PsmWidgetsClient | null = null
 let windowsClient: PsmWindowsClient | null = null

@@ -1,7 +1,7 @@
 import type {
   PsmAgentUsageStatus,
   PsmJsonConfigClient,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 export const AGENT_USAGE_STATUS_CACHE_KEY = 'status-cache'
 

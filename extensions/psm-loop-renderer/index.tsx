@@ -9,7 +9,7 @@ import type {
   PsmToolRendererRegistration,
   PsmToolRenderProps,
   PsmToolResolvedData,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 type LoopTaskInput = {
   description?: unknown
@@ -79,9 +79,9 @@ function LoopToolRenderer({ resolvedData, context }: PsmToolRenderProps) {
         <div className={`tool-output-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
             {isExpanded && (
-              <div className="space-y-3 p-3 text-sm">
+              <div className="tool-sections text-sm">
                 {tasks.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="tool-section space-y-2">
                     <ToolSectionHeader
                       label={t('components.toolCall.plan', 'Plan')}
                       text={JSON.stringify(tasks, null, 2)}
@@ -107,7 +107,7 @@ function LoopToolRenderer({ resolvedData, context }: PsmToolRenderProps) {
                   </div>
                 )}
                 {output && (
-                  <div className="tool-output">
+                  <div className="tool-section tool-output">
                     <ToolSectionHeader
                       label={t('components.toolCall.output', 'Output')}
                       text={output}

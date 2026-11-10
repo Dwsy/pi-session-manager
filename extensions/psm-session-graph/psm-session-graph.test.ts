@@ -3,7 +3,7 @@ import type {
   PsmCapabilityClient,
   PsmPluginHostContext,
   PsmSessionJsonlEntry,
-} from "@pi-session-manager/plugin-sdk";
+} from "@dwsy/plugin-sdk";
 
 import { buildSessionBranchModel, buildTopologyLayout } from "@/utils/session-branch";
 

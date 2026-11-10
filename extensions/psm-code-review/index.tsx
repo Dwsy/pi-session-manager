@@ -7,7 +7,7 @@ import type {
   PsmPluginI18nClient,
   PsmPluginSettingsClient,
   PsmSessionReference,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 import type { SessionEntry } from '@/types'
 import { subscribeToolReview } from '@/contexts/toolReviewBus'
@@ -167,6 +167,7 @@ function CodeReviewToolbarButton({
       </button>
 
       <ToolCallReviewModal
+        sessionCwd={session.cwd ?? undefined}
         isOpen={open}
         onClose={handleClose}
         entries={activeEntries}

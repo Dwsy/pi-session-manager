@@ -1,5 +1,5 @@
 import { Loader2, MessageCircleQuestion, PanelRightOpen } from "lucide-react";
-import type { PsmPluginI18nClient } from "@pi-session-manager/plugin-sdk";
+import type { PsmPluginI18nClient } from "@dwsy/plugin-sdk";
 
 import { sideChatStyles } from "./styles";
 

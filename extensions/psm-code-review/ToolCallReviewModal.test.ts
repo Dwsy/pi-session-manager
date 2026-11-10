@@ -114,6 +114,38 @@ describe("ToolCallReviewModal data model", () => {
     expect(DEFAULT_REVIEW_FILTER).toBe("all");
   });
 
+  it("distinguishes a pending tool call from a confirmed toolResult, including error outcome", () => {
+    const entry = assistantToolEntry([{
+      type: "toolCall",
+      id: "call-pending",
+      name: "write",
+      arguments: { file_path: "/repo/src/pending.ts", content: "new contents" },
+    }]);
+    const pending = extractFileOperations([entry], new Map());
+    expect(pending[0]?.outcome).toBe("pending");
+    expect(pending[0]?.isError).toBe(false);
+
+    const result: SessionEntry = {
+      type: "message",
+      id: "result-1",
+      timestamp: "2026-05-19T10:00:02.000Z",
+      message: {
+        role: "tool",
+        toolCallId: "call-pending",
+        toolName: "write",
+        content: [{ type: "text", text: "Wrote file" }],
+      },
+    };
+    const succeeded = extractFileOperations([entry], new Map([["call-pending", result]]));
+    expect(succeeded[0]?.outcome).toBe("succeeded");
+    expect(succeeded[0]?.isError).toBe(false);
+    const failed = extractFileOperations([entry], new Map([["call-pending", {
+      ...result, message: { ...result.message!, isError: true },
+    } as SessionEntry]]));
+    expect(failed[0]?.outcome).toBe("failed");
+    expect(failed[0]?.isError).toBe(true);
+  });
+
   it("extracts write operations with path, preview, and line metrics", () => {
     const operations = extractFileOperations(
       [

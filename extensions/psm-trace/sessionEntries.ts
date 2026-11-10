@@ -3,7 +3,7 @@ import { parseSessionEntriesWithLineCount } from "@/utils/session";
 import type {
   PsmCapabilityClient,
   PsmSessionReference,
-} from "@pi-session-manager/plugin-sdk";
+} from "@dwsy/plugin-sdk";
 
 const READ_CHUNK_BYTES = 384 * 1024;
 

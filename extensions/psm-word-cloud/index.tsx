@@ -7,7 +7,7 @@ import type {
   PsmPluginCommandContext,
   PsmPluginHostContext,
   PsmPluginManifest,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 import type { AppPluginSurfaceData } from '@/components/app/AppPluginSurfaceData'
 import {

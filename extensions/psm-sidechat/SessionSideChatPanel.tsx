@@ -17,7 +17,7 @@ import {
   type PsmPluginI18nClient,
   type PsmSessionReference,
   type PsmSideChatCitation,
-} from "@pi-session-manager/plugin-sdk";
+} from "@dwsy/plugin-sdk";
 import { askSideChatWithAgent } from "./agentSidechat";
 import ModelSelector, { type RPCModel } from "../../src/components/ModelSelector";
 import {

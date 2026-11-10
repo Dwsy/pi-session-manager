@@ -1,4 +1,4 @@
-import type { PsmPluginConfiguration } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginConfiguration } from '@dwsy/plugin-sdk'
 
 export const sidechatConfiguration: PsmPluginConfiguration = {
   title: 'Sidechat Settings',

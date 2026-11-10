@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import type {
   PsmAppViewRenderProps,
   PsmPluginHostContext,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 import type { AppPluginSurfaceData } from '@/components/app/AppPluginSurfaceData'
 
 import { manifest } from './manifest'

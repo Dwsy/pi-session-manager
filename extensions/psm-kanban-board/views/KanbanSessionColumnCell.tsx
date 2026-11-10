@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { PsmSessionListColumnRenderProps } from '@pi-session-manager/plugin-sdk'
+import type { PsmSessionListColumnRenderProps } from '@dwsy/plugin-sdk'
 
 import { useOptionalAppPluginSurfaceData } from '@/components/app/AppPluginSurfaceData'
 import TagBadge from '@/components/tags/TagBadge'

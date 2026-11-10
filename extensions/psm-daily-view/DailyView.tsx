@@ -19,7 +19,7 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import type { PsmPluginHostContext } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginHostContext } from '@dwsy/plugin-sdk'
 import {
   dateFromKey,
   dateKeyFromDate,

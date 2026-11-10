@@ -1,7 +1,7 @@
 import type {
   PluginRecord,
   PsmCapabilityClient,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 const PLUGIN_ID = 'builtin.session-summary'
 const SESSION_INTELLIGENCE_RECORD = 'session.intelligence'

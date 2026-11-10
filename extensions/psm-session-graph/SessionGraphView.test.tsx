@@ -6,7 +6,7 @@ import type {
   PluginRecord,
   PsmCapabilityClient,
   PsmSessionJsonlEntry,
-} from "@pi-session-manager/plugin-sdk";
+} from "@dwsy/plugin-sdk";
 
 vi.mock("@/components/session-branch-map", () => ({
   AtlasDialog: () => null,

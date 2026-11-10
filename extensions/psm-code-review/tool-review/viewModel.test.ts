@@ -3,9 +3,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { FileOperation } from "./model";
+import { getReviewStatus } from "./model";
 import {
   buildCodeViewItems,
   buildReviewTreeModel,
+  canonicalReviewPath,
   getReviewTreePath,
   resolveFileTreeDisplayPaths,
 } from "./viewModel";
@@ -28,6 +30,52 @@ function operation(overrides: Partial<FileOperation>): FileOperation {
 }
 
 describe("tool review view model", () => {
+  it("does not present pending or failed tool-call attempts as confirmed file changes", () => {
+    const pending = operation({
+      id: "pending", filePath: "/repo/src/pending.ts", outcome: "pending",
+      metrics: { additions: 20, deletions: 10, lines: 30, bytes: 40 },
+    });
+    const failed = operation({
+      id: "failed", filePath: "/repo/src/failed.ts", outcome: "failed", isError: true,
+      metrics: { additions: 5, deletions: 2, lines: 7, bytes: 10 },
+    });
+    const success = operation({
+      id: "succeeded", filePath: "/repo/src/done.ts", outcome: "succeeded",
+      metrics: { additions: 2, deletions: 1, lines: 3, bytes: 12 },
+    });
+    const tree = buildReviewTreeModel([pending, failed, success], "/repo");
+    expect(tree.status).toEqual([{ path: "src/done.ts", status: "modified" }]);
+    expect(tree.nodes.find((node) => node.path === "src/pending.ts")).toMatchObject({
+      additions: 0, deletions: 0, hasPending: true, hasError: false, status: undefined,
+    });
+    expect(tree.nodes.find((node) => node.path === "src/failed.ts")).toMatchObject({
+      additions: 0, deletions: 0, hasError: true, status: undefined,
+    });
+    expect(tree.nodes.find((node) => node.path === "src/done.ts")).toMatchObject({
+      additions: 2, deletions: 1, status: "modified",
+    });
+    expect(getReviewStatus(pending, true, true).fallbackLabel).toBe("Awaiting tool result");
+    expect(getReviewStatus(failed, true, true).fallbackLabel).toBe("Needs attention");
+  });
+  it("merges relative/absolute aliases only within the same session cwd", () => {
+    const model = buildReviewTreeModel([
+      operation({ id: "relative", filePath: "src/./task.ts" }),
+      operation({ id: "absolute", filePath: "/repo/src/task.ts" }),
+      operation({ id: "other-project", filePath: "/other-repo/src/task.ts" }),
+    ], "/repo");
+    expect(model.nodes).toHaveLength(2);
+    expect(model.nodes.find((node) => node.path === "src/task.ts")?.operations.map((op) => op.id))
+      .toEqual(["relative", "absolute"]);
+    expect(model.nodes.find((node) => node.path.startsWith("External/"))?.operations[0].id)
+      .toBe("other-project");
+  });
+
+  it("normalizes dot segments and Windows drive semantics without shortening away repository identity", () => {
+    expect(canonicalReviewPath("src/../src/app.ts", "/work/repo")).toBe("src/app.ts");
+    expect(canonicalReviewPath("../another/src/app.ts", "/work/repo")).toBe("External/work/another/src/app.ts");
+    expect(canonicalReviewPath("C:\\APP\\src\\a.ts", "c:/app")).toBe("src/a.ts");
+    expect(canonicalReviewPath("D:\\app\\src\\a.ts", "c:/app")).toBe("External/d:/app/src/a.ts");
+  });
   it("groups operations into tree paths with file status and totals", () => {
     const tree = buildReviewTreeModel([
       operation({

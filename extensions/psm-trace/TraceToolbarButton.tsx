@@ -1,5 +1,5 @@
 import { Workflow } from 'lucide-react'
-import type { PsmPluginI18nClient } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginI18nClient } from '@dwsy/plugin-sdk'
 
 interface TraceToolbarButtonProps {
   i18n: PsmPluginI18nClient

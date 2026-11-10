@@ -1,4 +1,4 @@
-import type { PsmPluginHostContext } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginHostContext } from '@dwsy/plugin-sdk'
 import { requestDashboardRecap } from '@/components/dashboard/dashboardRecap'
 import type { RecapPeriodKind } from '@/components/dashboard/recap/recapTypes'
 import { manifest } from './manifest'
