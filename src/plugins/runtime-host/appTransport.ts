@@ -1,8 +1,30 @@
 import { invoke as baseInvoke, isTauri } from '@/transport'
 import { invoke as tauriInvoke } from '@tauri-apps/api/core'
 import { listen as tauriListen } from '@tauri-apps/api/event'
-import type { PsmTransport } from '@pi-session-manager/plugin-sdk'
+import type { PsmTransport } from '@dwsy/plugin-sdk'
 import { applySessionEntryTransformers } from './sessionEntryTransformers'
+
+export interface LocalTerminalOpenRequest {
+  pluginId: string
+  cwd: string
+  label: string
+}
+
+export interface LocalTerminalOwner {
+  /** Window-local view generation; a late request after navigation is stale. */
+  ownerKey(): string
+  accept(request: LocalTerminalOpenRequest): void
+}
+
+let localTerminalOwner: LocalTerminalOwner | null = null
+
+/** Registration belongs to the invoking renderer, never a global Tauri event. */
+export function registerLocalTerminalOwner(owner: LocalTerminalOwner): () => void {
+  localTerminalOwner = owner
+  return () => {
+    if (localTerminalOwner === owner) localTerminalOwner = null
+  }
+}
 
 async function invokeRuntimeSessionCommand<T>(command: string, payload?: Record<string, unknown>): Promise<T | undefined> {
   const {
@@ -30,6 +52,23 @@ async function invokeRuntimeSessionCommand<T>(command: string, payload?: Record<
 
 export const appPsmTransport: PsmTransport = {
   async invoke<T>(command: string, payload?: Record<string, unknown>): Promise<T> {
+    if (command === 'plugin_terminal_open') {
+      if (!isTauri()) throw new Error('Plugin terminal opens require a local desktop owner')
+      const owner = localTerminalOwner
+      if (!owner) throw new Error('No frontend terminal owner is available')
+      const expectedOwner = owner.ownerKey()
+      // Rust validates existing absolute directory and plugin permission.
+      // No global broadcast; this renderer alone may accept the validated cwd.
+      const request = await tauriInvoke<LocalTerminalOpenRequest>('plugin_dispatch_command', {
+        command,
+        payload: (payload ?? {}) as Record<string, unknown>,
+      })
+      if (localTerminalOwner !== owner || owner.ownerKey() !== expectedOwner) {
+        throw new Error('Terminal request cancelled: owning view changed')
+      }
+      owner.accept(request)
+      return undefined as T // host accepted opening; PTY-ready is NOT implied
+    }
     let result: T
     if (isTauri()) {
       result = await tauriInvoke<T>('plugin_dispatch_command', {

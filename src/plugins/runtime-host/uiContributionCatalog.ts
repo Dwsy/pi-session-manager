@@ -1,6 +1,7 @@
 import type {
   PsmAppSidebarViewRegistration,
   PsmAppViewRegistration,
+  PsmProjectIdentityProviderRegistration,
   PsmProjectListActionRegistration,
   PsmProjectSessionViewRegistration,
   PsmSessionContextMenuActionRegistration,
@@ -10,12 +11,13 @@ import type {
   PsmSessionPanelRegistration,
   PsmSessionToolbarItemRegistration,
   PsmSessionTreeViewRegistration,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 import type {
   PsmAppSidebarViewRuntimeRegistration,
   PsmAppViewRuntimeRegistration,
   PsmPluginSessionUiSnapshot,
+  PsmProjectIdentityProviderRuntimeRegistration,
   PsmProjectListActionRuntimeRegistration,
   PsmProjectSessionViewRuntimeRegistration,
   PsmSessionContextMenuActionRuntimeRegistration,
@@ -28,6 +30,7 @@ import type {
 } from './types'
 
 const DEFAULT_COLUMN_ORDER = 100
+const DEFAULT_PROJECT_IDENTITY_PRIORITY = 100
 
 export interface PsmUiContributionRegistrationResult {
   registered: boolean
@@ -62,6 +65,10 @@ export class PsmPluginUiContributionCatalog {
   private readonly sessionListActions = new Map<string, PsmSessionListActionRuntimeRegistration>()
   private readonly sessionListColumns = new Map<string, PsmSessionListColumnRuntimeRegistration>()
   private readonly projectListActions = new Map<string, PsmProjectListActionRuntimeRegistration>()
+  private readonly projectIdentityProviders = new Map<
+    string,
+    PsmProjectIdentityProviderRuntimeRegistration
+  >()
   private readonly sessionContextMenuActions = new Map<string, PsmSessionContextMenuActionRuntimeRegistration>()
   private readonly sessionToolbarItems = new Map<string, PsmSessionToolbarItemRuntimeRegistration>()
   private readonly sessionPanels = new Map<string, PsmSessionPanelRuntimeRegistration>()
@@ -124,6 +131,24 @@ export class PsmPluginUiContributionCatalog {
   ): PsmUiContributionRegistrationResult {
     if (this.projectListActions.has(action.id)) return { registered: false }
     this.projectListActions.set(action.id, { ...action, pluginId })
+    return { registered: true }
+  }
+
+  registerProjectIdentityProvider(
+    pluginId: string,
+    provider: PsmProjectIdentityProviderRegistration,
+  ): PsmUiContributionRegistrationResult {
+    if (this.projectIdentityProviders.has(provider.id)) {
+      return {
+        registered: false,
+        duplicateMessage: `Project identity provider already registered: ${provider.id}`,
+      }
+    }
+    this.projectIdentityProviders.set(provider.id, {
+      ...provider,
+      pluginId,
+      priority: provider.priority ?? DEFAULT_PROJECT_IDENTITY_PRIORITY,
+    })
     return { registered: true }
   }
 
@@ -215,6 +240,12 @@ export class PsmPluginUiContributionCatalog {
     return sortedValues(this.projectListActions)
   }
 
+  listProjectIdentityProviders(): PsmProjectIdentityProviderRuntimeRegistration[] {
+    return sortedValues(this.projectIdentityProviders).sort(
+      (a, b) => a.priority - b.priority || a.id.localeCompare(b.id),
+    )
+  }
+
   listSessionContextMenuActions(): PsmSessionContextMenuActionRuntimeRegistration[] {
     return sortedValues(this.sessionContextMenuActions)
   }
@@ -244,6 +275,7 @@ export class PsmPluginUiContributionCatalog {
       sessionListActions: this.listSessionListActions(),
       sessionListColumns: this.listSessionListColumns(),
       projectListActions: this.listProjectListActions(),
+      projectIdentityProviders: this.listProjectIdentityProviders(),
       sessionContextMenuActions: this.listSessionContextMenuActions(),
       toolbarItems: this.listSessionToolbarItems(),
       panels: this.listSessionPanels(),
@@ -266,6 +298,7 @@ export class PsmPluginUiContributionCatalog {
     removeOwned(this.sessionListActions, pluginId)
     removeOwned(this.sessionListColumns, pluginId)
     removeOwned(this.projectListActions, pluginId)
+    removeOwned(this.projectIdentityProviders, pluginId)
     removeOwned(this.sessionContextMenuActions, pluginId)
     removeOwned(this.sessionToolbarItems, pluginId)
     removeOwned(this.sessionPanels, pluginId)
@@ -280,6 +313,7 @@ export class PsmPluginUiContributionCatalog {
     this.sessionListActions.clear()
     this.sessionListColumns.clear()
     this.projectListActions.clear()
+    this.projectIdentityProviders.clear()
     this.sessionContextMenuActions.clear()
     this.sessionToolbarItems.clear()
     this.sessionPanels.clear()

@@ -1,4 +1,4 @@
-import type { PsmSessionEntryTransformerRegistration } from '@pi-session-manager/plugin-sdk'
+import type { PsmSessionEntryTransformerRegistration } from '@dwsy/plugin-sdk'
 
 export interface PsmSessionEntryTransformerRuntimeRegistration extends PsmSessionEntryTransformerRegistration {
   pluginId: string

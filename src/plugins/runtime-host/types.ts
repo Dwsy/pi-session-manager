@@ -4,6 +4,7 @@ import type {
   PsmPluginSettingValue,
   PsmAppSidebarViewRegistration,
   PsmAppViewRegistration,
+  PsmProjectIdentityProviderRegistration,
   PsmProjectListActionRegistration,
   PsmProjectSessionViewRegistration,
   PsmSessionContextMenuActionRegistration,
@@ -17,7 +18,7 @@ import type {
   PsmSessionToolbarItemRegistration,
   PsmSessionTreeViewRegistration,
   PsmToolRendererRegistration,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 export type PsmPluginSource = 'builtin' | 'npm' | 'path' | 'dev'
 export type PsmPluginStatusState = 'active' | 'disabled' | 'error'
@@ -217,6 +218,12 @@ export interface PsmSessionContextMenuActionRuntimeRegistration extends PsmSessi
   pluginId: string
 }
 
+export interface PsmProjectIdentityProviderRuntimeRegistration
+  extends PsmProjectIdentityProviderRegistration {
+  pluginId: string
+  priority: number
+}
+
 export interface PsmPluginSessionUiSnapshot {
   ready: boolean
   appViews: PsmAppViewRuntimeRegistration[]
@@ -225,6 +232,7 @@ export interface PsmPluginSessionUiSnapshot {
   sessionListActions: PsmSessionListActionRuntimeRegistration[]
   sessionListColumns: PsmSessionListColumnRuntimeRegistration[]
   projectListActions: PsmProjectListActionRuntimeRegistration[]
+  projectIdentityProviders: PsmProjectIdentityProviderRuntimeRegistration[]
   sessionContextMenuActions: PsmSessionContextMenuActionRuntimeRegistration[]
   toolbarItems: PsmSessionToolbarItemRuntimeRegistration[]
   panels: PsmSessionPanelRuntimeRegistration[]

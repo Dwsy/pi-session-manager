@@ -1626,6 +1626,10 @@ describe('PsmPluginHost', () => {
                   title: 'Project List',
                   run: () => undefined,
                 })
+                ctx.ui.registerProjectIdentityProvider({
+                  id: 'failed.identity',
+                  resolve: () => null,
+                })
                 ctx.ui.registerSessionContextMenuAction({
                   id: 'failed.context-menu',
                   title: 'Context Menu',
@@ -1680,12 +1684,55 @@ describe('PsmPluginHost', () => {
       sessionListActions: [],
       sessionListColumns: [],
       projectListActions: [],
+      projectIdentityProviders: [],
       sessionContextMenuActions: [],
       toolbarItems: [],
       panels: [],
       treeViews: [],
       mainViews: [],
     })
+  })
+
+  it('publishes project identity providers registered by active plugins', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/identity',
+          async load() {
+            return {
+              manifest: {
+                manifestVersion: 1,
+                id: 'builtin.identity',
+                name: 'Identity',
+                version: '1.0.0',
+              },
+              activate: (ctx: any) => {
+                ctx.ui.registerProjectIdentityProvider({
+                  id: 'identity.bot-dirs',
+                  resolve: () => ({ label: 'zero' }),
+                })
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    await host.reload()
+
+    expect(host.getSessionUiSnapshot().projectIdentityProviders).toEqual([
+      {
+        id: 'identity.bot-dirs',
+        pluginId: 'builtin.identity',
+        priority: 100,
+        resolve: expect.any(Function),
+      },
+    ])
   })
 
 })

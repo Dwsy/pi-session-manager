@@ -51,6 +51,54 @@ describe('PsmPluginUiContributionCatalog', () => {
     })
   })
 
+  it('orders project identity providers by priority with an id tie-breaker', () => {
+    const catalog = new PsmPluginUiContributionCatalog()
+
+    catalog.registerProjectIdentityProvider('plugin.b', {
+      id: 'identity.b',
+      resolve: () => null,
+    })
+    catalog.registerProjectIdentityProvider('plugin.c', {
+      id: 'identity.c',
+      priority: 5,
+      resolve: () => null,
+    })
+    catalog.registerProjectIdentityProvider('plugin.a', {
+      id: 'identity.a',
+      priority: 5,
+      resolve: () => null,
+    })
+
+    expect(catalog.listProjectIdentityProviders()).toMatchObject([
+      { id: 'identity.a', priority: 5, pluginId: 'plugin.a' },
+      { id: 'identity.c', priority: 5, pluginId: 'plugin.c' },
+      { id: 'identity.b', priority: 100, pluginId: 'plugin.b' },
+    ])
+    expect(catalog.snapshot().projectIdentityProviders).toHaveLength(3)
+  })
+
+  it('rejects duplicate project identity providers and removes them with their plugin', () => {
+    const catalog = new PsmPluginUiContributionCatalog()
+    const resolve = () => null
+
+    expect(
+      catalog.registerProjectIdentityProvider('plugin.a', { id: 'identity.shared', resolve }),
+    ).toEqual({ registered: true })
+    expect(
+      catalog.registerProjectIdentityProvider('plugin.b', { id: 'identity.shared', resolve }),
+    ).toEqual({
+      registered: false,
+      duplicateMessage: 'Project identity provider already registered: identity.shared',
+    })
+    expect(catalog.listProjectIdentityProviders()).toEqual([
+      expect.objectContaining({ id: 'identity.shared', pluginId: 'plugin.a' }),
+    ])
+
+    catalog.removePlugin('plugin.a')
+
+    expect(catalog.listProjectIdentityProviders()).toEqual([])
+  })
+
   it('preserves warning and silent duplicate registration semantics', () => {
     const catalog = new PsmPluginUiContributionCatalog()
 
@@ -191,6 +239,7 @@ describe('PsmPluginUiContributionCatalog', () => {
       sessionListActions: [],
       sessionListColumns: [],
       projectListActions: [],
+      projectIdentityProviders: [],
       sessionContextMenuActions: [],
       toolbarItems: [],
       panels: [],
@@ -207,6 +256,7 @@ describe('PsmPluginUiContributionCatalog', () => {
       sessionListActions: [],
       sessionListColumns: [],
       projectListActions: [],
+      projectIdentityProviders: [],
       sessionContextMenuActions: [],
       toolbarItems: [],
       panels: [],

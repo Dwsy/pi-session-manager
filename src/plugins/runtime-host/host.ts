@@ -17,7 +17,7 @@ import {
   type PsmPluginSettingsClient,
   type PsmPluginToolRegistration,
   type PsmToolRendererRegistration,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 import i18n from '@/i18n/config'
 import { toolRenderRegistry } from '@/plugins/tools-render/registry'
@@ -168,7 +168,7 @@ function settingsFor(manifest: PsmPluginManifest, entry: PsmPluginConfigEntry): 
 }
 
 function isOptInPermission(permission: PsmPermission) {
-  return permission === 'fs:read' || permission === 'system-prompts:read' || permission === 'usage:read' || permission === 'terminal:read'
+  return permission === 'fs:read' || permission === 'system-prompts:read' || permission === 'usage:read' || permission === 'terminal:read' || permission === 'terminal:open' || permission === 'mesh:control'
 }
 
 function permissionStatusesFor(manifest: PsmPluginManifest, entry: PsmPluginConfigEntry) {
@@ -405,7 +405,7 @@ export class PsmPluginHost {
   private toolRenderers = new Map<string, PsmToolRendererRuntimeRegistration>()
   private readonly uiContributions = new PsmPluginUiContributionCatalog()
   private commandSnapshot: PsmPluginCommandRuntimeRegistration[] = []
-  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { ready: false, appViews: [], appSidebarViews: [], projectSessionViews: [], sessionListActions: [], sessionListColumns: [], projectListActions: [], sessionContextMenuActions: [], toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
+  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { ready: false, appViews: [], appSidebarViews: [], projectSessionViews: [], sessionListActions: [], sessionListColumns: [], projectListActions: [], projectIdentityProviders: [], sessionContextMenuActions: [], toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
   private listeners = new Set<() => void>()
   private activePlugins = new Map<string, ActivePlugin>()
   private statuses = new Map<string, PsmPluginStatus>()
@@ -840,6 +840,10 @@ export class PsmPluginHost {
         },
         registerProjectListAction: (action) => {
           this.uiContributions.registerProjectListAction(manifest.id, action)
+        },
+        registerProjectIdentityProvider: (provider) => {
+          const result = this.uiContributions.registerProjectIdentityProvider(manifest.id, provider)
+          if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
         },
         registerSessionContextMenuAction: (action) => {
           this.uiContributions.registerSessionContextMenuAction(manifest.id, action)

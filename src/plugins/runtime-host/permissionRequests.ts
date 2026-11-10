@@ -1,4 +1,4 @@
-import type { PsmPermission } from '@pi-session-manager/plugin-sdk'
+import type { PsmPermission } from '@dwsy/plugin-sdk'
 
 export interface PsmPluginPermissionRequestInput {
   pluginId: string

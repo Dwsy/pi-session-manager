@@ -6,7 +6,7 @@ import {
   createPluginCapabilityClient,
   type PluginRecord,
   type PsmPermissionContext,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 import { appPsmTransport } from '@/plugins/runtime-host/appTransport'
 
 const PLUGIN_RECORD_SEARCH_PERMISSIONS: PsmPermissionContext = {

@@ -1,4 +1,4 @@
-import type { PsmPermission } from '@pi-session-manager/plugin-sdk'
+import type { PsmPermission } from '@dwsy/plugin-sdk'
 
 export const PSM_PERMISSION_META: Record<PsmPermission, { label: string; description: string }> = {
   'sessions:read': {
@@ -37,6 +37,18 @@ export const PSM_PERMISSION_META: Record<PsmPermission, { label: string; descrip
     label: 'Events',
     description: 'Subscribe to host runtime events',
   },
+  'live-agents:read': {
+    label: 'Live agents',
+    description: 'Read lightweight status summaries for online Pi Agent sessions',
+  },
+  'openbot:read': {
+    label: 'OpenBot agents',
+    description: 'Read local OpenBot agent names and avatars for project labels',
+  },
+  'projects:read': {
+    label: 'Project detection',
+    description: 'Detect project types from marker files in known project directories',
+  },
   'model:invoke': {
     label: 'Models',
     description: 'Invoke host-managed model calls',
@@ -64,6 +76,18 @@ export const PSM_PERMISSION_META: Record<PsmPermission, { label: string; descrip
   'terminal:read': {
     label: 'Terminal history',
     description: 'Read persisted PSM terminal transcripts',
+  },
+  'terminal:open': {
+    label: 'Open terminal',
+    description: 'Open a host-managed terminal at a selected working directory',
+  },
+  'mesh:read': {
+    label: 'Mesh peers',
+    description: 'Read peers from the existing backend-local Mesh Hub',
+  },
+  'mesh:control': {
+    label: 'Mesh control',
+    description: 'Send, cancel and follow only via the backend-local Mesh Hub',
   },
 }
 
@@ -97,6 +121,25 @@ export function requiredRuntimeRequestPermissions(
     case 'plugin_terminal_history_list':
     case 'plugin_terminal_history_read':
       return ['terminal:read']
+    case 'plugin_live_agents_list':
+      return ['live-agents:read']
+    case 'plugin_openbot_agents_list':
+      return ['openbot:read']
+    case 'plugin_project_detect':
+      return ['projects:read']
+    case 'plugin_terminal_open':
+      return ['terminal:open']
+    case 'plugin_mesh_peers':
+    case 'plugin_mesh_herdr_agents':
+      return ['mesh:read']
+    case 'plugin_mesh_message':
+    case 'plugin_mesh_cancel':
+    case 'plugin_mesh_follow':
+    case 'plugin_mesh_focus':
+      return ['mesh:control']
+    case 'get_session_by_path':
+    case 'get_session_system_prompt_snapshots':
+      return ['sessions:read']
     default:
       return []
   }

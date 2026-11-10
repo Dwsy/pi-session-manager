@@ -12,7 +12,7 @@ import type {
   PsmPluginPaths,
   PsmPluginsConfig,
 } from './types'
-import type { PsmPermission, PsmPluginSettingValue } from '@pi-session-manager/plugin-sdk'
+import type { PsmPermission, PsmPluginSettingValue } from '@dwsy/plugin-sdk'
 
 export const defaultPsmPluginsConfig: PsmPluginsConfig = {
   version: 1,

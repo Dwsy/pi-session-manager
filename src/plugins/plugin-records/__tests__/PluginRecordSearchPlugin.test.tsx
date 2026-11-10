@@ -12,7 +12,7 @@ vi.mock('@/plugins/runtime-host/appTransport', () => ({
   appPsmTransport: { invoke: vi.fn() },
 }))
 
-vi.mock('@pi-session-manager/plugin-sdk', () => ({
+vi.mock('@dwsy/plugin-sdk', () => ({
   createPluginCapabilityClient: () => ({
     records: {
       search: mockSearchPluginRecords,

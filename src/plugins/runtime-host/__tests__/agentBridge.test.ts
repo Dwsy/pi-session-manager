@@ -6,7 +6,7 @@ import {
   createPsmAgentBridge,
   createPsmAgentHostModelResolver,
 } from '../agentBridge'
-import type { PsmTransport } from '@pi-session-manager/plugin-sdk'
+import type { PsmTransport } from '@dwsy/plugin-sdk'
 
 const usage: Usage = {
   input: 0,

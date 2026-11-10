@@ -31,7 +31,7 @@ import type {
   PsmPermission,
   PsmSessionOpenOptions,
   PsmTransport,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 export interface PsmAgentModelRef {
   provider?: string
