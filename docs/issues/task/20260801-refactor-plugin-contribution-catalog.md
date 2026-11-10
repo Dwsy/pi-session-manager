@@ -48,7 +48,7 @@ Make plugin UI contributions easier to extend and safer to reload by centralizin
 - [x] Session panels still default to `side: "right"`.
 - [x] Plugin host and catalog focused tests pass.
 - [x] Full frontend Vitest suite and production build pass.
-- [x] Public `@pi-session-manager/plugin-sdk` contracts are unchanged.
+- [x] Public `@dwsy/plugin-sdk` contracts are unchanged.
 
 ## Baseline
 

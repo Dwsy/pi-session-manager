@@ -1,7 +1,7 @@
 # Session Widget Panel SDK gap and minimal public API
 
 > Date: 2026-05-27
-> Scope: `@pi-session-manager/plugin-sdk`, session panel render props, and the minimum public contract needed for a widget list panel to reveal in-session widget/tool blocks.
+> Scope: `@dwsy/plugin-sdk`, session panel render props, and the minimum public contract needed for a widget list panel to reveal in-session widget/tool blocks.
 
 ## Background
 

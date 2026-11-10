@@ -144,7 +144,7 @@ src/plugins/runtime-host/permissions.ts
 Suggested shape:
 
 ```ts
-import type { PsmPermission } from '@pi-session-manager/plugin-sdk'
+import type { PsmPermission } from '@dwsy/plugin-sdk'
 
 export function requiredPermissionForPsmCommand(command: string): PsmPermission | null {
   switch (command) {
