@@ -9,14 +9,22 @@ use std::time::Duration;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 #[command(about = "Pi Session Manager CLI")]
-#[command(long_about = "A CLI tool to manage Pi sessions, models, tags, and more.\n\nExample: pi-session-cli status")]
+#[command(long_about = "A high-performance CLI tool to manage, search, recall, and analyze Pi sessions.\n\nExample: pi-session-cli recall 'bug fix' --max 3")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
     /// Server port (default: reads from config, fallback 52131)
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     port: Option<u16>,
+
+    /// Language code: zh-CN, en-US, ja-JP, de-DE, fr-FR, es-ES (or auto)
+    #[arg(short = 'l', long, global = true)]
+    lang: Option<String>,
+
+    /// Output Agent Skill definition Markdown to stdout
+    #[arg(long, global = true)]
+    skill: bool,
 }
 
 #[derive(Subcommand)]
@@ -80,6 +88,146 @@ enum Commands {
     },
     /// Search sessions
     Search { query: String },
+    /// High-performance session dialogue recall
+    Recall {
+        /// Search query string
+        query: String,
+        /// Optional target .jsonl file path
+        #[arg(short, long)]
+        target: Option<String>,
+        /// Entries before matching message (default: 2)
+        #[arg(short, long, default_value_t = 2)]
+        before: usize,
+        /// Entries after matching message (default: 2)
+        #[arg(short, long, default_value_t = 2)]
+        after: usize,
+        /// Maximum recall windows (default: 3)
+        #[arg(short, long, default_value_t = 3)]
+        max: usize,
+        /// Output machine-readable JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Fast session and token statistics (supports .jsonl file or directory)
+    Stats {
+        /// Target .jsonl file or directory path
+        target: Option<String>,
+        /// Filter sessions by project directory
+        #[arg(long)]
+        cwd: Option<String>,
+        /// From date (RFC3339 or YYYY-MM-DD)
+        #[arg(long)]
+        from: Option<String>,
+        /// To date (RFC3339 or YYYY-MM-DD)
+        #[arg(long)]
+        to: Option<String>,
+        /// Output machine-readable JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Deep session forensics, tool errors, and branch inspection
+    Inspect {
+        /// Path to .jsonl session file
+        path: String,
+        /// Inspection scope (active or all, default: active)
+        #[arg(short, long, default_value = "active")]
+        scope: String,
+        /// Output machine-readable JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Export PSM Agent Skill bundle
+    ExportSkill {
+        /// Target directory (default: .pi/skills/psm-session-tools)
+        output_dir: Option<String>,
+        /// Overwrite if directory exists
+        #[arg(short, long)]
+        force: bool,
+    },
+    /// Install PSM Agent Skill to ~/.agents/skills
+    InstallSkill {
+        /// Custom destination directory (default: ~/.agents/skills/psm-session-tools)
+        #[arg(short, long)]
+        dest: Option<String>,
+        /// Overwrite if directory exists
+        #[arg(short, long)]
+        force: bool,
+    },
+    /// Kanban workflow and board management
+    Kanban {
+        #[command(subcommand)]
+        command: Option<KanbanCommands>,
+    },
+}
+
+#[derive(Subcommand)]
+enum KanbanCommands {
+    /// View the Kanban board
+    Board {
+        /// Filter by project / working directory substring
+        #[arg(long)]
+        project: Option<String>,
+        /// Max cards per column (default: 10, 0 = unlimited)
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+        /// Output machine-readable JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// List all Kanban status columns
+    Columns,
+    /// Add a new Kanban status column
+    AddColumn {
+        /// Name of the new column
+        name: String,
+        /// Optional hex color (e.g. #0969da)
+        #[arg(short, long)]
+        color: Option<String>,
+    },
+    /// Remove a Kanban status column
+    RmColumn {
+        /// Column ID to remove
+        id: String,
+    },
+    /// Move a session to a status column (by name or ID)
+    Move {
+        /// Session ID
+        session_id: String,
+        /// Target column name or ID
+        column: String,
+        /// Optional position within column
+        #[arg(long)]
+        pos: Option<i64>,
+    },
+    /// Clear Kanban status for a session
+    Clear {
+        /// Session ID
+        session_id: String,
+    },
+    /// Inspect a session's current Kanban status
+    Status {
+        /// Session ID
+        session_id: String,
+    },
+    /// List all GitHub-style Labels
+    Labels,
+    /// Assign a GitHub-style label to a session
+    Label {
+        /// Session ID
+        session_id: String,
+        /// Label name
+        label: String,
+        /// Optional hex color (e.g. #0969da)
+        #[arg(short, long)]
+        color: Option<String>,
+    },
+    /// Remove a GitHub-style label from a session
+    Unlabel {
+        /// Session ID
+        session_id: String,
+        /// Label name
+        label: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -212,6 +360,15 @@ enum SkillCommands {
         #[arg(short, long)]
         path: String,
     },
+    /// Install PSM Agent Skill to ~/.agents/skills
+    Install {
+        /// Custom destination directory (default: ~/.agents/skills/psm-session-tools)
+        #[arg(short, long)]
+        dest: Option<String>,
+        /// Overwrite if directory exists
+        #[arg(short, long)]
+        force: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -297,15 +454,8 @@ fn load_port_from_config() -> u16 {
 }
 
 fn format_reqwest_error(e: &reqwest::Error, url: &str) -> String {
-    if e.is_connect() {
-        format!("无法连接到 {url} — 服务端是否已启动？\n  提示: 先运行 `pi-session-cli` 启动服务端，或用 `-p <port>` 指定端口")
-    } else if e.is_timeout() {
-        format!("请求超时: {url}")
-    } else if e.is_decode() {
-        format!("服务端返回了非 JSON 响应 ({url}) — 可能服务端版本不匹配")
-    } else {
-        format!("请求失败 ({url}): {e}")
-    }
+    let lang = crate::i18n::current_language();
+    crate::i18n::format_reqwest_error(e, url, lang)
 }
 
 async fn request_status(client: &Client, base_url: &str) -> Result<Value> {
@@ -356,11 +506,95 @@ async fn request_command(client: &Client, base_url: &str, command: &str, payload
 
 pub async fn run() -> Result<()> {
     let cli = Cli::parse();
+
+    // 1. Language configuration
+    if let Some(l) = &cli.lang {
+        crate::i18n::set_current_language(crate::i18n::Language::parse_or_default(l));
+    }
+
+    // 2. Direct --skill flag: print skill Markdown to stdout and exit
+    if cli.skill {
+        crate::ops::export_skill::print_skill_markdown();
+        return Ok(());
+    }
+
     let port = cli.port.unwrap_or_else(load_port_from_config);
     let client = Client::builder().timeout(Duration::from_secs(30)).no_proxy().build().map_err(|e| anyhow!("创建 HTTP 客户端失败: {e}"))?;
     let base_url = format!("http://localhost:{port}");
 
     match cli.command {
+        Some(Commands::Recall { query, target, before, after, max, json }) => {
+            crate::ops::recall::execute_recall(crate::ops::recall::RecallOptions {
+                query,
+                target,
+                before,
+                after,
+                max_results: max,
+                max_chars_per_entry: 1200,
+                json,
+            }).await?;
+        }
+        Some(Commands::Stats { target, cwd, from, to, json }) => {
+            crate::ops::stats::execute_stats(crate::ops::stats::StatsOptions {
+                target,
+                cwd,
+                from,
+                to,
+                json,
+            }).await?;
+        }
+        Some(Commands::Inspect { path, scope, json }) => {
+            crate::ops::inspect::execute_inspect(crate::ops::inspect::InspectOptions {
+                file_path: path,
+                scope,
+                json,
+            }).await?;
+        }
+        Some(Commands::ExportSkill { output_dir, force }) => {
+            crate::ops::export_skill::execute_export_skill(crate::ops::export_skill::ExportSkillOptions {
+                output_dir,
+                force,
+            }).await?;
+        }
+        Some(Commands::InstallSkill { dest, force }) => {
+            crate::ops::export_skill::execute_install_skill(dest, force).await?;
+        }
+        Some(Commands::Kanban { command }) => match command {
+            Some(KanbanCommands::Board { project, limit, json }) => {
+                crate::ops::kanban::execute_show_board(project, limit, json).await?;
+            }
+            Some(KanbanCommands::Columns) => {
+                crate::ops::kanban::execute_list_columns().await?;
+            }
+            Some(KanbanCommands::AddColumn { name, color }) => {
+                crate::ops::kanban::execute_add_column(name, color).await?;
+            }
+            Some(KanbanCommands::RmColumn { id }) => {
+                crate::ops::kanban::execute_remove_column(id).await?;
+            }
+            Some(KanbanCommands::Move { session_id, column, pos }) => {
+                crate::ops::kanban::execute_move_session(session_id, column, pos).await?;
+            }
+            Some(KanbanCommands::Clear { session_id }) => {
+                crate::ops::kanban::execute_clear_session(session_id).await?;
+            }
+            Some(KanbanCommands::Status { session_id }) => {
+                crate::ops::kanban::execute_inspect_session_status(session_id).await?;
+            }
+            Some(KanbanCommands::Labels) => {
+                crate::ops::kanban::execute_list_labels().await?;
+            }
+            Some(KanbanCommands::Label { session_id, label, color }) => {
+                crate::ops::kanban::execute_assign_label(session_id, label, color).await?;
+            }
+            Some(KanbanCommands::Unlabel { session_id, label }) => {
+                crate::ops::kanban::execute_remove_label(session_id, label).await?;
+            }
+            None => {
+                // Default: show Kanban board
+                crate::ops::kanban::execute_show_board(None, 10, false).await?;
+            }
+        },
         Some(Commands::Status) => {
             let data = request_status(&client, &base_url).await?;
             println!("{}", serde_json::to_string_pretty(&data)?.green());
@@ -456,6 +690,9 @@ pub async fn run() -> Result<()> {
                 let data = request_command(&client, &base_url, "get_skill_content", json!({ "path": path })).await?;
                 println!("{}", serde_json::to_string_pretty(&data)?.green());
             }
+            SkillCommands::Install { dest, force } => {
+                crate::ops::export_skill::execute_install_skill(dest, force).await?;
+            }
         },
         Some(Commands::Prompt { command }) => match command {
             PromptCommands::Scan => {
@@ -508,11 +745,28 @@ pub async fn run() -> Result<()> {
             }
         },
         Some(Commands::Search { query }) => {
-            // The legacy session-level FTS table (`sessions_fts`) is no longer created: message-level
-            // FTS is the primary index, so `search_sessions_fts` always fails with
-            // "no such table: sessions_fts". Query the current index instead.
-            let data = request_command(&client, &base_url, "full_text_search", json!({ "query": query, "role_filter": "all", "page": 0, "page_size": 20 })).await?;
-            println!("{}", serde_json::to_string_pretty(&data)?.green());
+            // First try online server, fallback to standalone local search
+            match request_command(&client, &base_url, "full_text_search", json!({ "query": query, "role_filter": "all", "page": 0, "page_size": 20 })).await {
+                Ok(data) => {
+                    println!("{}", serde_json::to_string_pretty(&data)?.green());
+                }
+                Err(_) => {
+                    let data = pi_session_manager::domain::session_search::full_text_search(
+                        query,
+                        "all".to_string(),
+                        None,
+                        None,
+                        0,
+                        20,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ).await.map_err(|e| anyhow!("Search failed: {e}"))?;
+                    println!("{}", serde_json::to_string_pretty(&data)?.green());
+                }
+            }
         }
         None => {
             clap::Command::new("pi-session-cli").print_help()?;
@@ -567,12 +821,13 @@ async fn handle_update_install(channel: &str, skip_confirm: bool, force: bool, u
     #[cfg(target_os = "windows")]
     {
         let _ = (channel, skip_confirm, force, use_proxy);
-        println!("{}", "✗ Windows 不支持 CLI 自更新（运行中的 exe 文件被系统锁定）".red().bold());
+        let lang = crate::i18n::current_language();
+        println!("{}", crate::i18n::msg_windows_update_not_supported(lang).red().bold());
         println!();
-        println!("{}", "请使用安装脚本重新安装最新版本：".yellow());
+        println!("{}", crate::i18n::msg_windows_update_hint(lang).yellow());
         println!("  {}", "irm https://raw.githubusercontent.com/Dwsy/pi-session-manager/main/scripts/install-cli.ps1 | iex".cyan());
         println!();
-        println!("{}", "或手动从 GitHub Releases 下载：".dimmed());
+        println!("{}", crate::i18n::msg_releases_download_hint(lang).dimmed());
         println!("  {}", "https://github.com/Dwsy/pi-session-manager/releases/latest".cyan().underline());
         std::process::exit(1);
     }

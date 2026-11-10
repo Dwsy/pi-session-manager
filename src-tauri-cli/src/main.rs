@@ -18,6 +18,8 @@ use tokio::sync::broadcast;
 use tracing::error;
 
 mod file_watcher;
+pub mod i18n;
+pub mod ops;
 mod run;
 mod terminal;
 mod updater;
