@@ -6,12 +6,25 @@ import {
   ListFilter,
   Terminal,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+  type RefObject,
+} from "react";
 import { useTranslation } from "react-i18next";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 import type { SessionEntry } from "@/types";
 import { normalizePiContent } from "@/utils/session";
 import { requestToolReview } from "@/contexts/toolReviewBus";
+import { estimateSessionEntrySize } from "@/hooks/useSessionViewerVirtualScroll";
 import SessionEntryRenderer from "./SessionEntryRenderer";
 
 interface ConversationPreviewTurn {
@@ -31,7 +44,26 @@ export interface ConversationPreviewMessagesProps {
   scrollTargetId: string | null;
   setScrollTargetId: (entryId: string | null) => void;
   foldMode?: ConversationFoldMode;
+  /** Scroller that owns the list (the session viewer scroll container). */
+  scrollElementRef?: RefObject<HTMLDivElement | null>;
+  /** Live follow: scroll to bottom on new turns while the flag stays set. */
+  pendingScrollToBottomRef?: MutableRefObject<boolean>;
 }
+
+export interface ConversationPreviewMessagesHandle {
+  scrollToTop: () => void;
+  scrollToBottom: () => void;
+  scrollToEntryId: (
+    entryId: string,
+    align?: "auto" | "center" | "end" | "start",
+  ) => boolean;
+}
+
+// Replaces the former space-y-3 margins: virtualizer measurement sees element
+// heights only, so inter-row spacing must live inside the measured row.
+const TURN_GAP_PX = 12;
+const TURN_OVERSCAN = 3;
+const DEFAULT_TURN_HEIGHT_PX = 480;
 
 function isPromptMessage(entry: SessionEntry): boolean {
   const role = entry.message?.role;
@@ -473,51 +505,21 @@ function ToolGroupedProcessEntries({
   toolResultByCallId,
   searchQuery,
   streamingId,
-  scrollTargetId,
+  expandedGroupIds,
+  onToggleGroup,
 }: {
   entries: SessionEntry[];
   allProcessEntries: SessionEntry[];
   toolResultByCallId: Map<string, SessionEntry>;
   searchQuery: string;
   streamingId: string | null;
-  scrollTargetId: string | null;
+  expandedGroupIds: Set<string>;
+  onToggleGroup: (groupId: string) => void;
 }) {
   const segments = useMemo(
     () => buildToolCallPreviewSegments(entries, streamingId),
     [entries, streamingId],
   );
-  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(
-    new Set(),
-  );
-
-  useEffect(() => {
-    if (!scrollTargetId) return;
-    const targetGroup = segments.find(
-      (segment) =>
-        segment.kind === "group" &&
-        segment.entries.some((entry) => entry.id === scrollTargetId),
-    );
-    if (!targetGroup || targetGroup.kind !== "group") return;
-
-    setExpandedGroupIds((prev) => {
-      if (prev.has(targetGroup.id)) return prev;
-      const next = new Set(prev);
-      next.add(targetGroup.id);
-      return next;
-    });
-  }, [scrollTargetId, segments]);
-
-  const toggleGroup = (groupId: string) => {
-    setExpandedGroupIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupId)) {
-        next.delete(groupId);
-      } else {
-        next.add(groupId);
-      }
-      return next;
-    });
-  };
 
   return (
     <>
@@ -546,7 +548,7 @@ function ToolGroupedProcessEntries({
                 summaryEntries={segment.memberEntries}
                 preserveSummaryOrder
                 expanded={false}
-                onToggle={() => toggleGroup(segment.id)}
+                onToggle={() => onToggleGroup(segment.id)}
                 toolResultByCallId={toolResultByCallId}
               />
               {segment.transparentEntries.map((entry, index) => (
@@ -575,7 +577,7 @@ function ToolGroupedProcessEntries({
                 summaryEntries={segment.memberEntries}
                 preserveSummaryOrder
                 expanded
-                onToggle={() => toggleGroup(segment.id)}
+                onToggle={() => onToggleGroup(segment.id)}
                 toolResultByCallId={toolResultByCallId}
               />
             </div>
@@ -605,24 +607,52 @@ function ToolGroupedProcessEntries({
   );
 }
 
+function estimateTurnHeight(
+  turn: ConversationPreviewTurn,
+  foldMode: ConversationFoldMode,
+): number {
+  const userHeight = turn.userEntry
+    ? estimateSessionEntrySize(turn.userEntry, undefined, true)
+    : 0;
+  const assistantHeight = turn.assistantEntry
+    ? estimateSessionEntrySize(turn.assistantEntry, undefined, true)
+    : 0;
+
+  let processHeight: number;
+  if (foldMode === "wholeTurn") {
+    processHeight = 64; // collapsed whole-turn process summary
+  } else {
+    processHeight = 0;
+    for (const segment of buildToolCallPreviewSegments(turn.processEntries)) {
+      processHeight +=
+        segment.kind === "entry"
+          ? estimateSessionEntrySize(segment.entry, undefined, false)
+          : 48; // collapsed tool-group summary row
+    }
+  }
+  return 8 + userHeight + assistantHeight + processHeight + TURN_GAP_PX;
+}
+
 function ConversationPreviewTurnView({
   turn,
   toolResultByCallId,
   searchQuery,
   streamingId,
-  scrollTargetId,
   foldMode,
   expanded,
   onToggle,
+  expandedGroupIds,
+  onToggleGroup,
 }: {
   turn: ConversationPreviewTurn;
   toolResultByCallId: Map<string, SessionEntry>;
   searchQuery: string;
   streamingId: string | null;
-  scrollTargetId: string | null;
   foldMode: ConversationFoldMode;
   expanded: boolean;
   onToggle: () => void;
+  expandedGroupIds: Set<string>;
+  onToggleGroup: (groupId: string) => void;
 }) {
   // Legacy whole-turn folding keeps model_change visible outside its summary.
   const { modelChanges, foldableEntries } = useMemo(
@@ -648,7 +678,8 @@ function ConversationPreviewTurnView({
           toolResultByCallId={toolResultByCallId}
           searchQuery={searchQuery}
           streamingId={streamingId}
-          scrollTargetId={scrollTargetId}
+          expandedGroupIds={expandedGroupIds}
+          onToggleGroup={onToggleGroup}
         />
       ) : (
         <>
@@ -721,50 +752,217 @@ function ConversationPreviewTurnView({
   );
 }
 
-export default function ConversationPreviewMessages({
-  entries,
-  toolResultByCallId,
-  searchQuery,
-  streamingId,
-  scrollTargetId,
-  setScrollTargetId,
-  foldMode = "toolGroups",
-}: ConversationPreviewMessagesProps) {
+const ConversationPreviewMessages = forwardRef<
+  ConversationPreviewMessagesHandle,
+  ConversationPreviewMessagesProps
+>(function ConversationPreviewMessages(
+  {
+    entries,
+    toolResultByCallId,
+    searchQuery,
+    streamingId,
+    scrollTargetId,
+    setScrollTargetId,
+    foldMode = "toolGroups",
+    scrollElementRef,
+    pendingScrollToBottomRef,
+  },
+  ref,
+) {
   const turns = useMemo(
     () => buildConversationPreviewTurns(entries),
     [entries],
   );
+  // Expansion state lives here (not inside rows) so virtualized rows keep
+  // their folded/expanded state across unmount/remount while scrolling.
   const [expandedTurnIds, setExpandedTurnIds] = useState<Set<string>>(
     new Set(),
   );
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(
+    new Set(),
+  );
 
-  const targetTurnId = useMemo(() => {
-    if (!scrollTargetId) return null;
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Estimated heights are precomputed once per entry set: building tool-group
+  // segments inside estimateSize would make every measurement rebuild O(session).
+  const turnEstimates = useMemo(() => {
+    const estimates = new Map<string, number>();
     for (const turn of turns) {
-      if (
-        turn.userEntry?.id === scrollTargetId ||
-        turn.assistantEntry?.id === scrollTargetId
-      ) {
-        return turn.id;
-      }
-      if (turn.processEntries.some((entry) => entry.id === scrollTargetId)) {
-        return turn.id;
-      }
+      estimates.set(turn.id, estimateTurnHeight(turn, foldMode));
     }
-    return null;
-  }, [scrollTargetId, turns]);
+    return estimates;
+  }, [turns, foldMode]);
+
+  const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
+    count: turns.length,
+    getScrollElement: () => scrollElementRef?.current ?? null,
+    estimateSize: (index) =>
+      turnEstimates.get(turns[index]?.id ?? "") ?? DEFAULT_TURN_HEIGHT_PX,
+    overscan: TURN_OVERSCAN,
+    lanes: 1,
+    isScrollingResetDelay: 200,
+    useAnimationFrameWithResizeObserver: true,
+  });
+
+  // Expanding/collapsing turns or tool groups changes row heights. Re-measure
+  // mounted rows synchronously so rows below reposition in the same frame —
+  // stale heights here are what made folded sections overlap.
+  useLayoutEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+    content
+      .querySelectorAll<HTMLDivElement>("[data-index]")
+      .forEach((row) => rowVirtualizer.measureElement(row));
+  }, [expandedTurnIds, expandedGroupIds, rowVirtualizer]);
+
+  const toggleTurn = useCallback((turnId: string) => {
+    setExpandedTurnIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(turnId)) {
+        next.delete(turnId);
+      } else {
+        next.add(turnId);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleGroup = useCallback((groupId: string) => {
+    setExpandedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  }, []);
+
+  const turnIndexById = useMemo(() => {
+    const indexById = new Map<string, number>();
+    turns.forEach((turn, index) => indexById.set(turn.id, index));
+    return indexById;
+  }, [turns]);
+
+  const turnByEntryId = useMemo(() => {
+    const byEntryId = new Map<string, ConversationPreviewTurn>();
+    for (const turn of turns) {
+      if (turn.userEntry) byEntryId.set(turn.userEntry.id, turn);
+      if (turn.assistantEntry) byEntryId.set(turn.assistantEntry.id, turn);
+      for (const entry of turn.processEntries) byEntryId.set(entry.id, turn);
+    }
+    return byEntryId;
+  }, [turns]);
+
+  const getScroller = useCallback(
+    () => scrollElementRef?.current ?? null,
+    [scrollElementRef],
+  );
+
+  const getContentOffsetTop = useCallback(() => {
+    const scroller = getScroller();
+    const content = contentRef.current;
+    if (!scroller || !content) return 0;
+    return (
+      content.getBoundingClientRect().top -
+      scroller.getBoundingClientRect().top +
+      scroller.scrollTop
+    );
+  }, [getScroller]);
+
+  const scrollToTop = useCallback(() => {
+    const scroller = getScroller();
+    if (!scroller) return;
+    scroller.scrollTop = 0;
+  }, [getScroller]);
+
+  const scrollToBottom = useCallback(() => {
+    const scroller = getScroller();
+    if (!scroller) return;
+    scroller.scrollTop = scroller.scrollHeight;
+  }, [getScroller]);
+
+  const expandForEntry = useCallback(
+    (turn: ConversationPreviewTurn, entryId: string) => {
+      if (foldMode === "wholeTurn") {
+        setExpandedTurnIds((prev) => {
+          if (prev.has(turn.id)) return prev;
+          const next = new Set(prev);
+          next.add(turn.id);
+          return next;
+        });
+      }
+      for (const segment of buildToolCallPreviewSegments(
+        turn.processEntries,
+        streamingId,
+      )) {
+        if (
+          segment.kind === "group" &&
+          segment.entries.some((entry) => entry.id === entryId)
+        ) {
+          setExpandedGroupIds((prev) => {
+            if (prev.has(segment.id)) return prev;
+            const next = new Set(prev);
+            next.add(segment.id);
+            return next;
+          });
+        }
+      }
+    },
+    [foldMode, streamingId],
+  );
+
+  const scrollToEntryId = useCallback(
+    (
+      entryId: string,
+      align: "auto" | "center" | "end" | "start" = "center",
+    ): boolean => {
+      const turn = turnByEntryId.get(entryId);
+      if (!turn) return false;
+      const index = turnIndexById.get(turn.id);
+      if (index === undefined) return false;
+      expandForEntry(turn, entryId);
+      rowVirtualizer.scrollToIndex(index, { align });
+      // Virtual offsets start below the session header inside the scroller.
+      const scroller = getScroller();
+      if (scroller) {
+        scroller.scrollTop += getContentOffsetTop();
+      }
+      return true;
+    },
+    [
+      expandForEntry,
+      getContentOffsetTop,
+      getScroller,
+      rowVirtualizer,
+      turnByEntryId,
+      turnIndexById,
+    ],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({ scrollToTop, scrollToBottom, scrollToEntryId }),
+    [scrollToBottom, scrollToEntryId, scrollToTop],
+  );
+
+  // Live follow: while the upstream viewer marks pending scroll-to-bottom, new
+  // turns scroll to the exact bottom (virtual estimates cannot land there).
+  useEffect(() => {
+    if (!pendingScrollToBottomRef?.current) return;
+    const rafId = requestAnimationFrame(() => {
+      scrollToBottom();
+      pendingScrollToBottomRef.current = false;
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [turns, pendingScrollToBottomRef, scrollToBottom]);
 
   useEffect(() => {
-    if (!scrollTargetId || !targetTurnId) return;
-
-    if (foldMode === "wholeTurn") {
-      setExpandedTurnIds((prev) => {
-        if (prev.has(targetTurnId)) return prev;
-        const next = new Set(prev);
-        next.add(targetTurnId);
-        return next;
-      });
-    }
+    if (!scrollTargetId) return;
+    // Not loaded yet: this effect re-runs when turns change.
+    if (!scrollToEntryId(scrollTargetId, "center")) return;
 
     const rafId = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -780,40 +978,55 @@ export default function ConversationPreviewMessages({
         window.setTimeout(() => {
           target.classList.remove("highlight");
         }, 2000);
-        setScrollTargetId(null);
       });
     });
 
+    setScrollTargetId(null);
     return () => cancelAnimationFrame(rafId);
-  }, [foldMode, scrollTargetId, setScrollTargetId, targetTurnId]);
+  }, [scrollTargetId, scrollToEntryId, setScrollTargetId]);
 
-  const toggleTurn = (turnId: string) => {
-    setExpandedTurnIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(turnId)) {
-        next.delete(turnId);
-      } else {
-        next.add(turnId);
-      }
-      return next;
-    });
-  };
+  const virtualRows = rowVirtualizer.getVirtualItems();
 
   return (
-    <div className="conversation-preview-messages space-y-3 px-1 py-1">
-      {turns.map((turn) => (
-        <ConversationPreviewTurnView
-          key={turn.id}
-          turn={turn}
-          toolResultByCallId={toolResultByCallId}
-          searchQuery={searchQuery}
-          streamingId={streamingId}
-          scrollTargetId={scrollTargetId}
-          foldMode={foldMode}
-          expanded={expandedTurnIds.has(turn.id)}
-          onToggle={() => toggleTurn(turn.id)}
-        />
-      ))}
+    <div className="conversation-preview-messages px-1 py-1">
+      <div
+        ref={contentRef}
+        className="relative w-full"
+        style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+      >
+        {virtualRows.map((virtualRow) => {
+          const turn = turns[virtualRow.index];
+          if (!turn) return null;
+
+          return (
+            <div
+              key={turn.id}
+              data-index={virtualRow.index}
+              ref={rowVirtualizer.measureElement}
+              className="absolute left-0 top-0 w-full"
+              style={{
+                transform: `translateY(${virtualRow.start}px)`,
+                paddingBottom:
+                  virtualRow.index === turns.length - 1 ? 0 : TURN_GAP_PX,
+              }}
+            >
+              <ConversationPreviewTurnView
+                turn={turn}
+                toolResultByCallId={toolResultByCallId}
+                searchQuery={searchQuery}
+                streamingId={streamingId}
+                foldMode={foldMode}
+                expanded={expandedTurnIds.has(turn.id)}
+                onToggle={() => toggleTurn(turn.id)}
+                expandedGroupIds={expandedGroupIds}
+                onToggleGroup={toggleGroup}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
-}
+});
+
+export default ConversationPreviewMessages;

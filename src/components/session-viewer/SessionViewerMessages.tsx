@@ -27,6 +27,7 @@ import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
 import type { LegacySessionStats, SessionEntry, SessionInfo } from "@/types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
 import ConversationPreviewMessages from "./ConversationPreviewMessages";
+import type { ConversationPreviewMessagesHandle } from "./ConversationPreviewMessages";
 import type { SessionPreviewVariant } from "./previewTypes";
 import NewMessagesButton from "./NewMessagesButton";
 import ScrollToBottomButton from "./ScrollToBottomButton";
@@ -161,7 +162,36 @@ const SessionViewerMessages = forwardRef<
     onReachBottom,
     previewMode,
     handlesScrollTarget: previewVariant !== "none",
+    handlesScrollCommands: previewVariant !== "none",
   });
+
+  // Conversation mode owns its scrolling: turn rows are virtualized inside
+  // ConversationPreviewMessages, so the flat entry virtualizer cannot address them.
+  const conversationRef = useRef<ConversationPreviewMessagesHandle>(null);
+  const isConversationMode = previewVariant !== "none";
+  const handleScrollToTop = useCallback(() => {
+    if (isConversationMode) {
+      conversationRef.current?.scrollToTop();
+      return;
+    }
+    scrollToTop();
+  }, [isConversationMode, scrollToTop]);
+  const handleScrollToBottom = useCallback(() => {
+    if (isConversationMode) {
+      conversationRef.current?.scrollToBottom();
+      return;
+    }
+    scrollToBottom(true);
+  }, [isConversationMode, scrollToBottom]);
+  const handleScrollToEntry = useCallback(
+    (entryId: string, align?: "auto" | "center" | "end" | "start") => {
+      if (isConversationMode) {
+        return conversationRef.current?.scrollToEntryId(entryId, align) ?? false;
+      }
+      return scrollToEntryId(entryId, align);
+    },
+    [isConversationMode, scrollToEntryId],
+  );
 
   const virtualRows = rowVirtualizer.getVirtualItems();
 
@@ -243,7 +273,7 @@ const SessionViewerMessages = forwardRef<
     container: messagesContainerRef.current,
     searchQuery,
     currentSearchTarget,
-    scrollToEntryId,
+    scrollToEntryId: handleScrollToEntry,
     ensureToolExpandedForSearch,
   });
 
@@ -332,8 +362,8 @@ const SessionViewerMessages = forwardRef<
 
   // Expose methods
   useImperativeHandle(ref, () => ({
-    scrollToTop,
-    scrollToBottom,
+    scrollToTop: handleScrollToTop,
+    scrollToBottom: handleScrollToBottom,
   }));
 
   // While loading: keep layout with a flex-1 placeholder; only show the
@@ -354,7 +384,7 @@ const SessionViewerMessages = forwardRef<
       {!isAtBottom && hasNewMessages && (
         <NewMessagesButton
           onClick={() => {
-            scrollToBottom();
+            handleScrollToBottom();
             setHasNewMessages(false);
           }}
           title={t("session.scrollToBottom", "Scroll to bottom")}
@@ -364,14 +394,14 @@ const SessionViewerMessages = forwardRef<
       <ScrollToTopButton
         title={t("session.scrollToTop", "Scroll to top")}
         visible={showScrollToTopHover}
-        onClick={() => scrollToTop()}
+        onClick={handleScrollToTop}
         onMouseEnter={() => setOverScrollToTopButton(true)}
         onMouseLeave={() => setOverScrollToTopButton(false)}
       />
       <ScrollToBottomButton
         title={t("session.scrollToBottom", "Scroll to bottom")}
         visible={showScrollToBottomHover}
-        onClick={() => scrollToBottom(true)}
+        onClick={handleScrollToBottom}
         onMouseEnter={() => setOverScrollToBottomButton(true)}
         onMouseLeave={() => setOverScrollToBottomButton(false)}
       />
@@ -392,12 +422,15 @@ const SessionViewerMessages = forwardRef<
           {renderableEntries.length > 0 ? (
             previewVariant !== "none" ? (
               <ConversationPreviewMessages
+                ref={conversationRef}
                 entries={renderableEntries}
                 toolResultByCallId={toolResultByCallId}
                 searchQuery={searchQuery}
                 streamingId={streamingId}
                 scrollTargetId={scrollTargetId}
                 setScrollTargetId={setScrollTargetId}
+                scrollElementRef={messagesContainerRef}
+                pendingScrollToBottomRef={pendingScrollToBottomRef}
                 foldMode={
                   previewVariant === "conversation-whole-turn"
                     ? "wholeTurn"

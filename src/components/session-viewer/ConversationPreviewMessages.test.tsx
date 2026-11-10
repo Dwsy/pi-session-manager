@@ -13,6 +13,32 @@ import ConversationPreviewMessages, {
   buildToolCallPreviewSegments,
 } from "./ConversationPreviewMessages";
 
+const virtualState = vi.hoisted(() => ({
+  window: Number.POSITIVE_INFINITY,
+}));
+
+// jsdom has no layout engine, so the real virtualizer renders nothing. This stub
+// renders `virtualState.window` turns (default: all) and lets tests simulate
+// scroll unmount/remount by shrinking and regrowing the window.
+vi.mock("@tanstack/react-virtual", () => ({
+  useVirtualizer: ({ count }: { count: number }) => {
+    const size = Math.min(count, virtualState.window);
+    return {
+      getVirtualItems: () =>
+        Array.from({ length: size }, (_, index) => ({
+          index,
+          key: index,
+          start: index * 200,
+          size: 200,
+        })),
+      getTotalSize: () => count * 200,
+      measureElement: () => undefined,
+      scrollToIndex: () => undefined,
+      measure: () => undefined,
+    };
+  },
+}));
+
 function Providers({ children }: { children: ReactNode }) {
   return (
     <SettingsProvider>
@@ -85,6 +111,7 @@ describe("buildConversationPreviewTurns", () => {
   });
 
   beforeEach(() => {
+    virtualState.window = Number.POSITIVE_INFINITY;
     registerBuiltinToolPlugins();
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: false,
@@ -448,5 +475,87 @@ describe("buildConversationPreviewTurns", () => {
     fireEvent.click(toolToggle!);
 
     expect(document.body.textContent).toContain("tests passed");
+  });
+
+  it("renders only the virtual window for long conversations", () => {
+    virtualState.window = 2;
+    const { container } = render(
+      <Providers>
+        <ConversationPreviewMessages
+          entries={Array.from({ length: 6 }, (_, i) =>
+            message(`user-${i}`, "user", `question ${i}`),
+          )}
+          toolResultByCallId={new Map()}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+        />
+      </Providers>,
+    );
+
+    expect(container.querySelectorAll("[data-index]")).toHaveLength(2);
+    expect(document.body.textContent).toContain("question 0");
+    expect(document.body.textContent).not.toContain("question 5");
+  });
+
+  it("keeps tool group expansion across row unmount and remount", () => {
+    const renderConversation = (entries: SessionEntry[]) =>
+      render(
+        <Providers>
+          <ConversationPreviewMessages
+            entries={entries}
+            toolResultByCallId={new Map()}
+            searchQuery=""
+            streamingId={null}
+            scrollTargetId={null}
+            setScrollTargetId={() => {}}
+          />
+        </Providers>,
+      );
+
+    const entries: SessionEntry[] = [
+      message("user-1", "user", "Run tests"),
+      toolCall("call-bash", "bash"),
+      message("assistant-1", "assistant", "Done"),
+    ];
+
+    const view = renderConversation(entries);
+    fireEvent.click(screen.getByText("Show"));
+    expect(screen.queryByText("Show")).toBeNull();
+    expect(screen.getByText("Hide")).toBeTruthy();
+
+    // Scrolling the row out of the virtual window unmounts it; scrolling back
+    // must not lose the expansion state (it lives above the row, not inside it).
+    virtualState.window = 0;
+    view.rerender(
+      <Providers>
+        <ConversationPreviewMessages
+          entries={entries}
+          toolResultByCallId={new Map()}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+        />
+      </Providers>,
+    );
+    expect(screen.queryByText("Hide")).toBeNull();
+
+    virtualState.window = Number.POSITIVE_INFINITY;
+    view.rerender(
+      <Providers>
+        <ConversationPreviewMessages
+          entries={entries}
+          toolResultByCallId={new Map()}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+        />
+      </Providers>,
+    );
+    expect(screen.queryByText("Show")).toBeNull();
+    expect(screen.getByText("Hide")).toBeTruthy();
   });
 });

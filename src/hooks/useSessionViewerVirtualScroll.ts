@@ -20,7 +20,7 @@ const HIGHLIGHT_DURATION_MS = 2000
 const HIGHLIGHT_RETRY_DELAY_MS = 50
 const ROW_OVERSCAN = 12
 
-function estimateSessionEntrySize(
+export function estimateSessionEntrySize(
   entry: SessionEntry | undefined,
   cachedHeight: number | undefined,
   previewMode: boolean,
@@ -94,6 +94,8 @@ export interface UseSessionViewerVirtualScrollOptions {
   previewMode?: boolean
   /** External renderer handles scrollTargetId, e.g. conversation groups. */
   handlesScrollTarget?: boolean
+  /** External renderer owns scroll-to-bottom, e.g. virtualized conversation turns. */
+  handlesScrollCommands?: boolean
 }
 
 export interface UseSessionViewerVirtualScrollResult {
@@ -122,6 +124,7 @@ export function useSessionViewerVirtualScroll({
   onReachBottom,
   previewMode = false,
   handlesScrollTarget = false,
+  handlesScrollCommands = false,
 }: UseSessionViewerVirtualScrollOptions): UseSessionViewerVirtualScrollResult {
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [isAtTop, setIsAtTop] = useState(true)
@@ -221,6 +224,7 @@ export function useSessionViewerVirtualScroll({
   }, [expandedToolIds, rowVirtualizer])
 
   useEffect(() => {
+    if (handlesScrollCommands) return
     if (loading || error || renderableEntries.length === 0) return
     if (!pendingScrollToBottomRef.current) return
 
@@ -242,6 +246,7 @@ export function useSessionViewerVirtualScroll({
     renderableEntries, // Watch for content updates too (typewriter effect)
     rowVirtualizer,
     pendingScrollToBottomRef,
+    handlesScrollCommands,
   ])
 
   const scrollToTop = useCallback(() => {
