@@ -241,8 +241,21 @@ function renderMermaidHtml(diagram: MermaidDiagram, source: string): string {
       <div class="mermaid-toolbar" role="group" aria-label="Mermaid view">
         <button class="mermaid-view-button is-active" type="button" data-mermaid-toggle="rendered" aria-pressed="true">Rendered</button>
         <button class="mermaid-view-button" type="button" data-mermaid-toggle="source" aria-pressed="false">Mermaid</button>
+        <span class="mermaid-render-controls">
+          <button class="mermaid-icon-button" type="button" data-mermaid-action="zoom-out" aria-label="Zoom out" title="Zoom out">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M16 16l4 4"/></svg>
+          </button>
+          <button class="mermaid-zoom-label" type="button" data-mermaid-action="fit" aria-label="Fit diagram to width" title="Fit diagram to width">100%</button>
+          <button class="mermaid-icon-button" type="button" data-mermaid-action="zoom-in" aria-label="Zoom in" title="Zoom in">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6M16 16l4 4"/></svg>
+          </button>
+          <button class="mermaid-zoom-label" type="button" data-mermaid-action="actual" aria-label="Actual size (100%)" title="Actual size (100%)">1:1</button>
+          <button class="mermaid-icon-button" type="button" data-mermaid-action="fullscreen" aria-label="Open diagram full screen" title="Open diagram full screen" aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>
+          </button>
+        </span>
       </div>
-      <div class="mermaid-rendered-view">
+      <div class="mermaid-rendered-view" role="region" tabindex="0" aria-label="Mermaid diagram">
         <div class="mermaid-svg">${diagram.svg}</div>
       </div>
       <div class="mermaid-source-view" hidden>

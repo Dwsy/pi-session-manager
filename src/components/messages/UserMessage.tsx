@@ -255,7 +255,7 @@ function UserMessageModal({ text, images, timestamp, searchQuery, initialShowRaw
   // Capture-phase ESC: close modal only, do not bubble to SessionViewer / search hotkeys
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || document.querySelector('.mermaid-fullscreen')) return
       e.preventDefault()
       e.stopPropagation()
       e.stopImmediatePropagation()

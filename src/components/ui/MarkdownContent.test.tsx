@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import MarkdownContent from './MarkdownContent'
+import UserMessage from '@/components/messages/UserMessage'
 import { enableMarkdownTableResize } from '@/utils/markdownTableResize'
 
-const invokeMock = vi.fn()
-const isTauriMock = vi.fn(() => true)
+const { invokeMock, isTauriMock } = vi.hoisted(() => ({
+  invokeMock: vi.fn(),
+  isTauriMock: vi.fn(() => false),
+}))
 
 vi.mock('@/transport', () => ({
   invoke: (...args: unknown[]) => invokeMock(...args),
@@ -152,6 +155,159 @@ zzzDiagram
 
     expect(container.querySelector('.mermaid-block')).toBeNull()
     expect(container.querySelector('.markdown-code-block code')?.textContent).toContain('zzzDiagram')
+  })
+
+  it('zooms each inline diagram independently and resets to fit', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300)
+    const content = [
+      '```mermaid\nflowchart LR\n A[Start] --> B[End]\n```',
+      '```mermaid\nflowchart LR\n C[Other] --> D[End]\n```',
+    ].join('\n\n')
+    const { container } = render(<MarkdownContent content={content} />)
+    const [first, second] = Array.from(container.querySelectorAll<HTMLElement>('.mermaid-block'))
+    const firstSvg = first.querySelector<SVGSVGElement>('.mermaid-svg > svg')!
+    const initialWidth = parseFloat(firstSvg.style.width)
+
+    fireEvent.click(within(first).getByRole('button', { name: 'Zoom in' }))
+    expect(parseFloat(firstSvg.style.width)).toBeCloseTo(initialWidth * 1.25)
+    expect(within(first).getByRole('button', { name: /Fit diagram to width/ }).textContent).toBe('125%')
+    expect(second.dataset.mermaidScale).toBeUndefined()
+
+    fireEvent.click(within(first).getByRole('button', { name: /Fit diagram to width/ }))
+    expect(parseFloat(firstSvg.style.width)).toBeCloseTo(initialWidth)
+    expect(first.dataset.mermaidScale).toBeUndefined()
+  })
+
+  it('allows a very wide diagram to reach its natural size and keeps manual zoom on resize', () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(200)
+    const nodes = Array.from({ length: 12 }, (_, index) => 'N' + index + '[Long diagram node ' + index + ']')
+    const content = '```mermaid\nflowchart LR\n ' + nodes.join(' --> ') + '\n```'
+    const { container } = render(<MarkdownContent content={content} />)
+    const block = container.querySelector<HTMLElement>('.mermaid-block')!
+    const svg = block.querySelector<SVGSVGElement>('.mermaid-svg > svg')!
+    const naturalWidth = Number(block.dataset.mermaidWidth)
+    expect(naturalWidth).toBeGreaterThan(1600)
+    expect(parseFloat(svg.style.width)).toBeCloseTo(200)
+
+    const zoomIn = within(block).getByRole('button', { name: 'Zoom in' })
+    const steps = Math.ceil(Math.log(naturalWidth / 200) / Math.log(1.25))
+    for (let index = 0; index < steps; index++) fireEvent.click(zoomIn)
+    expect(parseFloat(svg.style.width)).toBeGreaterThanOrEqual(naturalWidth)
+    const manualWidth = parseFloat(svg.style.width)
+
+    width.mockReturnValue(400)
+    fireEvent(window, new Event('resize'))
+    expect(parseFloat(svg.style.width)).toBeCloseTo(manualWidth)
+    fireEvent.click(within(block).getByRole('button', { name: /Fit diagram to width/ }))
+    expect(parseFloat(svg.style.width)).toBeCloseTo(400)
+    expect(within(block).getByRole('button', { name: /Fit diagram to width/ }).textContent)
+      .toBe(Math.round(400 / naturalWidth * 100) + '%')
+    fireEvent.click(within(block).getByRole('button', { name: 'Actual size (100%)' }))
+    expect(parseFloat(svg.style.width)).toBeCloseTo(naturalWidth)
+    expect(within(block).getByRole('button', { name: /Fit diagram to width/ }).textContent).toBe('100%')
+  })
+
+  it('opens a separate full-window diagram, supports zoom and restores focus on Escape', () => {
+    const content = '```mermaid\nflowchart LR\n A[Start] --> B[End]\n```'
+    const { container } = render(<MarkdownContent content={content} />)
+    const open = screen.getByRole('button', { name: 'Open diagram full screen' })
+    open.focus()
+    fireEvent.click(open)
+
+    const dialog = screen.getByRole('dialog', { name: 'Mermaid diagram' })
+    expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: 'Close diagram' }))
+    expect(document.body.style.overflow).toBe('hidden')
+    const inlineSvg = container.querySelector<SVGSVGElement>('.mermaid-svg > svg')!
+    const fullscreenSvg = dialog.querySelector<SVGSVGElement>('.mermaid-fullscreen-diagram > svg')!
+    expect(fullscreenSvg).not.toBe(inlineSvg)
+    expect(fullscreenSvg.textContent).toContain('Start')
+
+    const diagram = dialog.querySelector<HTMLElement>('.mermaid-fullscreen-diagram')!
+    const initialWidth = parseFloat(diagram.style.width)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Zoom in' }))
+    expect(parseFloat(diagram.style.width)).toBeCloseTo(initialWidth * 1.25)
+    const canvas = dialog.querySelector<HTMLElement>('.mermaid-fullscreen-canvas')!
+    fireEvent.wheel(canvas, { ctrlKey: true, deltaY: -100 })
+    expect(parseFloat(diagram.style.width)).toBeCloseTo(initialWidth * 1.25 * 1.25)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Actual size (100%)' }))
+    expect(parseFloat(diagram.style.width)).toBeCloseTo(initialWidth)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Zoom in' }))
+    fireEvent.keyDown(window, { key: '0' })
+    expect(parseFloat(diagram.style.width)).toBeCloseTo(initialWidth)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(document.activeElement).toBe(open)
+    expect(document.body.style.overflow).toBe('')
+  })
+
+  it('keeps the viewer open and restores focus after markdown or search updates', () => {
+    const content = '```mermaid\nflowchart LR\n A[Start] --> B[End]\n```'
+    const { rerender } = render(<MarkdownContent content={content} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open diagram full screen' }))
+    rerender(<MarkdownContent content={content + '\n\nMore text'} searchQuery="Start" />)
+    const dialog = screen.getByRole('dialog', { name: 'Mermaid diagram' })
+    expect(dialog).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open diagram full screen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open diagram full screen' }))
+    rerender(<MarkdownContent content="The diagram was removed." />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('accumulates a burst of small wheel events and reports the zoom level', () => {
+    const content = '```mermaid\nflowchart LR\n A[Start] --> B[End]\n```'
+    render(<MarkdownContent content={content} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open diagram full screen' }))
+    const dialog = screen.getByRole('dialog', { name: 'Mermaid diagram' })
+    const diagram = dialog.querySelector<HTMLElement>('.mermaid-fullscreen-diagram')!
+    const initialWidth = parseFloat(diagram.style.width)
+    const canvas = dialog.querySelector<HTMLElement>('.mermaid-fullscreen-canvas')!
+    act(() => {
+      for (let index = 0; index < 5; index++) {
+        fireEvent.wheel(canvas, { ctrlKey: true, deltaY: -20 })
+      }
+    })
+    expect(parseFloat(diagram.style.width)).toBeCloseTo(initialWidth * 1.25)
+    expect(within(dialog).getByLabelText('Zoom 125%')).toBeTruthy()
+  })
+
+  it('supports pinch zoom and continues panning with the remaining touch', () => {
+    const content = '```mermaid\nflowchart LR\n A[Start] --> B[End]\n```'
+    render(<MarkdownContent content={content} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open diagram full screen' }))
+    const dialog = screen.getByRole('dialog', { name: 'Mermaid diagram' })
+    const diagram = dialog.querySelector<HTMLElement>('.mermaid-fullscreen-diagram')!
+    const canvas = dialog.querySelector<HTMLElement>('.mermaid-fullscreen-canvas')!
+    const initialWidth = parseFloat(diagram.style.width)
+
+    fireEvent.pointerDown(canvas, { pointerId: 1, pointerType: 'touch', button: 0, clientX: 100, clientY: 100 })
+    fireEvent.pointerDown(canvas, { pointerId: 2, pointerType: 'touch', button: 0, clientX: 200, clientY: 100 })
+    fireEvent.pointerMove(canvas, { pointerId: 2, pointerType: 'touch', clientX: 300, clientY: 100 })
+    expect(parseFloat(diagram.style.width)).toBeCloseTo(initialWidth * 2)
+
+    canvas.scrollLeft = 120
+    fireEvent.pointerUp(canvas, { pointerId: 1, pointerType: 'touch' })
+    fireEvent.pointerMove(canvas, { pointerId: 2, pointerType: 'touch', clientX: 280, clientY: 100 })
+    expect(canvas.scrollLeft).toBe(140)
+    fireEvent.pointerUp(canvas, { pointerId: 2, pointerType: 'touch' })
+    expect(canvas.classList.contains('is-dragging')).toBe(false)
+  })
+
+  it('closes the diagram before its enclosing full-message dialog', () => {
+    const content = '```mermaid\nflowchart LR\n A[Start] --> B[End]\n```'
+    const { container } = render(
+      <UserMessage id="mermaid-message" content={[{ type: 'text', text: content }]} />,
+    )
+    fireEvent.click(container.querySelector<HTMLButtonElement>('.user-message-copy-button[aria-haspopup="dialog"]')!)
+    const messageDialog = screen.getByRole('dialog')
+    fireEvent.click(within(messageDialog).getByRole('button', { name: 'Open diagram full screen' }))
+    const diagramDialog = screen.getByRole('dialog', { name: 'Mermaid diagram' })
+
+    fireEvent.keyDown(within(diagramDialog).getByRole('button', { name: 'Close diagram' }), { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Mermaid diagram' })).toBeNull()
+    expect(screen.getByRole('dialog')).toBe(messageDialog)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('renders inline and block LaTeX with KaTeX', () => {

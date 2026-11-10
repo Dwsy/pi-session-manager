@@ -105,7 +105,7 @@ function SkillInvocationDialog({ skill, onClose }: SkillInvocationDialogProps) {
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
+      if (event.key !== 'Escape' || document.querySelector('.mermaid-fullscreen')) return
       event.preventDefault()
       event.stopPropagation()
       event.stopImmediatePropagation()
