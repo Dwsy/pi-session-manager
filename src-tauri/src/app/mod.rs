@@ -21,6 +21,7 @@ pub fn run() {
             read_session_file_incremental_offset,
             get_file_stats,
             get_session_entries,
+            get_session_system_prompt_snapshots,
             get_session_preview_entries,
             get_session_labels,
             detect_session_format,
@@ -255,11 +256,31 @@ mod tests {
         let handler_set = handlers.iter().copied().collect::<BTreeSet<_>>();
         let dispatch_set = crate::dispatch::capability_command_catalog().collect::<BTreeSet<_>>();
 
-        assert_eq!(handlers.len(), 174);
+        assert_eq!(handlers.len(), 175);
         assert_eq!(handler_set.len(), handlers.len());
 
         let dispatch_only = dispatch_set.difference(&handler_set).copied().collect::<Vec<_>>();
-        assert_eq!(dispatch_only, vec!["get_agent_usage_status", "invoke_model_text", "invoke_model_text_stream", "plugin_terminal_history_list", "plugin_terminal_history_read", "session_digest"]);
+        assert_eq!(
+            dispatch_only,
+            vec![
+                "get_agent_usage_status",
+                "invoke_model_text",
+                "invoke_model_text_stream",
+                "plugin_live_agents_list",
+                "plugin_mesh_cancel",
+                "plugin_mesh_focus",
+                "plugin_mesh_follow",
+                "plugin_mesh_herdr_agents",
+                "plugin_mesh_message",
+                "plugin_mesh_peers",
+                "plugin_openbot_agents_list",
+                "plugin_project_detect",
+                "plugin_terminal_history_list",
+                "plugin_terminal_history_read",
+                "plugin_terminal_open",
+                "session_digest",
+            ]
+        );
 
         let tauri_only = handler_set.difference(&dispatch_set).copied().collect::<Vec<_>>();
         assert_eq!(

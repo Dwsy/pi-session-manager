@@ -29,6 +29,7 @@ mod session_list;
 mod session_open;
 mod settings;
 mod skills;
+mod system_prompt;
 mod tags;
 #[cfg(feature = "gui")]
 pub mod terminal;
@@ -63,6 +64,7 @@ pub use session_list::*;
 pub use session_open::*;
 pub use settings::*;
 pub use skills::*;
+pub use system_prompt::*;
 pub use tags::*;
 #[cfg(feature = "gui")]
 pub use terminal::*;

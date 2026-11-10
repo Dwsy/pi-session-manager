@@ -20,6 +20,12 @@ enum PluginPermission {
     WindowsOpen,
     UsageRead,
     TerminalRead,
+    LiveAgentsRead,
+    OpenBotRead,
+    ProjectsRead,
+    TerminalOpen,
+    MeshRead,
+    MeshControl,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -45,6 +51,12 @@ fn parse_plugin_permission(value: &str) -> Option<PluginPermission> {
         "windows:open" => Some(PluginPermission::WindowsOpen),
         "usage:read" => Some(PluginPermission::UsageRead),
         "terminal:read" => Some(PluginPermission::TerminalRead),
+        "live-agents:read" => Some(PluginPermission::LiveAgentsRead),
+        "openbot:read" => Some(PluginPermission::OpenBotRead),
+        "projects:read" => Some(PluginPermission::ProjectsRead),
+        "terminal:open" => Some(PluginPermission::TerminalOpen),
+        "mesh:read" => Some(PluginPermission::MeshRead),
+        "mesh:control" => Some(PluginPermission::MeshControl),
         _ => None,
     }
 }
@@ -62,7 +74,7 @@ fn extract_plugin_permission_context(payload: &Value) -> PluginPermissionContext
 
 fn required_permissions_for_command(command: &str) -> &'static [PluginPermission] {
     match command {
-        "scan_sessions" | "scan_sessions_paginated" | "get_session_entries" | "read_session_file_chunk" | "get_session_labels" | "open_session_in_browser" | "open_session_in_terminal" => &[PluginPermission::SessionsRead],
+        "scan_sessions" | "scan_sessions_paginated" | "get_session_by_path" | "get_session_entries" | "get_session_system_prompt_snapshots" | "read_session_file_chunk" | "get_session_labels" | "open_session_in_browser" | "open_session_in_terminal" => &[PluginPermission::SessionsRead],
         "get_plugin_record" | "list_plugin_records_for_scope" | "search_plugin_records" => &[PluginPermission::RecordsRead],
         "upsert_plugin_record" => &[PluginPermission::RecordsWrite],
         "refresh_session_intelligence_record" => &[PluginPermission::RecordsWrite, PluginPermission::ModelInvoke],
@@ -77,6 +89,12 @@ fn required_permissions_for_command(command: &str) -> &'static [PluginPermission
         "plugin_window_open" | "plugin_window_close" => &[PluginPermission::WindowsOpen],
         "get_agent_usage_status" => &[PluginPermission::UsageRead],
         "plugin_terminal_history_list" | "plugin_terminal_history_read" => &[PluginPermission::TerminalRead],
+        "plugin_live_agents_list" => &[PluginPermission::LiveAgentsRead],
+        "plugin_openbot_agents_list" => &[PluginPermission::OpenBotRead],
+        "plugin_project_detect" => &[PluginPermission::ProjectsRead],
+        "plugin_terminal_open" => &[PluginPermission::TerminalOpen],
+        "plugin_mesh_peers" | "plugin_mesh_herdr_agents" => &[PluginPermission::MeshRead],
+        "plugin_mesh_message" | "plugin_mesh_cancel" | "plugin_mesh_follow" | "plugin_mesh_focus" => &[PluginPermission::MeshControl],
         _ => &[],
     }
 }
@@ -163,5 +181,81 @@ mod tests {
         });
         assert!(enforce_plugin_permission("plugin_terminal_history_list", &allowed).is_ok());
         assert!(enforce_plugin_permission("plugin_terminal_history_read", &allowed).is_ok());
+    }
+
+    #[test]
+    fn live_agent_summaries_require_live_agents_read() {
+        let denied = json!({
+            "__psm": {
+                "pluginId": "example.mesh",
+                "permissions": ["sessions:read"]
+            }
+        });
+        assert!(enforce_plugin_permission("plugin_live_agents_list", &denied).is_err());
+
+        let allowed = json!({
+            "__psm": {
+                "pluginId": "example.mesh",
+                "permissions": ["live-agents:read"]
+            }
+        });
+        assert!(enforce_plugin_permission("plugin_live_agents_list", &allowed).is_ok());
+    }
+
+    #[test]
+    fn openbot_agent_metadata_requires_openbot_read() {
+        let denied = json!({
+            "__psm": {
+                "pluginId": "builtin.project-identity",
+                "permissions": ["sessions:read", "fs:read"]
+            }
+        });
+        assert!(enforce_plugin_permission("plugin_openbot_agents_list", &denied).is_err());
+
+        let allowed = json!({
+            "__psm": {
+                "pluginId": "builtin.project-identity",
+                "permissions": ["openbot:read"]
+            }
+        });
+        assert!(enforce_plugin_permission("plugin_openbot_agents_list", &allowed).is_ok());
+    }
+
+    #[test]
+    fn opening_host_terminal_requires_terminal_open_not_terminal_read() {
+        let history_only = json!({
+            "__psm": {
+                "pluginId": "example.mesh",
+                "permissions": ["terminal:read"]
+            }
+        });
+        assert!(enforce_plugin_permission("plugin_terminal_open", &history_only).is_err());
+
+        let allowed = json!({
+            "__psm": {
+                "pluginId": "example.mesh",
+                "permissions": ["terminal:open"]
+            }
+        });
+        assert!(enforce_plugin_permission("plugin_terminal_open", &allowed).is_ok());
+    }
+
+    #[test]
+    fn project_detect_requires_projects_read() {
+        let denied = json!({
+            "__psm": {
+                "pluginId": "builtin.project-icons",
+                "permissions": ["sessions:read", "fs:read"]
+            }
+        });
+        assert!(enforce_plugin_permission("plugin_project_detect", &denied).is_err());
+
+        let allowed = json!({
+            "__psm": {
+                "pluginId": "builtin.project-icons",
+                "permissions": ["projects:read"]
+            }
+        });
+        assert!(enforce_plugin_permission("plugin_project_detect", &allowed).is_ok());
     }
 }

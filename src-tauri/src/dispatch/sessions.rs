@@ -12,6 +12,7 @@ pub(super) const COMMANDS: &[&str] = &[
     "read_session_file_incremental_offset",
     "get_file_stats",
     "get_session_entries",
+    "get_session_system_prompt_snapshots",
     "get_session_labels",
     "detect_session_format",
     "list_supported_session_providers",
@@ -104,6 +105,11 @@ pub(super) async fn dispatch(app_state: &Option<DispatchAppState>, command: &str
                 "get_session_entries" => {
                     let path = extract(payload, "path")?;
                     let result = crate::get_session_entries(path).await?;
+                    Ok(to_val(result, "serialize result")?)
+                }
+                "get_session_system_prompt_snapshots" => {
+                    let path = extract(payload, "path")?;
+                    let result = crate::get_session_system_prompt_snapshots(path).await?;
                     Ok(to_val(result, "serialize result")?)
                 }
                 "get_session_labels" => {

@@ -38,6 +38,49 @@ pub struct PiLiveSession {
     pub entries: Vec<serde_json::Value>,
 }
 
+/// Lightweight plugin-facing projection. Transcript entries intentionally stay host-owned.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PiLiveSessionSummary {
+    pub session_id: String,
+    pub session_path: Option<String>,
+    pub pid: Option<u32>,
+    pub cwd: Option<String>,
+    pub is_streaming: bool,
+    pub entry_count: u64,
+    pub last_seen: String,
+    pub model: Option<serde_json::Value>,
+    pub available_models: Option<Vec<serde_json::Value>>,
+    pub thinking_level: Option<String>,
+    pub context_usage: Option<serde_json::Value>,
+    pub pending_message_count: Option<u64>,
+    pub steering_queue: Option<Vec<String>>,
+    pub follow_up_queue: Option<Vec<String>>,
+    pub tags: Option<Vec<serde_json::Value>>,
+}
+
+impl From<&PiLiveSession> for PiLiveSessionSummary {
+    fn from(session: &PiLiveSession) -> Self {
+        Self {
+            session_id: session.session_id.clone(),
+            session_path: session.session_path.clone(),
+            pid: session.pid,
+            cwd: session.cwd.clone(),
+            is_streaming: session.is_streaming,
+            entry_count: session.entry_count,
+            last_seen: session.last_seen.clone(),
+            model: session.model.clone(),
+            available_models: session.available_models.clone(),
+            thinking_level: session.thinking_level.clone(),
+            context_usage: session.context_usage.clone(),
+            pending_message_count: session.pending_message_count,
+            steering_queue: session.steering_queue.clone(),
+            follow_up_queue: session.follow_up_queue.clone(),
+            tags: session.tags.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct PiLiveSessionStateUpdate {
     pub model: Option<serde_json::Value>,
@@ -119,6 +162,14 @@ impl PiAgentRegistry {
     /// List all sessions
     pub fn list(&self) -> Vec<PiLiveSession> {
         self.sessions.lock().expect("mutex poisoned").values().cloned().collect()
+    }
+
+    /// List lightweight session summaries without cloning or serializing transcript entries.
+    pub fn list_summaries(&self) -> Vec<PiLiveSessionSummary> {
+        let guard = self.sessions.lock().expect("mutex poisoned");
+        let mut summaries = guard.values().map(PiLiveSessionSummary::from).collect::<Vec<_>>();
+        summaries.sort_by(|left, right| left.session_id.cmp(&right.session_id));
+        summaries
     }
 
     /// Get a session by id (exact or partial match)
@@ -291,6 +342,22 @@ mod tests {
         let session = registry.get_live_session("session-1").unwrap();
         assert_eq!(session.entry_count, 3);
         assert!(!session.is_streaming);
+    }
+
+    #[test]
+    fn list_summaries_excludes_transcript_entries_and_is_stable() {
+        let registry = PiAgentRegistry::new();
+        registry.register("pi:session-b".into(), Some("/sessions/b.jsonl".into()), Some(42), Some("/repo/b".into()), vec![serde_json::json!({"type": "user_message"})]);
+        registry.register("pi:session-a".into(), Some("/sessions/a.jsonl".into()), Some(41), Some("/repo/a".into()), vec![serde_json::json!({"type": "assistant_message"})]);
+
+        let summaries = registry.list_summaries();
+        assert_eq!(summaries.iter().map(|item| item.session_id.as_str()).collect::<Vec<_>>(), vec!["pi:session-a", "pi:session-b"]);
+        assert_eq!(summaries[1].entry_count, 1);
+
+        let serialized = serde_json::to_value(&summaries[1]).expect("serialize summary");
+        assert!(serialized.get("entries").is_none(), "plugin summary must not contain transcript entries");
+        assert_eq!(serialized["sessionPath"], "/sessions/b.jsonl");
+        assert_eq!(serialized["cwd"], "/repo/b");
     }
 
     #[tokio::test]

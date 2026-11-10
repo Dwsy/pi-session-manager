@@ -7,6 +7,7 @@
 use serde_json::Value;
 
 mod desktop;
+mod mesh;
 mod models;
 mod permissions;
 mod plugins;
@@ -71,6 +72,13 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
     if let Some(result) = plugins::dispatch(app_state, command, payload).await {
         return result;
     }
+    if let Some(result) = mesh::dispatch(
+        #[cfg(feature = "gui")] app_state,
+        command,
+        payload,
+    ).await {
+        return result;
+    }
     if let Some(result) = resources::dispatch(app_state, command, payload).await {
         return result;
     }
@@ -89,7 +97,7 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
 
 #[cfg(test)]
 pub(crate) fn capability_command_catalog() -> impl Iterator<Item = &'static str> {
-    [sessions::COMMANDS, search::COMMANDS, plugins::COMMANDS, resources::COMMANDS, settings::COMMANDS, models::COMMANDS, desktop::COMMANDS].into_iter().flatten().copied()
+    [sessions::COMMANDS, search::COMMANDS, plugins::COMMANDS, mesh::COMMANDS, resources::COMMANDS, settings::COMMANDS, models::COMMANDS, desktop::COMMANDS].into_iter().flatten().copied()
 }
 
 #[cfg(test)]
@@ -100,7 +108,7 @@ mod tests {
     fn capability_command_catalog_is_unique_and_complete() {
         let commands = capability_command_catalog().collect::<Vec<_>>();
         let unique = commands.iter().copied().collect::<std::collections::HashSet<_>>();
-        assert_eq!(commands.len(), 162);
+        assert_eq!(commands.len(), 173);
         assert_eq!(unique.len(), commands.len());
     }
 

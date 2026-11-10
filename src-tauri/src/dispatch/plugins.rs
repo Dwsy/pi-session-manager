@@ -1,6 +1,11 @@
 //! Plugins command adapter routes.
 
 use super::*;
+#[cfg(feature = "gui")]
+use std::path::Path;
+
+#[cfg(feature = "gui")]
+use tauri::Emitter;
 
 pub(super) const COMMANDS: &[&str] = &[
     "get_plugin_record",
@@ -17,6 +22,10 @@ pub(super) const COMMANDS: &[&str] = &[
     "plugin_window_close",
     "plugin_terminal_history_list",
     "plugin_terminal_history_read",
+    "plugin_live_agents_list",
+    "plugin_openbot_agents_list",
+    "plugin_project_detect",
+    "plugin_terminal_open",
     "load_psm_plugin_config",
     "set_psm_plugin_enabled",
     "set_psm_plugin_settings",
@@ -174,6 +183,50 @@ pub(super) async fn dispatch(app_state: &Option<DispatchAppState>, command: &str
                     #[cfg(not(feature = "gui"))]
                     {
                         Err("terminal history is desktop-only".to_string())
+                    }
+                }
+                "plugin_live_agents_list" => {
+                    #[cfg(feature = "gui")]
+                    {
+                        let state = app_state.as_ref().ok_or_else(|| "live agent summaries require GUI app state".to_string())?;
+                        Ok(to_val(state.pi_agent_registry.list_summaries(), "serialize live agent summaries")?)
+                    }
+                    #[cfg(not(feature = "gui"))]
+                    {
+                        Err("live agent summaries are desktop-only".to_string())
+                    }
+                }
+                "plugin_openbot_agents_list" => Ok(to_val(crate::domain::openbot_agents::list_agents(), "serialize OpenBot agents")?),
+                "plugin_project_detect" => {
+                    let paths: Option<Vec<String>> = match payload.get("paths") {
+                        Some(value) if !value.is_null() => Some(serde_json::from_value(value.clone()).map_err(|e| format!("Invalid project detect paths: {e}"))?),
+                        _ => None,
+                    };
+                    let result = crate::domain::project_detect::detect_projects(paths)?;
+                    Ok(to_val(result, "serialize project detections")?)
+                }
+                "plugin_terminal_open" => {
+                    #[cfg(feature = "gui")]
+                    {
+                        let _state = app_state.as_ref().ok_or_else(|| "plugin_terminal_open requires GUI app state".to_string())?;
+                        let cwd = extract(payload, "cwd")?.trim().to_string();
+                        if cwd.is_empty() || !Path::new(&cwd).is_absolute() || !Path::new(&cwd).is_dir() {
+                            return Err("terminal cwd must be an existing absolute directory".to_string());
+                        }
+                        let plugin_id = extract_plugin_id(payload)?;
+                        let label = extract_optional_string(payload, "label")
+                            .map(|value| value.trim().chars().take(80).collect::<String>())
+                            .filter(|value| !value.is_empty())
+                            .or_else(|| Path::new(&cwd).file_name().and_then(|value| value.to_str()).map(str::to_string))
+                            .unwrap_or_else(|| "Terminal".to_string());
+                        // Validation only. Broadcasting a global Tauri event
+                        // opens every window. The initiating frontend owns its
+                        // terminal handler and will accept or reject locally.
+                        Ok(serde_json::json!({ "pluginId": plugin_id, "cwd": cwd, "label": label }))
+                    }
+                    #[cfg(not(feature = "gui"))]
+                    {
+                        Err("plugin_terminal_open is desktop-only".to_string())
                     }
                 }
                 "load_psm_plugin_config" => {
