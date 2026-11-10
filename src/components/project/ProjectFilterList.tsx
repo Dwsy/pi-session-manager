@@ -1,10 +1,13 @@
 import type { SessionInfo } from '@/types'
-import { FolderOpen, Folder, Check } from 'lucide-react'
+import { Folder, Check } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { RefObject } from 'react'
 import { getDirectoryName } from '@/utils/sessionDisplay'
+import type { PsmProjectIdentity } from '@dwsy/plugin-sdk'
+import { useProjectIdentityResolver } from '@/hooks/useProjectIdentity'
+import ProjectIdentityBadge from '@/components/project/ProjectIdentityBadge'
 
 interface ProjectFilterListProps {
   sessions: SessionInfo[]
@@ -16,6 +19,7 @@ interface ProjectFilterListProps {
 interface Project {
   dir: string
   dirName: string
+  identity: PsmProjectIdentity
   sessionCount: number
   messageCount: number
   lastModified: number
@@ -28,6 +32,7 @@ export default function ProjectFilterList({
   scrollParentRef,
 }: ProjectFilterListProps) {
   const { t } = useTranslation()
+  const resolveProjectIdentity = useProjectIdentityResolver()
 
   const projects: Project[] = useMemo(() => {
     const projectMap = sessions.reduce((acc, session) => {
@@ -39,17 +44,21 @@ export default function ProjectFilterList({
       return acc
     }, {} as Record<string, SessionInfo[]>)
 
-    const list = Object.entries(projectMap).map(([dir, dirSessions]) => ({
-      dir,
-      dirName: getDirectoryName(dir),
-      sessionCount: dirSessions.length,
-      messageCount: dirSessions.reduce((sum, s) => sum + s.message_count, 0),
-      lastModified: Math.max(...dirSessions.map(s => new Date(s.modified).getTime())),
-    }))
+    const list = Object.entries(projectMap).map(([dir, dirSessions]) => {
+      const dirName = getDirectoryName(dir)
+      return {
+        dir,
+        dirName,
+        identity: resolveProjectIdentity({ path: dir, name: dirName }),
+        sessionCount: dirSessions.length,
+        messageCount: dirSessions.reduce((sum, s) => sum + s.message_count, 0),
+        lastModified: Math.max(...dirSessions.map(s => new Date(s.modified).getTime())),
+      }
+    })
 
     list.sort((a, b) => b.lastModified - a.lastModified)
     return list
-  }, [sessions, t])
+  }, [sessions, t, resolveProjectIdentity])
 
   const totalSessions = sessions.length
 
@@ -132,18 +141,18 @@ export default function ProjectFilterList({
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
-                <div className={`h-6 w-6 rounded-md flex items-center justify-center flex-shrink-0 ${
+                <div className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md ${
                   isSelected
                     ? 'bg-info/20 text-info'
-                    : 'bg-surface border border-border/40 text-blue-400'
+                    : 'border border-border/40 bg-surface'
                 }`}>
-                  <FolderOpen className="h-3 w-3" />
+                  <ProjectIdentityBadge identity={project.identity} size="sm" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className={`text-xs font-medium truncate ${
                     isSelected ? 'text-foreground' : 'text-muted-foreground'
                   }`}>
-                    {project.dirName}
+                    {project.identity.label}
                   </div>
                   <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60">
                     <span>{project.sessionCount} {t('project.list.sessions')}</span>

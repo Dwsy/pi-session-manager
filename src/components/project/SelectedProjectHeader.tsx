@@ -1,8 +1,13 @@
 import type { ReactNode } from "react";
-import { ArrowLeft, FolderOpen, Star } from "lucide-react";
+import { ArrowLeft, Star } from "lucide-react";
+
+import { useProjectIdentityResolver } from "@/hooks/useProjectIdentity";
+import ProjectIdentityBadge from "@/components/project/ProjectIdentityBadge";
 
 interface SelectedProjectHeaderProps {
   projectName: string;
+  /** Full project path. When provided the header uses the plugin-resolved identity. */
+  projectPath?: string;
   sessionCount: number;
   onBack: () => void;
   backLabel: string;
@@ -14,6 +19,7 @@ interface SelectedProjectHeaderProps {
 
 function SelectedProjectHeader({
   projectName,
+  projectPath,
   sessionCount,
   onBack,
   backLabel,
@@ -21,6 +27,12 @@ function SelectedProjectHeader({
   isFavorite = false,
   trailing,
 }: SelectedProjectHeaderProps) {
+  const resolveProjectIdentity = useProjectIdentityResolver();
+  const identity = resolveProjectIdentity({
+    path: projectPath ?? projectName,
+    name: projectName,
+  });
+
   return (
     <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background flex-shrink-0 sticky top-0 z-10">
       <button
@@ -38,11 +50,11 @@ function SelectedProjectHeader({
           {isFavorite ? (
             <Star className="h-3.5 w-3.5 text-yellow-500 fill-current" />
           ) : (
-            <FolderOpen className="h-3.5 w-3.5 text-blue-400" />
+            <ProjectIdentityBadge identity={identity} size="md" />
           )}
         </div>
-        <span className={`${nameClassName} font-medium truncate`}>
-          {projectName}
+        <span className={`${nameClassName} font-medium truncate`} title={identity.subtitle}>
+          {identity.label}
         </span>
         <span className="text-[11px] text-muted-foreground flex-shrink-0">
           ({sessionCount})

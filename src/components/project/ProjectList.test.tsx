@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SessionInfo } from "@/types";
 import ProjectList from "./ProjectList";
 
@@ -33,8 +33,16 @@ vi.mock("@/hooks/useDelayedLoading", () => ({
   useDelayedLoading: () => false,
 }));
 
+const pluginUi = vi.hoisted(() => ({
+  current: {
+    projectListActions: [] as unknown[],
+    projectIdentityProviders: [] as unknown[],
+  },
+}));
+
 vi.mock("@/plugins/runtime-host", () => ({
-  usePsmPluginUi: () => ({ projectListActions: [] }),
+  usePsmPluginUi: () => pluginUi.current,
+  usePsmPluginSessionUi: () => pluginUi.current,
   PluginContributionBoundary: ({ children }: { children: ReactNode }) => (
     <>{children}</>
   ),
@@ -43,7 +51,20 @@ vi.mock("@/plugins/runtime-host", () => ({
   ),
 }));
 
+const session = (cwd: string): SessionInfo =>
+  ({
+    path: `${cwd}.jsonl`,
+    id: "id",
+    cwd,
+    modified: "2026-08-06T10:00:00.000Z",
+    message_count: 1,
+  }) as SessionInfo;
+
 describe("ProjectList", () => {
+  afterEach(() => {
+    pluginUi.current = { projectListActions: [], projectIdentityProviders: [] };
+  });
+
   it("groups equivalent Windows cwd values and preserves the first cwd", () => {
     const firstCwd = "C:\\Code\\Foo\\";
     const equivalentCwd = "c:/code/foo";
@@ -108,5 +129,93 @@ describe("ProjectList", () => {
     expect(screen.getByText("2 projects")).toBeTruthy();
     expect(screen.getByTitle(firstCwd)).toBeTruthy();
     expect(screen.getByTitle(secondCwd)).toBeTruthy();
+  });
+
+  it("renders the identity supplied by a plugin provider", () => {
+    pluginUi.current = {
+      projectListActions: [],
+      projectIdentityProviders: [
+        {
+          id: "p.bot",
+          pluginId: "builtin.project-identity",
+          priority: 100,
+          resolve: () => ({
+            label: "zero",
+            subtitle: "OpenBot agent",
+            avatar: { kind: "initial", value: "z", hue: 320 },
+          }),
+        },
+      ],
+    };
+
+    render(
+      <ProjectList
+        sessions={[session("/Users/dev/OpenBot/Agents/agent-da66bdca-0664-440c-a271-585ab5c62164")]}
+        loading={false}
+      />,
+    );
+
+    expect(screen.getByText("zero")).toBeTruthy();
+    expect(screen.getByText("OpenBot agent")).toBeTruthy();
+    expect(screen.getByText("Z")).toBeTruthy();
+    // The raw directory name stays reachable as the path line, but not as the title.
+    expect(
+      screen.getAllByText("agent-da66bdca-0664-440c-a271-585ab5c62164"),
+    ).toHaveLength(1);
+  });
+
+  it("hides the machine directory line when the provider owns the label", () => {
+    pluginUi.current = {
+      projectListActions: [],
+      projectIdentityProviders: [
+        {
+          id: "p.bot",
+          pluginId: "builtin.project-identity",
+          priority: 100,
+          resolve: () => ({ label: "zero", subtitle: "OpenBot agent", hidePath: true }),
+        },
+      ],
+    };
+
+    render(
+      <ProjectList
+        sessions={[session("/Users/dev/OpenBot/Agents/agent-da66bdca-0664-440c-a271-585ab5c62164")]}
+        loading={false}
+      />,
+    );
+
+    expect(screen.getByText("zero")).toBeTruthy();
+    expect(
+      screen.queryByText("agent-da66bdca-0664-440c-a271-585ab5c62164"),
+    ).toBeNull();
+  });
+
+  it("matches the search query against the plugin label", () => {
+    pluginUi.current = {
+      projectListActions: [],
+      projectIdentityProviders: [
+        {
+          id: "p.bot",
+          pluginId: "builtin.project-identity",
+          priority: 100,
+          resolve: ({ name }) => (name.startsWith("agent-") ? { label: "zero" } : null),
+        },
+      ],
+    };
+
+    render(
+      <ProjectList
+        sessions={[
+          session("/Users/dev/OpenBot/Agents/agent-da66bdca-0664-440c-a271-585ab5c62164"),
+          session("/Users/dev/Work/bw-platform"),
+        ]}
+        loading={false}
+        searchQuery="zero"
+      />,
+    );
+
+    expect(screen.getByText("1 projects")).toBeTruthy();
+    expect(screen.getByText("zero")).toBeTruthy();
+    expect(screen.queryByText("bw-platform")).toBeNull();
   });
 });

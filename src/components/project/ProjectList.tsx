@@ -9,6 +9,9 @@ export type ProjectListSortMode = "recent" | "sessions" | "messages" | "name";
 import { useDelayedLoading } from "@/hooks/useDelayedLoading";
 import { ProjectListSkeleton } from "@/components/ui/Skeleton";
 import { usePsmPluginUi, PluginContributionBoundary, PluginContributionSlot } from "@/plugins/runtime-host";
+import type { PsmProjectIdentity } from "@dwsy/plugin-sdk";
+import { useProjectIdentityResolver } from "@/hooks/useProjectIdentity";
+import ProjectIdentityBadge from "@/components/project/ProjectIdentityBadge";
 import type { SessionInfo } from "@/types";
 import {
   formatDirectory,
@@ -31,6 +34,7 @@ interface ProjectListProps {
 interface Project {
   dir: string;
   dirName: string;
+  identity: PsmProjectIdentity;
   sessionCount: number;
   messageCount: number;
   lastModified: number;
@@ -49,6 +53,7 @@ export default function ProjectList({
 }: ProjectListProps) {
   const { t } = useTranslation();
   const { projectListActions = [] } = usePsmPluginUi();
+  const resolveProjectIdentity = useProjectIdentityResolver();
 
   const projects: Project[] = useMemo(() => {
     const projectMap = sessions.reduce((acc, session) => {
@@ -68,9 +73,11 @@ export default function ProjectList({
       const liveCount = dirSessions.filter(
         (s) => s.isLive || (liveSessionIds?.has(s.id) ?? false),
       ).length;
+      const dirName = getDirectoryName(dir);
       return {
         dir,
-        dirName: getDirectoryName(dir),
+        dirName,
+        identity: resolveProjectIdentity({ path: dir, name: dirName }),
         sessionCount: dirSessions.length,
         messageCount: dirSessions.reduce((sum, s) => sum + s.message_count, 0),
         lastModified: Math.max(
@@ -81,7 +88,8 @@ export default function ProjectList({
     });
     const filteredList = normalizedQuery
       ? list.filter((project) => {
-          const haystack = `${project.dirName}\n${project.dir}`.toLowerCase();
+          const haystack =
+            `${project.identity.label}\n${project.identity.subtitle ?? ""}\n${project.dirName}\n${project.dir}`.toLowerCase();
           return haystack.includes(normalizedQuery);
         })
       : list;
@@ -89,11 +97,17 @@ export default function ProjectList({
     filteredList.sort((a, b) => {
       if (sortMode === "sessions") return b.sessionCount - a.sessionCount || b.lastModified - a.lastModified;
       if (sortMode === "messages") return b.messageCount - a.messageCount || b.lastModified - a.lastModified;
-      if (sortMode === "name") return a.dirName.localeCompare(b.dirName) || a.dir.localeCompare(b.dir);
+      if (sortMode === "name") {
+        return (
+          a.identity.label.localeCompare(b.identity.label) ||
+          a.dirName.localeCompare(b.dirName) ||
+          a.dir.localeCompare(b.dir)
+        );
+      }
       return b.lastModified - a.lastModified;
     });
     return filteredList;
-  }, [sessions, t, liveSessionIds, searchQuery, sortMode]);
+  }, [sessions, t, liveSessionIds, searchQuery, sortMode, resolveProjectIdentity]);
 
   const projectsVirtualizer = useVirtualizer({
     count: projects.length,
@@ -173,11 +187,16 @@ export default function ProjectList({
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <div className="p-0.5 rounded flex-shrink-0">
-                        <FolderOpen className="h-4 w-4 flex-shrink-0 text-blue-400" />
+                        <ProjectIdentityBadge identity={project.identity} />
                       </div>
                       <div className="text-[13px] sm:text-sm font-medium truncate leading-tight">
-                        {project.dirName}
+                        {project.identity.label}
                       </div>
+                      {project.identity.subtitle && (
+                        <div className="text-[10px] text-muted-foreground/70 truncate leading-tight">
+                          {project.identity.subtitle}
+                        </div>
+                      )}
                     </div>
                     <div className="text-[10px] sm:text-[11px] text-muted-foreground flex-shrink-0 pt-0.5 whitespace-nowrap">
                       {formatShortTime(
@@ -187,12 +206,14 @@ export default function ProjectList({
                     </div>
                   </div>
 
-                  <div
-                    className="text-[11px] sm:text-xs text-muted-foreground/80 truncate mb-2 font-mono"
-                    title={project.dir}
-                  >
-                    {formatDirectory(project.dir)}
-                  </div>
+                  {!project.identity.hidePath && (
+                    <div
+                      className="text-[11px] sm:text-xs text-muted-foreground/80 truncate mb-2 font-mono"
+                      title={project.dir}
+                    >
+                      {formatDirectory(project.dir)}
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-muted-foreground tabular-nums font-medium">
                     <span className="px-1.5 py-0.5 rounded bg-muted/40">
