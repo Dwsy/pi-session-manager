@@ -53,7 +53,7 @@ import type {
   PsmToolRenderProps,
   PsmToolResolvedData,
   PsmToolCallContent,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 ```
 
 A renderer registration contains:
@@ -148,7 +148,7 @@ import type {
   PsmPluginManifest,
   PsmToolRendererRegistration,
   PsmToolRenderProps,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 
 function ExampleRenderer({ resolvedData, context }: PsmToolRenderProps) {
   const { args, output, isError, entryId } = resolvedData
@@ -312,5 +312,5 @@ Avoid:
 - hard-coding dark-only colors
 - adding renderer-specific state outside the renderer or plugin lifecycle
 
-External npm plugins should depend only on `@pi-session-manager/plugin-sdk` and normal peer
+External npm plugins should depend only on `@dwsy/plugin-sdk` and normal peer
 runtime libraries. App-local imports are for repo-local builtin plugins only.

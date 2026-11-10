@@ -7,7 +7,7 @@ Date: 2026-05-23
 This note is a short architecture snapshot for the current PSM plugin capability line:
 
 - generic `plugin_records`
-- `@pi-session-manager/plugin-sdk`
+- `@dwsy/plugin-sdk`
 - `session.intelligence`
 - host-managed Pi Agent plugin sessions
 - opt-in permission enforcement
@@ -191,7 +191,7 @@ The V1 design is intentionally local and reviewable. It does not introduce remot
 
 Publishable package shape:
 
-- `@pi-session-manager/plugin-sdk`
+- `@dwsy/plugin-sdk`
 - exports: manifest types, permission types, record declaration types, `PsmTransport`, `createPluginCapabilityClient`, and plugin activation/host context types
 - excludes: `appPsmTransport`, app stores, React components, Rust command modules, and local service providers
 
@@ -203,7 +203,7 @@ Plugin package shape:
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@pi-session-manager/plugin-sdk": "^0.1.0"
+    "@dwsy/plugin-sdk": "^0.1.0"
   },
   "exports": {
     ".": "./dist/index.js"
@@ -214,7 +214,7 @@ Plugin package shape:
 Plugin module shape:
 
 ```ts
-import type { PsmPluginHostContext, PsmPluginManifest } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginHostContext, PsmPluginManifest } from '@dwsy/plugin-sdk'
 
 export const manifest: PsmPluginManifest = {
   manifestVersion: 1,

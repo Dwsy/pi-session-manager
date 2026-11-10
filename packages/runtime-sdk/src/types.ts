@@ -8,13 +8,19 @@ export type PsmPermission =
   | "config:read"
   | "config:write"
   | "events:read"
+  | "live-agents:read"
+  | "openbot:read"
+  | "projects:read"
   | "model:invoke"
   | "agent:invoke"
   | "fs:read"
   | "system-prompts:read"
   | "windows:open"
   | "usage:read"
-  | "terminal:read";
+  | "terminal:read"
+  | "terminal:open"
+  | "mesh:read"
+  | "mesh:control";
 
 export interface PsmPermissionContext {
   pluginId?: string;
@@ -510,6 +516,46 @@ export interface PsmProjectListActionRegistration {
   render(props: PsmProjectListActionRenderProps): unknown;
 }
 
+/** Minimal project facts available wherever the host renders a project.
+ * `name` is the raw directory basename, not the identity label. */
+export interface PsmProjectReference {
+  path: string;
+  name: string;
+}
+
+export interface PsmProjectIdentityAvatar {
+  /** `initial` renders one character, `emoji` renders the value as-is, `url` loads an image. */
+  kind: "initial" | "emoji" | "url";
+  value: string;
+  /** HSL hue 0-359 for the avatar background. Defaults to a hue derived from the label. */
+  hue?: number;
+}
+
+export interface PsmProjectIdentity {
+  /** Display name for the project. Replaces the directory basename. */
+  label: string;
+  /** Optional secondary line. The host still shows the full path. */
+  subtitle?: string;
+  /** Optional avatar. Without one the host renders its default folder icon. */
+  avatar?: PsmProjectIdentityAvatar;
+  /**
+   * Hides the secondary directory-path line, for identities whose label fully replaces a
+   * machine directory name (the path stays available as the row tooltip).
+   */
+  hidePath?: boolean;
+}
+
+export interface PsmProjectIdentityProviderRegistration {
+  id: string;
+  /** Lower values win. Defaults to 100. */
+  priority?: number;
+  /**
+   * Resolves display identity for a project path. Return `null` to defer to the next provider.
+   * Runs during render, so it must be synchronous and side-effect free. Cache any async data yourself.
+   */
+  resolve(project: PsmProjectReference): PsmProjectIdentity | null;
+}
+
 export interface PsmSessionContextMenuActionRenderProps {
   session: PsmSessionReference;
   close: () => void;
@@ -529,6 +575,7 @@ export interface PsmPluginUiRegistry {
   registerSessionListAction(action: PsmSessionListActionRegistration): void;
   registerSessionListColumn(column: PsmSessionListColumnRegistration): void;
   registerProjectListAction(action: PsmProjectListActionRegistration): void;
+  registerProjectIdentityProvider(provider: PsmProjectIdentityProviderRegistration): void;
   registerSessionContextMenuAction(action: PsmSessionContextMenuActionRegistration): void;
   registerSessionToolbarItem(item: PsmSessionToolbarItemRegistration): void;
   registerSessionPanel(panel: PsmSessionPanelRegistration): void;
@@ -673,6 +720,25 @@ export interface PsmSessionReadChunkOptions {
   maxBytes?: number;
 }
 
+/** Ordered effective section after one system-message version. */
+export interface PsmSystemPromptSection {
+  name: string;
+  text: string;
+}
+
+/** Full replayed prompt state at one system-message version in a session. */
+export interface PsmSystemPromptSnapshot {
+  id: string;
+  timestamp: string;
+  version: number;
+  prompt: string;
+  sections: PsmSystemPromptSection[];
+  changedSections: string[];
+  removedSections: string[];
+  toolsAdded: string[];
+  toolsRemoved: string[];
+}
+
 export interface PsmSessionOpenOptions {
   target?: "browser" | "terminal";
   cwd?: string;
@@ -684,6 +750,8 @@ export interface PsmSessionOpenOptions {
 export interface PsmSessionsClient {
   scan(): Promise<unknown[]>;
   list(params?: PsmSessionListParams): Promise<PsmPaginatedSessionsResult>;
+  /** Existing PSM indexed resolver; null when path is not indexed. */
+  lookupByPath(path: string): Promise<unknown | null>;
   readEntries(
     sessionPath: string,
     options?: { limit?: number },
@@ -692,6 +760,9 @@ export interface PsmSessionsClient {
     sessionPath: string,
     options?: PsmSessionReadChunkOptions,
   ): Promise<PsmSessionChunk>;
+  readSystemPromptSnapshots(
+    sessionPath: string,
+  ): Promise<PsmSystemPromptSnapshot[]>;
   getLabels(sessionPath: string): Promise<Record<string, string>>;
   open(sessionPath: string, options?: PsmSessionOpenOptions): Promise<void>;
 }
@@ -926,6 +997,138 @@ export interface PsmTerminalTranscriptChunk {
   hasMore: boolean;
 }
 
+export interface PsmLiveAgentModelInfo {
+  provider?: string;
+  id?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
+export interface PsmLiveAgentContextUsage {
+  used?: number;
+  limit?: number;
+  unit?: string;
+}
+
+export interface PsmLiveAgentTag {
+  id?: string;
+  name?: string;
+  color?: string;
+  [key: string]: unknown;
+}
+
+/** Lightweight projection of an online Pi Agent; intentionally excludes transcript entries. */
+export interface PsmLiveAgentSessionSummary {
+  sessionId: string;
+  sessionPath?: string | null;
+  pid?: number | null;
+  cwd?: string | null;
+  isStreaming: boolean;
+  entryCount: number;
+  lastSeen: string;
+  model?: PsmLiveAgentModelInfo | null;
+  availableModels?: PsmLiveAgentModelInfo[] | null;
+  thinkingLevel?: string | null;
+  contextUsage?: PsmLiveAgentContextUsage | null;
+  pendingMessageCount?: number | null;
+  steeringQueue?: string[] | null;
+  followUpQueue?: string[] | null;
+  tags?: PsmLiveAgentTag[] | null;
+}
+
+export interface PsmLiveAgentsClient {
+  list(): Promise<PsmLiveAgentSessionSummary[]>;
+}
+
+/**
+ * Local agent metadata from an OpenBot installation on the same machine.
+ * Read-only, best-effort: an unreachable database yields an empty list.
+ */
+export interface PsmOpenBotAgent {
+  /** Stable agent id, also the workspace directory name, e.g. `agent-<uuid>`. */
+  id: string;
+  name: string;
+  title?: string;
+  description?: string;
+  avatarSeed?: string;
+  /** 0-359 avatar hue used by OpenBot for the generated avatar. */
+  avatarHue?: number;
+  avatarUrl?: string;
+  /** Absolute workspace path, matching the session `cwd` PSM shows as a project. */
+  workspacePath?: string;
+}
+
+export interface PsmOpenBotClient {
+  listAgents(): Promise<PsmOpenBotAgent[]>;
+}
+
+/** Marker-detection result for one project directory. */
+export interface PsmProjectDetection {
+  /** Echo of the requested path (or the stored project root for whole-list scans). */
+  path: string;
+  /** Directory basename. */
+  name: string;
+  /** `false` means the path is outside the auto-authorized scan whitelist (known projects). */
+  authorized: boolean;
+  /** Normalized project kind (`rust`, `react`, `tauri`, ...), `null` when unknown or unauthorized. */
+  kind: string | null;
+}
+
+export interface PsmProjectsClient {
+  /**
+   * Detect project kinds by marker files. Omit `paths` to scan every
+   * auto-authorized project root. Unauthorized paths come back with
+   * `authorized: false`; no directory outside the whitelist is read.
+   */
+  detect(paths?: string[]): Promise<PsmProjectDetection[]>;
+}
+
+/** A view of a peer reported by the existing Mesh Hub, never inferred from Pi Live. */
+export interface PsmMeshPeer {
+  sessionId: string;
+  sessionFile: string;
+  cwd: string;
+  pid: number;
+  machineId: string;
+  startedAt: string;
+  state: 'running' | 'waiting' | 'offline' | 'closed';
+  lastHeartbeat: string;
+  title?: string;
+  model?: string;
+  ephemeral?: boolean;
+  persistence?: 'file' | 'memory';
+  git: { repoRoot: string | null; branch: string | null; worktree: 'main' | 'linked' | null; commonRoot: string | null };
+  files: Array<{ path: string; op: 'edit' | 'write'; ts: string }>;
+  following: string[];
+}
+
+export interface PsmMeshHerdrAgent {
+  paneId: string;
+  workspaceId: string;
+  sessionPath: string | null;
+  status: string;
+}
+
+export interface PsmMeshClient {
+  peers(): Promise<PsmMeshPeer[]>;
+  herdrAgents(): Promise<PsmMeshHerdrAgent[]>;
+  /** Focus an existing Herdr host through the Hub; never launches/resumes a peer. */
+  focus(targetSessionId: string): Promise<{ ok: true; message?: string; workspaceId?: string }>;
+  send(params: { targetSessionId: string; text: string; mode: 'steer' | 'followUp'; fromSessionId?: string }): Promise<{ ok: true; disposition?: string }>;
+  cancel(targetSessionId: string): Promise<{ ok: true }>;
+  follow(params: { fromSessionId: string; targetSessionId: string; following: boolean }): Promise<{ ok: true }>;
+}
+
+export interface PsmTerminalOpenParams {
+  cwd: string;
+  label?: string;
+}
+
+/** Requests the host to open its existing TerminalPanel; raw PTY control is not exposed. */
+export interface PsmTerminalClient {
+  open(params: PsmTerminalOpenParams): Promise<void>;
+}
+
 export interface PsmTerminalHistoryClient {
   listSessions(): Promise<PsmTerminalTranscriptSummary[]>;
   readTranscript(
@@ -1050,6 +1253,11 @@ export interface PsmCapabilityClient {
   agent: PsmAgentClient;
   models: PsmModelsClient;
   agentUsage: PsmAgentUsageClient;
+  liveAgents: PsmLiveAgentsClient;
+  openbot: PsmOpenBotClient;
+  projects: PsmProjectsClient;
+  mesh: PsmMeshClient;
+  terminal: PsmTerminalClient;
   terminalHistory: PsmTerminalHistoryClient;
   tags: PsmTagsClient;
   config: PsmJsonConfigClient;

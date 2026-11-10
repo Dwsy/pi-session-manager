@@ -17,7 +17,7 @@ function sourceAt(relativePath: string) {
 
 describe('published plugin SDK boundary', () => {
   it('uses the canonical package name and only re-exports the public runtime SDK', () => {
-    expect(sdkPackage.name).toBe('@pi-session-manager/plugin-sdk')
+    expect(sdkPackage.name).toBe('@dwsy/plugin-sdk')
 
     const source = sourceAt('../index.ts')
     expect(source).toContain("export * from './types'")

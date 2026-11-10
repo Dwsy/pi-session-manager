@@ -374,7 +374,7 @@ For writing PSM browser plugins, start with [Plugin Authoring](06-plugins.md). I
 Key local boundaries:
 
 - First-party built-ins live in `extensions/psm-*` and are discovered through `src/plugins/runtime-host/builtins.ts`.
-- External npm/path plugins must build browser-compatible ESM and use only `@pi-session-manager/plugin-sdk` as the public API.
+- External npm/path plugins must build browser-compatible ESM and use only `@dwsy/plugin-sdk` as the public API.
 - Plugin UI should register host contributions through `ctx.ui`, read settings through `ctx.settings`, and use injected `ctx.i18n` for text.
 - Published bundles must not import app aliases or host internals such as `@/components`, `@/types`, runtime host files, app transport, Tauri APIs, or desktop-private code.
 - Heavy or experimental dependencies belong inside plugin packages, not the main app dependency graph.

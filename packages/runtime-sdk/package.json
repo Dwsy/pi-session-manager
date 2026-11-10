@@ -1,5 +1,5 @@
 {
-  "name": "@pi-session-manager/plugin-sdk",
+  "name": "@dwsy/plugin-sdk",
   "version": "0.1.0",
   "description": "Public SDK for Pi Session Manager browser-compatible plugins",
   "type": "module",

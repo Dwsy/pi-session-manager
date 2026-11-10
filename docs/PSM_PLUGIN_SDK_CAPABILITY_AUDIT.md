@@ -1,7 +1,7 @@
 # PSM Plugin SDK Capability Audit
 
 > Date: 2026-05-25
-> Scope: `@pi-session-manager/plugin-sdk`, runtime host injection, backend dispatch permissions, and shared contract reuse.
+> Scope: `@dwsy/plugin-sdk`, runtime host injection, backend dispatch permissions, and shared contract reuse.
 
 ## Summary
 
@@ -42,6 +42,7 @@ The injected `ctx.psm` client currently has these namespaces:
 | `agent` | `createSession`, `run`, `runStream`, `abort`, `dispose` |
 | `models` | `listOptions` |
 | `agentUsage` | `getStatus` |
+| `projects` | `detect` |
 | `tags` | `listTags`, `createTag`, `assignTag`, `removeTag`, `listSessionTags` |
 | `config` | `read`, `write` |
 
@@ -67,6 +68,7 @@ Keep these grouped as host-owned or privileged surfaces in the docs:
 | Pi Live control | `pi_agent_prompt`, `pi_agent_steer`, `pi_agent_abort` | privileged or host-internal |
 | Settings/config | app and server settings writes | host-internal except plugin-scoped JSON config |
 | File/session mutation | `delete_sessions`, `rename_session`, `fork_session`, `export_session` | privileged or host-internal |
+| Project directory scanning | `plugin_project_detect` | public only through `ctx.psm.projects.detect` (`projects:read`): backend-side fixed marker catalog at the directory top level, auto-authorized whitelist of known project roots, no recursion, no file contents |
 | Plugin management | `install_psm_plugin`, `uninstall_psm_plugin` | host-internal |
 
 ## Session viewer control notes
@@ -86,6 +88,23 @@ Important limits:
 - `viewer` remains optional for compatibility with older host/runtime combinations.
 - The host owns active-branch state, DOM lookup, scroll timing, conversation-turn expansion, and tool-card expansion.
 - Plugins should pass stable ids from session content, not fabricate host-private render ids such as `tool-result-*`.
+
+## Mesh Hub and local terminal capability boundary (2026-11-02)
+
+| Capability | Public API and permission | Ground truth / limitation |
+| --- | --- | --- |
+| Mesh peer snapshot | `ctx.psm.mesh.peers()`, `mesh:read` | Existing Hub on the PSM backend host; no Live registry inference; disconnected is an error, not an empty snapshot |
+| Mesh send/steer/follow-up/cancel | `ctx.psm.mesh.send/cancel`, opt-in `mesh:control` | Existing Mesh Hub and target extension only; full exact UUID, online target and unique peer checks; no Pi Live/bridge fallback |
+| Mesh following graph | `ctx.psm.mesh.follow`, opt-in `mesh:control` | From/to are real Mesh UUIDs, **not** PSM favorites or an invented sender |
+| PSM historical lookup | `ctx.psm.sessions.lookupByPath`, `sessions:read` | Returns host session data or null; verify path plus full UUID in the caller before associating |
+| Project terminal UI | `ctx.psm.terminal.open`, `terminal:open` | Local Tauri renderer + active owner required; accepted UI request **does not guarantee PTY-ready**; Web/remote returns unavailable |
+| Existing Herdr pane / resume | Not exposed as general public SDK | Still gated pending PSM owner-aware attach UI, actual pane lifecycle and safe resurrection verification; no raw terminal or shell granted |
+
+This is a narrow adapter rather than a parallel peer registry, watcher, message
+queue, or PTY provider. See `docs/architecture/pi-mesh-psm-plugin.md` and the
+open issue `docs/issues/插件/20261101-pi-mesh-psm-plugin.md` for test and
+rollout gates. The production Mesh daemon is **not** hot reloaded after source
+changes; unit tests alone do not constitute real Hub/UI acceptance.
 
 ## Remaining Documentation Gaps
 

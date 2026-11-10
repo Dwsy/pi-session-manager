@@ -13,7 +13,7 @@ export default defineConfig({
       fileName: () => 'index.js',
     },
     rollupOptions: {
-      external: ['@pi-session-manager/plugin-sdk'],
+      external: ['@dwsy/plugin-sdk'],
     },
   },
 })

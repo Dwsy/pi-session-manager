@@ -42,7 +42,7 @@ import {
   type PsmPluginPaths,
   type PsmPluginStatus,
 } from "@/plugins/runtime-host";
-import type { PsmPermission, PsmPluginSettingDefinition, PsmPluginSettingValue } from "@pi-session-manager/plugin-sdk";
+import type { PsmPermission, PsmPluginSettingDefinition, PsmPluginSettingValue } from "@dwsy/plugin-sdk";
 import { OFFICIAL_PSM_PLUGIN_SOURCES, type PsmOfficialPluginSource } from "@/plugins/runtime-host/officialSources";
 import { SETTINGS_NAVIGATE_EVENT } from "../navigation";
 import { useModelOptions } from "./pi-config/useModelOptions";
@@ -90,6 +90,9 @@ function permissionLabel(permission: PsmPermission, t: (key: string, defaultValu
     "config:read": "Read config",
     "config:write": "Write config",
     "events:read": "Events",
+    "live-agents:read": "Live agents",
+    "openbot:read": "OpenBot agents",
+    "projects:read": "Project detection",
     "model:invoke": "Models",
     "agent:invoke": "Agent",
     "fs:read": "Files",
@@ -97,6 +100,9 @@ function permissionLabel(permission: PsmPermission, t: (key: string, defaultValu
     "windows:open": "Windows",
     "usage:read": "Agent usage",
     "terminal:read": "Terminal history",
+    "terminal:open": "Open terminal",
+    "mesh:read": "Mesh peer discovery",
+    "mesh:control": "Mesh message, stop and follow",
   };
   return t(labelKey, labels[permission] ?? permission);
 }
@@ -113,6 +119,9 @@ function permissionDescription(permission: PsmPermission, t: (key: string, defau
     "config:read": "Read plugin-scoped JSON config",
     "config:write": "Write plugin-scoped JSON config",
     "events:read": "Subscribe to host runtime events",
+    "live-agents:read": "Read lightweight status summaries for online Pi Agent sessions",
+    "openbot:read": "Read local OpenBot agent names and avatars for project labels",
+    "projects:read": "Detect project types from marker files in known project directories",
     "model:invoke": "Invoke host-managed model calls",
     "agent:invoke": "Create and run host-managed agent sessions",
     "fs:read": "Read-only access to specific project path files",
@@ -120,6 +129,9 @@ function permissionDescription(permission: PsmPermission, t: (key: string, defau
     "windows:open": "Request host to open window dialogs",
     "usage:read": "Read local agent credentials and fetch read-only subscription usage",
     "terminal:read": "Read persisted PSM terminal transcripts without terminal control access",
+    "terminal:open": "Open a host-managed terminal at a selected working directory",
+    "mesh:read": "Read registered peers from the existing local Mesh Hub",
+    "mesh:control": "Control Mesh peers exclusively via the existing local Mesh Hub (explicit opt-in)",
   };
   return t(descKey, descriptions[permission] ?? permission);
 }

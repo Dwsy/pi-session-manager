@@ -16,6 +16,7 @@ const SUPPORTED_PERMISSIONS = new Set<PsmPermission>([
   'config:read',
   'config:write',
   'events:read',
+  'live-agents:read',
   'model:invoke',
   'agent:invoke',
   'fs:read',
@@ -23,6 +24,11 @@ const SUPPORTED_PERMISSIONS = new Set<PsmPermission>([
   'windows:open',
   'usage:read',
   'terminal:read',
+  'terminal:open',
+  'mesh:read',
+  'mesh:control',
+  'openbot:read',
+  'projects:read',
 ])
 
 const SUPPORTED_SCOPES = new Set<PsmRecordScope>([

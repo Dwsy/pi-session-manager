@@ -9,7 +9,7 @@ This document explains how to develop, extend, and test the issue #36 proof of c
 The feature turns Pi Session Manager into a Rust-kernel + TypeScript plugin platform:
 
 - Rust owns sessions, SQLite, FTS, model calls, dispatch, HTTP, and persistence invariants.
-- TypeScript plugins call governed PSM capabilities through `@pi-session-manager/plugin-sdk`.
+- TypeScript plugins call governed PSM capabilities through `@dwsy/plugin-sdk`.
 - Plugin-owned facts are stored as generic `plugin_records`, not one table per feature.
 - The first record type is `session.intelligence`, produced by `builtin.session-summary`.
 
@@ -175,7 +175,7 @@ Create plugin code under `extensions/<plugin-name>/` for samples or local experi
 Minimal repo-local shape:
 
 ```ts
-import type { PsmPluginHostContext, PsmPluginManifest } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginHostContext, PsmPluginManifest } from '@dwsy/plugin-sdk'
 
 export const manifest: PsmPluginManifest = {
   manifestVersion: 1,
@@ -246,7 +246,7 @@ The first npm-installable design keeps PSM plugins as PSM-hosted extensions, not
 Publishable SDK package:
 
 ```text
-@pi-session-manager/plugin-sdk
+@dwsy/plugin-sdk
 ```
 
 It exports the stable SDK types/client listed above and excludes `appPsmTransport`, React UI internals, app stores, Rust command modules, and SQLite code.
@@ -259,7 +259,7 @@ Plugin package example:
   "version": "1.0.0",
   "type": "module",
   "peerDependencies": {
-    "@pi-session-manager/plugin-sdk": "^0.1.0"
+    "@dwsy/plugin-sdk": "^0.1.0"
   },
   "exports": {
     ".": "./dist/index.js"

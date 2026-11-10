@@ -3,10 +3,20 @@
   "include": [
     "src/vite-env.d.ts",
     "extensions/psm-code-review/**/*.ts",
-    "extensions/psm-code-review/**/*.tsx"
+    "extensions/psm-code-review/**/*.tsx",
+    "extensions/psm-mesh/**/*.ts",
+    "extensions/psm-mesh/**/*.tsx",
+    "extensions/psm-project-identity/**/*.ts",
+    "extensions/psm-project-icons/**/*.ts",
+    "extensions/psm-system-prompt-snapshot/**/*.ts",
+    "extensions/psm-system-prompt-snapshot/**/*.tsx"
   ],
   "exclude": [
     "extensions/psm-code-review/**/*.test.ts",
-    "extensions/psm-code-review/**/*.test.tsx"
+    "extensions/psm-code-review/**/*.test.tsx",
+    "extensions/psm-mesh/**/*.test.ts",
+    "extensions/psm-mesh/**/*.test.tsx",
+    "extensions/psm-project-identity/**/*.test.ts",
+    "extensions/psm-project-icons/**/*.test.ts"
   ]
 }

@@ -13,7 +13,12 @@ import type {
   PsmAgentRunStreamHandlers,
   PsmAgentSessionHandle,
   PsmAgentUsageStatus,
+  PsmLiveAgentSessionSummary,
+  PsmMeshPeer,
   PsmCapabilityClient,
+  PsmOpenBotAgent,
+  PsmProjectDetection,
+  PsmTerminalOpenParams,
   PsmTerminalTranscriptChunk,
   PsmTerminalTranscriptSummary,
   PsmCreateTagParams,
@@ -27,6 +32,7 @@ import type {
   PsmSessionListParams,
   PsmSessionOpenOptions,
   PsmSessionReadChunkOptions,
+  PsmSystemPromptSnapshot,
   PsmWindowOpenParams,
 } from './types'
 
@@ -240,6 +246,9 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
       list(params) {
         return invoke('scan_sessions_paginated', toSessionListPayload(params))
       },
+      lookupByPath(path) {
+        return invoke<unknown | null>('get_session_by_path', { path })
+      },
       readEntries(sessionPath, options) {
         return invoke<unknown[]>('get_session_entries', {
           path: sessionPath,
@@ -251,6 +260,9 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
           offset: readOptions?.offset,
           maxBytes: readOptions?.maxBytes,
         })
+      },
+      readSystemPromptSnapshots(sessionPath) {
+        return invoke<PsmSystemPromptSnapshot[]>('get_session_system_prompt_snapshots', { path: sessionPath })
       },
       getLabels(sessionPath) {
         return invoke<Record<string, string>>('get_session_labels', {
@@ -290,6 +302,57 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
       getStatus(options) {
         return invoke<PsmAgentUsageStatus>('get_agent_usage_status', {
           providerIds: options?.providerIds,
+        })
+      },
+    },
+    liveAgents: {
+      list() {
+        return invoke<PsmLiveAgentSessionSummary[]>('plugin_live_agents_list')
+      },
+    },
+    openbot: {
+      async listAgents() {
+        const agents = await invoke<PsmOpenBotAgent[]>('plugin_openbot_agents_list')
+        if (!Array.isArray(agents)) throw new Error('Invalid OpenBot agent list')
+        return agents
+      },
+    },
+    projects: {
+      async detect(paths?: string[]) {
+        const detections = await invoke<PsmProjectDetection[]>('plugin_project_detect', paths ? { paths } : {})
+        if (!Array.isArray(detections)) throw new Error('Invalid project detection list')
+        return detections
+      },
+    },
+    mesh: {
+      async peers() {
+        const snapshot = await invoke<{ peers: PsmMeshPeer[] }>('plugin_mesh_peers')
+        if (!Array.isArray(snapshot?.peers)) throw new Error('Invalid Mesh Hub snapshot')
+        return snapshot.peers
+      },
+      async herdrAgents() {
+        const snapshot = await invoke<{ agents: import('./types').PsmMeshHerdrAgent[] }>('plugin_mesh_herdr_agents')
+        if (!Array.isArray(snapshot?.agents)) throw new Error('Invalid Herdr agent snapshot')
+        return snapshot.agents
+      },
+      focus(targetSessionId) {
+        return invoke<{ ok: true; message?: string; workspaceId?: string }>('plugin_mesh_focus', { targetSessionId })
+      },
+      send(params) {
+        return invoke<{ ok: true; disposition?: string }>('plugin_mesh_message', params)
+      },
+      cancel(targetSessionId) {
+        return invoke<{ ok: true }>('plugin_mesh_cancel', { targetSessionId })
+      },
+      follow(params) {
+        return invoke<{ ok: true }>('plugin_mesh_follow', params)
+      },
+    },
+    terminal: {
+      async open(params: PsmTerminalOpenParams) {
+        await invoke<void>('plugin_terminal_open', {
+          cwd: params.cwd,
+          label: params.label,
         })
       },
     },

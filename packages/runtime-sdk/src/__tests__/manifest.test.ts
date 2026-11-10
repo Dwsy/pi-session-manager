@@ -88,6 +88,17 @@ describe('runtime-sdk manifest contract', () => {
     expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
   })
 
+  it('accepts the OpenBot agent metadata permission', () => {
+    const manifest: PsmPluginManifest = {
+      id: 'builtin.project-identity',
+      name: 'Project Identity',
+      version: '0.1.0',
+      permissions: ['openbot:read'],
+    }
+
+    expect(validatePsmPluginManifest(manifest)).toEqual({ ok: true, errors: [] })
+  })
+
   it('accepts agent usage permissions', () => {
     const manifest: PsmPluginManifest = {
       id: 'builtin.agent-usage',

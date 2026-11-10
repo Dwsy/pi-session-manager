@@ -17,7 +17,7 @@ examples live in [Extensions Overview](../extensions/README.md).
 
 ## Boundaries
 
-- Plugin authors use only `@pi-session-manager/plugin-sdk` as the public API.
+- Plugin authors use only `@dwsy/plugin-sdk` as the public API.
 - Do not import runtime host internals, app transport, Tauri APIs, desktop-only code,
   or app aliases such as `@/components`, `@/types`, and `@/plugins` in published bundles.
 - Built-in `extensions/psm-*` plugins are app-internal code only when they are
@@ -49,7 +49,7 @@ examples live in [Extensions Overview](../extensions/README.md).
 ## Host Internals
 
 The public plugin contract lives in `packages/runtime-sdk/` and is published as
-`@pi-session-manager/plugin-sdk`. Runtime implementation details stay under
+`@dwsy/plugin-sdk`. Runtime implementation details stay under
 `src/plugins/runtime-host/` and must not leak into external plugin bundles.
 
 | Runtime module | Ownership |
@@ -96,7 +96,7 @@ Use Dev Preview for external plugin source directories instead.
 ## Authoring Shape
 
 ```ts
-import type { PsmPluginHostContext, PsmPluginManifest } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginHostContext, PsmPluginManifest } from '@dwsy/plugin-sdk'
 
 export const manifest: PsmPluginManifest = {
   manifestVersion: 1,
@@ -115,10 +115,29 @@ UI plugins register contributions through `ctx.ui`:
 
 - `registerAppView(...)`
 - `registerAppSidebarView(...)`
+- `registerProjectIdentityProvider(...)`
 - `registerSessionToolbarItem(...)`
 - `registerSessionMainView(...)`
 - `registerSessionPanel(...)`
 - `registerToolRenderer(...)`
+
+### Project identity
+
+`registerProjectIdentityProvider({ id, priority, resolve })` controls how a project
+directory is displayed in the sidebar, the Explorer project table, the Explorer header
+and the project filter list. `resolve` runs during render, so it must be synchronous
+and side-effect free; cache anything async yourself.
+
+- Return `{ label, subtitle?, avatar?, hidePath? }` to take over the display.
+  `avatar.kind` is `initial`, `emoji`, or `url` (`https:` or `data:image/` only).
+  `hidePath: true` drops the secondary directory line for labels that fully replace a
+  machine directory name; the full path stays available as the row tooltip.
+- Return `null` to defer to the next provider.
+- `priority` sorts providers ascending (default `100`); the first valid identity wins.
+- With no provider, or only `null` results, the host keeps the directory basename and
+  its folder icon, so plugins are never required for correct behaviour.
+- Output is validated: empty labels, unknown avatar kinds and unsafe avatar URLs are
+  dropped, and a throwing provider is skipped with a console warning.
 
 Use `ctx.settings` for plugin-owned settings and `ctx.i18n` for translated copy. Do not
 create private i18n providers or depend on app React hooks from outside the plugin boundary.
@@ -180,6 +199,12 @@ Install local path plugins through Settings -> PSM Plugins, or by adding the bui
 For active development of an external plugin, add the plugin project directory
 through Dev Preview in Settings -> PSM Plugins. The project must have a `build`
 script and `package.json#psm.extensions`; click Rebuild after source edits.
+
+Dev Preview runs `npm run build` with the `node`/`npm` resolved from the app
+process PATH, not your shell PATH. On macOS GUI launches this can resolve to an
+old system Node (observed: 18.19.1). Plugin build tooling must run on that Node:
+Vite 8's rolldown bundler requires Node >= 18.20/20.12 and fails there — pin
+Vite 6 (rollup-based) in plugin projects built through Dev Preview.
 For built-in plugins, edit the repo-local `extensions/psm-*` source directly and
 let the main app dev server reload it.
 

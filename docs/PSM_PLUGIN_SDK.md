@@ -19,7 +19,7 @@ The SDK is the stable public contract for plugin authors. It intentionally hides
 ## Quick Start
 
 ```ts
-import type { PsmPluginHostContext, PsmPluginManifest } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginHostContext, PsmPluginManifest } from '@dwsy/plugin-sdk'
 
 export const manifest: PsmPluginManifest = {
   manifestVersion: 1,
@@ -88,7 +88,7 @@ The package entry must be browser-compatible ESM. Do not import Node built-ins i
 The public package is:
 
 ```text
-@pi-session-manager/plugin-sdk
+@dwsy/plugin-sdk
 ```
 
 It re-exports the public surface from `packages/runtime-sdk/src/index.ts`:
@@ -98,6 +98,13 @@ It re-exports the public surface from `packages/runtime-sdk/src/index.ts`:
 - `client`
 
 That means the SDK package is a small, stable facade. It is not the runtime host.
+
+External plugin projects consume it as a devDependency (type-only imports are
+erased at build time):
+
+```bash
+npm install --prefix <plugin-project> --save-dev @dwsy/plugin-sdk
+```
 
 ## Plugin Sources
 
@@ -189,6 +196,7 @@ Plugin-safe permissions currently include:
 | `model:invoke` | Read model options and invoke model-backed plugin features |
 | `agent:invoke` | Create and run host-managed Pi Agent sessions through `ctx.psm.agent` |
 | `fs:read` | Read files through declared restricted filesystem roots, including saved widget HTML under the `widgets` root |
+| `projects:read` | Detect project kinds from the fixed marker-file catalog in auto-authorized project directories (known projects); no file content is exposed |
 | `windows:open` | Open host-managed popup windows |
 | `usage:read` | Read local AI agent login credentials and fetch read-only official subscription usage (opt-in, sensitive) |
 | `terminal:read` | Read persisted PSM built-in terminal transcripts (opt-in, sensitive; no PTY control) |
@@ -299,6 +307,17 @@ features.
 | --- | --- |
 | `read(key, options?)` | Reads plugin-owned JSON config |
 | `write(key, value)` | Writes plugin-owned JSON config |
+
+### `projects`
+
+| Method | Notes |
+| --- | --- |
+| `detect(paths?)` | Detects project kinds from marker files. Without `paths` every auto-authorized project root is scanned. Paths outside the whitelist (directories PSM has no sessions for) come back `authorized: false` and are never read. Requires `projects:read`. |
+
+`projects.detect` is the backend scan boundary for project directories: the
+backend checks only the existence of a fixed marker catalog at the directory top
+level (plus the `src-tauri/` convention) and returns a normalized `kind` (`rust`,
+`react`, `tauri`, ...). It never returns file contents and never recurses.
 
 ## Logic Contributions
 
@@ -528,6 +547,56 @@ try {
   await ctx.psm.agent.dispose(agent.sessionId)
 }
 ```
+
+## Mesh collaboration (explicit opt-in)
+
+PSM can read and control **existing Pi Mesh Hub peers** without installing or enabling
+Pi Live/bridge. Mesh owns live state, following edges, accepted messages, steer,
+follow-up, and stop; PSM supplies session history, navigation, search, and
+rendering. This is not a substitute transport for `ctx.psm.agent` or Pi Live.
+
+Request `mesh:read` to enumerate; `mesh:control` is an **opt-in privileged
+permission** for sending, cancelling, and modifying the real Mesh following
+graph. A disabled or old Hub/host rejects calls; callers must not fallback to
+another message transport. Methods are:
+
+```ts
+const peers = await ctx.psm.mesh.peers()
+const target = peers.find(peer => peer.sessionId === fullSessionUuid)
+if (target && (target.state === 'running' || target.state === 'waiting')) {
+  await ctx.psm.mesh.send({
+    targetSessionId: target.sessionId,
+    text: 'Please check the last change',
+    mode: 'followUp', // or 'steer'
+    // fromSessionId: an ONLINE Mesh peer UUID, if following is desired
+  })
+}
+// Explicit user action only:
+await ctx.psm.mesh.cancel(fullSessionUuid)
+await ctx.psm.mesh.follow({ fromSessionId: senderUuid, targetSessionId: fullSessionUuid, following: true })
+// Read Herdr hosts (mesh:read), joined by exact sessionFile/sessionPath:
+const herdrAgents = await ctx.psm.mesh.herdrAgents()
+// User-initiated focus of an existing online peer (mesh:control); never resume/launch:
+await ctx.psm.mesh.focus(fullSessionUuid)
+```
+
+Every identity must be a **full exact UUID**. The backend refuses ambiguous
+duplicate peers and offline targets; do not use partial IDs, machine-local
+guesses, or PSM Live IDs as stand-ins. A successful Mesh send receipt means
+the target extension acknowledged delivery, not that the model completed a
+turn. On transport errors, unknown outcomes, or disconnection, retain drafts
+and do not retry automatically.
+
+For file-backed history missing from the current PSM list, use
+`ctx.psm.sessions.lookupByPath(sessionFile)` (`sessions:read`) and independently
+verify both `path` and full `id` before binding it to the Mesh peer.
+A memory-only Mesh session has no PSM JSONL history. An unindexed file-backed
+peer must **not** be mislabeled as memory-only.
+
+`ctx.psm.terminal.open({cwd,label})` remains a project-terminal request,
+not a Herdr pane attach. In the current host it is supported only for a local
+Tauri renderer with an active terminal owner; its resolved `Promise<void>`
+signals that the UI accepted the request, **not** that a PTY is ready.
 
 ## Legacy Compatibility
 

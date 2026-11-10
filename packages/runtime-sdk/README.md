@@ -1,4 +1,4 @@
-# @pi-session-manager/plugin-sdk
+# @dwsy/plugin-sdk
 
 Public TypeScript SDK for Pi Session Manager plugins.
 
@@ -24,7 +24,7 @@ Read these docs in order:
 ## Minimal Plugin
 
 ```ts
-import type { PsmPluginHostContext, PsmPluginManifest } from '@pi-session-manager/plugin-sdk'
+import type { PsmPluginHostContext, PsmPluginManifest } from '@dwsy/plugin-sdk'
 
 export const manifest: PsmPluginManifest = {
   manifestVersion: 1,

@@ -17,7 +17,7 @@ export default defineConfig({
       '@plugins': path.resolve(__dirname, './src/plugins'),
       '@demo': path.resolve(__dirname, './src/demo'),
       '@styles': path.resolve(__dirname, './src/styles'),
-      '@pi-session-manager/plugin-sdk': path.resolve(
+      '@dwsy/plugin-sdk': path.resolve(
         __dirname,
         './packages/runtime-sdk/src/index.ts',
       ),
@@ -37,6 +37,7 @@ export default defineConfig({
     include: [
       'src/**/*.test.{ts,tsx}',
       'extensions/**/*.test.{ts,tsx}',
+      'packages/**/*.test.{ts,tsx}',
       'vite.config.test.ts',
     ],
   },
