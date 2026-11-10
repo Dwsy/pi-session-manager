@@ -8,6 +8,8 @@ compatibility: Requires Node.js 22.18 or newer with built-in TypeScript type str
 
 Treat a session as an evidence tree, not a flat transcript. Use the bundled TypeScript CLI to create a compact index, query narrow evidence, and open exact records only when needed.
 
+> **Non-Redundancy Notice**: For fast single-pass Token/cost stats, quick session inspection, or dialogue window recall, prefer native Rust `pi-session-cli stats/inspect/recall` (from `psm-session-tools`), which runs in milliseconds with zero Node.js setup and no temporary index files. Use `pi-session-jsonl` when deep disk-chunked Markdown generation (`chunks/*.md`) and fine-grained offline tool timeline auditing are explicitly needed.
+
 ## Resolve the script
 
 Use the absolute path to this skill directory from the `read` call that loaded `SKILL.md`:

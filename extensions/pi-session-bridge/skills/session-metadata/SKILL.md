@@ -27,6 +27,7 @@ A session may have multiple GitHub-style Labels.
 
 ## Rules
 
+- Scope & Boundary: Applies strictly to the CURRENT active session. For global Kanban board view, multi-session triage, or managing other sessions, use `pi-session-cli kanban` (from `psm-session-tools`).
 - Do not use workflow Status as a substitute for Labels or vice versa.
 - Prefer existing names returned by the list actions before creating new metadata.
 - For ambiguous requests such as "mark this done", inspect statuses first and choose the matching existing workflow Status.

@@ -271,6 +271,172 @@ describe("pi-session-bridge commands", () => {
     expect(notifyPsmStatusChange).toHaveBeenCalledWith("sid");
   });
 
+  type MouseComponent = {
+    width?: number;
+    render(width: number): string[];
+    handleInput(data: string): void;
+    handleMouse?: (event: {
+      type: "press" | "release" | "move" | "drag" | "click" | "wheel";
+      button: "left" | "middle" | "right" | "none";
+      x: number;
+      y: number;
+      wheelDelta?: number;
+    }) => { handled?: boolean; focus?: boolean; render?: boolean } | undefined;
+  };
+
+  async function openKanbanComponent(
+    handlers: Map<string, (args: string, ctx: ExtensionContext) => Promise<void>>,
+    theme: { fg: (color: string, text: string) => string; bold: (text: string) => string } = {
+      fg: (_color: string, text: string) => text,
+      bold: (text: string) => text,
+    },
+  ) {
+    let captured: MouseComponent | undefined;
+    const custom = vi.fn(async (
+      factory: (tui: unknown, theme: unknown, kb: unknown, done: (result: unknown) => void) => unknown,
+    ) => {
+      captured = factory({ requestRender: vi.fn() }, theme, {}, vi.fn()) as MouseComponent;
+      return undefined;
+    });
+    const ctx = {
+      hasUI: true,
+      ui: { notify: vi.fn(), input: vi.fn(), custom },
+    } as unknown as ExtensionContext;
+    const command = handlers.get("kanban")!;
+    const pending = command("", ctx);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return { component: captured!, ctx, close: () => pending };
+  }
+
+  function rowIndexContaining(lines: string[], needle: string): number {
+    const index = lines.findIndex((line) => line.includes(needle));
+    if (index < 0) throw new Error(`No rendered row contains: ${needle}`);
+    return index;
+  }
+
+  it("exposes handleMouse so the kanban popup receives mouse events", async () => {
+    const { pi, handlers } = makePi();
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+
+    const { component } = await openKanbanComponent(handlers);
+
+    expect(typeof component.handleMouse).toBe("function");
+  });
+
+  it("selects on press and sets status on click via mouse", async () => {
+    getAllStatuses.mockResolvedValue([
+      { id: "tag-1", name: "Todo", color: "info", sort_order: 0, is_builtin: false, created_at: "", parent_id: null },
+      { id: "tag-2", name: "Doing", color: "warning", sort_order: 1, is_builtin: false, created_at: "", parent_id: null },
+    ]);
+    const { pi, handlers } = makePi();
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+
+    const { component } = await openKanbanComponent(handlers);
+    const y = rowIndexContaining(component.render(80), "( ) Doing");
+
+    const press = component.handleMouse!({ type: "press", button: "left", x: 4, y });
+    expect(press).toEqual({ handled: true, focus: true });
+    expect(component.render(80)[y]).toContain("> (");
+
+    component.handleMouse!({ type: "click", button: "left", x: 4, y });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(setSessionStatus).toHaveBeenCalledWith("sid", "tag-2", 0);
+    expect(notifyPsmStatusChange).toHaveBeenCalledWith("sid");
+  });
+
+  it("toggles a label on click via mouse", async () => {
+    const { pi, handlers } = makePi();
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+
+    const { component } = await openKanbanComponent(handlers);
+    const y = rowIndexContaining(component.render(80), "[ ] backend");
+
+    component.handleMouse!({ type: "press", button: "left", x: 4, y });
+    component.handleMouse!({ type: "click", button: "left", x: 4, y });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(assignLabel).toHaveBeenCalledWith("sid", "label-1");
+  });
+
+  it("moves the selection with the mouse wheel", async () => {
+    getAllStatuses.mockResolvedValue([
+      { id: "tag-1", name: "Todo", color: "info", sort_order: 0, is_builtin: false, created_at: "", parent_id: null },
+      { id: "tag-2", name: "Doing", color: "warning", sort_order: 1, is_builtin: false, created_at: "", parent_id: null },
+    ]);
+    const { pi, handlers } = makePi();
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+
+    const { component } = await openKanbanComponent(handlers);
+    const result = component.handleMouse!({ type: "wheel", button: "none", x: 4, y: 1, wheelDelta: 1 });
+    expect(result).toEqual({ handled: true });
+    expect(component.render(80)[rowIndexContaining(component.render(80), "( ) Doing")]).toContain("> (");
+
+    component.handleInput("\r");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(setSessionStatus).toHaveBeenCalledWith("sid", "tag-2", 0);
+  });
+
+  it("ignores mouse events on borders, headers, and non-left buttons", async () => {
+    const { pi, handlers } = makePi();
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+
+    const { component } = await openKanbanComponent(handlers);
+    const lines = component.render(80);
+    const itemY = rowIndexContaining(lines, "( ) Todo");
+    const headerY = lines.findIndex((line) => line.includes(" Status") && !line.includes("Status:"));
+    expect(headerY).toBeGreaterThan(0);
+
+    // Border row, border column, header row.
+    expect(component.handleMouse!({ type: "press", button: "left", x: 4, y: 0 })).toBeUndefined();
+    expect(component.handleMouse!({ type: "press", button: "left", x: 0, y: itemY })).toBeUndefined();
+    expect(component.handleMouse!({ type: "press", button: "left", x: 4, y: headerY })).toBeUndefined();
+    // Non-left button, drag, and move with a held button (plain move is hover).
+    expect(component.handleMouse!({ type: "press", button: "right", x: 4, y: itemY })).toBeUndefined();
+    expect(component.handleMouse!({ type: "drag", button: "left", x: 4, y: itemY })).toBeUndefined();
+    expect(component.handleMouse!({ type: "move", button: "left", x: 4, y: itemY })).toBeUndefined();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(setSessionStatus).not.toHaveBeenCalled();
+  });
+
+  it("highlights the hovered row in bold without moving the selection", async () => {
+    const { pi, handlers } = makePi();
+    const { registerAll } = await import("./commands.js");
+    registerAll(pi);
+    const theme = {
+      fg: (colorName: string, text: string) => `${colorName}{${text}}`,
+      bold: (text: string) => `**${text}**`,
+    };
+
+    const { component } = await openKanbanComponent(handlers, theme);
+    const lines = component.render(80);
+    const statusY = rowIndexContaining(lines, "Todo");
+    const labelY = rowIndexContaining(lines, "backend");
+
+    // Select the status row first so hover-vs-selection is observable.
+    component.handleMouse!({ type: "press", button: "left", x: 4, y: statusY });
+
+    const hover = component.handleMouse!({ type: "move", button: "none", x: 4, y: labelY });
+    expect(hover).toEqual({ handled: true, render: true });
+    let rendered = component.render(80);
+    expect(rendered[labelY]).toContain("**backend**");
+    expect(rendered[statusY]).toContain("accent{**Todo**}");
+
+    // Same row again: no repaint, selection untouched.
+    expect(component.handleMouse!({ type: "move", button: "none", x: 4, y: labelY })).toEqual({ handled: true, render: false });
+
+    // Leaving to a non-selectable row clears the hover highlight.
+    expect(component.handleMouse!({ type: "move", button: "none", x: 4, y: 0 })).toEqual({ handled: true, render: true });
+    rendered = component.render(80);
+    expect(rendered[labelY]).not.toContain("**backend**");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(setSessionStatus).not.toHaveBeenCalled();
+    expect(assignLabel).not.toHaveBeenCalled();
+  });
+
   it("maps every PSM Status color to a valid Pi theme color", async () => {
     const { mapKanbanStatusColorToTheme } = await import("./commands.js");
 

@@ -26,7 +26,6 @@ import { registerAll } from "./commands.js";
 import {
   sessionSearchTool,
   sessionContextTool,
-  sessionRecallTool,
   sessionStatusTool,
   sessionLabelTool,
 } from "./tools.js";
@@ -35,13 +34,15 @@ const baseDir = dirname(fileURLToPath(import.meta.url));
 
 export default async function (pi: ExtensionAPI) {
   pi.on("resources_discover", () => ({
-    skillPaths: [join(baseDir, "..", "skills", "session-metadata", "SKILL.md")],
+    skillPaths: [
+      join(baseDir, "..", "skills", "session-metadata", "SKILL.md"),
+      join(baseDir, "..", "skills", "session-tools", "SKILL.md"),
+    ],
   }));
 
   // ── Register tools ──────────────────────────────────
   pi.registerTool(sessionSearchTool);
   pi.registerTool(sessionContextTool);
-  pi.registerTool(sessionRecallTool);
   pi.registerTool(sessionStatusTool);
   pi.registerTool(sessionLabelTool);
 

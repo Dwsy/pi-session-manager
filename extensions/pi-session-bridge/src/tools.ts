@@ -3,7 +3,6 @@
  *
  * session_search:  Full-text search across indexed sessions.
  * session_context: Fetch dialogue context from a specific session.
- * session_recall:  Search + retrieve surrounding context.
  * session_status:  Single Kanban workflow Status via PSM JSON files.
  * session_label:   GitHub-style multi Labels via Kanban plugin config.
  */
@@ -16,9 +15,6 @@ import type { FullTextSearchResponse, LabelItem, SessionEntry, SessionInfo, Stat
 // ── Session cache (shared across tools) ───────────────
 
 let cachedSessions: SessionInfo[] | null = null;
-
-const MAX_RECALL_ENTRY_CHARS = 2_000;
-const MAX_RECALL_OUTPUT_CHARS = 12_000;
 
 type BridgeToolResult = { content: { type: string; text: string }[]; isError?: boolean };
 type BridgeTool = { execute: (toolCallId: string, params: Record<string, unknown>) => Promise<BridgeToolResult> };
@@ -35,12 +31,6 @@ function withToolDetails<T extends BridgeTool>(tool: T) {
       };
     },
   };
-}
-
-function truncateRecallText(text: string, maxChars: number, scope: "entry" | "output"): string {
-  const normalized = text.trim();
-  if (normalized.length <= maxChars) return normalized;
-  return `${normalized.slice(0, maxChars)}\n… [${scope} truncated: ${normalized.length - maxChars} characters omitted]`;
 }
 
 async function getSessions(): Promise<SessionInfo[]> {
@@ -65,6 +55,13 @@ async function getEntriesForSession(sessionId: string): Promise<SessionEntry[]> 
   const session = sessions.find((s) => s.id === sessionId || s.id.startsWith(sessionId));
   if (!session?.path) return [];
   return getEntriesByPath(session.path);
+}
+
+/** Search results from the session being searched in are noise unless explicitly requested. */
+function isCurrentSession(hitSessionId: string): boolean {
+  const current = getSessionId();
+  if (!current) return false;
+  return hitSessionId === current || hitSessionId.startsWith(current) || current.startsWith(hitSessionId);
 }
 
 // ── Tool: session_search ──────────────────────────────
@@ -111,6 +108,10 @@ export const sessionSearchTool = withToolDetails({
         type: "string",
         description: "Optional project path filter. Matches session cwd exactly (path), e.g. /Users/me/projects/demo.",
       },
+      includeSelf: {
+        type: "boolean",
+        description: "Include hits from the current session. Defaults to false.",
+      },
     },
     required: ["query"],
   },
@@ -135,9 +136,10 @@ export const sessionSearchTool = withToolDetails({
         ...(projectPathRaw ? { project_path: projectPathRaw } : {}),
       });
 
-      const hits = (fts.hits || []).filter(
-        (h) => h.source_type === "user" || h.source_type === "assistant",
-      );
+      const includeSelf = params.includeSelf === true;
+      const hits = (fts.hits || [])
+        .filter((h) => h.source_type === "user" || h.source_type === "assistant")
+        .filter((h) => includeSelf || !isCurrentSession(h.session_id));
 
       if (hits.length === 0) {
         return { content: [{ type: "text", text: `No matching messages found for: ${query}` }] };
@@ -169,7 +171,7 @@ export const sessionContextTool = withToolDetails({
   name: "session_context",
   label: "Session Context",
   description:
-    "Return the most recent message tail from one known session. This is not anchored to a search hit; use session_recall when context must surround matching messages.",
+    "Return the most recent message tail from one known session. This is not anchored to a search hit; use pi-session-cli recall when context must surround matching messages.",
   parameters: {
     type: "object" as const,
     properties: {
@@ -217,97 +219,6 @@ export const sessionContextTool = withToolDetails({
       return { content: [{ type: "text", text: lines.join("\n\n") }] };
     } catch (err) {
       return { content: [{ type: "text", text: `Failed: ${err}` }], isError: true };
-    }
-  },
-});
-
-// ── Tool: session_recall ──────────────────────────────
-
-export const sessionRecallTool = withToolDetails({
-  name: "session_recall",
-  label: "Session Recall",
-  description:
-    "Search past sessions and return small dialogue windows around matching messages. Use when excerpts alone are insufficient; prefer session_search when only hits or session IDs are needed.",
-  parameters: {
-    type: "object" as const,
-    properties: {
-      query: { type: "string", description: "Search query." },
-      maxResults: { type: "number", description: "Max recall windows. Default: 3." },
-      before: { type: "number", description: "Entries before hit. Default: 2." },
-      after: { type: "number", description: "Entries after hit. Default: 2." },
-    },
-    required: ["query"],
-  },
-  async execute(_toolCallId: string, params: Record<string, unknown>) {
-    const query = String(params.query || "").trim();
-    if (!query) return { content: [{ type: "text", text: "query is required." }], isError: true };
-
-    try {
-      const maxResults = Math.max(1, Math.min(Number(params.maxResults) || 3, 5));
-      const fts = await psm.fullTextSearch({
-        query,
-        page_size: maxResults * 3,
-      });
-
-      const hits = (fts.hits || [])
-        .filter((h) => h.source_type === "user" || h.source_type === "assistant")
-        .slice(0, maxResults);
-
-      if (hits.length === 0) {
-        return { content: [{ type: "text", text: `No matching dialogue for: ${query}` }] };
-      }
-
-      const before = Math.min(Math.max(Number(params.before) || 2, 0), 10);
-      const after = Math.min(Math.max(Number(params.after) || 2, 0), 10);
-      const sessions = await getSessions();
-      const pathToSession = new Map(sessions.map((s) => [s.path, s]));
-      const sections: string[] = [];
-
-      for (let i = 0; i < hits.length; i++) {
-        const hit = hits[i];
-        const matchedText = hit.content.replace(/\s+/g, " ").trim().slice(0, 200);
-        let context = "";
-
-        try {
-          const session = pathToSession.get(hit.session_path);
-          const entryPath = session?.path || hit.session_path;
-          if (entryPath) {
-            const entries = await getEntriesByPath(entryPath);
-            const idx = entries.findIndex((e) => e.id === hit.entry_id);
-            if (idx >= 0) {
-              const start = Math.max(0, idx - before);
-              const end = Math.min(entries.length, idx + after + 1);
-              context = entries
-                .slice(start, end)
-                .map((e, j) => {
-                  const role = e.message?.role || "unknown";
-                  const text = truncateRecallText(
-                    (e.message?.content || [])
-                      .filter((b) => b?.type === "text" && b.text)
-                      .map((b) => b.text!.trim())
-                      .join("\n"),
-                    MAX_RECALL_ENTRY_CHARS,
-                    "entry",
-                  );
-                  const marker = idx === start + j ? "->" : "  ";
-                  return `${marker} ${role}: ${text || "(no text)"}`;
-                })
-                .join("\n");
-            }
-          }
-        } catch { /* skip */ }
-
-        sections.push(
-          `${i + 1}. ${hit.session_name || hit.session_id.slice(0, 8)}\nmatched: ${matchedText}${context ? "\n\n" + context : ""}`,
-        );
-      }
-
-      const output = [`Session recall for: ${query}`, "", ...sections].join("\n\n");
-      return {
-        content: [{ type: "text", text: truncateRecallText(output, MAX_RECALL_OUTPUT_CHARS, "output") }],
-      };
-    } catch (err) {
-      return { content: [{ type: "text", text: `Recall failed: ${err}` }], isError: true };
     }
   },
 });

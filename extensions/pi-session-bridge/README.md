@@ -64,15 +64,15 @@ Real-time session sync via WebSocket. When connected:
 - **Model control**: model changes resolve against Pi's live ModelRegistry and report unavailable/unauthenticated models instead of silently accepting invalid IDs
 - **Abort semantics**: remote abort calls Pi's real abort API instead of injecting a synthetic steer message
 
-### LLM Tools
+### LLM Tools & Skills
 
-| Tool | Description |
+| Tool / Skill | Description |
 |------|-------------|
 | `session_search` | Full-text search across indexed sessions |
-| `session_recall` | Search + retrieve surrounding dialogue context |
 | `session_context` | Fetch messages from a specific session |
 | `session_status` | List/set/clear the single workflow Status |
 | `session_label` | List/add/remove GitHub-style multi Labels |
+| `psm-session-tools` *(Skill)* | High-performance session recall, statistics, diagnostics & Kanban via `pi-session-cli` |
 
 `session_search` 可选参数：
 

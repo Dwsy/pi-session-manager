@@ -16,11 +16,21 @@ type CustomTheme = {
   fg: (color: ThemeColor, text: string) => string;
   bold: (text: string) => string;
 };
+/** Structural subset of pi-tui's TuiMouseEvent — only the fields this panel reads. */
+type CustomMouseEvent = {
+  type: "press" | "release" | "move" | "drag" | "click" | "wheel";
+  button: "left" | "middle" | "right" | "none";
+  x: number;
+  y: number;
+  wheelDelta?: number;
+};
+type CustomMouseEventResult = { handled?: boolean; focus?: boolean; render?: boolean };
 type CustomComponent = {
   readonly width?: number;
   render(width: number): string[];
   invalidate(): void;
   handleInput?(data: string): void;
+  handleMouse?(event: CustomMouseEvent): CustomMouseEventResult | undefined;
 };
 type KanbanAction = "up" | "down" | "toggle" | "clear-status" | "new-status" | "new-label" | "refresh" | "close";
 type KanbanPanelResult = "new-status" | "new-label" | undefined;
@@ -196,22 +206,29 @@ function statusThemeColor(status: StatusItem): ThemeColor {
   return mapKanbanStatusColorToTheme(status.color);
 }
 
-function renderStatusLine(entry: Extract<KanbanItem, { kind: "status" }>, selected: boolean, theme: CustomTheme): string {
+function renderStatusLine(entry: Extract<KanbanItem, { kind: "status" }>, selected: boolean, hovered: boolean, theme: CustomTheme): string {
   const cursor = selected ? color(theme, "accent", ">") : " ";
   const marker = entry.active
     ? color(theme, statusThemeColor(entry.status), "(●)")
     : color(theme, "dim", "( )");
+  // Hover = bold on the normal style; the selected row stays distinct via `>` cursor + accent.
   const name = selected
     ? color(theme, "accent", bold(theme, entry.status.name))
-    : color(theme, statusThemeColor(entry.status), entry.status.name);
+    : hovered
+      ? bold(theme, color(theme, statusThemeColor(entry.status), entry.status.name))
+      : color(theme, statusThemeColor(entry.status), entry.status.name);
   const builtin = entry.status.is_builtin ? ` ${color(theme, "dim", "builtin")}` : "";
   return `${cursor} ${marker} ${name}${builtin}`;
 }
 
-function renderLabelLine(entry: Extract<KanbanItem, { kind: "label" }>, selected: boolean, theme: CustomTheme): string {
+function renderLabelLine(entry: Extract<KanbanItem, { kind: "label" }>, selected: boolean, hovered: boolean, theme: CustomTheme): string {
   const cursor = selected ? color(theme, "accent", ">") : " ";
   const marker = entry.assigned ? color(theme, "accent", "[x]") : color(theme, "dim", "[ ]");
-  const name = selected ? color(theme, "accent", bold(theme, entry.label.name)) : entry.label.name;
+  const name = selected
+    ? color(theme, "accent", bold(theme, entry.label.name))
+    : hovered
+      ? bold(theme, entry.label.name)
+      : entry.label.name;
   const description = entry.label.description ? ` ${color(theme, "dim", `— ${entry.label.description}`)}` : "";
   return `${cursor} ${marker} ${name} ${color(theme, "dim", entry.label.color)}${description}`;
 }
@@ -284,8 +301,13 @@ async function loadKanbanItems(sid: string): Promise<{ items: KanbanItem[]; stat
 async function showKanbanPanel(ctx: ExtensionContext, sid: string): Promise<KanbanPanelResult> {
   let snapshot = await loadKanbanItems(sid);
   let selected = clampIndex(0, snapshot.items.length);
-  let message = "Enter/Space set/toggle · c clear status · s new status · l new label · r refresh · q close";
+  let message = "Click/Enter set/toggle · c clear status · s new status · l new label · r refresh · q close";
   let busy = false;
+  /** rowMap[y] = absolute item index, or -1 for non-selectable rows; 1:1 with rendered lines (incl. borders). */
+  let rowMap: number[] = [];
+  let pressedIndex: number | undefined;
+  let hoveredIndex: number | undefined;
+  let renderedWidth = KANBAN_POPUP_WIDTH;
 
   async function refresh(): Promise<void> {
     snapshot = await loadKanbanItems(sid);
@@ -369,35 +391,74 @@ async function showKanbanPanel(ctx: ExtensionContext, sid: string): Promise<Kanb
         const statuses = snapshot.items.filter((item): item is Extract<KanbanItem, { kind: "status" }> => item.kind === "status");
         const labels = snapshot.items.filter((item): item is Extract<KanbanItem, { kind: "label" }> => item.kind === "label");
         let itemIndex = 0;
-        const statusLines = statuses.length > 0
-          ? statuses.map((entry) => renderStatusLine(entry, itemIndex++ === selected, theme))
-          : [color(theme, "dim", "  No statuses yet. Press s to create one.")];
-        const labelLines = labels.length > 0
-          ? labels.map((entry) => renderLabelLine(entry, itemIndex++ === selected, theme))
-          : [color(theme, "dim", "  No labels yet. Press l to create one.")];
+        const statusRows = statuses.length > 0
+          ? statuses.map((entry) => ({ line: renderStatusLine(entry, itemIndex === selected, itemIndex === hoveredIndex, theme), item: itemIndex++ }))
+          : [{ line: color(theme, "dim", "  No statuses yet. Press s to create one."), item: -1 }];
+        const labelRows = labels.length > 0
+          ? labels.map((entry) => ({ line: renderLabelLine(entry, itemIndex === selected, itemIndex === hoveredIndex, theme), item: itemIndex++ }))
+          : [{ line: color(theme, "dim", "  No labels yet. Press l to create one."), item: -1 }];
         const state = busy
           ? color(theme, "warning", "Working...")
           : color(theme, message.startsWith("Error:") ? "error" : "dim", message);
-        const lines = [
-          ` ${color(theme, "accent", bold(theme, title))}`,
-          ` ${color(theme, "dim", "Status:")} ${color(theme, "accent", snapshot.statusName)}`,
-          ` ${color(theme, "dim", "Labels:")} ${color(theme, "accent", snapshot.labelNames.join(", ") || "none")}`,
-          "",
-          ` ${bold(theme, "Status")}`,
-          ...statusLines,
-          "",
-          ` ${bold(theme, "Labels")}`,
-          ...labelLines,
-          "",
-          ` ${state}`,
+        const rows = [
+          { line: ` ${color(theme, "accent", bold(theme, title))}`, item: -1 },
+          { line: ` ${color(theme, "dim", "Status:")} ${color(theme, "accent", snapshot.statusName)}`, item: -1 },
+          { line: ` ${color(theme, "dim", "Labels:")} ${color(theme, "accent", snapshot.labelNames.join(", ") || "none")}`, item: -1 },
+          { line: "", item: -1 },
+          { line: ` ${bold(theme, "Status")}`, item: -1 },
+          ...statusRows,
+          { line: "", item: -1 },
+          { line: ` ${bold(theme, "Labels")}`, item: -1 },
+          ...labelRows,
+          { line: "", item: -1 },
+          { line: ` ${state}`, item: -1 },
         ];
-        return renderPopup(lines, popupWidth, theme);
+        renderedWidth = popupWidth;
+        // Top and bottom border rows are not selectable (-1).
+        rowMap = [-1, ...rows.map((row) => row.item), -1];
+        return renderPopup(rows.map((row) => row.line), popupWidth, theme);
       },
       invalidate() {},
       handleInput(data: string) {
         const action = parseKanbanInput(data);
         if (!action) return;
         void run(action);
+      },
+      handleMouse(event: CustomMouseEvent): CustomMouseEventResult | undefined {
+        // Hover: highlight only, never touches the selection (SelectList contract).
+        if (event.type === "move") {
+          if (event.button !== "none") return undefined;
+          const row = rowMap[event.y];
+          const inColumns = event.x >= 1 && event.x < renderedWidth - 1;
+          const next = inColumns && row !== undefined && row >= 0 ? row : undefined;
+          if (next === hoveredIndex) return { handled: true, render: false };
+          hoveredIndex = next;
+          tui.requestRender();
+          return { handled: true, render: true };
+        }
+        // Wheel moves the selection: the popup fits its content, there is no scroll offset.
+        if (event.type === "wheel" && event.wheelDelta) {
+          selected = clampIndex(selected + event.wheelDelta, snapshot.items.length);
+          tui.requestRender();
+          return { handled: true };
+        }
+        if (event.button !== "left" || (event.type !== "press" && event.type !== "click")) return undefined;
+        // Ignore the popup border columns.
+        if (event.x < 1 || event.x >= renderedWidth - 1) return undefined;
+        const index = rowMap[event.y];
+        if (index === undefined || index < 0) return undefined;
+        if (event.type === "press") {
+          pressedIndex = index;
+          selected = index;
+          tui.requestRender();
+          return { handled: true, focus: true };
+        }
+        // Click reuses the Enter path (toggle) to keep side effects in one place.
+        const target = pressedIndex ?? index;
+        pressedIndex = undefined;
+        selected = target;
+        void run("toggle");
+        return { handled: true };
       },
     };
 
