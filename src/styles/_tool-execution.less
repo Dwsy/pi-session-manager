@@ -309,8 +309,22 @@ html.tool-call-style-disabled {
 .tool-expand-content .tool-output,
 .tool-expand-content .tool-diff,
 .tool-expand-content .tool-arguments {
-  padding-top: 8px;
-  padding-bottom: 8px;
+  padding-top: 4px;
+  padding-bottom: 6px;
+}
+
+// Tool sections container for tools with multiple output sections (Command, Arguments, State, Output, etc.)
+.tool-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0 8px 0;
+
+  .tool-output,
+  .tool-section {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
 }
 
 // Tool Output Header
@@ -318,7 +332,7 @@ html.tool-call-style-disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 0;
+  padding: 2px 0 4px 0;
   font-size: calc(var(--font-size-base, 16px) * 0.625);
   border-radius: 4px;
 }
@@ -335,7 +349,7 @@ html.tool-call-style-disabled {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 3px;
   border: none;
   border-radius: 4px;
   background: transparent;
@@ -398,7 +412,10 @@ html.tool-call-style-disabled {
   flex-shrink: 0;
 }
 
-.tool-output .code-block-wrapper {
+.tool-execution .code-block-wrapper,
+.tool-expand-content .code-block-wrapper,
+.tool-output .code-block-wrapper,
+.tool-section .code-block-wrapper {
   margin: 0;
 }
 
@@ -927,13 +944,14 @@ button.tool-header-toggle:focus-visible,
 .tool-command-detail {
   border-top: 1px solid rgb(var(--color-border) / 0.5);
   background: rgb(var(--color-surface) / 0.22);
+  padding: 0 12px;
 }
 
 .tool-command-expanded {
   max-height: 180px;
   overflow: auto;
   margin: 0;
-  padding: 8px 10px;
+  padding: 2px 0 6px 0;
   background: transparent;
   font-family: var(--font-family-mono, ui-monospace, monospace);
   font-size: calc(var(--font-size-base, 16px) * 0.6875);

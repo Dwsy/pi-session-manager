@@ -210,7 +210,7 @@ Best first phase:
 
 ## Important Plugin API Types
 
-Use types from `@pi-session-manager/plugin-sdk` as shown in existing extensions:
+Use types from `@dwsy/plugin-sdk` as shown in existing extensions:
 
 ```ts
 import type {
@@ -219,7 +219,7 @@ import type {
   PsmToolRendererRegistration,
   PsmToolRenderProps,
   PsmToolResolvedData,
-} from '@pi-session-manager/plugin-sdk'
+} from '@dwsy/plugin-sdk'
 ```
 
 Renderer registration shape examples exist in:

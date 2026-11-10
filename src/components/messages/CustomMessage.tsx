@@ -31,7 +31,7 @@ export default function CustomMessage({ customType, content, details, timestamp 
     <div className="hook-message">
       {timestamp && <div className="message-timestamp">{formatDate(timestamp)}</div>}
       <div className="hook-type">[{customType ? escapeHtml(customType) : t('components.customMessage.custom')}]</div>
-      <div className="markdown-content">
+      <div className="markdown-content max-h-[min(60vh,520px)] overflow-y-auto">
         <MarkdownContent content={contentText} />
       </div>
     </div>

@@ -132,7 +132,7 @@ export default function BashExecution({
         <div className={`tool-output-wrapper collapsible ${expanded ? 'expanded' : ''}`}>
           <div className={`tool-expand-content ${expanded ? 'expanded' : ''}`}>
             {expanded ? (
-              <>
+              <div className="tool-output">
                 <ToolSectionHeader
                   label={t('components.toolCall.output', 'Output')}
                   text={output}
@@ -146,7 +146,7 @@ export default function BashExecution({
                   maxHeight={OUTPUT_MAX_HEIGHT}
                   searchQuery={searchQuery}
                 />
-              </>
+              </div>
             ) : null}
           </div>
         </div>

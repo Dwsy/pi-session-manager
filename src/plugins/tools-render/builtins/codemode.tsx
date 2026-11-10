@@ -390,19 +390,21 @@ function CodemodeExecution({ resolvedData, searchQuery, context }: ToolRenderPro
           {output && (
             <div className="tool-output-wrapper collapsible expanded">
               <div className="tool-expand-content expanded">
-                <ToolSectionHeader
-                  label={t('components.toolCall.output', 'Output')}
-                  text={output}
-                  copyText={copyToClipboard}
-                />
-                <CodeBlock
-                  code={output}
-                  language={detectOutputLanguage(output)}
-                  showLineNumbers={true}
-                  scrollable
-                  maxHeight={CODE_MAX_HEIGHT}
-                  searchQuery={searchQuery}
-                />
+                <div className="tool-output">
+                  <ToolSectionHeader
+                    label={t('components.toolCall.output', 'Output')}
+                    text={output}
+                    copyText={copyToClipboard}
+                  />
+                  <CodeBlock
+                    code={output}
+                    language={detectOutputLanguage(output)}
+                    showLineNumbers={true}
+                    scrollable
+                    maxHeight={CODE_MAX_HEIGHT}
+                    searchQuery={searchQuery}
+                  />
+                </div>
               </div>
             </div>
           )}

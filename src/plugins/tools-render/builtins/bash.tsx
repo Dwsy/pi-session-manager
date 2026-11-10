@@ -157,7 +157,7 @@ function createShellExecution(variant: ShellToolVariant) {
           <div className={`tool-output-wrapper collapsible ${isExpanded ? 'expanded' : ''}`}>
             <div className={`tool-expand-content ${isExpanded ? 'expanded' : ''}`}>
               {isExpanded && (
-                <>
+                <div className="tool-output">
                   <ToolSectionHeader
                     label={t('components.toolCall.output', 'Output')}
                     text={output}
@@ -171,7 +171,7 @@ function createShellExecution(variant: ShellToolVariant) {
                     maxHeight={OUTPUT_MAX_HEIGHT}
                     searchQuery={searchQuery}
                   />
-                </>
+                </div>
               )}
             </div>
           </div>
