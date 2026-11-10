@@ -4,8 +4,7 @@ use tauri::{
     image::Image,
     menu::{CheckMenuItem, Menu, MenuBuilder, MenuItemBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Listener, Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-    PhysicalPosition, Position, LogicalPosition,
+    AppHandle, Emitter, Listener, LogicalPosition, Manager, PhysicalPosition, Position, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 
 const TRAY_ID: &str = "main";
@@ -98,13 +97,7 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
             }
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                position,
-                ..
-            } = event
-            {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, position, .. } = event {
                 let app = tray.app_handle();
                 show_or_create_window(app, Some(position));
             }
@@ -171,9 +164,7 @@ fn create_main_window<R: Runtime>(app: &AppHandle<R>, click_position: Option<Phy
     let target_position = click_position.or_else(|| get_current_mouse_position(app));
 
     // Find the monitor containing the target position (multi-monitor support)
-    let monitor = target_position
-        .and_then(|pos| app.monitor_from_point(pos.x, pos.y).ok().flatten())
-        .or_else(|| app.primary_monitor().ok().flatten());
+    let monitor = target_position.and_then(|pos| app.monitor_from_point(pos.x, pos.y).ok().flatten()).or_else(|| app.primary_monitor().ok().flatten());
 
     let ((w, h), (min_w, min_h)) = crate::resolve_window_dimensions(monitor.as_ref());
 
@@ -186,22 +177,13 @@ fn create_main_window<R: Runtime>(app: &AppHandle<R>, click_position: Option<Phy
         let work_area_y = work_area.position.y as f64 / scale;
         let work_area_w = work_area.size.width as f64 / scale;
         let work_area_h = work_area.size.height as f64 / scale;
-        (
-            work_area_x + (work_area_w - w) / 2.0,
-            work_area_y + (work_area_h - h) / 2.0,
-        )
+        (work_area_x + (work_area_w - w) / 2.0, work_area_y + (work_area_h - h) / 2.0)
     } else {
         // Fallback: let Tauri center on primary monitor
         (0.0, 0.0)
     };
 
-    let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-        .title("Pi Session Manager")
-        .inner_size(w, h)
-        .min_inner_size(min_w, min_h)
-        .resizable(true)
-        .fullscreen(false)
-        .zoom_hotkeys_enabled(true);
+    let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into())).title("Pi Session Manager").inner_size(w, h).min_inner_size(min_w, min_h).resizable(true).fullscreen(false).zoom_hotkeys_enabled(true);
 
     // Set explicit position if we calculated one (non-zero), otherwise let .center() handle it
     if pos_x != 0.0 || pos_y != 0.0 {
@@ -212,11 +194,7 @@ fn create_main_window<R: Runtime>(app: &AppHandle<R>, click_position: Option<Phy
 
     #[cfg(target_os = "macos")]
     {
-        builder = builder
-            .decorations(true)
-            .title_bar_style(tauri::TitleBarStyle::Overlay)
-            .hidden_title(true)
-            .traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 22.0)));
+        builder = builder.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true).traffic_light_position(tauri::Position::Logical(tauri::LogicalPosition::new(16.0, 22.0)));
     }
     #[cfg(not(target_os = "macos"))]
     {
