@@ -7,6 +7,7 @@ export const manifest: PsmPluginManifest = {
   id: 'builtin.bookmarks',
   name: 'Bookmarks',
   version: '0.1.0',
+  defaultEnabled: false,
   runtime: {
     sdk: '^0.1.0',
     host: '>=0.6.3',

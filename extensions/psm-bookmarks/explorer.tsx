@@ -7,6 +7,7 @@ import {
   LayoutList,
   MessagesSquare,
   NotebookPen,
+  Pencil,
   Search,
   Sparkles,
   Trash2,
@@ -29,6 +30,7 @@ import {
 } from './bookmark'
 import { explorerState, type BookmarkGrouping } from './explorerState'
 import {
+  NoteEditor,
   formatTime,
   truncated,
   type BookmarkQuotable,
@@ -62,11 +64,13 @@ interface ExplorerRowProps {
   i18n: I18nLike
   showSession: boolean
   onSelectSession?: (sessionPath: string) => void
+  onEditNote: (row: RegistryEntry, note: string) => Promise<void>
   onDelete: (row: RegistryEntry) => void
 }
 
-function ExplorerRow({ row, i18n, showSession, onSelectSession, onDelete }: ExplorerRowProps) {
+function ExplorerRow({ row, i18n, showSession, onSelectSession, onEditNote, onDelete }: ExplorerRowProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [editing, setEditing] = useState(false)
   return (
     <div className="group rounded-xl border border-border/50 bg-secondary/25 px-3 py-2.5 transition-colors duration-150 hover:border-info/35 hover:bg-secondary/45">
       <div className="flex items-start justify-between gap-2">
@@ -74,6 +78,15 @@ function ExplorerRow({ row, i18n, showSession, onSelectSession, onDelete }: Expl
           {truncated(row.quote, 240)}
         </p>
         <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+          <button
+            type="button"
+            className={sessionPluginPanelIconButtonClass}
+            title={t(i18n, 'editNote', 'Edit note')}
+            aria-label={t(i18n, 'editNote', 'Edit note')}
+            onClick={() => setEditing((value) => !value)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
           <button
             type="button"
             className={`${sessionPluginPanelIconButtonClass} ${confirmingDelete ? 'text-warning' : ''}`}
@@ -90,12 +103,24 @@ function ExplorerRow({ row, i18n, showSession, onSelectSession, onDelete }: Expl
         </div>
       </div>
 
-      {row.note && (
+      {editing ? (
+        <div className="mt-2">
+          <NoteEditor
+            initial={row.note ?? ''}
+            i18n={i18n}
+            onSave={async (note) => {
+              setEditing(false)
+              await onEditNote(row, note)
+            }}
+            onCancel={() => setEditing(false)}
+          />
+        </div>
+      ) : row.note ? (
         <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
           <NotebookPen className="mt-0.5 h-3 w-3 shrink-0 text-info/80" aria-hidden="true" />
           <span className="min-w-0 break-words">{row.note}</span>
         </p>
-      )}
+      ) : null}
 
       <div className="mt-1.5 flex items-center gap-2 text-[10px] text-muted-foreground/70">
         <span>{formatTime(row.createdAt, i18n.language ?? 'en-US')}</span>
@@ -125,6 +150,7 @@ function ExplorerGroupSection({
   i18n,
   showSession,
   onSelectSession,
+  onEditNote,
   onDelete,
 }: ExplorerGroupSectionProps) {
   return (
@@ -150,6 +176,7 @@ function ExplorerGroupSection({
             i18n={i18n}
             showSession={showSession}
             onSelectSession={onSelectSession}
+            onEditNote={onEditNote}
             onDelete={onDelete}
           />
         ))}
@@ -301,6 +328,18 @@ export function BookmarksAppView({
     [store],
   )
 
+  const onEditNote = useCallback(
+    async (row: RegistryEntry, note: string) => {
+      try {
+        const full = (await store.listForSession(row.sessionPath)).find((item) => item.id === row.id)
+        if (full) await store.updateNote(full.id, full.sessionPath, note)
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause))
+      }
+    },
+    [store],
+  )
+
   const onRunTidy = useCallback(async () => {
     if (!aiTidy || tidyState === 'running') return
     const corpus: BookmarkQuotable[] = visibleRows.map((row) => ({
@@ -376,6 +415,7 @@ export function BookmarksAppView({
                   ? 'bg-info/15 text-info'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
+              aria-pressed={viewState.grouping === tab.id}
               onClick={() => explorerState.set({ grouping: tab.id })}
             >
               <tab.icon className="h-3 w-3" aria-hidden="true" />
@@ -387,6 +427,7 @@ export function BookmarksAppView({
         <button
           type="button"
           className={`${sessionPluginPanelIconButtonClass} px-2 py-1 text-[11px]`}
+          aria-label={viewState.sortOrder === 'newest' ? t(i18n, 'sortNewest', 'Newest first') : t(i18n, 'sortOldest', 'Oldest first')}
           title={viewState.sortOrder === 'newest' ? t(i18n, 'sortNewest', 'Newest first') : t(i18n, 'sortOldest', 'Oldest first')}
           onClick={() =>
             explorerState.set({ sortOrder: viewState.sortOrder === 'newest' ? 'oldest' : 'newest' })
@@ -437,9 +478,7 @@ export function BookmarksAppView({
         <span>
           {query.trim()
             ? t(i18n, 'searchHint', 'Search across every session')
-            : viewState.projectFilter
-              ? t(i18n, 'count', '{{count}} bookmarks', { count: visibleRows.length })
-              : t(i18n, 'recentTitle', 'Recent bookmarks')}
+            : t(i18n, 'recentTitle', 'Recent bookmarks')}
         </span>
         <span>{t(i18n, 'count', '{{count}} bookmarks', { count: visibleRows.length })}</span>
       </div>
@@ -456,7 +495,7 @@ export function BookmarksAppView({
         )}
 
         {loading ? (
-          <SessionPluginPanelState>{t(i18n, 'recentTitle', 'Recent bookmarks')}</SessionPluginPanelState>
+          <SessionPluginPanelState>{t(i18n, 'loading', 'Loading…')}</SessionPluginPanelState>
         ) : error ? (
           <SessionPluginPanelState tone="error">
             {t(i18n, 'loadFailed', 'Failed to load bookmarks: {{message}}', { message: error })}
@@ -486,6 +525,7 @@ export function BookmarksAppView({
                 i18n={i18n}
                 showSession={viewState.grouping !== 'session'}
                 onSelectSession={onSelectSession}
+                onEditNote={onEditNote}
                 onDelete={onDelete}
               />
             ))}
@@ -499,6 +539,7 @@ export function BookmarksAppView({
                 i18n={i18n}
                 showSession
                 onSelectSession={onSelectSession}
+                onEditNote={onEditNote}
                 onDelete={onDelete}
               />
             ))}

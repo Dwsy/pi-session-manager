@@ -77,7 +77,7 @@ interface NoteEditorProps {
   onCancel: () => void
 }
 
-function NoteEditor({ initial, i18n, autoFocus = true, onSave, onCancel }: NoteEditorProps) {
+export function NoteEditor({ initial, i18n, autoFocus = true, onSave, onCancel }: NoteEditorProps) {
   const [value, setValue] = useState(initial)
 
   return (
@@ -235,7 +235,7 @@ function BookmarkCard({
       ) : null}
 
       <div className="mt-1.5 text-[10px] text-muted-foreground/70">
-        {formatTime(bookmark.createdAt, language)}
+        {formatTime(bookmark.updatedAt, language)}
       </div>
     </div>
   )
@@ -333,7 +333,7 @@ export function BookmarksPanel({
       />
       <SessionPluginPanelBody className="flex flex-col gap-2">
         {loading ? (
-          <SessionPluginPanelState>{t(i18n, 'loadFailed', 'Loading…')}</SessionPluginPanelState>
+          <SessionPluginPanelState>{t(i18n, 'loading', 'Loading…')}</SessionPluginPanelState>
         ) : error ? (
           <SessionPluginPanelState tone="error">
             {t(i18n, 'loadFailed', 'Failed to load bookmarks: {{message}}', { message: error })}
@@ -459,7 +459,7 @@ export function BookmarkHighlightPopover({
           )}
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-muted-foreground/70">
-              {formatTime(bookmark.createdAt, i18n.language ?? 'en-US')}
+              {formatTime(bookmark.updatedAt, i18n.language ?? 'en-US')}
             </span>
             <BookmarkActions
               i18n={i18n}

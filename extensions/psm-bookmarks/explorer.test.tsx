@@ -152,6 +152,29 @@ describe('BookmarksAppView', () => {
   })
 })
 
+  it('edits a note inline from a row', async () => {
+    const store = createStore()
+    const { container } = await render(
+      <BookmarksAppView store={store} i18n={i18n} active />,
+    )
+    await flush()
+    await act(async () => {
+      Array.from(container.querySelectorAll('button[aria-label="Edit note"]'))[0]!.click()
+    })
+    const textarea = container.querySelector('textarea')!
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea, 'edited from explorer')
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Save note')!
+        .click()
+    })
+    expect(store.updateNote).toHaveBeenCalledWith('bm-2', '/demo/infra/session-002.jsonl', 'edited from explorer')
+  })
+
 describe('BookmarksAppSidebar', () => {
   it('lists projects with counts and applies the project filter', async () => {
     const { container } = await render(
