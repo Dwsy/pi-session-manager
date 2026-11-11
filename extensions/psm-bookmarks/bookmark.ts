@@ -248,8 +248,11 @@ export class BookmarkStore {
   }
 
   async listRecent(): Promise<RegistryEntry[]> {
-    const records = await this.client.search({
-      query: REGISTRY_ID,
+    // The registry record carries no searchable text, so it is read by scope
+    // (records.search is FTS-backed and never matches empty rows).
+    const records = await this.client.listForScope({
+      scopeType: 'global',
+      scopeId: 'global',
       recordType: REGISTRY_RECORD_TYPE,
       pluginId: this.pluginId,
       limit: 5,

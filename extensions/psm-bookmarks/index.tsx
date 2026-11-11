@@ -36,7 +36,6 @@ interface AppSurfaceData {
 
 export default function activate(ctx: PsmPluginHostContext) {
   const store = new BookmarkStore(ctx.psm.records, ctx.manifest.id)
-  const bookmarkByHighlightId = new Map<string, Bookmark>()
 
   const notifySaveFailure = (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error)
@@ -143,9 +142,7 @@ export default function activate(ctx: PsmPluginHostContext) {
     id: HIGHLIGHT_PROVIDER_ID,
     async resolveHighlights({ session }) {
       const bookmarks = await store.listForSession(session.path)
-      bookmarkByHighlightId.clear()
       const highlights: PsmSessionHighlight[] = bookmarks.map((bookmark) => {
-        bookmarkByHighlightId.set(bookmark.id, bookmark)
         return {
           id: bookmark.id,
           entryId: bookmark.anchor.entryId,
@@ -156,15 +153,17 @@ export default function activate(ctx: PsmPluginHostContext) {
       })
       return highlights
     },
-    renderPopover({ highlight, close }) {
-      const bookmark = bookmarkByHighlightId.get(highlight.id)
-      if (!bookmark) return null
+    renderPopover({ session, highlight, close }) {
       return createElement(BookmarkHighlightPopover, {
         store,
         i18n: ctx.i18n,
-        bookmark,
+        bookmarkId: highlight.id,
+        sessionPath: session.path,
         onClose: close,
       })
+    },
+    subscribe(onChange) {
+      return store.subscribe(onChange)
     },
   })
 

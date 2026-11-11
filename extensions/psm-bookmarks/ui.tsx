@@ -407,7 +407,8 @@ export function BookmarksPanel({
 export interface BookmarkHighlightPopoverProps {
   store: BookmarkStoreLike
   i18n: I18nLike
-  bookmark: BookmarkModel
+  bookmarkId: string
+  sessionPath: string
   onClose: () => void
 }
 
@@ -415,11 +416,29 @@ export interface BookmarkHighlightPopoverProps {
 export function BookmarkHighlightPopover({
   store,
   i18n,
-  bookmark,
+  bookmarkId,
+  sessionPath,
   onClose,
 }: BookmarkHighlightPopoverProps) {
-  const [editing, setEditing] = useState(!bookmark.note)
+  const [bookmark, setBookmark] = useState<BookmarkModel | null>(null)
+  const [editing, setEditing] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  // Data-aware: reloads on every store change so edits made here (or in the
+  // session panel) never leave a stale popover behind.
+  const load = useCallback(async () => {
+    const items = await store.listForSession(sessionPath)
+    const found = items.find((item) => item.id === bookmarkId) ?? null
+    setBookmark(found)
+    if (found && !found.note) setEditing(true)
+  }, [store, sessionPath, bookmarkId])
+
+  useEffect(() => {
+    void load()
+    return store.subscribe(() => void load())
+  }, [load, store])
+
+  if (!bookmark) return null
 
   return (
     <div className="flex w-[300px] flex-col gap-2 p-3">
@@ -557,7 +576,8 @@ export function BookmarksAppView({
     setTidyState('running')
     setTidyResult(null)
     try {
-      setTidyResult(await aiTidy(corpus))
+      const result = (await aiTidy(corpus)).trim()
+      setTidyResult(result || t(i18n, 'aiTidyEmptyResult', 'AI organize returned no content.'))
     } catch (cause) {
       setTidyResult(
         t(i18n, 'aiTidyFailed', 'AI organize failed: {{message}}', {

@@ -76,18 +76,25 @@ export default function SessionSelectionLayer({
   const applyHighlights = useCallback(() => {
     const container = containerRef?.current
     if (!container) return
-    const live = new Set<string>()
-    for (const ref of highlightsRef.current) live.add(highlightKey(ref))
+    const live = new Map<string, HighlightRef>()
+    for (const ref of highlightsRef.current) live.set(highlightKey(ref), ref)
 
-    // Drop marks whose highlight no longer exists, keep the rest.
+    // Drop marks whose highlight no longer exists; keep the rest in sync with
+    // the latest label/hue so edited notes show up without a reload.
     const appliedKeys = new Set<string>()
     container.querySelectorAll<HTMLElement>(`mark.${MARK_CLASS}[data-psm-key]`).forEach((mark) => {
       const key = mark.dataset.psmKey ?? ''
-      if (!live.has(key)) {
+      const ref = live.get(key)
+      if (!ref) {
         mark.replaceWith(...Array.from(mark.childNodes))
         return
       }
       appliedKeys.add(key)
+      if (ref.highlight.label) mark.title = ref.highlight.label
+      else mark.removeAttribute('title')
+      if (typeof ref.highlight.hue === 'number') {
+        mark.style.setProperty('--psm-highlight-hue', String(ref.highlight.hue))
+      }
     })
 
     for (const ref of highlightsRef.current) {
@@ -118,8 +125,29 @@ export default function SessionSelectionLayer({
     )
   }, [applyHighlights])
 
+  // Re-resolve one provider's highlights (e.g. after the popover edited a
+  // note) and re-anchor without touching the other providers.
+  const refreshProvider = useCallback(
+    (provider: PsmSessionHighlightProviderRuntimeRegistration) => {
+      void Promise.resolve(provider.resolveHighlights({ session }))
+        .then((highlights) => {
+          highlightsRef.current = [
+            ...highlightsRef.current.filter((ref) => ref.provider.id !== provider.id),
+            ...highlights.map((highlight) => ({ provider, highlight })),
+          ]
+          scheduleApply()
+        })
+        .catch((error) => {
+          console.error(`[PSM highlights] Provider failed: ${provider.id}`, error)
+        })
+    },
+    [session, scheduleApply],
+  )
+
   // Resolve plugin highlights for this session and re-anchor them after every
   // transcript DOM rebuild (virtual scroll remounts, streaming updates).
+  // Providers can push change notifications (e.g. a bookmark was deleted
+  // from a panel) to re-resolve without a session reload.
   useEffect(() => {
     let cancelled = false
     const load = async () => {
@@ -137,10 +165,16 @@ export default function SessionSelectionLayer({
       scheduleApply()
     }
     void load()
+    const unsubscribers: Array<() => void> = []
+    for (const provider of highlightProviders) {
+      const unsubscribe = provider.subscribe?.(() => refreshProvider(provider))
+      if (typeof unsubscribe === 'function') unsubscribers.push(unsubscribe)
+    }
     return () => {
       cancelled = true
+      for (const unsubscribe of unsubscribers) unsubscribe()
     }
-  }, [session, highlightProviders, scheduleApply])
+  }, [session, highlightProviders, scheduleApply, refreshProvider])
 
   useEffect(() => {
     scheduleApply()
@@ -152,19 +186,21 @@ export default function SessionSelectionLayer({
     }
   }, [])
 
-  // Re-anchor after rows come back into the virtual window.
+  // Re-anchor after rows come back into the virtual window. Document-level
+  // capture listener: scroll events do not bubble and the container ref is
+  // only populated once the async messages DOM mounts.
   useEffect(() => {
-    const container = containerRef?.current
-    if (!container) return
     let timer = 0
-    const onScroll = () => {
+    const onScroll = (event: Event) => {
+      const container = containerRef?.current
+      if (!container || !(event.target instanceof Node) || !container.contains(event.target)) return
       window.clearTimeout(timer)
       timer = window.setTimeout(applyHighlights, SCROLL_REAPPLY_DEBOUNCE_MS)
     }
-    container.addEventListener('scroll', onScroll, { passive: true })
+    document.addEventListener('scroll', onScroll, { passive: true, capture: true })
     return () => {
       window.clearTimeout(timer)
-      container.removeEventListener('scroll', onScroll)
+      document.removeEventListener('scroll', onScroll, true)
     }
   }, [containerRef, applyHighlights])
 
@@ -175,14 +211,14 @@ export default function SessionSelectionLayer({
     setPopover(null)
   }, [session.path])
 
-  // Selection -> menu.
+  // Selection -> menu. Listeners live on the document (capture) and filter by
+  // the live container ref so they also work when the messages DOM mounts
+  // after this component.
   useEffect(() => {
-    const container = containerRef?.current
-    if (!container) return
-
     const refreshMenu = () => {
+      const container = containerRef?.current
       const anchor = resolveTranscriptSelection(window.getSelection())
-      if (!anchor || !container.contains(anchor.entryElement)) {
+      if (!container || !anchor || !container.contains(anchor.entryElement)) {
         setMenu(null)
         return
       }
@@ -194,36 +230,47 @@ export default function SessionSelectionLayer({
       sessionSelectionStore.set(selection)
       setMenu({ selection, ...selectionMenuStateFor(rectForRange(anchor.range)) })
     }
-    const onMouseUp = () => window.requestAnimationFrame(refreshMenu)
-    const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Shift' || event.key.startsWith('Arrow')) onMouseUp()
-    }
-    const onScroll = () => setMenu(null)
-    const onDocumentMouseDown = (event: Event) => {
+    const isOwnOverlay = (event: Event) => {
       const target = event.target as HTMLElement | null
-      if (target?.closest('.psm-selection-menu')) return
+      return Boolean(target?.closest('.psm-selection-menu, .psm-highlight-popover'))
+    }
+    const onMouseUp = (event: Event) => {
+      const container = containerRef?.current
+      if (!container || isOwnOverlay(event)) return
+      if (!(event.target instanceof Node) || !container.contains(event.target)) return
+      window.requestAnimationFrame(refreshMenu)
+    }
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Shift' || event.key.startsWith('Arrow')) onMouseUp(event)
+    }
+    const onScroll = (event: Event) => {
+      const container = containerRef?.current
+      if (!container || !(event.target instanceof Node) || !container.contains(event.target)) return
+      setMenu(null)
+    }
+    const onDocumentMouseDown = (event: Event) => {
+      if (isOwnOverlay(event)) return
       setMenu(null)
     }
 
-    container.addEventListener('mouseup', onMouseUp)
-    container.addEventListener('keyup', onKeyUp)
-    container.addEventListener('scroll', onScroll, { passive: true })
+    document.addEventListener('mouseup', onMouseUp, true)
+    document.addEventListener('keyup', onKeyUp, true)
+    document.addEventListener('scroll', onScroll, { passive: true, capture: true })
     document.addEventListener('mousedown', onDocumentMouseDown, true)
     return () => {
-      container.removeEventListener('mouseup', onMouseUp)
-      container.removeEventListener('keyup', onKeyUp)
-      container.removeEventListener('scroll', onScroll)
+      document.removeEventListener('mouseup', onMouseUp, true)
+      document.removeEventListener('keyup', onKeyUp, true)
+      document.removeEventListener('scroll', onScroll, true)
       document.removeEventListener('mousedown', onDocumentMouseDown, true)
     }
   }, [containerRef, session])
 
   // Highlight activation -> plugin popover.
   useEffect(() => {
-    const container = containerRef?.current
-    if (!container) return
     const onClick = (event: MouseEvent) => {
+      const container = containerRef?.current
       const mark = (event.target as HTMLElement | null)?.closest(`mark.${MARK_CLASS}`) as HTMLElement | null
-      if (!mark) return
+      if (!container || !mark || !container.contains(mark)) return
       const key = mark.dataset.psmKey
       const ref = highlightsRef.current.find((item) => highlightKey(item) === key)
       if (!ref?.provider.renderPopover) return
@@ -232,7 +279,10 @@ export default function SessionSelectionLayer({
         session,
         highlight: ref.highlight,
         anchor: mark,
-        close: () => setPopover(null),
+        close: () => {
+          setPopover(null)
+          refreshProvider(ref.provider)
+        },
       })
       setPopover({
         anchor: mark,
@@ -247,9 +297,11 @@ export default function SessionSelectionLayer({
         ),
       })
     }
-    container.addEventListener('click', onClick)
-    return () => container.removeEventListener('click', onClick)
-  }, [containerRef, session])
+    // Document-level capture listener: the transcript container ref may be
+    // populated only after this component mounts.
+    document.addEventListener('click', onClick, true)
+    return () => document.removeEventListener('click', onClick, true)
+  }, [containerRef, session, refreshProvider])
 
   const runAction = useCallback(
     (action: PsmSelectionActionRuntimeRegistration) => {

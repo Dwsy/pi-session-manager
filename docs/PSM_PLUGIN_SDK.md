@@ -540,6 +540,7 @@ export interface PsmSessionHighlightProviderRegistration {
     anchor: HTMLElement
     close(): void
   }): unknown
+  subscribe?(onChange: () => void): (() => void) | void
 }
 ```
 
@@ -550,6 +551,8 @@ Rules:
 - `renderPopover` is optional; without it, `label` is the only hover feedback.
 - `anchor` is the host-owned `<mark>` element; do not mutate or retain it.
 - Highlight marks disappear with their DOM; re-anchoring is the host's job.
+- `subscribe` lets a provider push data changes (create/edit/delete) so the
+  host re-resolves immediately instead of waiting for the next session load.
 
 Reference implementation: `extensions/psm-bookmarks` (bookmark records,
 selection actions, highlight provider, session panel, explorer view).

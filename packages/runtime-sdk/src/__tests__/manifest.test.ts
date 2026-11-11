@@ -357,13 +357,13 @@ describe('plugin capability client', () => {
           },
           indexValues: [
             {
-              recordId: 'custom-record',
-              pluginId: 'builtin.session-summary',
-              recordType: 'session.intelligence',
-              indexName: 'status',
-              valueText: 'active',
-              valueNumber: null,
-              valueDatetime: null,
+              record_id: 'custom-record',
+              plugin_id: 'builtin.session-summary',
+              record_type: 'session.intelligence',
+              index_name: 'status',
+              value_text: 'active',
+              value_number: null,
+              value_datetime: null,
             },
           ],
           __psm: {

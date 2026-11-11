@@ -2,7 +2,6 @@ import type {
   CreatePsmClientOptions,
   DbPluginRecord,
   PluginRecord,
-  PluginRecordIndexValue,
   PluginRecordListParams,
   PluginRecordSearchHit,
   PluginRecordSearchParams,
@@ -87,16 +86,18 @@ function toCreateTagPayload(params: PsmCreateTagParams) {
   }
 }
 
-function toPluginRecordIndexValues(params: PluginRecordUpsertParams): PluginRecordIndexValue[] | undefined {
+// Wire shape for `DbPluginRecordIndexValue`: the backend deserializes
+// snake_case field names, while the SDK contract stays camelCase.
+function toPluginRecordIndexValues(params: PluginRecordUpsertParams) {
   const recordId = params.id || `${params.pluginId}:${params.scopeType}:${params.scopeId}:${params.recordType}`
-  return params.indexValues?.map((value): PluginRecordIndexValue => ({
-    recordId: value.recordId || recordId,
-    pluginId: value.pluginId,
-    recordType: value.recordType,
-    indexName: value.indexName,
-    valueText: value.valueText ?? null,
-    valueNumber: value.valueNumber ?? null,
-    valueDatetime: value.valueDatetime ?? null,
+  return params.indexValues?.map((value) => ({
+    record_id: value.recordId || recordId,
+    plugin_id: value.pluginId,
+    record_type: value.recordType,
+    index_name: value.indexName,
+    value_text: value.valueText ?? null,
+    value_number: value.valueNumber ?? null,
+    value_datetime: value.valueDatetime ?? null,
   }))
 }
 

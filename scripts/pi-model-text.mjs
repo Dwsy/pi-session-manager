@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-import { completeSimple, streamSimple } from '@earendil-works/pi-ai'
-import { AuthStorage, ModelRegistry } from '@earendil-works/pi-coding-agent'
+import { ModelRuntime } from '@earendil-works/pi-coding-agent'
 
 function readStdin() {
   return new Promise((resolve, reject) => {
@@ -38,17 +37,17 @@ function requestMessages(request) {
   ]
 }
 
-function resolveModel(registry, provider, modelId) {
+function resolveModel(runtime, provider, modelId) {
   if (provider && modelId) {
-    const model = registry.find(provider, modelId)
+    const model = runtime.getModel(provider, modelId)
     if (model) return model
     throw new Error(`Model not found: ${provider}/${modelId}`)
   }
 
-  const available = registry.getAvailable()
+  const available = runtime.getAvailableSnapshot()
   if (available.length > 0) return available[0]
 
-  const all = registry.getAll()
+  const all = runtime.getModels()
   if (all.length > 0) return all[0]
 
   throw new Error('No Pi models are configured')
@@ -56,10 +55,11 @@ function resolveModel(registry, provider, modelId) {
 
 async function main() {
   const request = JSON.parse(await readStdin())
-  const registry = ModelRegistry.create(AuthStorage.create())
-  const model = resolveModel(registry, request.provider, request.model)
-  const auth = await registry.getApiKeyAndHeaders(model)
-  if (!auth.ok) throw new Error(auth.error)
+  const runtime = await ModelRuntime.create()
+  const model = resolveModel(runtime, request.provider, request.model)
+  const resolved = await runtime.getAuth(model)
+  const auth = resolved?.auth
+  if (!auth) throw new Error(`No auth available for ${request.provider || 'default'}/${request.model || 'default'}`)
 
   const context = {
     systemPrompt: request.systemPrompt,
@@ -70,12 +70,13 @@ async function main() {
   const options = {
     apiKey: auth.apiKey,
     headers: auth.headers,
+    baseUrl: auth.baseUrl,
     reasoning: request.reasoning,
     maxTokens: request.maxTokens,
   }
 
   if (request.stream) {
-    const eventStream = streamSimple(model, context, options)
+    const eventStream = runtime.streamSimple(model, context, options)
     let finalMessage = null
     for await (const event of eventStream) {
       if (request.protocol === 'pi-agent') {
@@ -109,7 +110,7 @@ async function main() {
     return
   }
 
-  const message = await completeSimple(model, context, options)
+  const message = await runtime.completeSimple(model, context, options)
   writeEvent({
     type: 'done',
     response: {

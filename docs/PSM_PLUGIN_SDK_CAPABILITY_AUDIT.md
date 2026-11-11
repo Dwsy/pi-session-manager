@@ -112,7 +112,7 @@ changes; unit tests alone do not constitute real Hub/UI acceptance.
 | --- | --- | --- |
 | Transcript text selection | `ctx.ui.registerSelectionAction(...)`, `selection`-scoped command `context.selection` | Single-entry selections only; host renders the floating menu and owns the transcript DOM; cross-entry selections are rejected before plugin code runs |
 | Text-quote anchoring | `PsmTextQuoteSelector` (`exact` + 32-char `prefix`/`suffix`) | Host re-anchors into rendered DOM; duplicate quotes are disambiguated by context; failed anchors degrade silently |
-| Plugin text highlights | `ctx.ui.registerSessionHighlightProvider(...)`, `records:read` | `resolveHighlights` runs per session open; `renderPopover` receives a host-owned `<mark>` anchor that plugins must not retain or mutate |
+| Plugin text highlights | `ctx.ui.registerSessionHighlightProvider(...)`, `records:read` | `resolveHighlights` runs per session open; `renderPopover` receives a host-owned `<mark>` anchor that plugins must not retain or mutate; optional `subscribe(onChange)` pushes data changes so highlights stay in sync without a reload |
 | Note-follows-save UX | `PsmSelectionActionRenderProps.openPanel(panelId)` | Opens a registered session panel through a host request bus; no general panel-control API is exposed |
 
 Reference implementation: `extensions/psm-bookmarks` (bookmark records + explorer

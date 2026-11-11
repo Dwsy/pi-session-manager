@@ -18,6 +18,7 @@ const snapshot: {
     pluginId: string
     resolveHighlights: (props: unknown) => PsmSessionHighlight[] | Promise<PsmSessionHighlight[]>
     renderPopover?: (props: unknown) => unknown
+    subscribe?: (onChange: () => void) => (() => void) | void
   }>
 } = {
   selectionActions: [],
@@ -126,6 +127,38 @@ describe('SessionSelectionLayer highlights', () => {
     // Provider returns nothing -> the host unwraps the stale mark.
     snapshot.highlightProviders[0]!.resolveHighlights = () => []
     await renderLayer(2)
+    await flushTimers()
+    expect(container.querySelector('mark.psm-text-highlight')).toBeNull()
+    expect(container.textContent).toBe('alpha beta gamma')
+  })
+
+  it('re-resolves a provider immediately when it reports changes', async () => {
+    let highlights: PsmSessionHighlight[] = [
+      { id: 'h1', entryId: 'm1', textQuote: { exact: 'beta', prefix: 'alpha ', suffix: ' gamma' } },
+    ]
+    let notify: (() => void) | null = null
+    snapshot.highlightProviders = [
+      {
+        id: 'provider',
+        pluginId: 'plugin',
+        resolveHighlights: () => highlights,
+        subscribe: (onChange) => {
+          notify = onChange
+          return () => {
+            notify = null
+          }
+        },
+      },
+    ]
+    await renderLayer()
+    await flushTimers()
+    expect(container.querySelector('mark.psm-text-highlight')?.textContent).toBe('beta')
+
+    highlights = []
+    await act(async () => {
+      notify?.()
+      await Promise.resolve()
+    })
     await flushTimers()
     expect(container.querySelector('mark.psm-text-highlight')).toBeNull()
     expect(container.textContent).toBe('alpha beta gamma')

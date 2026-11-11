@@ -170,14 +170,17 @@ describe('BookmarksPanel', () => {
 })
 
 describe('BookmarkHighlightPopover', () => {
-  it('edits the note inline and closes after delete', async () => {
-    const store = createStore()
+  it('edits the note inline and keeps data in sync through the store', async () => {
+    const store = createStore({
+      listForSession: vi.fn(async () => [{ ...bookmark, note: undefined }]),
+    })
     const onClose = vi.fn()
     const { container } = await render(
       <BookmarkHighlightPopover
         store={store}
         i18n={i18n}
-        bookmark={{ ...bookmark, note: undefined }}
+        bookmarkId="bm-1"
+        sessionPath="/tmp/session.jsonl"
         onClose={onClose}
       />,
     )
@@ -191,6 +194,21 @@ describe('BookmarkHighlightPopover', () => {
         .click()
     })
     expect(store.updateNote).toHaveBeenCalledWith('bm-1', '/tmp/session.jsonl', '')
+  })
+
+  it('renders nothing once the bookmark is gone', async () => {
+    const store = createStore({ listForSession: vi.fn(async () => []) })
+    const { container } = await render(
+      <BookmarkHighlightPopover
+        store={store}
+        i18n={i18n}
+        bookmarkId="bm-404"
+        sessionPath="/tmp/session.jsonl"
+        onClose={() => undefined}
+      />,
+    )
+    await flush()
+    expect(container.textContent).toBe('')
   })
 })
 

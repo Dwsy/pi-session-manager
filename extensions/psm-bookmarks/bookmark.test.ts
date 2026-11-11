@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { PluginRecord, PluginRecordUpsertParams } from '@dwsy/plugin-sdk'
 
@@ -237,5 +237,15 @@ describe('BookmarkStore', () => {
     unsubscribe()
     await store.save(makeBookmark({ id: 'bm-2', anchor: { entryId: 'm2', textQuote: { exact: 'gamma' } }, quote: 'gamma' }))
     expect(notifications).toBe(1)
+  })
+
+  it('reads the registry by scope instead of FTS search', async () => {
+    const client = makeClient()
+    const store = new BookmarkStore(client, 'builtin.bookmarks')
+    await store.save(makeBookmark({ id: 'bm-1' }))
+    const searchSpy = vi.spyOn(client, 'search')
+    const recent = await store.listRecent()
+    expect(searchSpy).not.toHaveBeenCalled()
+    expect(recent.map((item) => item.id)).toEqual(['bm-1'])
   })
 })

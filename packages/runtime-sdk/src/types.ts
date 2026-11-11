@@ -652,6 +652,12 @@ export interface PsmSessionHighlightProviderRegistration {
     props: PsmSessionHighlightResolveProps,
   ): PsmSessionHighlight[] | Promise<PsmSessionHighlight[]>;
   renderPopover?(props: PsmSessionHighlightActivateProps): unknown;
+  /**
+   * Optional change feed: call the returned callback whenever the provider's
+   * highlights change (created, edited, deleted) so the host re-resolves
+   * without waiting for a session reload.
+   */
+  subscribe?(onChange: () => void): (() => void) | void;
 }
 
 export interface PsmPluginUiRegistry {
