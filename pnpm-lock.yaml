@@ -54,8 +54,8 @@ importers:
         specifier: ^3.10.8
         version: 3.13.18(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@tauri-apps/api':
-        specifier: ^2.9.1
-        version: 2.10.1
+        specifier: ^2.12.4
+        version: 2.12.4
       '@tauri-apps/plugin-dialog':
         specifier: ^2.6.0
         version: 2.6.0
@@ -2199,6 +2199,7 @@ packages:
   '@smithy/core@3.24.4':
     resolution: {integrity: sha512-3UNRKEyQyAgVgM0LGlerCLm+ChZWZ1GPfde+jBEW6bm6bSBGU1p0EbblaUV3unbhwvidjLA5Zs3sOs7mnZwvAw==}
     engines: {node: '>=18.0.0'}
+    deprecated: Deprecated due to a bug in custom logger data redaction. See https://github.com/aws/aws-sdk-js-v3/issues/8393.
 
   '@smithy/credential-provider-imds@4.3.4':
     resolution: {integrity: sha512-vKW0MEFRU4Y3MkVZUkpJm+g9qyPGLCXhc0YLggUdSdBB4g7IaSSsCE75P9rBXyWHrXY1UYSQUl8/DwsTR7QciA==}
@@ -2263,6 +2264,9 @@ packages:
 
   '@tauri-apps/api@2.10.1':
     resolution: {integrity: sha512-hKL/jWf293UDSUN09rR69hrToyIXBb8CjGaWC7gfinvnQrBVvnLr08FeFi38gxtugAVyVcTa5/FD/Xnkb1siBw==}
+
+  '@tauri-apps/api@2.12.4':
+    resolution: {integrity: sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg==}
 
   '@tauri-apps/cli-darwin-arm64@2.10.0':
     resolution: {integrity: sha512-avqHD4HRjrMamE/7R/kzJPcAJnZs0IIS+1nkDP5b+TNBn3py7N2aIo9LIpy+VQq0AkN8G5dDpZtOOBkmWt/zjA==}
@@ -3676,6 +3680,7 @@ packages:
   image-size@0.5.5:
     resolution: {integrity: sha512-6TDAlDPZxUFCv+fuOkIoXT/V/f3Qbq8e37p+YOiYrUv3v9cc3/6x78VdfPgFVaB9dZYeLUfKgHRebpkm/oP2VQ==}
     engines: {node: '>=0.10.0'}
+    deprecated: Please migrate to image-size@2.x
     hasBin: true
 
   immer@10.2.0:
@@ -8454,6 +8459,8 @@ snapshots:
   '@tanstack/virtual-core@3.13.18': {}
 
   '@tauri-apps/api@2.10.1': {}
+
+  '@tauri-apps/api@2.12.4': {}
 
   '@tauri-apps/cli-darwin-arm64@2.10.0':
     optional: true
