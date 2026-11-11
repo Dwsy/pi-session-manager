@@ -313,21 +313,99 @@ where
     Ok(response)
 }
 
-fn pi_model_text_script_path() -> Result<std::path::PathBuf, String> {
-    let cwd = std::env::current_dir().map_err(|error| format!("Failed to resolve current directory: {error}"))?;
-    let direct = cwd.join("scripts/pi-model-text.mjs");
-    if direct.exists() {
-        return Ok(direct);
-    }
+const PI_MODEL_TEXT_SCRIPT_REL: &str = "scripts/pi-model-text.mjs";
 
-    let parent = cwd.parent().map(|path| path.join("scripts/pi-model-text.mjs"));
-    if let Some(path) = parent {
-        if path.exists() {
-            return Ok(path);
+fn pi_model_text_script_path() -> Result<std::path::PathBuf, String> {
+    find_pi_model_text_script(
+        std::env::var_os("PSM_PI_MODEL_TEXT_SCRIPT").map(std::path::PathBuf::from),
+        &script_search_roots(),
+    )
+    .ok_or_else(|| format!("Pi AI SDK helper not found at {PI_MODEL_TEXT_SCRIPT_REL} (checked PSM_PI_MODEL_TEXT_SCRIPT, cwd, and executable-relative locations)"))
+}
+
+/// Probe roots for the helper script: the process cwd (dev flows), then
+/// executable-relative locations (packaged CLI / macOS .app bundles).
+fn script_search_roots() -> Vec<std::path::PathBuf> {
+    let mut roots: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(cwd) = std::env::current_dir() {
+        roots.push(cwd.clone());
+        if let Some(parent) = cwd.parent() {
+            roots.push(parent.to_path_buf());
         }
     }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            roots.push(exe_dir.to_path_buf());
+            if let Some(parent) = exe_dir.parent() {
+                roots.push(parent.to_path_buf());
+            }
+            // macOS bundle layout: <App>.app/Contents/MacOS/<binary>
+            if exe_dir.file_name().and_then(|name| name.to_str()) == Some("MacOS") {
+                if let Some(contents) = exe_dir.parent() {
+                    roots.push(contents.join("Resources"));
+                }
+            }
+        }
+    }
+    roots
+}
 
-    Err("Pi AI SDK helper not found at scripts/pi-model-text.mjs".to_string())
+fn find_pi_model_text_script(
+    explicit: Option<std::path::PathBuf>,
+    roots: &[std::path::PathBuf],
+) -> Option<std::path::PathBuf> {
+    if let Some(path) = explicit {
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    roots
+        .iter()
+        .map(|root| root.join(PI_MODEL_TEXT_SCRIPT_REL))
+        .find(|path| path.is_file())
+}
+
+#[cfg(test)]
+mod script_path_tests {
+    use super::{find_pi_model_text_script, PI_MODEL_TEXT_SCRIPT_REL};
+
+    fn make_script_root(label: &str) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let scripts = dir.path().join("scripts");
+        std::fs::create_dir_all(&scripts).expect("create scripts dir");
+        std::fs::write(scripts.join("pi-model-text.mjs"), format!("// {label}")).expect("write script");
+        dir
+    }
+
+    #[test]
+    fn explicit_override_wins_even_when_roots_have_nothing() {
+        let root = make_script_root("override");
+        let explicit = root.path().join(PI_MODEL_TEXT_SCRIPT_REL);
+        let found = find_pi_model_text_script(Some(explicit.clone()), &[]);
+        assert_eq!(found, Some(explicit));
+    }
+
+    #[test]
+    fn explicit_override_must_exist_or_fall_through() {
+        let root = make_script_root("fallback");
+        let missing = root.path().join("missing.mjs");
+        let found = find_pi_model_text_script(Some(missing), &[root.path().to_path_buf()]);
+        assert_eq!(found, Some(root.path().join(PI_MODEL_TEXT_SCRIPT_REL)));
+    }
+
+    #[test]
+    fn probes_roots_in_order_and_skips_missing_ones() {
+        let empty = tempfile::tempdir().expect("tempdir");
+        let with_script = make_script_root("ordered");
+        let found = find_pi_model_text_script(None, &[empty.path().to_path_buf(), with_script.path().to_path_buf()]);
+        assert_eq!(found, Some(with_script.path().join(PI_MODEL_TEXT_SCRIPT_REL)));
+    }
+
+    #[test]
+    fn returns_none_when_the_script_is_nowhere() {
+        let empty = tempfile::tempdir().expect("tempdir");
+        assert_eq!(find_pi_model_text_script(None, &[empty.path().to_path_buf()]), None);
+    }
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]

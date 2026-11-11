@@ -378,3 +378,51 @@ describe('createPsmAgentHostModelResolver', () => {
     await expect(createPsmAgentHostModelResolver(emptyTransport)()).resolves.toBeUndefined()
   })
 })
+
+describe('createPsmAgentBridge error surfacing', () => {
+  function errorBridge(error: AssistantMessage) {
+    const stream = createAssistantMessageEventStream()
+    stream.push({ type: 'error', reason: 'error', error })
+    return createPsmAgentBridge({
+      pluginId: 'builtin.bookmarks',
+      permissions: ['agent:invoke', 'model:invoke'],
+      resolveHostModel: async () => ({ provider: 'openai', id: 'gpt-5.5' }),
+      streamFn: (() => stream) as StreamFn,
+    })
+  }
+
+  function errorAssistant(errorMessage: string): AssistantMessage {
+    return {
+      ...assistant([{ type: 'text', text: '' }], 'error'),
+      errorMessage,
+    }
+  }
+
+  it('rejects run() with the model stream error instead of resolving with empty text', async () => {
+    const bridge = errorBridge(errorAssistant('Pi AI SDK helper not found at scripts/pi-model-text.mjs'))
+    const handle = await bridge.createSession({
+      purpose: 'bookmarks-tidy',
+      model: 'host-default',
+      tools: [],
+      storage: { scope: 'memory' },
+    })
+    await expect(bridge.run({ sessionId: handle.sessionId, prompt: 'hi' })).rejects.toThrow(
+      'Pi AI SDK helper not found',
+    )
+  })
+
+  it('reports the failure through runStream onError and still rejects', async () => {
+    const bridge = errorBridge(errorAssistant('model stream exploded'))
+    const handle = await bridge.createSession({
+      purpose: 'bookmarks-tidy',
+      model: 'host-default',
+      tools: [],
+      storage: { scope: 'memory' },
+    })
+    const onError = vi.fn()
+    await expect(
+      bridge.runStream({ sessionId: handle.sessionId, prompt: 'hi' }, { onError }),
+    ).rejects.toThrow('model stream exploded')
+    expect(onError).toHaveBeenCalledWith('model stream exploded')
+  })
+})

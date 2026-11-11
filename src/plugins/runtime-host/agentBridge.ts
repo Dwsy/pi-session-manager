@@ -539,6 +539,27 @@ function assistantText(message: AgentMessage): string {
     .join('')
 }
 
+/**
+ * Model stream failures arrive as a terminal assistant message with an error
+ * stop reason. Surface them instead of resolving with empty text so plugin
+ * callers can tell "no output" apart from "the run failed".
+ */
+function throwIfAgentFailed(messages: AgentMessage[]): void {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (!isRecord(message) || message.role !== 'assistant') continue
+    const stopReason = message.stopReason
+    if (stopReason === 'error' || stopReason === 'aborted') {
+      const detail =
+        typeof message.errorMessage === 'string' && message.errorMessage
+          ? message.errorMessage
+          : `PSM agent run ${stopReason}`
+      throw new Error(detail)
+    }
+    return
+  }
+}
+
 function toolResultText(message: ToolResultMessage): string {
   return message.content
     .filter((part): part is TextContent => part.type === 'text')
@@ -698,6 +719,7 @@ export function createPsmAgentBridge(options: PsmAgentBridgeOptions): PsmAgentBr
       if (!session) throw new Error(`PSM agent session not found: ${params.sessionId}`)
 
       const messages = await runAgentSession(session, params)
+      throwIfAgentFailed(messages)
       return runResult(session.sessionId, messages)
     },
 
@@ -715,6 +737,7 @@ export function createPsmAgentBridge(options: PsmAgentBridgeOptions): PsmAgentBr
 
       try {
         const messages = await runAgentSession(session, params)
+        throwIfAgentFailed(messages)
         const result = runResult(session.sessionId, messages)
         if (!receivedDelta && result.text) handlers?.onDelta?.(result.text)
         handlers?.onDone?.(result)
