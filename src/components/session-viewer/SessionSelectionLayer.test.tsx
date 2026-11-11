@@ -240,3 +240,37 @@ describe('SessionSelectionLayer selection menu', () => {
     expect(document.querySelector('.psm-selection-menu')).toBeNull()
   })
 })
+
+describe('selection menu edge coverage', () => {
+  it('ignores selections made in another surface that reuses entry markup', async () => {
+    // e.g. a preview pane renders its own #entry-* copies outside the container.
+    const foreign = document.createElement('div')
+    foreign.innerHTML = '<div id="entry-preview-1"><p>alpha beta gamma</p></div>'
+    document.body.append(foreign)
+    snapshot.selectionActions = [{ id: 'act', title: 'Bookmark', order: 10, run: vi.fn() as never }]
+    await renderLayer()
+
+    const walker = document.createTreeWalker(foreign, NodeFilter.SHOW_TEXT)
+    const node = walker.nextNode() as Text
+    const range = document.createRange()
+    range.setStart(node, 6)
+    range.setEnd(node, 10)
+    const selection = window.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    await act(async () => {
+      foreign.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    })
+    await flushFrames()
+    expect(document.querySelector('.psm-selection-menu')).toBeNull()
+    foreign.remove()
+  })
+
+  it('flips the menu below the selection when there is no room above', async () => {
+    const { selectionMenuStateFor } = await import('./SelectionActionsMenu')
+    const tall = { top: 40, bottom: 80, left: 100, width: 60, height: 40 } as DOMRect
+    expect(selectionMenuStateFor(tall).flipped).toBe(true)
+    const low = { top: 500, bottom: 540, left: 100, width: 60, height: 40 } as DOMRect
+    expect(selectionMenuStateFor(low).flipped).toBe(false)
+  })
+})

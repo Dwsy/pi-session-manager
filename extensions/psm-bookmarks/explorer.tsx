@@ -32,15 +32,12 @@ import { explorerState, type BookmarkGrouping } from './explorerState'
 import {
   NoteEditor,
   formatTime,
+  t,
   truncated,
   type BookmarkQuotable,
   type BookmarkStoreLike,
   type I18nLike,
 } from './ui'
-
-function t(i18n: I18nLike, key: string, fallback: string, values?: Record<string, unknown>) {
-  return i18n.t(`plugins.bookmarks.${key}`, fallback, values)
-}
 
 function rowFromBookmark(bookmark: BookmarkModel): RegistryEntry {
   return {

@@ -50,7 +50,7 @@ export interface BookmarkQuotable {
 
 const QUOTE_TRUNCATE_CHARS = 280
 
-function t(i18n: I18nLike | PsmPluginI18nClient, key: string, fallback: string, values?: Record<string, unknown>) {
+export function t(i18n: I18nLike | PsmPluginI18nClient, key: string, fallback: string, values?: Record<string, unknown>) {
   return i18n.t(`plugins.bookmarks.${key}`, fallback, values)
 }
 
