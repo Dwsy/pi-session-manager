@@ -36,6 +36,7 @@ export const command = {
     placeholder: '搜索插件命令...',
     requiresProject: '需要当前项目',
     requiresSession: '需要当前会话',
+    requiresSelection: '需要选中的文本',
     unavailable: '当前上下文不可用',
     empty: '暂无插件命令',
     emptyForQuery: '没有匹配的命令',

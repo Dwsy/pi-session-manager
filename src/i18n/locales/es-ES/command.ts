@@ -81,6 +81,7 @@ export const command = {
     placeholder: 'Buscar comandos de plugins...',
     requiresProject: 'Requiere un proyecto activo',
     requiresSession: 'Requiere una sesión activa',
+    requiresSelection: 'Requiere una selección de texto activa',
     unavailable: 'No disponible en el contexto actual',
     empty: 'Sin comandos de plugins registrados',
     emptyForQuery: 'No se encontraron comandos',

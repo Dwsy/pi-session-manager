@@ -21,6 +21,7 @@ import SessionViewerMessages, {
 import SessionViewerSearchBar, {
   type SessionViewerSearchBarProps,
 } from "@/components/session-viewer/SessionViewerSearchBar";
+import SessionSelectionLayer from "@/components/session-viewer/SessionSelectionLayer";
 import SessionViewerSidebar from "@/components/session-viewer/SessionViewerSidebar";
 import SessionViewerToolbar from "@/components/session-viewer/SessionViewerToolbar";
 import SessionViewerTabs, { type SessionViewerTabsProps } from "@/components/session-viewer/SessionViewerTabs";
@@ -247,6 +248,14 @@ export default function SessionViewerBody({
                   previewMode={previewMode}
                   previewVariant={previewVariant}
                 />
+
+                {!previewMode && (
+                  <SessionSelectionLayer
+                    containerRef={scrollContainerRef}
+                    session={session}
+                    revisionKey={messages.renderableEntries.length}
+                  />
+                )}
 
                 {!previewMode && !suppressLiveInput && (
                   <ChatInput

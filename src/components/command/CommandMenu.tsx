@@ -3,6 +3,7 @@ import {
   useMemo,
   useState,
   useCallback,
+  useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
   memo,
 } from "react";
@@ -12,6 +13,7 @@ import type { SearchPluginResult, SearchContext } from "@/plugins/types";
 import { useSearchPlugins } from "@/hooks/useSearchPlugins";
 import { psmPluginHost, usePsmPluginCommands } from "@/plugins/runtime-host";
 import { getPathBasename } from "@/utils/path";
+import { sessionSelectionStore } from "@/utils/sessionSelection";
 import { getCachedSettings } from "@/utils/settingsApi";
 import { formatSourceFilterToken } from "@/utils/search";
 import type { MessageSearchPluginOptions } from "@/plugins/message/MessageSearchPlugin";
@@ -128,8 +130,15 @@ export default memo(function CommandMenu({
 
   const groupedResults = useMemo(() => groupResultsByPlugin(results), [results]);
 
+  const currentSelection = useSyncExternalStore(
+    sessionSelectionStore.subscribe,
+    () => sessionSelectionStore.get(),
+    () => sessionSelectionStore.get(),
+  );
+
   const commandContext = useMemo(() => ({
     selectedProject: context.selectedProject,
+    selection: currentSelection,
     selectedSession: context.selectedSession
       ? {
           path: context.selectedSession.path,
@@ -148,7 +157,7 @@ export default memo(function CommandMenu({
       },
       openProject: context.setSelectedProject,
     },
-  }), [context, onClose, query]);
+  }), [context, currentSelection, onClose, query]);
 
   const commandActions = useMemo<CommandActionItem[]>(() => {
     const normalized = query.trim().toLowerCase()
@@ -160,6 +169,9 @@ export default memo(function CommandMenu({
         }
         if (command.scope === 'session' && !context.selectedSession) {
           disabledReason = t('command.commands.requiresSession', 'Requires an active session')
+        }
+        if (command.scope === 'selection' && !currentSelection) {
+          disabledReason = t('command.commands.requiresSelection', 'Requires an active text selection')
         }
         if (!disabledReason && command.when && !command.when(commandContext)) {
           disabledReason = t('command.commands.unavailable', 'Unavailable in the current context')

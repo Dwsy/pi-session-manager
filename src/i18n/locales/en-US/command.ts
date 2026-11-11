@@ -36,6 +36,7 @@ export const command = {
     placeholder: 'Search plugin commands...',
     requiresProject: 'Requires an active project',
     requiresSession: 'Requires an active session',
+    requiresSelection: 'Requires an active text selection',
     unavailable: 'Unavailable in the current context',
     empty: 'No plugin commands registered',
     emptyForQuery: 'No commands found',

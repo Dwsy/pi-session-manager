@@ -218,6 +218,15 @@ describe('PsmPluginUiContributionCatalog', () => {
       title: 'Main',
       render,
     })
+    catalog.registerSelectionAction(failedPlugin, {
+      id: 'failed.selection-action',
+      title: 'Selection Action',
+      run: () => undefined,
+    })
+    catalog.registerSessionHighlightProvider(failedPlugin, {
+      id: 'failed.highlight-provider',
+      resolveHighlights: () => [],
+    })
     catalog.registerAppView('plugin.healthy', {
       id: 'healthy.app',
       title: 'Healthy',
@@ -245,6 +254,8 @@ describe('PsmPluginUiContributionCatalog', () => {
       panels: [],
       treeViews: [],
       mainViews: [],
+      selectionActions: [],
+      highlightProviders: [],
     })
 
     catalog.clear()
@@ -262,6 +273,8 @@ describe('PsmPluginUiContributionCatalog', () => {
       panels: [],
       treeViews: [],
       mainViews: [],
+      selectionActions: [],
+      highlightProviders: [],
     })
   })
 })

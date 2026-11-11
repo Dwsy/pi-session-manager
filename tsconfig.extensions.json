@@ -2,6 +2,8 @@
   "extends": "./tsconfig.json",
   "include": [
     "src/vite-env.d.ts",
+    "extensions/psm-bookmarks/**/*.ts",
+    "extensions/psm-bookmarks/**/*.tsx",
     "extensions/psm-code-review/**/*.ts",
     "extensions/psm-code-review/**/*.tsx",
     "extensions/psm-mesh/**/*.ts",
@@ -12,6 +14,8 @@
     "extensions/psm-system-prompt-snapshot/**/*.tsx"
   ],
   "exclude": [
+    "extensions/psm-bookmarks/**/*.test.ts",
+    "extensions/psm-bookmarks/**/*.test.tsx",
     "extensions/psm-code-review/**/*.test.ts",
     "extensions/psm-code-review/**/*.test.tsx",
     "extensions/psm-mesh/**/*.test.ts",

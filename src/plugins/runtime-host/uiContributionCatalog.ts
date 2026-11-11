@@ -9,6 +9,8 @@ import type {
   PsmSessionListColumnRegistration,
   PsmSessionMainViewRegistration,
   PsmSessionPanelRegistration,
+  PsmSelectionActionRegistration,
+  PsmSessionHighlightProviderRegistration,
   PsmSessionToolbarItemRegistration,
   PsmSessionTreeViewRegistration,
 } from '@dwsy/plugin-sdk'
@@ -25,12 +27,15 @@ import type {
   PsmSessionListColumnRuntimeRegistration,
   PsmSessionMainViewRuntimeRegistration,
   PsmSessionPanelRuntimeRegistration,
+  PsmSelectionActionRuntimeRegistration,
+  PsmSessionHighlightProviderRuntimeRegistration,
   PsmSessionToolbarItemRuntimeRegistration,
   PsmSessionTreeViewRuntimeRegistration,
 } from './types'
 
 const DEFAULT_COLUMN_ORDER = 100
 const DEFAULT_PROJECT_IDENTITY_PRIORITY = 100
+const DEFAULT_SELECTION_ACTION_ORDER = 100
 
 export interface PsmUiContributionRegistrationResult {
   registered: boolean
@@ -74,6 +79,8 @@ export class PsmPluginUiContributionCatalog {
   private readonly sessionPanels = new Map<string, PsmSessionPanelRuntimeRegistration>()
   private readonly sessionTreeViews = new Map<string, PsmSessionTreeViewRuntimeRegistration>()
   private readonly sessionMainViews = new Map<string, PsmSessionMainViewRuntimeRegistration>()
+  private readonly selectionActions = new Map<string, PsmSelectionActionRuntimeRegistration>()
+  private readonly highlightProviders = new Map<string, PsmSessionHighlightProviderRuntimeRegistration>()
 
   registerAppView(pluginId: string, view: PsmAppViewRegistration): PsmUiContributionRegistrationResult {
     if (this.appViews.has(view.id)) {
@@ -214,6 +221,32 @@ export class PsmPluginUiContributionCatalog {
     return { registered: true }
   }
 
+  registerSelectionAction(
+    pluginId: string,
+    action: PsmSelectionActionRegistration,
+  ): PsmUiContributionRegistrationResult {
+    if (this.selectionActions.has(action.id)) {
+      return { registered: false, duplicateMessage: `Selection action already registered: ${action.id}` }
+    }
+    this.selectionActions.set(action.id, {
+      ...action,
+      pluginId,
+      order: action.order ?? DEFAULT_SELECTION_ACTION_ORDER,
+    })
+    return { registered: true }
+  }
+
+  registerSessionHighlightProvider(
+    pluginId: string,
+    provider: PsmSessionHighlightProviderRegistration,
+  ): PsmUiContributionRegistrationResult {
+    if (this.highlightProviders.has(provider.id)) {
+      return { registered: false, duplicateMessage: `Session highlight provider already registered: ${provider.id}` }
+    }
+    this.highlightProviders.set(provider.id, { ...provider, pluginId })
+    return { registered: true }
+  }
+
   listAppViews(): PsmAppViewRuntimeRegistration[] {
     return sortedValues(this.appViews)
   }
@@ -266,6 +299,16 @@ export class PsmPluginUiContributionCatalog {
     return sortedValues(this.sessionMainViews)
   }
 
+  listSelectionActions(): PsmSelectionActionRuntimeRegistration[] {
+    return sortedValues(this.selectionActions).sort(
+      (a, b) => a.order - b.order || a.id.localeCompare(b.id),
+    )
+  }
+
+  listSessionHighlightProviders(): PsmSessionHighlightProviderRuntimeRegistration[] {
+    return sortedValues(this.highlightProviders)
+  }
+
   snapshot(ready = true): PsmPluginSessionUiSnapshot {
     return {
       ready,
@@ -281,6 +324,8 @@ export class PsmPluginUiContributionCatalog {
       panels: this.listSessionPanels(),
       treeViews: this.listSessionTreeViews(),
       mainViews: this.listSessionMainViews(),
+      selectionActions: this.listSelectionActions(),
+      highlightProviders: this.listSessionHighlightProviders(),
     }
   }
 
@@ -304,6 +349,8 @@ export class PsmPluginUiContributionCatalog {
     removeOwned(this.sessionPanels, pluginId)
     removeOwned(this.sessionTreeViews, pluginId)
     removeOwned(this.sessionMainViews, pluginId)
+    removeOwned(this.selectionActions, pluginId)
+    removeOwned(this.highlightProviders, pluginId)
   }
 
   clear() {
@@ -319,5 +366,7 @@ export class PsmPluginUiContributionCatalog {
     this.sessionPanels.clear()
     this.sessionTreeViews.clear()
     this.sessionMainViews.clear()
+    this.selectionActions.clear()
+    this.highlightProviders.clear()
   }
 }

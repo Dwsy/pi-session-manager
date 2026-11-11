@@ -177,6 +177,8 @@ export type PsmPluginCommandScope =
 export interface PsmPluginCommandContext {
   selectedSession?: PsmSessionReference | null;
   selectedProject?: string | null;
+  /** Active text selection in the session viewer transcript, for `selection`-scoped commands. */
+  selection?: PsmSessionSelection | null;
   query?: string;
   closeCommandMenu?: () => void;
   navigate?: {
@@ -568,6 +570,90 @@ export interface PsmSessionContextMenuActionRegistration {
   render(props: PsmSessionContextMenuActionRenderProps): unknown;
 }
 
+/**
+ * W3C Web Annotation TextQuoteSelector subset used to re-anchor a bookmark
+ * to rendered text even after the surrounding DOM or markdown output changes.
+ */
+export interface PsmTextQuoteSelector {
+  /** Selected text with whitespace normalized to single spaces. */
+  exact: string;
+  /** Up to 32 characters immediately before the match in the entry text. */
+  prefix?: string;
+  /** Up to 32 characters immediately after the match in the entry text. */
+  suffix?: string;
+}
+
+/** A non-empty text selection made by the user inside one transcript entry. */
+export interface PsmSessionSelection {
+  sessionPath: string;
+  sessionId?: string;
+  entryId: string;
+  entryRole?: string;
+  selectedText: string;
+  textQuote: PsmTextQuoteSelector;
+}
+
+export interface PsmSelectionActionRenderProps {
+  selection: PsmSessionSelection;
+  /** Dismiss the floating selection menu. */
+  close: () => void;
+  /** Open a registered session panel by id (e.g. to collect a note). */
+  openPanel?: (panelId: string) => void;
+}
+
+/**
+ * Contributes one button to the floating menu shown next to a transcript text
+ * selection. The host renders the button; the plugin only handles `run`.
+ */
+export interface PsmSelectionActionRegistration {
+  id: string;
+  title: string;
+  /** Optional lucide icon name rendered by the host. */
+  icon?: string;
+  /** Lower values render earlier. Defaults to 100. */
+  order?: number;
+  /** Return false to hide the action for a given selection. */
+  when?(selection: PsmSessionSelection): boolean;
+  run(props: PsmSelectionActionRenderProps): void | Promise<void>;
+}
+
+/** A plugin-owned highlight anchored to session text via a text quote. */
+export interface PsmSessionHighlight {
+  /** Stable id inside the provider; echoed back to `renderPopover`. */
+  id: string;
+  entryId: string;
+  textQuote: PsmTextQuoteSelector;
+  /** Hover tooltip text, typically the note or a short label. */
+  label?: string;
+  /** Host highlight hue (0-360). Defaults to a provider-derived hue. */
+  hue?: number;
+}
+
+export interface PsmSessionHighlightResolveProps {
+  session: PsmSessionReference;
+}
+
+export interface PsmSessionHighlightActivateProps {
+  session: PsmSessionReference;
+  highlight: PsmSessionHighlight;
+  anchor: HTMLElement;
+  /** Dismiss the popover opened for this highlight. */
+  close: () => void;
+}
+
+/**
+ * Rehydration contract for plugin text highlights. The host re-anchors the
+ * quotes into the rendered transcript and renders `renderPopover` when a
+ * highlight is activated (clicked).
+ */
+export interface PsmSessionHighlightProviderRegistration {
+  id: string;
+  resolveHighlights(
+    props: PsmSessionHighlightResolveProps,
+  ): PsmSessionHighlight[] | Promise<PsmSessionHighlight[]>;
+  renderPopover?(props: PsmSessionHighlightActivateProps): unknown;
+}
+
 export interface PsmPluginUiRegistry {
   registerAppView(view: PsmAppViewRegistration): void;
   registerAppSidebarView(view: PsmAppSidebarViewRegistration): void;
@@ -582,6 +668,8 @@ export interface PsmPluginUiRegistry {
   registerSessionTreeView(view: PsmSessionTreeViewRegistration): void;
   registerSessionMainView(view: PsmSessionMainViewRegistration): void;
   registerToolRenderer(renderer: PsmToolRendererRegistration): void;
+  registerSelectionAction(action: PsmSelectionActionRegistration): void;
+  registerSessionHighlightProvider(provider: PsmSessionHighlightProviderRegistration): void;
 }
 
 export interface PsmPluginSettingsClient {

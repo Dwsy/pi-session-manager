@@ -15,6 +15,8 @@ import type {
   PsmPluginCommandRegistration,
   PsmPluginToolRegistration,
   PsmSessionPanelRegistration,
+  PsmSelectionActionRegistration,
+  PsmSessionHighlightProviderRegistration,
   PsmSessionToolbarItemRegistration,
   PsmSessionTreeViewRegistration,
   PsmToolRendererRegistration,
@@ -224,6 +226,16 @@ export interface PsmProjectIdentityProviderRuntimeRegistration
   priority: number
 }
 
+export interface PsmSelectionActionRuntimeRegistration extends PsmSelectionActionRegistration {
+  pluginId: string
+  order: number
+}
+
+export interface PsmSessionHighlightProviderRuntimeRegistration
+  extends PsmSessionHighlightProviderRegistration {
+  pluginId: string
+}
+
 export interface PsmPluginSessionUiSnapshot {
   ready: boolean
   appViews: PsmAppViewRuntimeRegistration[]
@@ -238,6 +250,8 @@ export interface PsmPluginSessionUiSnapshot {
   panels: PsmSessionPanelRuntimeRegistration[]
   treeViews: PsmSessionTreeViewRuntimeRegistration[]
   mainViews: PsmSessionMainViewRuntimeRegistration[]
+  selectionActions: PsmSelectionActionRuntimeRegistration[]
+  highlightProviders: PsmSessionHighlightProviderRuntimeRegistration[]
 }
 
 export type { PsmPluginCommandContext }

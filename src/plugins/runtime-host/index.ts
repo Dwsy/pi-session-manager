@@ -1,6 +1,7 @@
 export * from './host'
 export * from './PluginContributionBoundary'
 export * from './service'
+export * from './sessionPanelBus'
 export * from './types'
 export * from './usePsmPluginSessionUi'
 export * from './usePsmPluginCommands'

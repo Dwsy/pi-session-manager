@@ -25,6 +25,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('@/plugins/runtime-host', () => ({
   PluginContributionBoundary: ({ children }: any) => children,
   PluginContributionSlot: ({ render }: any) => render(),
+  subscribeOpenSessionPanel: () => () => undefined,
   usePsmPluginSessionUi: () => ({
     toolbarItems: [
       {

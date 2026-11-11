@@ -339,6 +339,8 @@ Use command and tool registrations for plugin behavior that should appear in the
 | `ctx.ui.registerSessionPanel(...)` | Add a right-side session panel |
 | `ctx.ui.registerSessionTreeView(...)` | Add a tree-style session view |
 | `ctx.ui.registerToolRenderer(...)` | Customize tool-call rendering |
+| `ctx.ui.registerSelectionAction(...)` | Add a floating action next to transcript text selections |
+| `ctx.ui.registerSessionHighlightProvider(...)` | Re-anchor and render plugin text highlights |
 
 `registerSessionToolbarItem(...)` also supports the narrow `hostSlot` takeover contract for host-owned controls. Setting `hostSlot: 'system-prompt-tools'` replaces the built-in **System Prompt & Tools** control with the plugin's `render(...)` result while preserving the normal `panelId`/`togglePanel` render props. Only one active plugin may occupy a named host slot; later registrations are rejected with a diagnostic.
 
@@ -456,6 +458,101 @@ ctx.ui.registerToolRenderer({
   },
 })
 ```
+
+## Text Selection and Highlights
+
+Selection and highlight flows split along the same host/plugin line as the
+rest of the SDK: the host owns the transcript DOM, plugins own the data and
+the popovers.
+
+### Selection contract
+
+A selection is always contained in a single transcript entry. Cross-entry
+selections are rejected by the host and never reach plugin code.
+
+```ts
+export interface PsmTextQuoteSelector {
+  exact: string // selected text, whitespace-normalized
+  prefix?: string // up to 32 chars before the match
+  suffix?: string // up to 32 chars after the match
+}
+
+export interface PsmSessionSelection {
+  sessionPath: string
+  sessionId?: string
+  entryId: string
+  entryRole?: string
+  selectedText: string
+  textQuote: PsmTextQuoteSelector
+}
+```
+
+### Selection actions
+
+`ctx.ui.registerSelectionAction(...)` contributes one button to the floating
+menu the host shows next to a text selection. The host renders the button and
+handles keyboard navigation; the plugin provides the label and `run`.
+
+```ts
+export interface PsmSelectionActionRegistration {
+  id: string
+  title: string
+  icon?: string // host-known icon name: bookmark, note, tag, star, sparkles, search, copy
+  order?: number // default 100
+  when?(selection: PsmSessionSelection): boolean
+  run(props: PsmSelectionActionRenderProps): void | Promise<void>
+}
+
+export interface PsmSelectionActionRenderProps {
+  selection: PsmSessionSelection
+  close(): void // dismiss the menu
+  openPanel?(panelId: string): void // open a registered session panel
+}
+```
+
+`selection`-scoped commands also receive the active selection as
+`context.selection` (`PsmPluginCommandContext`).
+
+### Highlight providers
+
+`ctx.ui.registerSessionHighlightProvider(...)` lets a plugin rehydrate text
+highlights into the rendered transcript. The host re-anchors quotes after DOM
+rebuilds (virtual scrolling, streaming) and falls back silently when a quote
+no longer matches.
+
+```ts
+export interface PsmSessionHighlight {
+  id: string // stable inside the provider
+  entryId: string
+  textQuote: PsmTextQuoteSelector
+  label?: string // hover tooltip
+  hue?: number // 0-360 highlight hue
+}
+
+export interface PsmSessionHighlightProviderRegistration {
+  id: string
+  resolveHighlights(props: {
+    session: PsmSessionReference
+  }): PsmSessionHighlight[] | Promise<PsmSessionHighlight[]>
+  renderPopover?(props: {
+    session: PsmSessionReference
+    highlight: PsmSessionHighlight
+    anchor: HTMLElement
+    close(): void
+  }): unknown
+}
+```
+
+Rules:
+
+- `resolveHighlights` runs per session open and on provider changes; keep it
+  cheap and side-effect free beyond its own data reads.
+- `renderPopover` is optional; without it, `label` is the only hover feedback.
+- `anchor` is the host-owned `<mark>` element; do not mutate or retain it.
+- Highlight marks disappear with their DOM; re-anchoring is the host's job.
+
+Reference implementation: `extensions/psm-bookmarks` (bookmark records,
+selection actions, highlight provider, session panel, explorer view).
 
 ## Events
 

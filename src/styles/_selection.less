@@ -1,0 +1,145 @@
+// =====================================================
+// ========== Transcript Selection & Highlights ========
+// Selection action menu, bookmark highlight marks,
+// and plugin highlight popovers.
+// =====================================================
+
+@psm-highlight-hue: 45; // warm bookmark amber
+
+mark.psm-text-highlight {
+  background: hsla(var(--psm-highlight-hue, @psm-highlight-hue), 92%, 62%, 0.26);
+  border-bottom: 1.5px solid hsla(var(--psm-highlight-hue, @psm-highlight-hue), 72%, 48%, 0.55);
+  border-radius: 3px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0 1px;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    background 150ms ease-out,
+    border-color 150ms ease-out,
+    box-shadow 150ms ease-out;
+
+  &:hover {
+    background: hsla(var(--psm-highlight-hue, @psm-highlight-hue), 92%, 62%, 0.42);
+    box-shadow: 0 0 0 2px hsla(var(--psm-highlight-hue, @psm-highlight-hue), 72%, 58%, 0.22);
+  }
+}
+
+.psm-selection-menu {
+  position: fixed;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  transform: translate(-50%, calc(-100% - 2px));
+  border-radius: 12px;
+  border: 1px solid rgba(var(--accent-rgb), 0.28);
+  background: rgba(var(--color-card), 0.92);
+  box-shadow:
+    0 14px 36px rgba(var(--shadow-rgb), 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  animation: psm-selection-menu-in 140ms ease-out;
+
+  &.psm-selection-menu--flipped {
+    transform: translate(-50%, 2px);
+    animation: psm-selection-menu-in-flipped 140ms ease-out;
+  }
+}
+
+.psm-selection-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: rgb(var(--color-foreground));
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 120ms ease-out,
+    color 120ms ease-out;
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(var(--accent-rgb), 0.14);
+    color: rgb(var(--accent));
+    outline: none;
+  }
+}
+
+.psm-selection-menu__icon {
+  width: 13px;
+  height: 13px;
+  color: rgb(var(--accent));
+}
+
+.psm-selection-menu__label {
+  line-height: 1;
+}
+
+.psm-highlight-popover {
+  position: fixed;
+  z-index: 92;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--accent-rgb), 0.24);
+  background: rgba(var(--color-card), 0.97);
+  box-shadow:
+    0 18px 44px rgba(var(--shadow-rgb), 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  overflow: hidden;
+  animation: psm-highlight-popover-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes psm-selection-menu-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 2px)) translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 2px)) translateY(0) scale(1);
+  }
+}
+
+@keyframes psm-selection-menu-in-flipped {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 2px) translateY(-4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 2px) translateY(0) scale(1);
+  }
+}
+
+@keyframes psm-highlight-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .psm-selection-menu,
+  .psm-selection-menu--flipped,
+  .psm-highlight-popover {
+    animation: none;
+  }
+
+  mark.psm-text-highlight {
+    transition: none;
+  }
+}

@@ -106,6 +106,19 @@ open issue `docs/issues/插件/20261101-pi-mesh-psm-plugin.md` for test and
 rollout gates. The production Mesh daemon is **not** hot reloaded after source
 changes; unit tests alone do not constitute real Hub/UI acceptance.
 
+## Text selection and highlight contract (2026-11-11)
+
+| Capability | Public API and permission | Ground truth / limitation |
+| --- | --- | --- |
+| Transcript text selection | `ctx.ui.registerSelectionAction(...)`, `selection`-scoped command `context.selection` | Single-entry selections only; host renders the floating menu and owns the transcript DOM; cross-entry selections are rejected before plugin code runs |
+| Text-quote anchoring | `PsmTextQuoteSelector` (`exact` + 32-char `prefix`/`suffix`) | Host re-anchors into rendered DOM; duplicate quotes are disambiguated by context; failed anchors degrade silently |
+| Plugin text highlights | `ctx.ui.registerSessionHighlightProvider(...)`, `records:read` | `resolveHighlights` runs per session open; `renderPopover` receives a host-owned `<mark>` anchor that plugins must not retain or mutate |
+| Note-follows-save UX | `PsmSelectionActionRenderProps.openPanel(panelId)` | Opens a registered session panel through a host request bus; no general panel-control API is exposed |
+
+Reference implementation: `extensions/psm-bookmarks` (bookmark records + explorer
+view). Deletion of plugin records is still host-privileged; plugins tombstone via
+`records:write` and must filter tombstones in every read path.
+
 ## Remaining Documentation Gaps
 
 These are the places that still deserve explicit notes in the docs because they can confuse plugin authors if left implicit.

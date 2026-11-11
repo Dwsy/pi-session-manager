@@ -1655,6 +1655,15 @@ describe('PsmPluginHost', () => {
                   title: 'Main',
                   render: () => 'main',
                 })
+                ctx.ui.registerSelectionAction({
+                  id: 'failed.selection-action',
+                  title: 'Selection Action',
+                  run: () => undefined,
+                })
+                ctx.ui.registerSessionHighlightProvider({
+                  id: 'failed.highlight-provider',
+                  resolveHighlights: () => [],
+                })
                 throw new Error('activation exploded')
               },
             }
@@ -1690,7 +1699,64 @@ describe('PsmPluginHost', () => {
       panels: [],
       treeViews: [],
       mainViews: [],
+      selectionActions: [],
+      highlightProviders: [],
     })
+  })
+
+  it('publishes selection actions and highlight providers registered by active plugins', async () => {
+    const host = new PsmPluginHost({
+      builtinEntries: [
+        {
+          source: 'builtin',
+          sourceId: 'extensions/selection',
+          async load() {
+            return {
+              manifest: {
+                manifestVersion: 1,
+                id: 'builtin.selection',
+                name: 'Selection',
+                version: '1.0.0',
+              },
+              activate: (ctx: any) => {
+                ctx.ui.registerSelectionAction({
+                  id: 'selection.bookmark',
+                  title: 'Bookmark',
+                  icon: 'bookmark',
+                  order: 5,
+                  run: () => undefined,
+                })
+                ctx.ui.registerSessionHighlightProvider({
+                  id: 'selection.highlights',
+                  resolveHighlights: () => [],
+                })
+              },
+            }
+          },
+        },
+      ],
+      services: {
+        loadConfig: async () => config(),
+        listNpmEntries: async () => [],
+      },
+    })
+
+    await host.reload()
+
+    const snapshot = host.getSessionUiSnapshot()
+    expect(snapshot.selectionActions).toEqual([
+      expect.objectContaining({
+        id: 'selection.bookmark',
+        pluginId: 'builtin.selection',
+        order: 5,
+      }),
+    ])
+    expect(snapshot.highlightProviders).toEqual([
+      expect.objectContaining({
+        id: 'selection.highlights',
+        pluginId: 'builtin.selection',
+      }),
+    ])
   })
 
   it('publishes project identity providers registered by active plugins', async () => {

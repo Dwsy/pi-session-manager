@@ -7,7 +7,7 @@ import SessionViewer from "@/components/SessionViewer";
 import { SortablePinnedPanels, type SessionFeatureItem } from "@/components/session-viewer/SessionViewerPinnedPanels";
 import { useSettings } from "@/hooks/useSettings";
 import { useDeferredPresence } from "@/hooks/useDeferredPresence";
-import { PluginContributionBoundary, PluginContributionSlot, usePsmPluginSessionUi } from "@/plugins/runtime-host";
+import { PluginContributionBoundary, PluginContributionSlot, subscribeOpenSessionPanel, usePsmPluginSessionUi } from "@/plugins/runtime-host";
 import type { PsmSessionToolbarItemRuntimeRegistration } from "@/plugins/runtime-host/types";
 import type { PsmSessionViewerController } from "@dwsy/plugin-sdk";
 
@@ -102,6 +102,12 @@ function AppSessionViewerPane({
   const togglePanel = useCallback((id: string) => {
     setActivePanelId((prev) => (prev === id ? null : id));
   }, []);
+
+  // Selection actions and plugin commands can request a panel from outside
+  // this component tree via the host request bus.
+  useEffect(() => subscribeOpenSessionPanel((panelId) => {
+    setActivePanelId(panelId);
+  }), []);
 
   const closePanel = useCallback((id: string) => {
     setActivePanelId((prev) => (prev === id ? null : prev));

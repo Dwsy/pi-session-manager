@@ -405,7 +405,7 @@ export class PsmPluginHost {
   private toolRenderers = new Map<string, PsmToolRendererRuntimeRegistration>()
   private readonly uiContributions = new PsmPluginUiContributionCatalog()
   private commandSnapshot: PsmPluginCommandRuntimeRegistration[] = []
-  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { ready: false, appViews: [], appSidebarViews: [], projectSessionViews: [], sessionListActions: [], sessionListColumns: [], projectListActions: [], projectIdentityProviders: [], sessionContextMenuActions: [], toolbarItems: [], panels: [], treeViews: [], mainViews: [] }
+  private sessionUiSnapshot: PsmPluginSessionUiSnapshot = { ready: false, appViews: [], appSidebarViews: [], projectSessionViews: [], sessionListActions: [], sessionListColumns: [], projectListActions: [], projectIdentityProviders: [], sessionContextMenuActions: [], toolbarItems: [], panels: [], treeViews: [], mainViews: [], selectionActions: [], highlightProviders: [] }
   private listeners = new Set<() => void>()
   private activePlugins = new Map<string, ActivePlugin>()
   private statuses = new Map<string, PsmPluginStatus>()
@@ -862,6 +862,14 @@ export class PsmPluginHost {
         },
         registerSessionMainView: (view) => {
           const result = this.uiContributions.registerSessionMainView(manifest.id, view)
+          if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
+        },
+        registerSelectionAction: (action) => {
+          const result = this.uiContributions.registerSelectionAction(manifest.id, action)
+          if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
+        },
+        registerSessionHighlightProvider: (provider) => {
+          const result = this.uiContributions.registerSessionHighlightProvider(manifest.id, provider)
           if (result.duplicateMessage) diagnostics.push(diagnostic('warn', result.duplicateMessage))
         },
         registerToolRenderer: (renderer: PsmToolRendererRegistration) => {

@@ -84,6 +84,7 @@ export const command = {
     placeholder: 'プラグインコマンドを検索...',
     requiresProject: 'アクティブなプロジェクトが必要です',
     requiresSession: 'アクティブなセッションが必要です',
+    requiresSelection: 'テキストの選択が必要です',
     unavailable: '現在のコンテキストでは利用できません',
     empty: '登録されたプラグインコマンドはありません',
     emptyForQuery: 'コマンドが見つかりません',

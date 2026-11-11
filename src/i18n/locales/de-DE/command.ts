@@ -81,6 +81,7 @@ export const command = {
     placeholder: 'Plugin-Befehle suchen...',
     requiresProject: 'Erfordert ein aktives Projekt',
     requiresSession: 'Erfordert eine aktive Sitzung',
+    requiresSelection: 'Erfordert eine aktive Textauswahl',
     unavailable: 'Im aktuellen Kontext nicht verfügbar',
     empty: 'Keine Plugin-Befehle registriert',
     emptyForQuery: 'Keine Befehle gefunden',
