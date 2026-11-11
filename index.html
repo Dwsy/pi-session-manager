@@ -19,10 +19,31 @@
           var raw = localStorage.getItem("pi-session-manager-settings");
           if (!raw) return;
           var settings = JSON.parse(raw);
-          var theme = settings && settings.appearance && settings.appearance.theme;
+          var appearance = settings && settings.appearance;
+          var root = document.documentElement;
+
+          // Apply the rem-based sizing before React mounts. The stylesheet falls
+          // back to 16px, so without this the first paint uses a different scale
+          // than useAppearance writes in its effect and the whole layout
+          // re-flows once the settings are applied.
+          var fontSizeMap = { small: "14px", medium: "16px", large: "18px" };
+          var fontSize = appearance && fontSizeMap[appearance.fontSize];
+          if (fontSize) root.style.setProperty("--font-size-base", fontSize);
+
+          var spacingMap = { compact: "8px", comfortable: "16px", spacious: "24px" };
+          var spacing = appearance && spacingMap[appearance.messageSpacing];
+          if (spacing) root.style.setProperty("--spacing-base", spacing);
+
+          if (appearance && appearance.fontFamily) {
+            root.style.setProperty("--font-family", appearance.fontFamily);
+          }
+          if (appearance && appearance.fontFamilyMono) {
+            root.style.setProperty("--font-family-mono", appearance.fontFamilyMono);
+          }
+
+          var theme = appearance && appearance.theme;
           if (theme !== "light" && theme !== "dark") return;
 
-          var root = document.documentElement;
           root.dataset.startupTheme = theme;
           root.style.colorScheme = theme;
           root.classList.remove("theme-dark", "theme-light");
@@ -44,6 +65,13 @@
         --startup-bg: #1a1b26;
         --startup-logo-color: #f8fafc;
         --startup-logo-shadow: rgba(0, 0, 0, 0.28);
+      }
+
+      /* rem sizing must resolve at first paint: the LESS bundle arrives later
+         and a late font-size change re-flows every rem-based width (the startup
+         jitter was the sidebar snapping 320px -> 280px here). */
+      html {
+        font-size: var(--font-size-base, 16px);
       }
 
       @media (prefers-color-scheme: light) {
