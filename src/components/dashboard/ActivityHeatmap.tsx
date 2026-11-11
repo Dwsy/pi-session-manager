@@ -88,10 +88,10 @@ export default function ActivityHeatmap({
     const activityLabel = [
       t('dashboard.activityLevels.none', 'No activity'),
       t('dashboard.activityLevels.low', 'Low'),
-      t('dashboard.activityLevels.low', 'Low'),
       t('dashboard.activityLevels.medium', 'Medium'),
       t('dashboard.activityLevels.high', 'High'),
       t('dashboard.activityLevels.veryHigh', 'Very high'),
+      t('dashboard.activityLevels.peak', 'Peak'),
     ][level]
     const formatCost = (value: number) => value < 0.01 ? `$${value.toFixed(4)}` : `$${value.toFixed(value < 1 ? 3 : 2)}`
     const content = (
