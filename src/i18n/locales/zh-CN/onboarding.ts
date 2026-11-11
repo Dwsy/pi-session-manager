@@ -19,6 +19,7 @@ export const onboarding = {
       topProjectsTitle: '最活跃的项目',
       topProjectsEmpty: '还没有扫描到会话。在下一步添加来源后，它们会出现在这里。',
       sessionCount: '{{count}} 个会话',
+      sessionCount_one: '{{count}} 个会话',
     },
     sources: {
       title: '会话来源',

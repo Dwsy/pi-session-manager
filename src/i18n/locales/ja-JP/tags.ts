@@ -27,6 +27,8 @@ export const tags = {
     favorite: 'お気に入り',
     copyResume: '再開コマンドをコピー',
     delete: '削除',
+    fork: 'セッションを複製',
+    rename: '名前を変更',
   },
   filter: {
     title: 'ラベル',
@@ -46,6 +48,8 @@ export const tags = {
     last30Days: '過去30日',
     active: 'アクティブ',
     back: '戻る',
+    last24h: '過去 24 時間',
+    last2Days: '過去 2 日',
   },
   autoRules: {
     title: '自動ルール',

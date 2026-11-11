@@ -21,7 +21,7 @@ export const search = {
   next: '次の結果 (Enter または Cmd/Ctrl+G)',
   close: '検索を閉じる (Esc)',
   searching: '検索中...',
-  results: '{count} 件',
+  results: '{{count}} 件',
   fullText: {
     placeholder: '全セッションを検索...',
     resultsFound: '{{count}} 件の一致が見つかりました',
@@ -45,5 +45,10 @@ export const search = {
     sortNewest: '最新',
     sortOldest: '最古',
     sortTitle: 'ソート順',
+    showingResults: '{{total}} 件中 {{shown}} 件を表示',
+    loadMore: 'さらに読み込む',
+    loadMoreRemaining: 'さらに読み込む（残り {{count}} 件）',
+    retryLoadMore: '再読み込みを再試行',
+    sessionIdMatch: 'セッション ID',
   },
 } as const

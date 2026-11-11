@@ -40,6 +40,7 @@ export const common = {
     hoursAgo: '{{count}}時間前',
     daysAgo: '{{count}}日前',
     monthsAgo: '{{count}}ヶ月前',
+    weeksAgo: '{{count}} 週間前',
   },
   systemPrompt: {
     systemPrompt: 'システムプロンプト',
@@ -48,4 +49,10 @@ export const common = {
     noToolsUsed: 'このセッションではツール未使用',
     calls: '回呼出',
   },
+  done: '完了',
+  loadMoreCount: 'さらに {{loadCount}} 件読み込む（残り {{remaining}} 件）',
+  copied: 'クリップボードにコピーしました',
+  copyFailed: 'コピーに失敗しました',
+  warning: '警告',
+  clearAll: 'すべてクリア',
 } as const

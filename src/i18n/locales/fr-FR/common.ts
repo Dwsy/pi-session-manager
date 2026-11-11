@@ -35,11 +35,12 @@ export const common = {
   created: 'Créé',
   updated: 'Mis à jour',
   time: {
-    justNow: "À l'instant",
+    justNow: 'À l\'instant',
     minutesAgo: 'il y a {{count}} min',
     hoursAgo: 'il y a {{count}} h',
     daysAgo: 'il y a {{count}} jours',
     monthsAgo: 'il y a {{count}} mois',
+    weeksAgo: 'il y a {{count}} semaines',
   },
   systemPrompt: {
     systemPrompt: 'Prompt système',
@@ -48,4 +49,10 @@ export const common = {
     noToolsUsed: 'Aucun outil utilisé dans cette session',
     calls: 'appels',
   },
+  done: 'Terminé',
+  loadMoreCount: 'Charger {{loadCount}} de plus ({{remaining}} restants)',
+  copied: 'Copié dans le presse-papiers',
+  copyFailed: 'Échec de la copie',
+  warning: 'Avertissement',
+  clearAll: 'Tout effacer',
 } as const

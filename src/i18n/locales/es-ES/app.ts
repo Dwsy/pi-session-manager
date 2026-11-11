@@ -25,9 +25,10 @@ export const app = {
     renameSession: 'Error al renombrar la sesión',
     exportFailed: 'Error en la exportación',
     exportSuccess: 'Exportación completada',
+    forkSession: 'Error al bifurcar la sesión',
   },
   confirm: {
-    deleteSession: '¿Eliminar la sesión "{name}"?',
+    deleteSession: '¿Eliminar la sesión "{{name}}"?',
     deleteSessions: '¿Eliminar las {{count}} sesiones seleccionadas?',
     deleteIrreversible: 'Esta acción no se puede deshacer.',
   },

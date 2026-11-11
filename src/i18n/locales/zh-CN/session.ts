@@ -307,4 +307,5 @@ export const session = {
     reviewShort: '审查',
   },
   newMessages: '有新消息',
+  userMessage: '用户消息',
 } as const

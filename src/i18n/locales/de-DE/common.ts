@@ -34,11 +34,18 @@ export const common = {
   no: 'Nein',
   created: 'Erstellt',
   updated: 'Aktualisiert',
+  done: 'Fertig',
+  copied: 'In die Zwischenablage kopiert',
+  copyFailed: 'Kopieren fehlgeschlagen',
+  warning: 'Warnung',
+  clearAll: 'Löschen',
+  loadMoreCount: '{{loadCount}} weitere laden ({{remaining}} verbleibend)',
   time: {
     justNow: 'Gerade eben',
     minutesAgo: 'vor {{count}} Min.',
     hoursAgo: 'vor {{count}} Std.',
     daysAgo: 'vor {{count}} Tagen',
+    weeksAgo: 'vor {{count}} Wochen',
     monthsAgo: 'vor {{count}} Monaten',
   },
   systemPrompt: {

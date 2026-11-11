@@ -25,9 +25,10 @@ export const app = {
     renameSession: 'セッションの名前変更に失敗',
     exportFailed: 'エクスポートに失敗',
     exportSuccess: 'エクスポート成功',
+    forkSession: 'セッションのフォークに失敗しました',
   },
   confirm: {
-    deleteSession: 'セッション「{name}」を削除しますか？',
+    deleteSession: 'セッション「{{name}}」を削除しますか？',
     deleteSessions: '選択した {{count}} 件のセッションを削除しますか？',
     deleteIrreversible: 'この操作は元に戻せません。',
   },

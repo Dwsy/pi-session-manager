@@ -21,6 +21,7 @@ export const onboarding = {
       topProjectsEmpty:
         'まだセッションが見つかりません。次のステップでソースを追加すると、ここに表示されます。',
       sessionCount: '{{count}} セッション',
+      sessionCount_one: '{{count}} セッション',
     },
     sources: {
       title: 'セッションのソース',

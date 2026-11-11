@@ -8,5 +8,6 @@ export default {
     connected: 'Connecté',
     disconnected: 'Déconnecté',
     shortcut: 'Cmd+J',
+    sessionDescription: 'Shell de la session',
   },
 }

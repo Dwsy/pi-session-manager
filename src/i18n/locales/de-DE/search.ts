@@ -21,7 +21,7 @@ export const search = {
   next: 'Nächstes Ergebnis (Enter oder Cmd/Ctrl+G)',
   close: 'Suche schließen (Esc)',
   searching: 'Suche läuft...',
-  results: '{count} Ergebnisse',
+  results: '{{count}} Ergebnisse',
   fullText: {
     placeholder: 'Alle Sitzungen durchsuchen...',
     resultsFound: '{{count}} Treffer gefunden',
@@ -45,5 +45,10 @@ export const search = {
     sortNewest: 'Neueste',
     sortOldest: 'Älteste',
     sortTitle: 'Sortieren nach',
+    showingResults: '{{shown}} von {{total}} angezeigt',
+    loadMore: 'Mehr laden',
+    loadMoreRemaining: 'Mehr laden ({{count}} verbleibend)',
+    retryLoadMore: 'Laden erneut versuchen',
+    sessionIdMatch: 'Sitzungs-ID',
   },
 } as const

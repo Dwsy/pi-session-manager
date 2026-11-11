@@ -182,6 +182,7 @@ export const dashboard = {
     medium: 'Medium',
     high: 'High',
     veryHigh: 'Very High',
+    peak: 'Peak',
   },
   msgs: 'msgs',
   noRecentSessions: 'No recent sessions',

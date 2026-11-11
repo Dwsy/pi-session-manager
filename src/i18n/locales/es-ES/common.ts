@@ -40,6 +40,7 @@ export const common = {
     hoursAgo: 'hace {{count}} h',
     daysAgo: 'hace {{count}} días',
     monthsAgo: 'hace {{count}} meses',
+    weeksAgo: 'hace {{count}} semanas',
   },
   systemPrompt: {
     systemPrompt: 'Prompt del sistema',
@@ -48,4 +49,10 @@ export const common = {
     noToolsUsed: 'No se usaron herramientas en esta sesión',
     calls: 'llamadas',
   },
+  done: 'Hecho',
+  loadMoreCount: 'Cargar {{loadCount}} más ({{remaining}} restantes)',
+  copied: 'Copiado al portapapeles',
+  copyFailed: 'Error al copiar',
+  warning: 'Advertencia',
+  clearAll: 'Limpiar',
 } as const

@@ -27,6 +27,8 @@ export const tags = {
     favorite: 'Favorito',
     copyResume: 'Copiar comando de reanudación',
     delete: 'Eliminar',
+    fork: 'Duplicar sesión',
+    rename: 'Renombrar',
   },
   filter: {
     title: 'Etiquetas',
@@ -46,6 +48,8 @@ export const tags = {
     last30Days: 'Últimos 30 días',
     active: 'Activo',
     back: 'Volver',
+    last24h: 'Últimas 24 horas',
+    last2Days: 'Últimos 2 días',
   },
   autoRules: {
     title: 'Reglas automáticas',

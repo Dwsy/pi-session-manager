@@ -27,6 +27,8 @@ export const tags = {
     favorite: 'Favorit',
     copyResume: 'Wiederaufnahmebefehl kopieren',
     delete: 'Löschen',
+    fork: 'Sitzung duplizieren',
+    rename: 'Umbenennen',
   },
   filter: {
     title: 'Labels',
@@ -43,6 +45,8 @@ export const tags = {
     allTime: 'Gesamter Zeitraum',
     today: 'Heute',
     last7Days: 'Letzte 7 Tage',
+    last24h: 'Letzte 24 Stunden',
+    last2Days: 'Letzte 2 Tage',
     last30Days: 'Letzte 30 Tage',
     active: 'Aktiv',
     back: 'Zurück',

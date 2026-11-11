@@ -21,13 +21,14 @@ export const app = {
   errors: {
     loadSessions: 'Échec du chargement des sessions',
     deleteSession: 'Échec de la suppression de la session',
-    deleteSessionPartial: "{{count}} sessions n'ont pas pu être supprimées. Consultez la console pour plus de détails.",
+    deleteSessionPartial: '{{count}} sessions n\'ont pas pu être supprimées. Consultez la console pour plus de détails.',
     renameSession: 'Échec du renommage de la session',
-    exportFailed: "Échec de l'exportation",
+    exportFailed: 'Échec de l\'exportation',
     exportSuccess: 'Exportation réussie',
+    forkSession: 'Échec de la duplication de la session',
   },
   confirm: {
-    deleteSession: 'Supprimer la session « {name} » ?',
+    deleteSession: 'Supprimer la session « {{name}} » ?',
     deleteSessions: 'Supprimer les {{count}} sessions sélectionnées ?',
     deleteIrreversible: 'Cette action est irréversible.',
   },

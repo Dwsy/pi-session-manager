@@ -27,6 +27,8 @@ export const tags = {
     favorite: 'Favori',
     copyResume: 'Copier la commande de reprise',
     delete: 'Supprimer',
+    fork: 'Dupliquer la session',
+    rename: 'Renommer',
   },
   filter: {
     title: 'Étiquettes',
@@ -41,11 +43,13 @@ export const tags = {
     allModels: 'Tous les modèles',
     dateRange: 'Plage de dates',
     allTime: 'Tout le temps',
-    today: "Aujourd'hui",
+    today: 'Aujourd\'hui',
     last7Days: '7 derniers jours',
     last30Days: '30 derniers jours',
     active: 'Actif',
     back: 'Retour',
+    last24h: 'Dernières 24 heures',
+    last2Days: '2 derniers jours',
   },
   autoRules: {
     title: 'Règles automatiques',

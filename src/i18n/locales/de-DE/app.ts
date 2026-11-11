@@ -25,9 +25,10 @@ export const app = {
     renameSession: 'Sitzung konnte nicht umbenannt werden',
     exportFailed: 'Export fehlgeschlagen',
     exportSuccess: 'Export erfolgreich',
+    forkSession: 'Forken der Sitzung fehlgeschlagen',
   },
   confirm: {
-    deleteSession: 'Sitzung „{name}" löschen?',
+    deleteSession: 'Sitzung „{{name}}" löschen?',
     deleteSessions: '{{count}} ausgewählte Sitzungen löschen?',
     deleteIrreversible: 'Diese Aktion kann nicht rückgängig gemacht werden.',
   },

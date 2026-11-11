@@ -45,5 +45,10 @@ export const search = {
     sortNewest: '最新',
     sortOldest: '最早',
     sortTitle: '排序方式',
+    loadMore: '加载更多',
+    loadMoreRemaining: '加载更多（剩余 {{count}} 项）',
+    retryLoadMore: '重试加载',
+    sessionIdMatch: '会话 ID',
+    showingResults: '显示 {{shown}} / {{total}}',
   },
 } as const

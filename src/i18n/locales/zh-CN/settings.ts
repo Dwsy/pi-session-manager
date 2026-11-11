@@ -493,6 +493,8 @@ export const settings = {
     // Legacy
     collapse: "收起",
     expandSettings: "展开设置",
+    optional: "可选",
+    resumeCommandDesc: "留空使用默认：cd {cwd} && {pi} --session {path}",
     // Terminal Options
     options: {
       auto: { name: "自动检测", description: "自动检测可用终端" },
@@ -512,6 +514,11 @@ export const settings = {
         description: "系统默认终端",
       },
       tmux: { name: "tmux", description: "tmux 会话 (pi)" },
+      cmd: { name: "cmd", description: "命令提示符" },
+      gnomeTerminal: { name: "GNOME Terminal", description: "GNOME 终端" },
+      konsole: { name: "Konsole", description: "KDE Konsole 终端" },
+      powershell: { name: "PowerShell", description: "Windows PowerShell 终端" },
+      windowsTerminal: { name: "Windows Terminal", description: "Windows 终端" },
       custom: { name: "自定义", description: "使用自定义命令" },
     },
   },
