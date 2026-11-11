@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Bookmark, RegistryEntry } from './bookmark'
-import { BookmarksAppView, BookmarksPanel, BookmarkHighlightPopover, type BookmarkStoreLike } from './ui'
+import { BookmarksPanel, BookmarkHighlightPopover, type BookmarkStoreLike } from './ui'
 
 const bookmark: Bookmark = {
   id: 'bm-1',
@@ -209,63 +209,5 @@ describe('BookmarkHighlightPopover', () => {
     )
     await flush()
     expect(container.textContent).toBe('')
-  })
-})
-
-describe('BookmarksAppView', () => {
-  it('searches bookmarks and offers session navigation', async () => {
-    const store = createStore()
-    const onSelectSession = vi.fn()
-    const { container } = await render(
-      <BookmarksAppView
-        store={store}
-        i18n={i18n}
-        active
-        onSelectSession={onSelectSession}
-      />,
-    )
-    await flush()
-    expect(store.listRecent).toHaveBeenCalled()
-    expect(container.textContent).toContain('Recent bookmarks')
-    expect(container.textContent).toContain('beta delta')
-
-    await act(async () => {
-      Array.from(container.querySelectorAll('button'))
-        .find((button) => button.textContent === 'Open session')!
-        .click()
-    })
-    expect(onSelectSession).toHaveBeenCalledWith('/tmp/session.jsonl')
-
-    const input = container.querySelector('input')!
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
-      setter.call(input, 'beta')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-    })
-    await flush()
-    expect(store.search).toHaveBeenCalledWith('beta')
-  })
-
-  it('runs AI organization on the visible bookmarks', async () => {
-    const aiTidy = vi.fn(async () => 'Theme: greek letters')
-    const { container } = await render(
-      <BookmarksAppView
-        store={createStore()}
-        i18n={i18n}
-        active
-        aiTidy={aiTidy}
-      />,
-    )
-    await flush()
-    await act(async () => {
-      Array.from(container.querySelectorAll('button'))
-        .find((button) => button.textContent?.includes('AI organize'))!
-        .click()
-    })
-    await flush()
-    expect(aiTidy).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'bm-1', quote: 'beta delta' }),
-    ])
-    expect(container.textContent).toContain('Theme: greek letters')
   })
 })

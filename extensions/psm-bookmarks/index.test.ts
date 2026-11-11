@@ -39,6 +39,7 @@ function makeCtx() {
       id: string
       render: (props: { viewId: string; active: boolean; data?: unknown }) => unknown
     }>,
+    appSidebarViews: [] as Array<{ id: string; appViewId?: string }>,
     commands: new Map<string, (args: Record<string, unknown>, context?: unknown) => unknown>(),
   }
   const ctx = {
@@ -75,6 +76,9 @@ function makeCtx() {
       }) => {
         captured.appViews.push(view)
       },
+      registerAppSidebarView: (view: { id: string; appViewId?: string }) => {
+        captured.appSidebarViews.push(view)
+      },
     },
     registerCommand: (
       command: string | { id: string; run: (args: Record<string, unknown>, context?: unknown) => unknown },
@@ -103,6 +107,7 @@ describe('bookmarks plugin activation', () => {
       'builtin.bookmarks.highlights',
     ])
     expect(captured.appViews.map((view) => view.id)).toEqual(['builtin.bookmarks.view'])
+    expect(captured.appSidebarViews.map((view) => view.id)).toEqual(['builtin.bookmarks.sidebar'])
     expect([...captured.commands.keys()]).toEqual([
       'builtin.bookmarks.open',
       'builtin.bookmarks.save',

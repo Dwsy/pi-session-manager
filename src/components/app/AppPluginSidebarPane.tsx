@@ -14,6 +14,27 @@ function normalizeRoute(route?: string) {
   return normalized.replace(/\/+$/, "") || "/";
 }
 
+/** Shared lookup so other sidebar hosts can tell whether an app view brings its own sidebar. */
+export function findAppSidebarView<
+  AV extends { id: string; route?: string },
+  SV extends { appViewId?: string; route?: string },
+>(
+  appViewId: string | null,
+  appViews: AV[],
+  appSidebarViews: SV[],
+): SV | null {
+  const appView = appViewId ? appViews.find((view) => view.id === appViewId) : null;
+  if (!appView) return null;
+  const appViewRoute = normalizeRoute(appView.route);
+  return (
+    appSidebarViews.find((view) => {
+      if (view.appViewId === appView.id) return true;
+      const sidebarRoute = normalizeRoute(view.route);
+      return !!appViewRoute && sidebarRoute === appViewRoute;
+    }) ?? null
+  );
+}
+
 export interface AppPluginSidebarPaneProps {
   appViewId: string | null;
   fallback?: ReactNode;
@@ -26,14 +47,7 @@ function AppPluginSidebarPane({
   const appData = useAppPluginSurfaceData();
   const { ready, appViews, appSidebarViews } = usePsmPluginUi();
   const appView = appViewId ? appViews.find((view) => view.id === appViewId) : null;
-  const appViewRoute = normalizeRoute(appView?.route);
-  const sidebarView = appView
-    ? appSidebarViews.find((view) => {
-        if (view.appViewId === appView.id) return true;
-        const sidebarRoute = normalizeRoute(view.route);
-        return !!appViewRoute && sidebarRoute === appViewRoute;
-      })
-    : null;
+  const sidebarView = findAppSidebarView(appViewId, appViews, appSidebarViews);
 
   if (!appView) {
     if (!ready) return <>{fallback}</>;

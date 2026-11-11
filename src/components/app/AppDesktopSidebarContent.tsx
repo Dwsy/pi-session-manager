@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import ProjectList from "@/components/project/ProjectList";
 import SessionList from "@/components/session-list/SessionList";
 import SelectedProjectHeader from "@/components/project/SelectedProjectHeader";
-import AppPluginSidebarPane from "./AppPluginSidebarPane";
+import AppPluginSidebarPane, { findAppSidebarView } from "./AppPluginSidebarPane";
 import { useOptionalAppPluginSurfaceData } from "./AppPluginSurfaceData";
 import {
   PluginContributionBoundary,
@@ -100,8 +100,13 @@ function AppDesktopSidebarContent({
 }: AppDesktopSidebarContentProps) {
   const { t } = useTranslation();
   const pluginSurfaceData = useOptionalAppPluginSurfaceData();
-  const { projectSessionViews } = usePsmPluginUi();
+  const { projectSessionViews, appViews, appSidebarViews } = usePsmPluginUi();
   const projectSessionView = pluginSurfaceData ? (projectSessionViews[0] ?? null) : null;
+  // App views own their sidebar; without a plugin sidebar the raw session list
+  // would render an empty "No sessions found" in app mode.
+  const hasAppPluginSidebar =
+    sidebarMode === "app" &&
+    Boolean(findAppSidebarView(activeAppViewId, appViews, appSidebarViews));
   const [projectSessionMode, setProjectSessionMode] = useState<string | null>(null);
   const pluginProjectSessionModes = projectSessionView?.modes ?? [];
   const projectSessionModes = projectSessionView
@@ -213,6 +218,16 @@ function AppDesktopSidebarContent({
           scrollParentRef={listScrollRef}
           liveSessionIds={liveSessionIds}
         />
+      ) : sidebarMode === "app" ? (
+        hasAppPluginSidebar ? null : (
+          <ProjectList
+            sessions={filteredSessions}
+            onSelectProject={onSelectProject}
+            loading={loading}
+            scrollParentRef={listScrollRef}
+            liveSessionIds={liveSessionIds}
+          />
+        )
       ) : (
         <SessionList
           {...sessionListCommonProps}

@@ -11,7 +11,11 @@ import {
   bookmarkFromRecord,
   bookmarkFromSelection,
   bookmarkToRecordParams,
+  groupByProject,
+  groupBySession,
+  projectPathOf,
   registryRemove,
+  sortEntries,
   registryUpsert,
   type Bookmark,
   type RecordsClientLike,
@@ -204,6 +208,57 @@ function makeClient(): RecordsClientLike & {
     },
   }
 }
+
+describe('grouping helpers', () => {
+  const rows = [
+    {
+      id: 'a',
+      sessionPath: '/demo/ai/s1.jsonl',
+      entryId: 'm1',
+      quote: 'one',
+      sessionName: 'Session One',
+      projectPath: '/demo/ai',
+      createdAt: '2026-11-11T10:00:00.000Z',
+    },
+    {
+      id: 'b',
+      sessionPath: '/demo/ai/s1.jsonl',
+      entryId: 'm2',
+      quote: 'two',
+      sessionName: 'Session One',
+      projectPath: '/demo/ai',
+      createdAt: '2026-11-11T11:00:00.000Z',
+    },
+    {
+      id: 'c',
+      sessionPath: '/demo/infra/s2.jsonl',
+      entryId: 'm1',
+      quote: 'three',
+      createdAt: '2026-11-11T09:00:00.000Z',
+    },
+  ]
+
+  it('groups by session with newest items first', () => {
+    const groups = groupBySession(rows)
+    expect(groups.map((group) => group.label)).toEqual(['Session One', 's2'])
+    expect(groups[0]!.items.map((item) => item.id)).toEqual(['b', 'a'])
+    expect(groups[0]!.sublabel).toBe('/demo/ai/s1.jsonl')
+  })
+
+  it('groups by project and derives the project from the session path', () => {
+    const groups = groupByProject(rows)
+    expect(groups.map((group) => group.key).sort()).toEqual(['/demo/ai', '/demo/infra'])
+    const infra = groups.find((group) => group.key === '/demo/infra')!
+    expect(infra.label).toBe('infra')
+    expect(infra.items.map((item) => item.id)).toEqual(['c'])
+  })
+
+  it('sorts entries in both directions', () => {
+    expect(sortEntries(rows, 'newest').map((item) => item.id)).toEqual(['b', 'a', 'c'])
+    expect(sortEntries(rows, 'oldest').map((item) => item.id)).toEqual(['c', 'a', 'b'])
+    expect(projectPathOf({ sessionPath: '/x/y/z.jsonl' })).toBe('/x/y')
+  })
+})
 
 describe('BookmarkStore', () => {
   it('saves once for a repeated selection of the same quote', async () => {

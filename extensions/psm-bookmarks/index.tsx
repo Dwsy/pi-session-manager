@@ -1,5 +1,6 @@
 import { createElement } from 'react'
 import type {
+  PsmAppSidebarViewRenderProps,
   PsmAppViewRenderProps,
   PsmPluginCommandContext,
   PsmPluginHostContext,
@@ -13,10 +14,10 @@ import {
   bookmarkFromSelection,
   type Bookmark,
 } from './bookmark'
+import { BookmarksAppSidebar, BookmarksAppView } from './explorer'
 import { manifest } from './manifest'
 import {
   BookmarkHighlightPopover,
-  BookmarksAppView,
   BookmarksPanel,
   BookmarksToolbarButton,
   type BookmarkQuotable,
@@ -26,6 +27,7 @@ export { manifest }
 
 const PANEL_ID = 'builtin.bookmarks.panel'
 const APP_VIEW_ID = 'builtin.bookmarks.view'
+const APP_SIDEBAR_ID = 'builtin.bookmarks.sidebar'
 const HIGHLIGHT_PROVIDER_ID = 'builtin.bookmarks.highlights'
 const HIGHLIGHT_HUE = 42
 
@@ -42,11 +44,33 @@ export default function activate(ctx: PsmPluginHostContext) {
     ctx.log.error(ctx.i18n.t('plugins.bookmarks.saveFailed', 'Bookmark failed: {{message}}', { message }))
   }
 
+  /** Best-effort session facts for grouping (name, project directory). */
+  async function sessionFacts(
+    sessionPath: string,
+  ): Promise<{ sessionName?: string; projectPath?: string }> {
+    try {
+      const info = await ctx.psm.sessions.lookupByPath(sessionPath)
+      if (info && typeof info === 'object') {
+        const record = info as Record<string, unknown>
+        return {
+          sessionName:
+            typeof record.name === 'string' && record.name ? record.name : undefined,
+          projectPath:
+            typeof record.cwd === 'string' && record.cwd ? record.cwd : undefined,
+        }
+      }
+    } catch {
+      // Enrichment is best-effort; grouping falls back to the session path.
+    }
+    return {}
+  }
+
   async function saveSelection(
     selection: PsmSessionSelection,
     options: { withNote?: boolean } = {},
   ): Promise<Bookmark> {
-    const bookmark = bookmarkFromSelection(selection, { colorHue: HIGHLIGHT_HUE })
+    const facts = await sessionFacts(selection.sessionPath)
+    const bookmark = bookmarkFromSelection(selection, { colorHue: HIGHLIGHT_HUE, ...facts })
     return store.save(bookmark, options)
   }
 
@@ -185,6 +209,15 @@ export default function activate(ctx: PsmPluginHostContext) {
         },
       })
     },
+  })
+
+  ctx.ui.registerAppSidebarView({
+    id: APP_SIDEBAR_ID,
+    title: ctx.i18n.t('plugins.bookmarks.sidebarTitle', 'Bookmarks'),
+    appViewId: APP_VIEW_ID,
+    route: '/bookmarks',
+    render: (_props: PsmAppSidebarViewRenderProps) =>
+      createElement(BookmarksAppSidebar, { store, i18n: ctx.i18n }),
   })
 
   ctx.registerCommand({

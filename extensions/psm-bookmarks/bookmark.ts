@@ -19,7 +19,7 @@ export const BOOKMARK_RECORD_TYPE = 'bookmark.text-quote'
 export const REGISTRY_RECORD_TYPE = 'bookmark.registry'
 export const BOOKMARK_SCHEMA_VERSION = 1
 export const REGISTRY_ID = 'builtin.bookmarks.registry'
-export const REGISTRY_MAX_ENTRIES = 200
+export const REGISTRY_MAX_ENTRIES = 2000
 
 export interface BookmarkPayload {
   anchor: {
@@ -30,6 +30,8 @@ export interface BookmarkPayload {
   quote: string
   note?: string
   colorHue?: number
+  sessionName?: string
+  projectPath?: string
   createdAt: string
   updatedAt: string
 }
@@ -45,6 +47,8 @@ export interface RegistryEntry {
   entryId: string
   quote: string
   note?: string
+  sessionName?: string
+  projectPath?: string
   createdAt: string
 }
 
@@ -56,6 +60,69 @@ export interface RecordsClientLike {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+/**
+ * Project a bookmark belongs to: the recorded project path when known,
+ * otherwise the session file's directory.
+ */
+export function projectPathOf(entry: Pick<RegistryEntry, 'projectPath' | 'sessionPath'>): string {
+  if (entry.projectPath) return entry.projectPath
+  const cut = entry.sessionPath.lastIndexOf('/')
+  return cut > 0 ? entry.sessionPath.slice(0, cut) : entry.sessionPath
+}
+
+export interface BookmarkGroup {
+  key: string
+  label: string
+  sublabel?: string
+  items: RegistryEntry[]
+}
+
+function sessionLabel(entry: RegistryEntry): string {
+  if (entry.sessionName) return entry.sessionName
+  const base = entry.sessionPath.split('/').pop() ?? entry.sessionPath
+  return base.replace(/\.jsonl$/, '')
+}
+
+/** Group bookmarks by session file, newest sessions first. */
+export function groupBySession(entries: RegistryEntry[]): BookmarkGroup[] {
+  const groups = new Map<string, RegistryEntry[]>()
+  for (const entry of entries) {
+    const group = groups.get(entry.sessionPath) ?? []
+    group.push(entry)
+    groups.set(entry.sessionPath, group)
+  }
+  return [...groups.entries()].map(([key, items]) => ({
+    key,
+    label: sessionLabel(items[0]!),
+    sublabel: key,
+    items: sortEntries(items, 'newest'),
+  }))
+}
+
+/** Group bookmarks by project, then by session inside each project group. */
+export function groupByProject(entries: RegistryEntry[]): BookmarkGroup[] {
+  const groups = new Map<string, RegistryEntry[]>()
+  for (const entry of entries) {
+    const key = projectPathOf(entry)
+    const group = groups.get(key) ?? []
+    group.push(entry)
+    groups.set(key, group)
+  }
+  return [...groups.entries()].map(([key, items]) => ({
+    key,
+    label: key.split('/').filter(Boolean).pop() ?? key,
+    sublabel: key,
+    items: sortEntries(items, 'newest'),
+  }))
+}
+
+export type BookmarkSortOrder = 'newest' | 'oldest'
+
+export function sortEntries(entries: RegistryEntry[], order: BookmarkSortOrder): RegistryEntry[] {
+  const sorted = [...entries].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  return order === 'newest' ? sorted.reverse() : sorted
 }
 
 function optionalText(value: unknown): string | undefined {
@@ -71,7 +138,14 @@ export function newBookmarkId(): string {
 /** Build a bookmark from a live transcript selection. */
 export function bookmarkFromSelection(
   selection: PsmSessionSelection,
-  options: { id?: string; note?: string; colorHue?: number; now?: string } = {},
+  options: {
+    id?: string
+    note?: string
+    colorHue?: number
+    sessionName?: string
+    projectPath?: string
+    now?: string
+  } = {},
 ): Bookmark {
   const quote = selection.textQuote.exact.trim()
   if (!quote) throw new Error('bookmark selection requires non-empty text')
@@ -88,6 +162,8 @@ export function bookmarkFromSelection(
     quote,
     note: options.note,
     colorHue: options.colorHue,
+    sessionName: options.sessionName,
+    projectPath: options.projectPath,
     createdAt: timestamp,
     updatedAt: timestamp,
   }
@@ -129,6 +205,8 @@ export function bookmarkToRecordParams(
       quote: bookmark.quote,
       note: bookmark.note,
       colorHue: bookmark.colorHue,
+      sessionName: bookmark.sessionName,
+      projectPath: bookmark.projectPath,
       createdAt: bookmark.createdAt,
       updatedAt: bookmark.updatedAt,
     },
@@ -165,6 +243,8 @@ export function bookmarkFromRecord(record: PluginRecord): Bookmark | null {
     quote: payload.quote,
     note: optionalText(payload.note),
     colorHue: typeof payload.colorHue === 'number' ? payload.colorHue : undefined,
+    sessionName: optionalText(payload.sessionName),
+    projectPath: optionalText(payload.projectPath),
     createdAt: optionalText(payload.createdAt) ?? record.updated_at,
     updatedAt: optionalText(payload.updatedAt) ?? record.updated_at,
   }
@@ -177,6 +257,8 @@ export function registryEntryFromBookmark(bookmark: Bookmark): RegistryEntry {
     entryId: bookmark.anchor.entryId,
     quote: bookmark.quote,
     note: bookmark.note,
+    sessionName: bookmark.sessionName,
+    projectPath: bookmark.projectPath,
     createdAt: bookmark.createdAt,
   }
 }
