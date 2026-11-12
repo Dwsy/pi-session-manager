@@ -6,6 +6,55 @@
 
 @psm-highlight-hue: 45; // warm bookmark amber
 
+// Make the *native* selection unmistakable while the toolbar is open. Without
+// this the browser's default grey (and its faded unfocused state) leaves the
+// user guessing which words the floating menu belongs to.
+.session-viewer ::selection,
+.session-viewer ::-moz-selection {
+  background: hsla(var(--psm-highlight-hue, @psm-highlight-hue), 92%, 62%, 0.42);
+  color: inherit;
+}
+
+// Persistent underline painted by the host while the selection menu is open.
+// It survives focus moving into the toolbar and is non-interactive, so it can
+// never steal a click from the transcript.
+.psm-selection-underline {
+  position: fixed;
+  inset: 0;
+  z-index: 89;
+  pointer-events: none;
+}
+
+.psm-selection-underline__line {
+  position: fixed;
+  height: 2px;
+  border-radius: 2px;
+  background: hsla(var(--psm-highlight-hue, @psm-highlight-hue), 78%, 48%, 0.9);
+  box-shadow: 0 0 0 2px hsla(var(--psm-highlight-hue, @psm-highlight-hue), 92%, 62%, 0.18);
+}
+
+.psm-selection-menu__caret,
+.psm-highlight-popover__caret {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: inherit;
+  border: inherit;
+  transform: translateX(-50%) rotate(45deg);
+  pointer-events: none;
+}
+
+.psm-selection-menu__caret {
+  bottom: -6px;
+  border-top: 0;
+  border-left: 0;
+  border-radius: 0 0 2px 0;
+  // The menu uses a translucent blurred surface; the caret gets the solid
+  // card color so it reads as a clean pointer instead of a glass smudge.
+  background: rgb(var(--color-card));
+  border: 1px solid rgba(var(--accent-rgb), 0.28);
+}
+
 mark.psm-text-highlight {
   background: hsla(var(--psm-highlight-hue, @psm-highlight-hue), 92%, 62%, 0.26);
   border-bottom: 1.5px solid hsla(var(--psm-highlight-hue, @psm-highlight-hue), 72%, 48%, 0.55);
@@ -95,8 +144,31 @@ mark.psm-text-highlight {
     0 18px 44px rgba(var(--shadow-rgb), 0.42),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(20px);
-  overflow: hidden;
   animation: psm-highlight-popover-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  // The caret lives outside the card, so content must not be clipped away by
+  // `overflow: hidden`. Plugin content keeps its own rounded corners.
+  > :not(.psm-highlight-popover__caret) {
+    border-radius: inherit;
+  }
+
+  .psm-highlight-popover__caret {
+    bottom: -6px;
+    background: rgb(var(--color-card));
+    border: 1px solid rgba(var(--accent-rgb), 0.24);
+    border-top: 0;
+    border-left: 0;
+    border-radius: 0 0 2px 0;
+  }
+
+  &.psm-highlight-popover--flipped .psm-highlight-popover__caret {
+    top: -6px;
+    bottom: auto;
+    border: 1px solid rgba(var(--accent-rgb), 0.24);
+    border-bottom: 0;
+    border-right: 0;
+    border-radius: 2px 0 0 0;
+  }
 }
 
 @keyframes psm-selection-menu-in {

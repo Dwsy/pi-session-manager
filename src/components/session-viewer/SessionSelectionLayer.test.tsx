@@ -217,6 +217,29 @@ describe('SessionSelectionLayer selection menu', () => {
     )
   })
 
+  it('paints a persistent underline and does not steal focus from the selection', async () => {
+    snapshot.selectionActions = [
+      { id: 'act', title: 'Bookmark', order: 10, run: vi.fn() as never },
+    ]
+    await renderLayer()
+
+    selectText('beta')
+    await act(async () => {
+      container.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    })
+    await flushFrames()
+
+    // One line box per selected line, positioned as a non-interactive overlay.
+    const underline = document.querySelector('.psm-selection-underline')
+    expect(underline).not.toBeNull()
+    expect(underline!.querySelectorAll('.psm-selection-underline__line').length).toBeGreaterThan(0)
+
+    // Auto-focusing the first button used to fade the native selection out.
+    const menu = document.querySelector('.psm-selection-menu')!
+    expect(menu.querySelector('button')).not.toBe(document.activeElement)
+    expect(menu.querySelector('.psm-selection-menu__caret')).not.toBeNull()
+  })
+
   it('stays hidden for selections outside transcript entries', async () => {
     snapshot.selectionActions = [{ id: 'act', title: 'Bookmark', order: 10, run: vi.fn() as never }]
     const loose = document.createElement('p')

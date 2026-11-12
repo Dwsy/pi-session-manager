@@ -23,7 +23,7 @@ import { buildSessionSelection, resolveTranscriptSelection, sessionSelectionStor
 import { entryIdFromElement } from '@/utils/sessionSelection'
 import { findQuoteRange, wrapRange } from '@/utils/textQuote'
 import HighlightPopover, { type HighlightPopoverState } from './HighlightPopover'
-import SelectionActionsMenu, { rectForRange, selectionMenuStateFor, type SelectionMenuState } from './SelectionActionsMenu'
+import SelectionActionsMenu, { rectForRange, rectsForRange, selectionMenuStateFor, type SelectionMenuState } from './SelectionActionsMenu'
 
 const MARK_CLASS = 'psm-text-highlight'
 const REAPPLY_DELAYS_MS = [300, 800, 1600, 3000]
@@ -228,7 +228,10 @@ export default function SessionSelectionLayer({
         return
       }
       sessionSelectionStore.set(selection)
-      setMenu({ selection, ...selectionMenuStateFor(rectForRange(anchor.range)) })
+      setMenu({
+        selection,
+        ...selectionMenuStateFor(rectForRange(anchor.range), rectsForRange(anchor.range)),
+      })
     }
     const isOwnOverlay = (event: Event) => {
       const target = event.target as HTMLElement | null
