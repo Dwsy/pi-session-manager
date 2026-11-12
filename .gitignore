@@ -93,3 +93,4 @@ notepad/
 dist-dataset/assets/*.js
 dist-dataset/
 .pi/
+.alma-snapshots

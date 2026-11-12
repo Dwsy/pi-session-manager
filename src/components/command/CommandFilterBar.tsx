@@ -97,7 +97,7 @@ export default function CommandFilterBar({
                   <span
                     className={`inline-flex min-w-[16px] items-center justify-center rounded-[3px] px-1 text-[10px] font-semibold tabular-nums ${
                       isActive
-                        ? 'bg-foreground/85 text-background'
+                        ? 'bg-foreground/10 text-foreground'
                         : 'bg-surface/60 text-muted-foreground'
                     }`}
                   >
