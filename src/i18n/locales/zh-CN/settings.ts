@@ -555,6 +555,8 @@ export const settings = {
     userThemes: "用户主题",
     base46Preview: "base46 预览",
     noCustomThemes: "~/.pi/agent/themes 中没有找到自定义主题",
+    deleteThemeTitle: "删除主题",
+    deleteThemeConfirm: "确定要删除自定义主题 {name} 吗？此操作无法撤销。",
     messageSpacing: "消息间距",
     spacing: {
       compact: "紧凑",

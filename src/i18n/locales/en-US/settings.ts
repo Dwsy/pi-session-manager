@@ -576,6 +576,8 @@ export const settings = {
     userThemes: "User themes",
     base46Preview: "base46 preview",
     noCustomThemes: "No custom themes found in ~/.pi/agent/themes",
+    deleteThemeTitle: "Delete Theme",
+    deleteThemeConfirm: "Are you sure you want to delete the custom theme {name}? This cannot be undone.",
     messageSpacing: "Message Spacing",
     spacing: {
       compact: "Compact",

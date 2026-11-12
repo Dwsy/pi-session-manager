@@ -216,6 +216,8 @@ export const settings = {
     userThemes: 'Temas de usuario',
     base46Preview: 'vista previa base46',
     noCustomThemes: 'No se encontraron temas personalizados en ~/.pi/agent/themes',
+    deleteThemeTitle: "Eliminar tema",
+    deleteThemeConfirm: "¿Seguro que desea eliminar el tema personalizado {name}? Esta acción no se puede deshacer.",
     disableToolSuccessStyle: 'Desactivar estilo de éxito de herramienta',
     disableToolSuccessStyleDesc: 'Desactivar el fondo verde y el borde en ejecuciones de herramientas exitosas para tarjetas más limpias',
     disableToolCallStyle: 'Desactivar estilo de llamada de herramienta',

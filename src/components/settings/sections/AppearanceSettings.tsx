@@ -16,10 +16,11 @@ import {
   getBuiltInCodexThemes,
   listUserPiThemes,
   deleteUserPiTheme,
-  resolveThemePreview,
+  loadThemePreview,
   toBase46Selection,
   toCodexSelection,
 } from '@/utils/piTheme'
+import type { ThemePreview } from '@/utils/piTheme'
 import ThemeStudioModal from '@/components/settings/sections/ThemeStudioModal'
 import { useEscapeToClose } from '@/components/dialogs/useEscapeToClose'
 import { CODE_THEMES, MONOSPACE_FONTS } from '@/utils/codeThemes'
@@ -347,15 +348,22 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
     onUpdate('appearance', 'customTheme', savedName)
   }
 
+  const [deleteConfirmTheme, setDeleteConfirmTheme] = useState<string | null>(null)
+
   const handleDeleteTheme = async (themeName: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (confirm(`Are you sure you want to delete custom theme "${themeName}"?`)) {
-      await deleteUserPiTheme(themeName)
-      const updatedUserThemes = await listUserPiThemes()
-      setPiThemes(updatedUserThemes)
-      if (settings.appearance.customTheme === themeName) {
-        onUpdate('appearance', 'customTheme', 'app-default')
-      }
+    setDeleteConfirmTheme(themeName)
+  }
+
+  const confirmDeleteTheme = async () => {
+    if (!deleteConfirmTheme) return
+    const name = deleteConfirmTheme
+    setDeleteConfirmTheme(null)
+    await deleteUserPiTheme(name)
+    const updatedUserThemes = await listUserPiThemes()
+    setPiThemes(updatedUserThemes)
+    if (settings.appearance.customTheme === name) {
+      onUpdate('appearance', 'customTheme', 'app-default')
     }
   }
   const deferredThemeQuery = useDeferredValue(themeQuery)
@@ -363,10 +371,15 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
   const deferredFontQuery = useDeferredValue(fontQuery)
   const builtInThemes = useMemo(() => getBuiltInBase46Themes(), [])
   const builtInCodexThemes = useMemo(() => getBuiltInCodexThemes(), [])
-  const selectedPreview = useMemo(
-    () => resolveThemePreview(settings.appearance.customTheme),
-    [settings.appearance.customTheme]
-  )
+  const [selectedPreview, setSelectedPreview] = useState<ThemePreview | null>(null)
+
+  useEffect(() => {
+    let active = true
+    loadThemePreview(settings.appearance.customTheme).then((preview) => {
+      if (active) setSelectedPreview(preview)
+    })
+    return () => { active = false }
+  }, [settings.appearance.customTheme])
 
   const currentCodeTheme = settings.appearance.codeBlockTheme || 'github'
   const currentUiFont = settings.appearance.fontFamily || ''
@@ -1242,6 +1255,33 @@ export default function AppearanceSettings({ settings, onUpdate }: AppearanceSet
         initialThemeName={studioInitialTheme}
         onThemeSaved={handleThemeSaved}
       />
+
+      {deleteConfirmTheme && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
+          <div className="w-[min(440px,calc(100vw-32px))] rounded-xl border border-border bg-popover p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-foreground">{t('settings.appearance.deleteThemeTitle', 'Delete Theme')}</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t('settings.appearance.deleteThemeConfirm', 'Are you sure you want to delete the custom theme "{name}"? This cannot be undone.', { name: deleteConfirmTheme })}
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmTheme(null)}
+                className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                {t('common.cancel', 'Cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteTheme}
+                className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors"
+              >
+                {t('common.delete', 'Delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

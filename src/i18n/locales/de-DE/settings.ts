@@ -264,6 +264,8 @@ export const settings = {
     userThemes: 'Benutzerdesigns',
     base46Preview: 'base46-Vorschau',
     noCustomThemes: 'Keine benutzerdefinierten Designs in ~/.pi/agent/themes gefunden',
+    deleteThemeTitle: "Design Löschen",
+    deleteThemeConfirm: "Möchten Sie das benutzerdefinierte Design {name} wirklich Löschen? Dies kann nicht rückgängig gemacht werden.",
     disableToolSuccessStyle: 'Tool-Erfolgs-Stil deaktivieren',
     disableToolSuccessStyleDesc: 'Grünen Hintergrund und Rahmen bei erfolgreicher Tool-Ausführung für sauberere Tool-Karten deaktivieren',
     disableToolCallStyle: 'Tool-Call-Stil deaktivieren',

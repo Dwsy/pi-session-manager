@@ -15,8 +15,11 @@ import {
   validateAndParseThemeJson,
   applyRawThemeObject,
   applyPiChatTheme,
+  loadThemePreview,
 } from '@/utils/piTheme'
+import type { ThemePreview } from '@/utils/piTheme'
 import { toBase46Selection, getBuiltInBase46Theme, toPiThemeFileFromBase46 } from '@/utils/base46Themes'
+import { getBuiltInCodexThemes, toCodexSelection, getBuiltInCodexTheme, toPiThemeFileFromCodex } from '@/utils/codexThemes'
 
 interface ThemeStudioModalProps {
   isOpen: boolean
@@ -132,10 +135,30 @@ export default function ThemeStudioModal({
         const piFile = toPiThemeFileFromBase46(base46Theme)
         if (piFile.vars) updateThemeVars({ ...DEFAULT_VARS, ...piFile.vars })
       }
+    } else if (selection.startsWith('codex:')) {
+      const codexTheme = getBuiltInCodexTheme(selection)
+      if (codexTheme) {
+        const piFile = toPiThemeFileFromCodex(codexTheme)
+        if (piFile.vars) updateThemeVars({ ...DEFAULT_VARS, ...piFile.vars })
+      }
     } else if (selection !== 'app-default') {
-      // User theme selection
-      const formattedTheme: PiThemeFile = { vars: { ...DEFAULT_VARS } }
-      updateThemeVars(formattedTheme.vars!)
+      // User theme: load from disk
+      loadThemePreview(selection).then((preview: ThemePreview | null) => {
+        if (preview) {
+          updateThemeVars({ ...DEFAULT_VARS,
+            background: preview.colors.background,
+            panel: preview.colors.panel,
+            panelAlt: preview.colors.panelAlt,
+            text: preview.colors.text,
+            muted: preview.colors.muted,
+            accent: preview.colors.accent,
+            border: preview.colors.border,
+            success: preview.colors.success,
+            error: preview.colors.error,
+            warning: preview.colors.warning,
+          })
+        }
+      })
     } else {
       updateThemeVars(DEFAULT_VARS)
     }
@@ -224,6 +247,13 @@ export default function ThemeStudioModal({
                   {builtInBase46List.map((t) => (
                     <option key={t.id} value={toBase46Selection(t.id)}>
                       {t.label} ({t.scheme})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label={t('settings.themeStudio.builtInCodexPresets', 'Built-in Codex Presets')}>
+                  {getBuiltInCodexThemes().map((t) => (
+                    <option key={t.slug} value={toCodexSelection(t.slug)}>
+                      {t.name} ({t.mode})
                     </option>
                   ))}
                 </optgroup>

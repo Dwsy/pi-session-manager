@@ -1,5 +1,5 @@
 import { BUILT_IN_CODEX_THEMES, type CodexTheme } from './codexThemesData'
-import type { PiThemeFile } from './piTheme'
+import type { PiThemeFile } from './themeTokens'
 
 export { BUILT_IN_CODEX_THEMES, type CodexTheme } from './codexThemesData'
 

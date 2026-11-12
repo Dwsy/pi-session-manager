@@ -5,12 +5,21 @@ import {
   isBuiltInBase46ThemeSelection,
   toPiThemeFileFromBase46,
 } from './base46Themes'
-import type { ThemePreviewModel } from './base46Themes'
 import {
   getBuiltInCodexTheme,
   isBuiltInCodexThemeSelection,
   toPiThemeFileFromCodex,
 } from './codexThemes'
+import {
+  applyThemeVars,
+  clearThemeVars,
+  computeThemeVars,
+  resolveThemeScheme,
+} from './themeTokens'
+import type { PiThemeFile, ThemePreview, ThemeScheme } from './themeTokens'
+
+export type { PiThemeFile, ThemePreview, ThemeScheme } from './themeTokens'
+export { THEME_OVERRIDE_VARS, normalizeHexColor } from './themeTokens'
 
 export {
   getBuiltInBase46Themes,
@@ -26,253 +35,31 @@ export {
   toPiThemeFileFromCodex,
 } from './codexThemes'
 
-
-export interface PiThemeFile {
-  name?: string
-  vars?: Record<string, string>
-  colors?: Record<string, string>
-  export?: {
-    pageBg?: string
-  }
-}
-
 const APP_DEFAULT_THEME = 'app-default'
 
-const OVERRIDE_VARS = [
-  '--color-background',
-  '--color-foreground',
-  '--color-card',
-  '--color-card-foreground',
-  '--color-popover',
-  '--color-popover-foreground',
-  '--color-primary',
-  '--color-primary-foreground',
-  '--color-secondary',
-  '--color-secondary-foreground',
-  '--color-muted',
-  '--color-muted-foreground',
-  '--color-accent',
-  '--color-accent-foreground',
-  '--color-destructive',
-  '--color-destructive-foreground',
-  '--color-border',
-  '--color-input',
-  '--color-ring',
-  '--color-info',
-  '--color-success',
-  '--color-warning',
-  '--color-surface',
-  '--color-surface-dark',
-  '--color-secondary-hover',
-  '--color-border-hover',
-  '--color-purple',
-  '--accent-rgb',
-  '--border-rgb',
-  '--highlight-rgb',
-  '--info-rgb',
-  '--success-rgb',
-  '--warning-rgb',
-  '--destructive-rgb',
-  '--foreground-rgb',
-  '--muted-fg-rgb',
-  '--glass-rgb',
-  '--text-secondary',
-  '--accent',
-  '--border',
-  '--success',
-  '--error',
-  '--warning',
-  '--muted',
-  '--dim',
-  '--text',
-  '--selectedBg',
-  '--userMessageBg',
-  '--userMessageText',
-  '--customMessageBg',
-  '--customMessageText',
-  '--customMessageLabel',
-  '--toolPendingBg',
-  '--toolSuccessBg',
-  '--toolErrorBg',
-  '--toolTitle',
-  '--toolOutput',
-  '--toolExecutionBg',
-  '--toolSuccessBgOverride',
-  '--toolSuccessBorderOverride',
-  '--toolOutputExpandedMargin',
-  '--mdHeading',
-  '--mdLink',
-  '--mdLinkUrl',
-  '--mdCode',
-  '--mdCodeBlock',
-  '--mdCodeBlockBorder',
-  '--mdQuote',
-  '--mdQuoteBorder',
-  '--mdHr',
-  '--mdListBullet',
-  '--toolDiffAdded',
-  '--toolDiffRemoved',
-  '--toolDiffContext',
-  '--bg-subtle',
-  '--bg-inset',
-  '--bg-inset-hover',
-  '--thinkingText',
-  '--borderAccent',
-  '--borderMuted',
-  '--body-bg',
-  '--container-bg',
-  '--info-bg',
-] as const
+const THEME_FILE_PATTERN = /^[a-zA-Z0-9._\/-]+$/
 
 const themeCache = new Map<string, PiThemeFile | null>()
 let activeThemeApplyId = 0
 
-const THEME_NAME_PATTERN = /^[a-zA-Z0-9._\/-]+$/
-
-function normalizeHexColor(hex: string): string | null {
-  const value = hex.trim()
-  if (!value.startsWith('#')) return null
-
-  if (value.length === 4) {
-    const r = value[1]
-    const g = value[2]
-    const b = value[3]
-    return `#${r}${r}${g}${g}${b}${b}`
-  }
-
-  if (value.length === 7) return value
-  return null
-}
-
-function hexToRgb(hex: string): [number, number, number] | null {
-  const normalized = normalizeHexColor(hex)
-  if (!normalized) return null
-
-  const parsed = Number.parseInt(normalized.slice(1), 16)
-  if (Number.isNaN(parsed)) return null
-
-  const red = (parsed >> 16) & 255
-  const green = (parsed >> 8) & 255
-  const blue = parsed & 255
-  return [red, green, blue]
-}
-
-function toRelativeLuminance(rgb: [number, number, number]): number {
-  const channels = rgb.map((value) => {
-    const scaled = value / 255
-    return scaled <= 0.03928 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4
-  }) as [number, number, number]
-
-  return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2])
-}
-
-function resolveThemeColorScheme(theme: PiThemeFile): 'dark' | 'light' | null {
-  // 1. Try to infer from theme name
-  const themeName = (theme.name || '').toLowerCase()
-  if (themeName.includes('dark')) return 'dark'
-  if (themeName.includes('light')) return 'light'
-
-  // 2. Try to resolve from background color with extended fallbacks
-  const backgroundHex = resolveThemeHex(theme, 'background', [
-    'bg',
-    'panel',
-    'userBg',
-    'customBg',
-    'toolPending',
-    'userMessageBg',
-    'customMessageBg',
-  ])
-
-  // 3. Fallback to export.pageBg
-  const exportPageBg = theme.export?.pageBg ? normalizeHexColor(theme.export.pageBg) : undefined
-
-  const finalBg = backgroundHex || exportPageBg
-  if (!finalBg) return null
-
-  const rgb = hexToRgb(finalBg)
-  if (!rgb) return null
-
-  return toRelativeLuminance(rgb) >= 0.5 ? 'light' : 'dark'
-}
-
-function setColorVar(root: HTMLElement, variable: string, hex: string | undefined) {
-  if (!hex) return
-  const rgb = hexToRgb(hex)
-  if (!rgb) return
-  root.style.setProperty(variable, `${rgb[0]} ${rgb[1]} ${rgb[2]}`)
-}
-
-function setRgbVar(root: HTMLElement, variable: string, hex: string | undefined) {
-  if (!hex) return
-  const rgb = hexToRgb(hex)
-  if (!rgb) return
-  root.style.setProperty(variable, `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`)
-}
-
-function setHexVar(root: HTMLElement, variable: string, hex: string | undefined) {
-  if (!hex) return
-  const normalized = normalizeHexColor(hex)
-  if (!normalized) return
-  root.style.setProperty(variable, normalized)
-}
-
-function firstValidHex(...candidates: Array<string | undefined>): string | undefined {
-  for (const candidate of candidates) {
-    if (!candidate) continue
-    const normalized = normalizeHexColor(candidate)
-    if (normalized) return normalized
-  }
-  return undefined
-}
-
-function resolveThemeHex(theme: PiThemeFile, colorKey: string, fallbackVarKeys: string[] = []): string | undefined {
-  const vars = theme.vars || {}
-  const mappedColor = theme.colors?.[colorKey]
-
-  if (mappedColor) {
-    const directMapped = normalizeHexColor(mappedColor)
-    if (directMapped) return directMapped
-    if (vars[mappedColor]) {
-      const mappedVarHex = normalizeHexColor(vars[mappedColor])
-      if (mappedVarHex) return mappedVarHex
-    }
-  }
-
-  const directVarHex = normalizeHexColor(vars[colorKey] || '')
-  if (directVarHex) return directVarHex
-
-  for (const fallbackKey of fallbackVarKeys) {
-    const fallbackHex = normalizeHexColor(vars[fallbackKey] || '')
-    if (fallbackHex) return fallbackHex
-  }
-
-  return undefined
-}
-
 function sanitizeThemeName(themeName: string): string {
   const clean = themeName.trim().replace(/^themes\//, '').replace(/\.json$/i, '')
-
   if (!clean) return ''
-  if (!THEME_NAME_PATTERN.test(clean)) return ''
+  if (!THEME_FILE_PATTERN.test(clean)) return ''
   if (clean.includes('..') || clean.startsWith('/') || clean.startsWith('\\')) return ''
-
   return clean
 }
 
 function toThemePath(themeName: string): string {
   const clean = sanitizeThemeName(themeName)
   if (!clean) return ''
-  return `themes/${clean}.json`
+  return 'themes/' + clean + '.json'
 }
 
 async function loadThemeFile(themeName: string): Promise<PiThemeFile | null> {
   const key = sanitizeThemeName(themeName)
   if (!key) return null
-
-  if (themeCache.has(key)) {
-    return themeCache.get(key) ?? null
-  }
-
+  if (themeCache.has(key)) return themeCache.get(key) ?? null
   try {
     const content = await invoke<string>('read_resource_file', {
       path: toThemePath(key),
@@ -287,14 +74,12 @@ async function loadThemeFile(themeName: string): Promise<PiThemeFile | null> {
   }
 }
 
-function loadBuiltInBase46Theme(selection: string): PiThemeFile | null {
-  const theme = getBuiltInBase46Theme(selection)
-  return theme ? toPiThemeFileFromBase46(theme) : null
-}
-
-function loadBuiltInCodexTheme(selection: string): PiThemeFile | null {
-  const theme = getBuiltInCodexTheme(selection)
-  return theme ? toPiThemeFileFromCodex(theme) : null
+function loadBuiltInTheme(selection: string): PiThemeFile | null {
+  const base46 = getBuiltInBase46Theme(selection)
+  if (base46) return toPiThemeFileFromBase46(base46)
+  const codex = getBuiltInCodexTheme(selection)
+  if (codex) return toPiThemeFileFromCodex(codex)
+  return null
 }
 
 function resolveThemeName(selection: string): string | null {
@@ -305,265 +90,127 @@ function resolveThemeName(selection: string): string | null {
   return sanitized || null
 }
 
-export function resolveThemePreview(selection: string | undefined): ThemePreviewModel | null {
+function toPreview(
+  selection: string,
+  theme: PiThemeFile,
+  source: ThemePreview['source'],
+): ThemePreview | null {
+  const computed = computeThemeVars(theme)
+  if (!computed) return null
+  return {
+    selection,
+    label: theme.name || selection,
+    source,
+    scheme: computed.scheme ?? 'dark',
+    colors: {
+      background: computed.palette.background,
+      panel: computed.palette.panel,
+      panelAlt: computed.palette.panelAlt,
+      text: computed.palette.text,
+      muted: computed.palette.muted,
+      accent: computed.palette.accent,
+      border: computed.palette.border,
+      success: computed.palette.success,
+      warning: computed.palette.warning,
+      error: computed.palette.error,
+      code: computed.palette.code,
+      markdown: computed.palette.markdown,
+    },
+  }
+}
+
+/**
+ * Sync preview for built-in themes and cached user themes.
+ * Use loadThemePreview for uncached user themes (needs disk access).
+ */
+export function resolveThemePreview(selection: string | undefined): ThemePreview | null {
   if (!selection) return null
-
-  if (isBuiltInBase46ThemeSelection(selection)) {
-    const theme = getBuiltInBase46Theme(selection)
-    if (!theme) return null
-
-    const mapped = toPiThemeFileFromBase46(theme)
-    const vars = mapped.vars
-
-    return {
-      selection,
-      label: theme.label,
-      source: 'built-in',
-      scheme: theme.scheme,
-      colors: {
-        background: vars.background,
-        panel: vars.panel,
-        panelAlt: vars.panelAlt,
-        text: vars.text,
-        muted: vars.muted,
-        accent: vars.accent,
-        border: vars.border,
-        success: vars.success,
-        warning: vars.warning,
-        error: vars.error,
-        code: vars.mdCode,
-        markdown: vars.mdHeading,
-      },
-    }
-  }
-
-  if (isBuiltInCodexThemeSelection(selection)) {
-    const theme = getBuiltInCodexTheme(selection)
-    if (!theme) return null
-
-    const mapped = toPiThemeFileFromCodex(theme)
-    const vars = mapped.vars!
-
-    return {
-      selection,
-      label: theme.name,
-      source: 'built-in',
-      scheme: theme.mode,
-      colors: {
-        background: vars.background,
-        panel: vars.panel,
-        panelAlt: vars.panelAlt,
-        text: vars.text,
-        muted: vars.muted,
-        accent: vars.accent,
-        border: vars.border,
-        success: vars.success,
-        warning: vars.warning,
-        error: vars.error,
-        code: vars.mdCode,
-        markdown: vars.mdHeading,
-      },
-    }
-  }
-
+  const builtIn = loadBuiltInTheme(selection)
+  if (builtIn) return toPreview(selection, builtIn, 'built-in')
+  const cached = themeCache.get(sanitizeThemeName(selection))
+  if (cached) return toPreview(selection, cached, 'user')
   return null
 }
 
+/** Async preview that also covers user theme files on disk. */
+export async function loadThemePreview(selection: string | undefined): Promise<ThemePreview | null> {
+  if (!selection) return null
+  const builtIn = loadBuiltInTheme(selection)
+  if (builtIn) return toPreview(selection, builtIn, 'built-in')
+  const themeName = resolveThemeName(selection)
+  if (!themeName) return null
+  const theme = await loadThemeFile(themeName)
+  if (!theme) return null
+  return toPreview(selection, theme, 'user')
+}
 
 export async function listUserPiThemes(): Promise<string[]> {
   try {
     const resources = await invoke<ResourceInfo[]>('scan_all_resources', { cwd: null })
     const names = resources
-      .filter((resource) => resource.resourceType === 'themes' && resource.metadata.scope === 'user')
-      .map((resource) => resource.path)
-      .filter((resourcePath) => resourcePath.endsWith('.json'))
-      .map((resourcePath) => resourcePath.replace(/^themes\//, '').replace(/\.json$/i, ''))
+      .filter((r) => r.resourceType === 'themes' && r.metadata.scope === 'user')
+      .map((r) => r.path)
+      .filter((p) => p.endsWith('.json'))
+      .map((p) => p.replace(/^themes\//, '').replace(/\.json$/i, ''))
       .filter((name) => sanitizeThemeName(name) !== '')
-
     return [...new Set(names)].sort((a, b) => a.localeCompare(b))
   } catch {
     return []
   }
 }
 
-export async function resolvePiThemeColorScheme(selection: string | undefined): Promise<'dark' | 'light' | null> {
+export async function resolvePiThemeColorScheme(
+  selection: string | undefined,
+): Promise<ThemeScheme | null> {
   const normalized = (selection || APP_DEFAULT_THEME).trim() || APP_DEFAULT_THEME
-  const builtInTheme = loadBuiltInBase46Theme(normalized) || loadBuiltInCodexTheme(normalized)
-  if (builtInTheme) return resolveThemeColorScheme(builtInTheme)
-
+  const builtIn = loadBuiltInTheme(normalized)
+  if (builtIn) return resolveThemeScheme(builtIn)
   const themeName = resolveThemeName(normalized)
   if (!themeName) return null
-
   const theme = await loadThemeFile(themeName)
   if (!theme?.vars) return null
-
-  return resolveThemeColorScheme(theme)
+  return resolveThemeScheme(theme)
 }
 
 export function clearPiThemeOverrides() {
-  const root = document.documentElement
-  OVERRIDE_VARS.forEach((variable) => root.style.removeProperty(variable))
-  root.removeAttribute('data-chat-theme')
-  root.removeAttribute('data-chat-theme-scheme')
-  root.classList.remove('theme-dark', 'theme-light')
+  clearThemeVars()
 }
 
 export async function applyPiChatTheme(selection: string | undefined) {
-  const root = document.documentElement
   const applyId = ++activeThemeApplyId
-
   const normalized = (selection || APP_DEFAULT_THEME).trim() || APP_DEFAULT_THEME
-  const builtInTheme = loadBuiltInBase46Theme(normalized) || loadBuiltInCodexTheme(normalized)
-  const themeName = resolveThemeName(normalized)
 
-  if (!builtInTheme && !themeName) {
-    // Not a custom theme, clear only CSS variable overrides but preserve theme class
-    OVERRIDE_VARS.forEach((variable) => root.style.removeProperty(variable))
-    root.removeAttribute('data-chat-theme')
-    root.removeAttribute('data-chat-theme-scheme')
+  const builtIn = loadBuiltInTheme(normalized)
+  const themeName = builtIn ? null : resolveThemeName(normalized)
+
+  // App default: drop overrides and let appearance setting own theme classes.
+  if (!builtIn && !themeName) {
+    clearThemeVars()
     return
   }
 
-  const theme = builtInTheme ?? await loadThemeFile(themeName!)
+  const theme = builtIn ?? (await loadThemeFile(themeName!))
   if (applyId !== activeThemeApplyId) return
-
-  clearPiThemeOverrides()
-  if (!theme?.vars) return
-
-  const background = resolveThemeHex(theme, 'background', ['bg'])
-  const panel = resolveThemeHex(theme, 'panel', ['bgLighter', 'background', 'bg'])
-  const panelAlt = resolveThemeHex(theme, 'panelAlt', ['bgSlightlyLighter', 'bgLighter', 'panel'])
-  const text = resolveThemeHex(theme, 'text', ['foreground'])
-  const muted = resolveThemeHex(theme, 'muted', ['comment'])
-  const dim = resolveThemeHex(theme, 'dim', ['dimGray', 'darkGray'])
-  const accent = resolveThemeHex(theme, 'accent', ['violet', 'purple', 'cyan'])
-  const border = resolveThemeHex(theme, 'border', ['teal', 'cyan', 'dimGray'])
-  const success = resolveThemeHex(theme, 'success', ['green'])
-  const error = resolveThemeHex(theme, 'error', ['red'])
-  const warning = resolveThemeHex(theme, 'warning', ['orange', 'yellow'])
-  const purple = firstValidHex(resolveThemeHex(theme, 'purple', []), theme.vars.purple, theme.vars.violet)
-  const selectedBg = resolveThemeHex(theme, 'selectedBg', ['selected', 'selection'])
-
-  const resolvedScheme = resolveThemeColorScheme(theme)
-  const isLight = resolvedScheme === 'light'
-
-  let effectivePanelAlt = panelAlt
-  if (isLight && panelAlt) {
-    const rgb = hexToRgb(panelAlt)
-    if (rgb && toRelativeLuminance(rgb) < 0.5) {
-      effectivePanelAlt = panel || background
-    }
+  if (!theme) {
+    clearThemeVars()
+    return
   }
 
-  setColorVar(root, '--color-background', background)
-  setColorVar(root, '--color-foreground', text)
-  setColorVar(root, '--color-card', panel)
-  setColorVar(root, '--color-card-foreground', text)
-  setColorVar(root, '--color-popover', panel)
-  setColorVar(root, '--color-popover-foreground', text)
-  setColorVar(root, '--color-primary', text)
-  setColorVar(root, '--color-primary-foreground', background)
-  setColorVar(root, '--color-secondary', effectivePanelAlt)
-  setColorVar(root, '--color-secondary-foreground', text)
-  setColorVar(root, '--color-muted', effectivePanelAlt)
-  setColorVar(root, '--color-muted-foreground', muted)
-  setColorVar(root, '--color-accent', effectivePanelAlt)
-  setColorVar(root, '--color-accent-foreground', text)
-  setColorVar(root, '--color-destructive', error)
-  setColorVar(root, '--color-destructive-foreground', text)
-  setColorVar(root, '--color-border', border)
-  setColorVar(root, '--color-input', border)
-  setColorVar(root, '--color-ring', accent)
-  setColorVar(root, '--color-info', accent)
-  setColorVar(root, '--color-success', success)
-  setColorVar(root, '--color-warning', warning)
-  setColorVar(root, '--color-surface', panel)
-  setColorVar(root, '--color-surface-dark', panelAlt || panel)
-  setColorVar(root, '--color-secondary-hover', selectedBg || panelAlt)
-  setColorVar(root, '--color-border-hover', border)
-  setColorVar(root, '--color-purple', purple)
-
-  setRgbVar(root, '--accent-rgb', accent)
-  setRgbVar(root, '--border-rgb', border)
-  setRgbVar(root, '--highlight-rgb', text)
-  setRgbVar(root, '--info-rgb', accent)
-  setRgbVar(root, '--success-rgb', success)
-  setRgbVar(root, '--warning-rgb', warning)
-  setRgbVar(root, '--destructive-rgb', error)
-  setRgbVar(root, '--foreground-rgb', text)
-  setRgbVar(root, '--muted-fg-rgb', muted)
-  setRgbVar(root, '--glass-rgb', panelAlt || panel)
-
-  setHexVar(root, '--accent', accent)
-  setHexVar(root, '--border', border)
-  setHexVar(root, '--success', success)
-  setHexVar(root, '--error', error)
-  setHexVar(root, '--warning', warning)
-  setHexVar(root, '--muted', muted)
-  setHexVar(root, '--dim', dim)
-  setHexVar(root, '--text', text)
-  setHexVar(root, '--selectedBg', selectedBg)
-  setHexVar(root, '--userMessageBg', resolveThemeHex(theme, 'userMessageBg', ['userMsgBg']) || panel)
-  setHexVar(root, '--userMessageText', resolveThemeHex(theme, 'userMessageText', ['foreground', 'text']) || text)
-  setHexVar(root, '--customMessageBg', resolveThemeHex(theme, 'customMessageBg', ['customMsgBg']) || panelAlt || panel)
-  setHexVar(root, '--customMessageText', resolveThemeHex(theme, 'customMessageText', ['foreground', 'text']) || text)
-  setHexVar(root, '--customMessageLabel', resolveThemeHex(theme, 'customMessageLabel', ['purple', 'violet']) || accent)
-  setHexVar(root, '--toolPendingBg', resolveThemeHex(theme, 'toolPendingBg', ['bgSlightlyLighter']) || panelAlt || panel)
-  setHexVar(root, '--toolSuccessBg', resolveThemeHex(theme, 'toolSuccessBg', ['bgSlightlyLighter']) || panel)
-  setHexVar(root, '--toolErrorBg', resolveThemeHex(theme, 'toolErrorBg', ['bgSlightlyLighter']) || panel)
-  setHexVar(root, '--toolTitle', resolveThemeHex(theme, 'toolTitle', ['accent', 'foreground']) || accent || text)
-  setHexVar(root, '--toolOutput', resolveThemeHex(theme, 'toolOutput', ['muted', 'comment']) || muted || text)
-  setHexVar(root, '--mdHeading', resolveThemeHex(theme, 'mdHeading', ['orange', 'yellow']) || warning)
-  setHexVar(root, '--mdLink', resolveThemeHex(theme, 'mdLink', ['accent', 'cyan']) || accent)
-  setHexVar(root, '--mdLinkUrl', resolveThemeHex(theme, 'mdLinkUrl', ['dim', 'dimGray']) || dim || muted)
-  setHexVar(root, '--mdCode', resolveThemeHex(theme, 'mdCode', ['cyan', 'accent']) || accent)
-  setHexVar(root, '--mdCodeBlock', resolveThemeHex(theme, 'mdCodeBlock', ['green']) || success)
-  setHexVar(root, '--mdCodeBlockBorder', resolveThemeHex(theme, 'mdCodeBlockBorder', ['border']) || border)
-  setHexVar(root, '--mdQuote', resolveThemeHex(theme, 'mdQuote', ['muted', 'comment']) || muted)
-  setHexVar(root, '--mdQuoteBorder', resolveThemeHex(theme, 'mdQuoteBorder', ['border']) || border)
-  setHexVar(root, '--mdHr', resolveThemeHex(theme, 'mdHr', ['border']) || border)
-  setHexVar(root, '--mdListBullet', resolveThemeHex(theme, 'mdListBullet', ['purple', 'violet']) || purple || accent)
-  setHexVar(root, '--toolDiffAdded', resolveThemeHex(theme, 'toolDiffAdded', ['green']) || success)
-  setHexVar(root, '--toolDiffRemoved', resolveThemeHex(theme, 'toolDiffRemoved', ['red']) || error)
-  setHexVar(root, '--toolDiffContext', resolveThemeHex(theme, 'toolDiffContext', ['muted', 'comment']) || muted)
-  setHexVar(root, '--borderAccent', accent || border)
-  setHexVar(root, '--borderMuted', border || dim)
-  setHexVar(root, '--thinkingText', muted || text)
-  setHexVar(root, '--body-bg', background)
-  setHexVar(root, '--container-bg', panel)
-  setHexVar(root, '--info-bg', panelAlt || panel)
-  if (panelAlt || panel || background) {
-    if (isLight) {
-      root.style.setProperty('--bg-subtle', 'rgba(0, 0, 0, 0.03)')
-      root.style.setProperty('--bg-inset', 'rgba(0, 0, 0, 0.05)')
-      root.style.setProperty('--bg-inset-hover', 'rgba(0, 0, 0, 0.08)')
-    } else {
-      root.style.setProperty('--bg-subtle', 'rgba(0, 0, 0, 0.18)')
-      root.style.setProperty('--bg-inset', 'rgba(0, 0, 0, 0.28)')
-      root.style.setProperty('--bg-inset-hover', 'rgba(0, 0, 0, 0.38)')
-    }
+  const computed = computeThemeVars(theme)
+  if (!computed) {
+    clearThemeVars()
+    return
   }
 
-  if (muted) {
-    root.style.setProperty('--text-secondary', muted)
-  }
-
-  if (resolvedScheme) {
-    root.setAttribute('data-chat-theme-scheme', resolvedScheme)
-    // Auto-set theme class for components that depend on theme-dark/theme-light
-    root.classList.remove('theme-dark', 'theme-light')
-    root.classList.add(resolvedScheme === 'dark' ? 'theme-dark' : 'theme-light')
-  }
-
-  root.setAttribute('data-chat-theme', theme.name || themeName || normalized)
+  clearThemeVars()
+  applyThemeVars(computed.vars, computed.scheme)
+  document.documentElement.setAttribute('data-chat-theme', theme.name || themeName || normalized)
 }
 
 export async function saveUserPiTheme(name: string, theme: PiThemeFile): Promise<void> {
   const cleanName = sanitizeThemeName(name)
-  if (!cleanName) {
-    throw new Error('Invalid theme name')
-  }
-  const path = `themes/${cleanName}.json`
+  if (!cleanName) throw new Error('Invalid theme name')
+  const path = 'themes/' + cleanName + '.json'
   const content = JSON.stringify({ ...theme, name: cleanName }, null, 2)
   await invoke('write_resource_file', { path, content, scope: 'user' })
   themeCache.set(cleanName, { ...theme, name: cleanName })
@@ -571,18 +218,16 @@ export async function saveUserPiTheme(name: string, theme: PiThemeFile): Promise
 
 export async function deleteUserPiTheme(name: string): Promise<void> {
   const cleanName = sanitizeThemeName(name)
-  if (!cleanName) {
-    throw new Error('Invalid theme name')
-  }
-  const path = `themes/${cleanName}.json`
+  if (!cleanName) throw new Error('Invalid theme name')
+  const path = 'themes/' + cleanName + '.json'
   await invoke('delete_resource_file', { path, scope: 'user' })
   themeCache.delete(cleanName)
 }
 
-export function validateAndParseThemeJson(jsonStr: string): { valid: boolean; theme?: PiThemeFile; error?: string } {
-  if (!jsonStr.trim()) {
-    return { valid: false, error: 'Theme JSON cannot be empty.' }
-  }
+export function validateAndParseThemeJson(
+  jsonStr: string,
+): { valid: boolean; theme?: PiThemeFile; error?: string } {
+  if (!jsonStr.trim()) return { valid: false, error: 'Theme JSON cannot be empty.' }
   try {
     const parsed = JSON.parse(jsonStr)
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
@@ -593,134 +238,98 @@ export function validateAndParseThemeJson(jsonStr: string): { valid: boolean; th
     }
     return { valid: true, theme: parsed as PiThemeFile }
   } catch (err: any) {
-    return { valid: false, error: `JSON Syntax Error: ${err.message || String(err)}` }
+    return { valid: false, error: 'JSON Syntax Error: ' + (err.message || String(err)) }
   }
 }
 
+/**
+ * Prompt handed to an external model to author a theme.
+ * Mirrors the real pi-coding-agent schema: surface = background, ink = text.
+ */
 export function generateThemePrompt(baseTheme?: PiThemeFile): string {
   const currentVars = baseTheme?.vars ? JSON.stringify(baseTheme.vars, null, 2) : ''
-  return `Act as an expert UI/UX and color palette designer. I want you to design a stunning, accessible, and high-quality custom theme for my developer dashboard (Pi Session Manager).
-
-Please return ONLY a raw JSON object matching the following format:
-
-{
-  "name": "custom-theme",
-  "vars": {
-    "background": "#1a1b26",
-    "panel": "#242536",
-    "panelAlt": "#1e1f2e",
-    "text": "#e5e5e7",
-    "muted": "#565f89",
-    "dim": "#414868",
-    "accent": "#8abeb7",
-    "border": "#5f87ff",
-    "success": "#7ee787",
-    "error": "#ef4444",
-    "warning": "#ffa657",
-    "purple": "#c792ea",
-    "selectedBg": "#2e3248"
+  const lines = [
+    'You are an expert UI/UX and colour-palette designer. Design a complete, accessible theme for a developer desktop app (Pi Session Manager).',
+    '',
+    'Return ONLY a raw JSON object in exactly this shape \u2014 no prose, no markdown fences:',
+    '',
+    '{',
+    '  "name": "my-theme",',
+    '  "vars": {',
+    '    "surface": "#0d0d0f",',
+    '    "ink": "#f5f5f7",',
+    '    "accent": "#ff6600",',
+    '    "border": "#7a818f",',
+    '    "borderAccent": "#7a818f",',
+    '    "borderMuted": "#505050",',
+    '    "success": "#22c55e",',
+    '    "error": "#ef4444",',
+    '    "warning": "#f0c674",',
+    '    "skill": "#7a818f",',
+    '    "muted": "#808080",',
+    '    "dim": "#666666",',
+    '    "thinkingText": "#808080",',
+    '    "selectedBg": "#1a1a1c",',
+    '    "userMessageBg": "#141416",',
+    '    "userMessageText": "#f5f5f7",',
+    '    "customMessageBg": "#141416",',
+    '    "customMessageText": "#f5f5f7",',
+    '    "customMessageLabel": "#7a818f",',
+    '    "toolPendingBg": "#141416",',
+    '    "toolSuccessBg": "#12251a",',
+    '    "toolErrorBg": "#2a1414",',
+    '    "toolTitle": "#7a818f",',
+    '    "toolOutput": "#c8c8cc",',
+    '    "mdHeading": "#f0c674",',
+    '    "mdLink": "#7a818f",',
+    '    "mdLinkUrl": "#808080",',
+    '    "mdCode": "#7a818f",',
+    '    "mdCodeBlock": "#22c55e",',
+    '    "mdCodeBlockBorder": "#808080",',
+    '    "mdQuote": "#808080",',
+    '    "mdQuoteBorder": "#808080",',
+    '    "mdHr": "#808080",',
+    '    "mdListBullet": "#7a818f",',
+    '    "toolDiffAdded": "#22c55e",',
+    '    "toolDiffRemoved": "#ef4444",',
+    '    "toolDiffContext": "#808080",',
+    '    "syntaxComment": "#6A9955",',
+    '    "syntaxKeyword": "#569CD6",',
+    '    "syntaxFunction": "#DCDCAA",',
+    '    "syntaxVariable": "#9CDCFE",',
+    '    "syntaxString": "#CE9178",',
+    '    "syntaxNumber": "#B5CEA8",',
+    '    "syntaxType": "#4EC0B0",',
+    '    "syntaxOperator": "#D4D4D4",',
+    '    "syntaxPunctuation": "#D4D4D4",',
+    '    "bashMode": "#22c55e"',
+    '  }',
+    '}',
+    '',
+    'Critical rules \u2014 the app renders these literally:',
+    '- "surface" IS the app background. There is no "background" key. Omitting "surface" makes the theme fail to load.',
+    '- "ink" IS the primary body text colour. There is no "text" key.',
+    '- Every value must be a 6-digit hex string like "#1a1b26". No rgb(), no hsl(), no alpha, no empty strings.',
+    '- Provide the full palette. Do not abbreviate it or invent new keys.',
+    '- toolPendingBg / toolSuccessBg / toolErrorBg must differ from the surface, otherwise running, failed and finished tool calls look identical.',
+    '- Aim for WCAG AA contrast between "surface" and "ink", and between "surface" and each of success / error / warning.',
+  ]
+  if (currentVars) {
+    lines.push('')
+    lines.push('Design language reference (existing theme vars, for the general vibe only):')
+    lines.push(currentVars)
   }
+  return lines.join('\n')
 }
 
-Key color role guidelines:
-- "background": Main app background color (#RRGGBB Hex format).
-- "panel": Card and sidebar panel surface color.
-- "panelAlt": Secondary subtle surface / hovering color.
-- "text": Primary high-contrast text color.
-- "muted": Comments, secondary labels, muted text.
-- "dim": Subtle borders, icons, faint divider elements.
-- "accent": Interactive brand color (buttons, links, active rings).
-- "border": Primary border/outline color.
-- "success": Success state (tool execution success, diff additions).
-- "error": Destructive state (errors, diff deletions).
-- "warning": Warnings or highlight badges.
-${currentVars ? `\nYou can use the following existing theme as a baseline reference:\n${currentVars}` : ''}
-`
-}
-
+/**
+ * Apply a theme object straight to the DOM (Theme Studio live preview).
+ * Uses the same computeThemeVars as applyPiChatTheme.
+ */
 export function applyRawThemeObject(theme: PiThemeFile) {
-  const root = document.documentElement
-  clearPiThemeOverrides()
-  if (!theme.vars) return
-
-  const background = resolveThemeHex(theme, 'background', ['bg'])
-  const panel = resolveThemeHex(theme, 'panel', ['bgLighter', 'background', 'bg'])
-  const panelAlt = resolveThemeHex(theme, 'panelAlt', ['bgSlightlyLighter', 'bgLighter', 'panel'])
-  const text = resolveThemeHex(theme, 'text', ['foreground'])
-  const muted = resolveThemeHex(theme, 'muted', ['comment'])
-  const dim = resolveThemeHex(theme, 'dim', ['dimGray', 'darkGray'])
-  const accent = resolveThemeHex(theme, 'accent', ['violet', 'purple', 'cyan'])
-  const border = resolveThemeHex(theme, 'border', ['teal', 'cyan', 'dimGray'])
-  const success = resolveThemeHex(theme, 'success', ['green'])
-  const error = resolveThemeHex(theme, 'error', ['red'])
-  const warning = resolveThemeHex(theme, 'warning', ['orange', 'yellow'])
-  const purple = firstValidHex(resolveThemeHex(theme, 'purple', []), theme.vars.purple, theme.vars.violet)
-  const selectedBg = resolveThemeHex(theme, 'selectedBg', ['selected', 'selection'])
-
-  const resolvedScheme = resolveThemeColorScheme(theme)
-  const isLight = resolvedScheme === 'light'
-
-  let effectivePanelAlt = panelAlt
-  if (isLight && panelAlt) {
-    const rgb = hexToRgb(panelAlt)
-    if (rgb && toRelativeLuminance(rgb) < 0.5) {
-      effectivePanelAlt = panel || background
-    }
-  }
-
-  setColorVar(root, '--color-background', background)
-  setColorVar(root, '--color-foreground', text)
-  setColorVar(root, '--color-card', panel)
-  setColorVar(root, '--color-card-foreground', text)
-  setColorVar(root, '--color-popover', panel)
-  setColorVar(root, '--color-popover-foreground', text)
-  setColorVar(root, '--color-primary', text)
-  setColorVar(root, '--color-primary-foreground', background)
-  setColorVar(root, '--color-secondary', effectivePanelAlt)
-  setColorVar(root, '--color-secondary-foreground', text)
-  setColorVar(root, '--color-muted', effectivePanelAlt)
-  setColorVar(root, '--color-muted-foreground', muted)
-  setColorVar(root, '--color-accent', effectivePanelAlt)
-  setColorVar(root, '--color-accent-foreground', text)
-  setColorVar(root, '--color-destructive', error)
-  setColorVar(root, '--color-destructive-foreground', text)
-  setColorVar(root, '--color-border', border)
-  setColorVar(root, '--color-input', border)
-  setColorVar(root, '--color-ring', accent)
-  setColorVar(root, '--color-info', accent)
-  setColorVar(root, '--color-success', success)
-  setColorVar(root, '--color-warning', warning)
-  setColorVar(root, '--color-surface', panel)
-  setColorVar(root, '--color-surface-dark', panelAlt || panel)
-  setColorVar(root, '--color-secondary-hover', selectedBg || panelAlt)
-  setColorVar(root, '--color-border-hover', border)
-  setColorVar(root, '--color-purple', purple)
-
-  setRgbVar(root, '--accent-rgb', accent)
-  setRgbVar(root, '--border-rgb', border)
-  setRgbVar(root, '--highlight-rgb', text)
-  setRgbVar(root, '--info-rgb', accent)
-  setRgbVar(root, '--success-rgb', success)
-  setRgbVar(root, '--warning-rgb', warning)
-  setRgbVar(root, '--destructive-rgb', error)
-  setRgbVar(root, '--foreground-rgb', text)
-  setRgbVar(root, '--muted-fg-rgb', muted)
-  setRgbVar(root, '--glass-rgb', panelAlt || panel)
-
-  setHexVar(root, '--accent', accent)
-  setHexVar(root, '--border', border)
-  setHexVar(root, '--success', success)
-  setHexVar(root, '--error', error)
-  setHexVar(root, '--warning', warning)
-  setHexVar(root, '--muted', muted)
-  setHexVar(root, '--dim', dim)
-  setHexVar(root, '--text', text)
-  setHexVar(root, '--selectedBg', selectedBg)
-
-  if (resolvedScheme) {
-    root.setAttribute('data-chat-theme-scheme', resolvedScheme)
-    root.classList.remove('theme-dark', 'theme-light')
-    root.classList.add(resolvedScheme === 'dark' ? 'theme-dark' : 'theme-light')
-  }
-  root.setAttribute('data-chat-theme', theme.name || 'studio-preview')
+  const computed = computeThemeVars(theme)
+  clearThemeVars()
+  if (!computed) return
+  applyThemeVars(computed.vars, computed.scheme)
+  document.documentElement.setAttribute('data-chat-theme', theme.name || 'studio-preview')
 }

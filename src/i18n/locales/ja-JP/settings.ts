@@ -267,6 +267,8 @@ export const settings = {
     userThemes: 'ユーザーテーマ',
     base46Preview: 'base46 プレビュー',
     noCustomThemes: '~/.pi/agent/themes にカスタムテーマが見つかりません',
+    deleteThemeTitle: "テーマを削除",
+    deleteThemeConfirm: "カスタムテーマ {name} を削除しますか？この操作は取り消せません。",
     disableToolSuccessStyle: 'ツール成功スタイルを無効化',
     disableToolSuccessStyleDesc: 'ツール実行成功時の緑の背景と枠線を無効にし、ツールカードをすっきりさせます',
     disableToolCallStyle: 'ツール呼び出しスタイルを無効化',
