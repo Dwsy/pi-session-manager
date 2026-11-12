@@ -8,6 +8,8 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
     "outDir": "dist",
     "declaration": false,
     "baseUrl": "../..",
