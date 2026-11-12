@@ -1495,7 +1495,10 @@
 }
 
 .app-desktop-sidebar {
-  background: rgb(var(--color-card));
+  // Match the session view background so the sidebar and content read as one
+  // surface across every theme. --color-card (panel) diverges from the
+  // background in most custom themes, which made the sidebar look detached.
+  background: var(--body-bg);
 }
 
 .app-desktop-content {
