@@ -194,7 +194,7 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
 
   return (
     <div
-      className={`fixed inset-0 z-[9998] flex items-start justify-center px-4 pt-[3vh] sm:px-6 sm:pt-[5vh] bg-black/35 backdrop-blur-[6px] motion-overlay-backdrop ${visible ? 'opacity-100' : 'opacity-0'}`}
+      className={`fixed inset-0 z-[9998] flex items-center justify-center bg-black/35 backdrop-blur-[6px] motion-overlay-backdrop ${visible ? 'opacity-100' : 'opacity-0'}`}
       onClick={close}
     >
       <div
@@ -202,7 +202,7 @@ export default function CommandPalette({ context }: CommandPaletteProps) {
         role="dialog"
         aria-modal="true"
         aria-label={t('command.paletteLabel', 'Command palette')}
-        className={`w-full max-w-[1380px] h-[80vh] bg-background/98 border border-border/80 rounded-xl shadow-[0_24px_80px_rgba(15,23,42,0.18)] overflow-hidden motion-overlay-surface flex flex-col min-h-0 ${visible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-[0.985] opacity-0'}`}
+        className={`w-[90vw] h-[90vh] bg-background/98 border border-border/80 rounded-xl shadow-[0_24px_80px_rgba(15,23,42,0.18)] overflow-hidden motion-overlay-surface flex flex-col min-h-0 ${visible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-[0.985] opacity-0'}`}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handlePanelKeyDown}
       >

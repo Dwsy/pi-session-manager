@@ -78,7 +78,8 @@ describe('renderSessionEntry string content coercion', () => {
   it('renders a system message whose content is a raw string', () => {
     render(<>{renderSessionEntry(messageEntry('system', 'You are a helpful assistant.'))}</>)
 
-    expect(screen.getByTestId('markdown').textContent).toBe('You are a helpful assistant.')
+    expect(screen.getByText('You are a helpful assistant.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /System prompt/ })).toHaveProperty('disabled', true)
   })
 
   it('renders a developer message whose content is a raw string', () => {
@@ -90,7 +91,7 @@ describe('renderSessionEntry string content coercion', () => {
   it('does not throw for an empty string body', () => {
     render(<>{renderSessionEntry(messageEntry('system', ''))}</>)
 
-    expect(screen.getByTestId('markdown').textContent).toBe('')
+    expect(screen.getByRole('button', { name: /System prompt/ })).toBeTruthy()
   })
 
   it('coerces user message content into content parts', () => {

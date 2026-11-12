@@ -139,8 +139,8 @@ function CodeReviewToolbarButton({
     setInitialToolCallId(null)
   }, [])
 
-  const title = i18n.t('session.codeReview.title', 'Code review')
-  const shortLabel = i18n.t('session.codeReview.traceLabel', 'Trace')
+  const title = i18n.t('session.codeReview.reviewSession', 'Review Session')
+  const shortLabel = title
 
   return (
     <>

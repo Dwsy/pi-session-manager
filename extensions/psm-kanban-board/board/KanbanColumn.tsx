@@ -282,7 +282,7 @@ export default function KanbanColumn({
             onChange={(event) => onColumnSearchChange?.(event.currentTarget.value)}
             placeholder={t('plugins.kanbanBoard.columnSearch', 'Search')}
             aria-label={t('plugins.kanbanBoard.columnSearch', 'Search')}
-            className="h-6 w-full rounded-md border border-border/25 bg-background/40 pl-5 pr-1.5 text-[10px] text-foreground outline-none placeholder:text-muted-foreground/45 focus:border-primary/50"
+            className="h-6 w-full rounded-md border border-border/30 bg-background/40 pl-5 pr-1.5 text-[10px] text-foreground outline-none placeholder:text-muted-foreground/45 focus:border-primary/50"
           />
         </div>
         <span className="text-[10px] text-muted-foreground tabular-nums px-1.5 py-0.5 rounded bg-muted/50">

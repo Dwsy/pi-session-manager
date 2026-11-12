@@ -8,6 +8,7 @@ import ModelChange from "@/components/messages/ModelChange";
 import SessionInfoEntry from "@/components/session-viewer/SessionInfoEntry";
 import ThinkingLevelChange from "@/components/messages/ThinkingLevelChange";
 import UserMessage from "@/components/messages/UserMessage";
+import SystemMessage from "@/components/messages/SystemMessage";
 
 import type { Content, SessionEntry } from "@/types";
 import { normalizePiContent } from "@/utils/session";
@@ -76,7 +77,18 @@ export function renderSessionEntry(
         );
       }
 
-      if (role === "developer" || role === "system") {
+      if (role === "system") {
+        return (
+          <SystemMessage
+            key={entry.id}
+            entryId={entry.id}
+            message={entry.message}
+            timestamp={entry.timestamp}
+          />
+        );
+      }
+
+      if (role === "developer") {
         return (
           <CustomMessage
             key={entry.id}

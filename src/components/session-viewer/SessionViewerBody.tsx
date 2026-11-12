@@ -12,6 +12,7 @@ import type {
 import { CornerDownLeft } from "lucide-react";
 
 import SystemPromptDialog from "@/components/messages/SystemPromptDialog";
+import { SystemMessageProvider } from "@/components/messages/SystemMessageContext";
 import ChatInput from "@/components/pi-live/PiLiveChatInput";
 import type { SessionTreeRef } from "@/components/session-tree/SessionTree";
 import SessionViewerMessages, {
@@ -177,6 +178,7 @@ export default function SessionViewerBody({
   ) : null;
 
   return (
+    <SystemMessageProvider key={session.path} entries={entries} sessionPath={session.path}>
     <div
       className={`h-full flex relative ${showToolExpandIndicator ? "" : "tool-expand-indicators-hidden"} ${previewMode ? "session-viewer-preview" : ""}`}
     >
@@ -280,5 +282,6 @@ export default function SessionViewerBody({
         />
       )}
     </div>
+    </SystemMessageProvider>
   );
 }

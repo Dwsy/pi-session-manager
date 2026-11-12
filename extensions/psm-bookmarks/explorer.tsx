@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ArrowDownUp,
   Bookmark,
   ExternalLink,
   Folder,
@@ -505,16 +506,17 @@ export function BookmarksAppView({
 
         <button
           type="button"
-          className={`${sessionPluginPanelIconButtonClass} px-2 py-1 text-[11px]`}
+          className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border/50 bg-secondary/25 px-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground focus-ring"
           aria-label={viewState.sortOrder === 'newest' ? t(i18n, 'sortNewest', 'Newest first') : t(i18n, 'sortOldest', 'Oldest first')}
           title={viewState.sortOrder === 'newest' ? t(i18n, 'sortNewest', 'Newest first') : t(i18n, 'sortOldest', 'Oldest first')}
           onClick={() =>
             explorerState.set({ sortOrder: viewState.sortOrder === 'newest' ? 'oldest' : 'newest' })
           }
         >
-          {viewState.sortOrder === 'newest'
+          <ArrowDownUp className="h-3 w-3 shrink-0" aria-hidden="true" />
+          <span>{viewState.sortOrder === 'newest'
             ? t(i18n, 'sortNewest', 'Newest first')
-            : t(i18n, 'sortOldest', 'Oldest first')}
+            : t(i18n, 'sortOldest', 'Oldest first')}</span>
         </button>
 
         {viewState.projectFilter && (

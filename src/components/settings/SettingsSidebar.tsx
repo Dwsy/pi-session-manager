@@ -151,7 +151,7 @@ export default function SettingsSidebar({
               key={area.id}
               onClick={() => onAreaChange(area.id)}
               aria-pressed={activeArea === area.id}
-              className={`focus-ring min-h-[30px] truncate border-r border-border px-2 text-xs font-medium last:border-r-0 ${
+              className={`focus-ring min-h-[30px] truncate border-r border-border px-2 text-xs font-medium first:rounded-l-[5px] last:rounded-r-[5px] last:border-r-0 ${
                 activeArea === area.id
                   ? "settings-accent-bg-soft settings-accent-ring settings-accent-fg font-semibold"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"

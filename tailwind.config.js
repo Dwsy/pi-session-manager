@@ -1,13 +1,14 @@
+import colors from 'tailwindcss/colors.js'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ['class', '.theme-dark'],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
-    "./extensions/psm-*/*.{js,ts,jsx,tsx}",
-    "./extensions/psm-*/src/**/*.{js,ts,jsx,tsx}",
-    "./extensions/psm-*/tool-review/**/*.{js,ts,jsx,tsx}",
-    "./extensions/psm-*/LoopStrip/**/*.{js,ts,jsx,tsx}",
+    "./extensions/psm-*/**/*.{js,ts,jsx,tsx}",
+    "./extensions/pi-notes/psm-plugin.tsx",
+    "!./extensions/psm-*/**/node_modules/**",
   ],
   theme: {
     extend: {
@@ -82,7 +83,7 @@ export default {
         },
         'secondary-hover': 'rgb(var(--color-secondary-hover) / <alpha-value>)',
         'border-hover': 'rgb(var(--color-border-hover) / <alpha-value>)',
-        purple: 'rgb(var(--color-purple) / <alpha-value>)',
+        purple: { ...colors.purple, DEFAULT: 'rgb(var(--color-purple) / <alpha-value>)' },
       },
     },
   },

@@ -33,6 +33,8 @@ vi.mock('react-i18next', () => ({
 }))
 
 import SystemPromptDialog from './SystemPromptDialog'
+import SystemMessage from './SystemMessage'
+import { SystemMessageProvider } from './SystemMessageContext'
 
 afterEach(cleanup)
 
@@ -139,6 +141,28 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof SystemPromp
 beforeEach(() => {
   invokeMock.mockReset()
   copyTextMock.mockClear()
+})
+
+describe('System message snapshots', () => {
+  it('shows effective state and opens the selected historical version without another fetch', async () => {
+    invokeMock.mockResolvedValue(snapshots)
+    const systemEntries = snapshots.map((item) => ({ type: 'message', id: item.id, timestamp: item.timestamp, message: { role: 'system', content: [] } } as SessionEntry))
+    render(<SystemMessageProvider entries={systemEntries} sessionPath={sessionPath}>
+      {systemEntries.map((entry) => <SystemMessage key={entry.id} entryId={entry.id} message={entry.message!} />)}
+    </SystemMessageProvider>)
+    const prompt = await screen.findByRole('button', { name: /System prompt.*Rules version one/ })
+    const firstCard = prompt.closest('.system-message-card') as HTMLElement
+    expect(within(firstCard).getByRole('button', { name: /Tools.*\+1.*−0.*\+read/ })).toBeTruthy()
+    fireEvent.click(prompt)
+    expect(await screen.findByRole('combobox', { name: 'Version' })).toHaveProperty('value', '1')
+    expect(screen.getByRole('dialog').textContent).toContain('Rules version one')
+    expect(invokeMock).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    fireEvent.click(within(firstCard).getByRole('button', { name: /Tools.*\+1.*−0/ }))
+    expect(await screen.findByRole('tab', { name: /Tools Used/, selected: true })).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Version' })).toHaveProperty('value', '1')
+    expect(invokeMock).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('SystemPromptDialog', () => {

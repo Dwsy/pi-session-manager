@@ -390,7 +390,7 @@ export default function ResourcesTab({ cwd = null }: ResourcesTabProps) {
       ) : null}
 
       {error ? (
-        <div role="alert" className="rounded-md border border-danger/35 bg-danger/10 px-3 py-2 text-xs text-danger">
+        <div role="alert" className="rounded-md border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {t("settings.piResources.catalog.error", {
             reason: error,
             defaultValue: "Resource operation failed: {{reason}}",

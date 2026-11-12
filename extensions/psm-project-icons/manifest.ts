@@ -5,6 +5,7 @@ export const manifest: PsmPluginManifest = {
   id: 'builtin.project-icons',
   name: 'Project Icons',
   version: '0.1.0',
+  defaultEnabled: false,
   permissions: ['projects:read'],
 }
 

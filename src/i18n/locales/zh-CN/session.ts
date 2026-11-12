@@ -12,6 +12,14 @@ export const session = {
   scrollToTop: '滚动到顶部',
   scrollToBottom: '滚动到底部',
   systemPromptAndTools: '系统提示词和工具',
+  systemMessage: {
+    prompt: '系统提示词',
+    sections: '{{count}} 个区块',
+    tools: '工具',
+    removed: '已移除',
+    noPrompt: '没有提示词变更',
+    noTools: '没有工具变更',
+  },
   modelControls: {
     title: '模型与思考控制',
     thinkingLevel: '思考级别',

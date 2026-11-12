@@ -44,7 +44,7 @@ export default function StatCard({
   const content = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded border border-current/15 ${toneClasses}`}>
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[color:color-mix(in_srgb,currentColor_15%,transparent)] ${toneClasses}`}>
           <Icon className="h-3.5 w-3.5" style={color ? { color } : undefined} aria-hidden="true" />
         </span>
         {change ? (

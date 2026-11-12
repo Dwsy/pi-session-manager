@@ -669,7 +669,7 @@ export default function HeatmapDayModal({
                             key={session.path}
                             type="button"
                             onClick={() => onOpenSession?.(session.path)}
-                            className={`group relative w-full rounded-lg border bg-background/18 px-2.5 py-2 text-left ${onOpenSession ? 'border-border/15 hover:border-border hover:bg-background/28 focus-ring' : 'border-border/12'}`}
+                            className={`group relative w-full rounded-lg border bg-background/18 px-2.5 py-2 text-left ${onOpenSession ? 'border-border/15 hover:border-border hover:bg-background/28 focus-ring' : 'border-border/10'}`}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div className="min-w-0 flex-1">

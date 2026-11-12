@@ -42,6 +42,36 @@ function modelChange(
 }
 
 describe("useSessionViewerDerivedData", () => {
+  it("hides initialization and duplicates but keeps switches back to the initial model", () => {
+    const entries: SessionEntry[] = [
+      { type: "session", id: "header", timestamp: "", provider: "openai", modelId: "a" },
+      modelChange("initial", "a"),
+      message("user", "user", "hello"),
+      modelChange("duplicate", "a"),
+      modelChange("switch", "b"),
+      modelChange("back", "a"),
+    ];
+    expect(selectRenderableEntries(entries, null).map((entry) => entry.id)).toEqual(["user", "switch", "back"]);
+    expect(selectRenderableEntries(entries, null, true).map((entry) => entry.id)).toEqual(["user"]);
+  });
+
+  it("uses the first Pi model record as initialization when the header has no model", () => {
+    const entries: SessionEntry[] = [
+      { type: "session", id: "header", timestamp: "" },
+      modelChange("initial", "a"),
+      modelChange("switch", "b"),
+      message("user", "user", "hello"),
+    ];
+    expect(selectRenderableEntries(entries, null).map((entry) => entry.id)).toEqual(["switch", "user"]);
+  });
+
+  it("keeps switches between providers with the same model id", () => {
+    const entries: SessionEntry[] = [
+      { type: "session", id: "header", timestamp: "", provider: "openai", modelId: "a" },
+      { ...modelChange("switch", "a"), provider: "other" },
+    ];
+    expect(selectRenderableEntries(entries, null).map((entry) => entry.id)).toEqual(["switch"]);
+  });
   it("keeps developer messages renderable", () => {
     const entries = [
       message("dev-1", "developer", "Continue active goal"),
@@ -156,7 +186,7 @@ describe("useSessionViewerDerivedData", () => {
     ]);
   });
 
-  it("keeps only the last model_change in a consecutive run", () => {
+  it("keeps distinct consecutive model changes when the initial model is unknown", () => {
     const entries: SessionEntry[] = [
       modelChange("mc-1", "gpt-5.6-luna"),
       modelChange("mc-2", "gpt-5.6-terra"),
@@ -171,7 +201,7 @@ describe("useSessionViewerDerivedData", () => {
       result.current.renderableEntries
         .filter((entry) => entry.type === "model_change")
         .map((entry) => entry.id),
-    ).toEqual(["mc-2"]);
+    ).toEqual(["mc-1", "mc-2"]);
   });
 
   it("treats non-renderable entries as transparent for model_change runs", () => {
@@ -201,7 +231,7 @@ describe("useSessionViewerDerivedData", () => {
       result.current.renderableEntries
         .filter((entry) => entry.type === "model_change")
         .map((entry) => entry.id),
-    ).toEqual(["mc-2"]);
+    ).toEqual(["mc-1", "mc-2"]);
   });
 
   it("keeps non-consecutive model_change entries separated by user messages", () => {

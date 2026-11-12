@@ -809,6 +809,114 @@
   font-weight: bold;
 }
 
+// System message — neutral card with teal accent; deliberately avoids the
+// purple custom-message palette so a prompt snapshot reads as system metadata.
+.message-system {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.system-message-card {
+  padding: 8px 10px 10px;
+  background: rgb(var(--color-surface) / 0.55);
+  border: 1px solid rgb(var(--color-border) / 0.25);
+  border-radius: 8px;
+}
+
+.system-message-label {
+  padding: 2px 6px 6px;
+  color: var(--accent);
+  font-size: calc(var(--font-size-base, 16px) * 0.6875);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.system-message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
+  appearance: none;
+  cursor: pointer;
+  transition: background-color 0.15s var(--motion-ease-standard);
+}
+
+.system-message-row + .system-message-row {
+  border-top: 1px solid rgb(var(--color-border) / 0.18);
+}
+
+.system-message-row:hover:not(:disabled) {
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
+.system-message-row:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.55);
+  outline-offset: 1px;
+}
+
+.system-message-row:disabled {
+  cursor: default;
+}
+
+.system-message-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+.system-message-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.system-message-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.system-message-meta {
+  font-weight: 400;
+  color: rgb(var(--color-muted-foreground));
+}
+
+.system-message-detail {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.system-message-tools {
+  font-family: var(--font-family-mono);
+}
+
+.system-message-chevron {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--muted);
+  transition: color 0.15s var(--motion-ease-standard), transform 0.15s var(--motion-ease-standard);
+}
+
+.system-message-row:hover:not(:disabled) .system-message-chevron {
+  color: var(--accent);
+  transform: translateX(1px);
+}
+
 // Model Change
 .model-change {
   display: flex;

@@ -154,11 +154,11 @@ export default function WorkspacePanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-transparent">
-      <div className="relative border-b border-border/65 px-2 py-2">
+      <div className="relative border-b border-border/50 px-2 py-2">
         <button
           type="button"
           onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
-          className="flex h-8 w-full items-center gap-2 rounded-md border border-border/65 px-2 text-xs font-medium hover:bg-secondary/55"
+          className="flex h-8 w-full items-center gap-2 rounded-md border border-border/50 px-2 text-xs font-medium hover:bg-secondary/55"
           aria-expanded={isWorkspaceOpen}
           aria-haspopup="menu"
         >
@@ -172,7 +172,7 @@ export default function WorkspacePanel({
         </button>
 
         {isWorkspaceOpen && (
-          <div className="absolute left-2 right-2 top-full z-50 mt-1 rounded-md border border-border/75 bg-popover py-1 shadow-sm" role="menu">
+          <div className="absolute left-2 right-2 top-full z-50 mt-1 rounded-md border border-border/70 bg-popover py-1 shadow-sm" role="menu">
             {workspaces.map((workspace) => (
               <div key={workspace.id} className={`flex items-center group px-1 ${workspace.id === activeWorkspaceId ? 'bg-primary/5' : ''}`}>
                 <button
@@ -253,7 +253,7 @@ export default function WorkspacePanel({
         </div>
       )}
 
-      <div className="border-b border-border/65 px-2 py-2">
+      <div className="border-b border-border/50 px-2 py-2">
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <CompositionInput
@@ -261,7 +261,7 @@ export default function WorkspacePanel({
             placeholder={t('common.searchProjectsPlaceholder')}
             value={searchQuery}
             onChange={setSearchQuery}
-            className="h-8 w-full rounded-md border border-border/65 bg-background py-1.5 pl-7 pr-2 text-xs outline-none focus:border-ring/50 focus:ring-2 focus:ring-ring/15"
+            className="h-8 w-full rounded-md border border-border/50 bg-background py-1.5 pl-7 pr-2 text-xs outline-none focus:border-ring/50 focus:ring-2 focus:ring-ring/15"
           />
         </div>
       </div>

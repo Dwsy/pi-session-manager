@@ -250,6 +250,9 @@ export interface SessionConvertResult {
 export interface Message {
   role: string;
   content: Content[];
+  sections?: Record<string, string | null>;
+  toolsAdded?: SystemPromptTool[];
+  toolsRemoved?: (string | { name: string })[];
   model?: string;
   provider?: string;
   usage?: TokenUsage;

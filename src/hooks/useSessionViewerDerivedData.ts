@@ -32,24 +32,6 @@ function isRenderableNonMessageEntry(entry: SessionEntry): boolean {
   );
 }
 
-/** True when a later model_change follows without a renderable entry between. */
-export function isFollowedByModelChange(
-  entries: SessionEntry[],
-  idx: number,
-): boolean {
-  for (let i = idx + 1; i < entries.length; i++) {
-    const next = entries[i];
-    if (!next) continue;
-    if (next.type === "model_change") return true;
-    if (next.type === "message") {
-      if (isRenderableMessageEntry(next)) return false;
-      continue;
-    }
-    if (isRenderableNonMessageEntry(next)) return false;
-  }
-  return false;
-}
-
 /**
  * Entries shown in the main transcript for the active branch path (root → leaf).
  * When activeEntryId is missing or not in the file, returns the unfiltered sequence.
@@ -68,11 +50,22 @@ export function selectRenderableEntries(
     pathIds != null ? entries.filter((entry) => pathIds.has(entry.id)) : entries;
 
   const renderableEntries: SessionEntry[] = [];
+  const header = entries.find((entry) => entry.type === "session");
+  let currentModel = header?.modelId
+    ? { id: header.modelId, provider: header.provider || "" }
+    : null;
+  let conversationStarted = false;
 
   for (let idx = 0; idx < source.length; idx++) {
     const entry = source[idx]!;
 
     if (entry.type === "message") {
+      if (entry.message?.role === "assistant" && entry.message.model) {
+        currentModel = { id: entry.message.model, provider: entry.message.provider || "" };
+      }
+      if (entry.message?.role === "user" || entry.message?.role === "assistant") {
+        conversationStarted = true;
+      }
       if (!isRenderableMessageEntry(entry)) {
         continue;
       }
@@ -81,13 +74,14 @@ export function selectRenderableEntries(
     }
 
     if (!previewMode && isRenderableNonMessageEntry(entry)) {
-      // Collapse consecutive model_change runs on the *visible* path only,
-      // so sibling-branch model switches do not hide the active branch's marker.
-      if (
-        entry.type === "model_change" &&
-        isFollowedByModelChange(source, idx)
-      ) {
-        continue;
+      if (entry.type === "model_change" && entry.modelId) {
+        const nextModel = { id: entry.modelId, provider: entry.provider || "" };
+        const redundant = currentModel?.id === nextModel.id &&
+          currentModel.provider === nextModel.provider;
+        // Pi's first model record can initialize a session with no header model.
+        const initializesSession = !currentModel && !!header && !conversationStarted;
+        currentModel = nextModel;
+        if (redundant || initializesSession) continue;
       }
       renderableEntries.push(entry);
     }

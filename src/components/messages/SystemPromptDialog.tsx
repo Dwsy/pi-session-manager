@@ -29,6 +29,9 @@ interface SystemPromptDialogProps {
   onClose: () => void
   entries?: SessionEntry[]
   sessionPath?: string
+  initialSnapshotId?: string
+  initialTab?: 'prompt' | 'tools'
+  initialSnapshots?: SystemPromptSnapshot[]
 }
 
 type TabType = 'prompt' | 'tools'
@@ -108,7 +111,7 @@ function SkillsContent({ text }: { text: string }) {
   )
 }
 
-function SystemPromptDialog({ isOpen, onClose, entries = [], sessionPath }: SystemPromptDialogProps) {
+function SystemPromptDialog({ isOpen, onClose, entries = [], sessionPath, initialSnapshotId, initialTab = 'prompt', initialSnapshots }: SystemPromptDialogProps) {
   const { t } = useTranslation()
   const { copyText } = useClipboard()
   const titleId = useId()
@@ -177,12 +180,12 @@ function SystemPromptDialog({ isOpen, onClose, entries = [], sessionPath }: Syst
 
   useEffect(() => {
     if (!isOpen) return
-    setActiveTab('prompt')
+    setActiveTab(initialTab)
     setSelectedVersion(null)
     setSelectedBlockKey(FULL_PROMPT)
     setToolQuery('')
     setExpandedTools(new Set())
-  }, [isOpen, sessionPath])
+  }, [isOpen, sessionPath, initialSnapshotId, initialTab])
 
   useEffect(() => {
     if (!isOpen) return
@@ -213,13 +216,13 @@ function SystemPromptDialog({ isOpen, onClose, entries = [], sessionPath }: Syst
       }
 
       try {
-        const list = await invoke<SystemPromptSnapshot[]>('get_session_system_prompt_snapshots', { path: sessionPath })
+        const list = initialSnapshots ?? await invoke<SystemPromptSnapshot[]>('get_session_system_prompt_snapshots', { path: sessionPath })
         if (isStale()) return
         if (list.length > 0) {
           const ordered = newestFirst(list)
           setSnapshots(ordered)
           setFallbackPrompt('')
-          setSelectedVersion(ordered[0].version)
+          setSelectedVersion(ordered.find((snapshot) => snapshot.id === initialSnapshotId)?.version ?? ordered[0].version)
           setLoadState('ready')
           return
         }
@@ -249,7 +252,7 @@ function SystemPromptDialog({ isOpen, onClose, entries = [], sessionPath }: Syst
     return () => {
       cancelled = true
     }
-  }, [isOpen, sessionPath, reloadKey])
+  }, [isOpen, sessionPath, reloadKey, initialSnapshotId, initialSnapshots])
 
   useEffect(() => {
     if (!isOpen) return

@@ -12,6 +12,14 @@ export const session = {
   scrollToTop: 'Scroll to top',
   scrollToBottom: 'Scroll to bottom',
   systemPromptAndTools: 'System Prompt & Tools',
+  systemMessage: {
+    prompt: 'System prompt',
+    sections: '{{count}} sections',
+    tools: 'Tools',
+    removed: 'Removed',
+    noPrompt: 'No prompt changes',
+    noTools: 'No tool changes',
+  },
   modelControls: {
     title: 'Model & Thinking Controls',
     thinkingLevel: 'Thinking Level',

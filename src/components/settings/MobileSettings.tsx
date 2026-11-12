@@ -217,7 +217,7 @@ export default function MobileSettings({
                 <button
                   key={area.id}
                   onClick={() => handleAreaClick(area.id)}
-                  className={`focus-ring min-h-[36px] truncate border-r border-border px-2 text-xs font-medium last:border-r-0 ${
+                  className={`focus-ring min-h-[36px] truncate border-r border-border px-2 text-xs font-medium first:rounded-l-[5px] last:rounded-r-[5px] last:border-r-0 ${
                     activeArea === area.id
                       ? "bg-secondary text-secondary-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"

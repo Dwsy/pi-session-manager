@@ -729,7 +729,7 @@ export function CacheUsagePanel({
       {refreshing || (error && stats) ? (
         <div className={`flex min-h-8 shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5 text-xs ${error ? 'border-destructive/30 bg-destructive/5 text-destructive' : 'border-border/70 bg-primary/5 text-muted-foreground'}`} role="status">
           <span>{error ? t('session.cacheUsage.refreshFailed', 'Refresh failed: {{message}}', { message: error }) : t('session.cacheUsage.refreshing', 'Refreshing cache usage...')}</span>
-          {error ? <button type="button" onClick={handleRefresh} className="border border-current/30 px-2 py-1 text-[11px] hover:bg-background/40">{t('session.cacheUsage.retry', 'Retry')}</button> : null}
+          {error ? <button type="button" onClick={handleRefresh} className="border border-[color:color-mix(in_srgb,currentColor_30%,transparent)] px-2 py-1 text-[11px] hover:bg-background/40">{t('session.cacheUsage.retry', 'Retry')}</button> : null}
         </div>
       ) : null}
 
@@ -739,7 +739,7 @@ export function CacheUsagePanel({
         ) : error && !stats ? (
           <SessionPluginPanelState tone="error" className="m-3" role="alert">
             <p>{error}</p>
-            <button type="button" onClick={handleRefresh} className="mt-2 border border-current/30 px-2 py-1 text-xs hover:bg-destructive/5">{t('session.cacheUsage.retry', 'Retry')}</button>
+            <button type="button" onClick={handleRefresh} className="mt-2 border border-[color:color-mix(in_srgb,currentColor_30%,transparent)] px-2 py-1 text-xs hover:bg-destructive/5">{t('session.cacheUsage.retry', 'Retry')}</button>
           </SessionPluginPanelState>
         ) : !stats || stats.assistantMessages === 0 ? (
           <SessionPluginPanelState className="m-3" role="status">
