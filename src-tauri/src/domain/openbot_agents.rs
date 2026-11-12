@@ -44,21 +44,12 @@ pub fn database_path() -> Option<PathBuf> {
         }
     }
 
-    let base = if cfg!(target_os = "linux") {
-        dirs::config_dir()
-    } else {
-        dirs::data_dir()
-    }?;
+    let base = if cfg!(target_os = "linux") { dirs::config_dir() } else { dirs::data_dir() }?;
     Some(base.join("OpenBot").join("openbot.db"))
 }
 
 fn text_field(value: &Value, key: &str) -> Option<String> {
-    value
-        .get(key)
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|text| !text.is_empty())
-        .map(str::to_string)
+    value.get(key).and_then(Value::as_str).map(str::trim).filter(|text| !text.is_empty()).map(str::to_string)
 }
 
 /// Parses one `projection_agents.agent_json` payload.
@@ -73,11 +64,7 @@ pub fn parse_agent_json(raw: &str) -> Option<OpenBotAgent> {
         title: text_field(&value, "title"),
         description: text_field(&value, "description"),
         avatar_seed: text_field(&value, "avatarSeed"),
-        avatar_hue: value
-            .get("avatarHue")
-            .and_then(Value::as_f64)
-            .filter(|hue| hue.is_finite())
-            .map(|hue| hue.round().rem_euclid(360.0) as u32),
+        avatar_hue: value.get("avatarHue").and_then(Value::as_f64).filter(|hue| hue.is_finite()).map(|hue| hue.round().rem_euclid(360.0) as u32),
         avatar_url: text_field(&value, "avatarUrl"),
         workspace_path: text_field(&value, "workspacePath"),
     })
@@ -144,19 +131,16 @@ mod tests {
 
     fn create_agents_db(path: &Path, rows: &[Option<&str>]) {
         let connection = Connection::open(path).unwrap();
-        connection
-            .execute_batch("CREATE TABLE projection_agents (agent_json TEXT NOT NULL)")
-            .unwrap();
+        connection.execute_batch("CREATE TABLE projection_agents (agent_json TEXT NOT NULL)").unwrap();
         for row in rows {
             if let Some(raw) = row {
-                connection
-                    .execute("INSERT INTO projection_agents (agent_json) VALUES (?1)", [raw])
-                    .unwrap();
+                connection.execute("INSERT INTO projection_agents (agent_json) VALUES (?1)", [raw]).unwrap();
             }
         }
     }
 
-    const ZERO_JSON: &str = r#"{"id":"agent-da66bdca-0664-440c-a271-585ab5c62164","name":"zero","title":"","description":"General-purpose assistant","avatarSeed":"first-bot:avatar:0:7","avatarHue":320,"avatarUrl":null,"workspacePath":"/Users/dev/OpenBot/Agents/agent-da66bdca-0664-440c-a271-585ab5c62164"}"#;
+    const ZERO_JSON: &str =
+        r#"{"id":"agent-da66bdca-0664-440c-a271-585ab5c62164","name":"zero","title":"","description":"General-purpose assistant","avatarSeed":"first-bot:avatar:0:7","avatarHue":320,"avatarUrl":null,"workspacePath":"/Users/dev/OpenBot/Agents/agent-da66bdca-0664-440c-a271-585ab5c62164"}"#;
 
     #[test]
     fn parses_agent_json_fields() {
@@ -166,10 +150,7 @@ mod tests {
         assert_eq!(agent.name, "zero");
         assert_eq!(agent.title, None, "empty titles stay absent");
         assert_eq!(agent.avatar_hue, Some(320));
-        assert_eq!(
-            agent.workspace_path.as_deref(),
-            Some("/Users/dev/OpenBot/Agents/agent-da66bdca-0664-440c-a271-585ab5c62164")
-        );
+        assert_eq!(agent.workspace_path.as_deref(), Some("/Users/dev/OpenBot/Agents/agent-da66bdca-0664-440c-a271-585ab5c62164"));
     }
 
     #[test]
@@ -186,10 +167,7 @@ mod tests {
     #[test]
     fn reads_rows_and_skips_malformed_ones() {
         let path = temp_db_path("rows");
-        create_agents_db(
-            &path,
-            &[Some(ZERO_JSON), Some("{broken"), Some(r#"{"id":"no-name"}"#)],
-        );
+        create_agents_db(&path, &[Some(ZERO_JSON), Some("{broken"), Some(r#"{"id":"no-name"}"#)]);
 
         let agents = list_agents_at(&path);
 
@@ -212,10 +190,7 @@ mod tests {
     #[test]
     fn tolerates_databases_without_the_agents_table() {
         let path = temp_db_path("empty-schema");
-        Connection::open(&path)
-            .unwrap()
-            .execute_batch("CREATE TABLE unrelated (id TEXT)")
-            .unwrap();
+        Connection::open(&path).unwrap().execute_batch("CREATE TABLE unrelated (id TEXT)").unwrap();
 
         assert!(list_agents_at(&path).is_empty());
         std::fs::remove_file(&path).ok();

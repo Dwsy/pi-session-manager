@@ -73,10 +73,13 @@ async fn dispatch_impl(app_state: &Option<DispatchAppState>, command: &str, payl
         return result;
     }
     if let Some(result) = mesh::dispatch(
-        #[cfg(feature = "gui")] app_state,
+        #[cfg(feature = "gui")]
+        app_state,
         command,
         payload,
-    ).await {
+    )
+    .await
+    {
         return result;
     }
     if let Some(result) = resources::dispatch(app_state, command, payload).await {

@@ -316,11 +316,7 @@ where
 const PI_MODEL_TEXT_SCRIPT_REL: &str = "scripts/pi-model-text.mjs";
 
 fn pi_model_text_script_path() -> Result<std::path::PathBuf, String> {
-    find_pi_model_text_script(
-        std::env::var_os("PSM_PI_MODEL_TEXT_SCRIPT").map(std::path::PathBuf::from),
-        &script_search_roots(),
-    )
-    .ok_or_else(|| format!("Pi AI SDK helper not found at {PI_MODEL_TEXT_SCRIPT_REL} (checked PSM_PI_MODEL_TEXT_SCRIPT, cwd, and executable-relative locations)"))
+    find_pi_model_text_script(std::env::var_os("PSM_PI_MODEL_TEXT_SCRIPT").map(std::path::PathBuf::from), &script_search_roots()).ok_or_else(|| format!("Pi AI SDK helper not found at {PI_MODEL_TEXT_SCRIPT_REL} (checked PSM_PI_MODEL_TEXT_SCRIPT, cwd, and executable-relative locations)"))
 }
 
 /// Probe roots for the helper script: the process cwd (dev flows), then
@@ -350,19 +346,13 @@ fn script_search_roots() -> Vec<std::path::PathBuf> {
     roots
 }
 
-fn find_pi_model_text_script(
-    explicit: Option<std::path::PathBuf>,
-    roots: &[std::path::PathBuf],
-) -> Option<std::path::PathBuf> {
+fn find_pi_model_text_script(explicit: Option<std::path::PathBuf>, roots: &[std::path::PathBuf]) -> Option<std::path::PathBuf> {
     if let Some(path) = explicit {
         if path.is_file() {
             return Some(path);
         }
     }
-    roots
-        .iter()
-        .map(|root| root.join(PI_MODEL_TEXT_SCRIPT_REL))
-        .find(|path| path.is_file())
+    roots.iter().map(|root| root.join(PI_MODEL_TEXT_SCRIPT_REL)).find(|path| path.is_file())
 }
 
 #[cfg(test)]

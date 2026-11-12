@@ -86,12 +86,7 @@ fn scan_projects(roots: &[String], paths: Option<&[String]>) -> Result<Vec<Proje
     for path in requested {
         let key = normalize_root(&path);
         let root = whitelisted.get(&key);
-        detections.push(ProjectDetection {
-            name: directory_name(&path),
-            authorized: root.is_some(),
-            kind: root.and_then(|root| detect_kind(Path::new(root))),
-            path,
-        });
+        detections.push(ProjectDetection { name: directory_name(&path), authorized: root.is_some(), kind: root.and_then(|root| detect_kind(Path::new(root))), path });
     }
     Ok(detections)
 }
@@ -116,11 +111,7 @@ fn dependency_names(root: &Path) -> Vec<String> {
     let Ok(value) = serde_json::from_slice::<serde_json::Value>(&raw) else {
         return Vec::new();
     };
-    ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]
-        .iter()
-        .filter_map(|field| value.get(field).and_then(serde_json::Value::as_object))
-        .flat_map(|deps| deps.keys().cloned())
-        .collect()
+    ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"].iter().filter_map(|field| value.get(field).and_then(serde_json::Value::as_object)).flat_map(|deps| deps.keys().cloned()).collect()
 }
 
 /// Node-family refinement: frameworks win over the plain `node` kind.
