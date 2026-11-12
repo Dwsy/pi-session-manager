@@ -123,7 +123,7 @@ export default function SessionViewerToolbar({
   return (
     <>
       <div
-        className={`border-b border-border relative z-20 ${isMobile ? "px-2.5 py-2" : "px-3 py-1.5 min-h-10 flex flex-col justify-center"}`}
+        className={`border-b border-border/30 relative z-20 ${isMobile ? "px-2.5 py-2" : "px-3 py-1.5 min-h-10 flex flex-col justify-center"}`}
         data-session-toolbar
         {...(enableWindowDrag ? { "data-tauri-drag-region": true } : {})}
         onMouseDown={handleToolbarMouseDown}
@@ -455,7 +455,7 @@ export default function SessionViewerToolbar({
               <ArrowDown className="h-4 w-4 text-muted-foreground" />
               {t("session.scrollToBottom", "Scroll to bottom")}
             </button>
-            <div className="border-t border-border my-1" />
+            <div className="border-t border-border/30 my-1" />
             {onRename && (
               <button
                 onClick={() => {

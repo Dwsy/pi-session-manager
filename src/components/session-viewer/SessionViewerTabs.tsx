@@ -63,7 +63,7 @@ export default function SessionViewerTabs({
 
   return (
     <div
-      className="flex items-center gap-1 px-2 h-9 border-b border-border overflow-x-auto"
+      className="flex items-center gap-1 px-2 h-9 border-b border-border/30 overflow-x-auto"
       data-session-tabs
       {...(enableWindowDrag ? { "data-tauri-drag-region": true } : {})}
       onMouseDown={handleTabsMouseDown}

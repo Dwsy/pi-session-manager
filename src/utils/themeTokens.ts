@@ -417,6 +417,11 @@ export function computeThemeVars(theme: PiThemeFile): ComputedThemeVars | null {
     resolveColor(theme, 'accent', ['blue', 'violet', 'purple', 'cyan', 'teal']) ??
     mixHex(background, text, 0.7)
   const border = resolveColor(theme, 'border', ['teal', 'cyan', 'dimGray', 'line']) ?? mixHex(panel, text, 0.15)
+  // Structural hairline used by border-border in Tailwind. Deliberately neutral:
+  // the theme's own 'border' colour is often saturated (pi uses #3183d8) and
+  // must not be painted on every divider — that is what turned the UI into a
+  // grid of bright lines.
+  const hairline = mixHex(background, text, isLight ? 0.16 : 0.14)
   const success = resolveColor(theme, 'success', ['green', 'vibrant_green']) ?? (isLight ? '#16a34a' : '#7ee787')
   const error = resolveColor(theme, 'error', ['red']) ?? (isLight ? '#dc2626' : '#ef4444')
   const warning = resolveColor(theme, 'warning', ['orange', 'yellow']) ?? (isLight ? '#d97706' : '#ffa657')
@@ -504,7 +509,7 @@ export function computeThemeVars(theme: PiThemeFile): ComputedThemeVars | null {
     ['--color-accent-foreground', text],
     ['--color-destructive', error],
     ['--color-destructive-foreground', text],
-    ['--color-border', border],
+    ['--color-border', hairline],
     ['--color-input', border],
     ['--color-ring', accent],
     ['--color-info', accent],
@@ -513,7 +518,7 @@ export function computeThemeVars(theme: PiThemeFile): ComputedThemeVars | null {
     ['--color-surface', panel],
     ['--color-surface-dark', panelAlt],
     ['--color-secondary-hover', selectedBg],
-    ['--color-border-hover', border],
+    ['--color-border-hover', mixHex(background, text, isLight ? 0.3 : 0.26)],
     ['--color-purple', purple],
   ]
   for (const [name, value] of colorVars) {

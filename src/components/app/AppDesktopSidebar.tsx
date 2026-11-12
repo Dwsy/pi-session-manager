@@ -156,12 +156,12 @@ function AppDesktopSidebar({
 
   return (
     <div
-      className="app-desktop-sidebar relative w-80 border-r border-border flex flex-col"
+      className="app-desktop-sidebar relative w-80 border-r border-border/30 flex flex-col"
       role="navigation"
       aria-label={t("app.sidebar.label", "Primary navigation")}
     >
       <div
-        className={`app-desktop-sidebar__chrome ${isTauriRuntime ? "h-10" : ""} border-b border-border flex items-center px-3 ${isTauriRuntime ? "py-0" : "py-1.5"} select-none`}
+        className={`app-desktop-sidebar__chrome ${isTauriRuntime ? "h-10" : ""} border-b border-border/30 flex items-center px-3 ${isTauriRuntime ? "py-0" : "py-1.5"} select-none`}
         {...(enableWindowDrag
           ? { "data-tauri-drag-region": true, onMouseDown: startDragging }
           : {})}

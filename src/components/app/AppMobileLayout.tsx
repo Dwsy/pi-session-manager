@@ -148,7 +148,7 @@ function AppMobileLayout({
       </div>
 
       {!showSessionLayer && (
-        <nav className="flex-shrink-0 border-t border-border bg-background/95 flex items-center justify-around px-1 safe-area-bottom">
+        <nav className="flex-shrink-0 border-t border-border/30 bg-background/95 flex items-center justify-around px-1 safe-area-bottom">
           {tabs.map((tab) => (
             <button
               key={tab.id}
