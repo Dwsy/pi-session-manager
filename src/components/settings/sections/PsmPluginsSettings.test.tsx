@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -226,6 +226,66 @@ describe('PsmPluginsSettings npm lifecycle controls', () => {
 
   afterEach(() => {
     cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it('loads the next batch when the list sentinel becomes visible and resets on search', async () => {
+    const observers: { callback: IntersectionObserverCallback; disconnect: ReturnType<typeof vi.fn> }[] = []
+    class TestObserver {
+      disconnect = vi.fn()
+      observe = vi.fn()
+      unobserve = vi.fn()
+      constructor(callback: IntersectionObserverCallback) {
+        observers.push({ callback, disconnect: this.disconnect })
+      }
+    }
+    vi.stubGlobal('IntersectionObserver', TestObserver)
+    const plugins = Array.from({ length: 20 }, (_, index) => ({
+      ...pathPlugin, id: `path.plugin-${index}`, name: `Plugin ${String(index).padStart(2, '0')}`,
+    }))
+    mocks.reload.mockResolvedValueOnce(plugins)
+    render(<PsmPluginsSettings />)
+    await screen.findByText('Plugin 00')
+    expect(screen.queryByText('Plugin 08')).toBeNull()
+    expect(observers.length).toBeGreaterThan(0)
+    act(() => observers.at(-1)!.callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver))
+    expect(screen.getByText('Plugin 08')).toBeTruthy()
+    expect(screen.queryByText('Plugin 16')).toBeNull()
+    act(() => observers.at(-1)!.callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver))
+    expect(screen.getByText('Plugin 16')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Show more/ })).toBeNull()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search installed plugins' }), { target: { value: 'Plugin 0' } })
+    expect(screen.queryByText('Plugin 08')).toBeNull()
+    act(() => observers.at(-1)!.callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver))
+    expect(screen.getByText('Plugin 08')).toBeTruthy()
+    expect(observers[0].disconnect).toHaveBeenCalled()
+  })
+
+  it('filters installed plugins by capability and search, with a fallback tag', async () => {
+    const uncategorized = { ...pathPlugin, commands: [], name: 'Quiet plugin' }
+    mocks.reload.mockResolvedValueOnce([builtinPlugin, npmPlugin, uncategorized])
+    render(<PsmPluginsSettings />)
+    await screen.findByText('Quiet plugin')
+    fireEvent.click(screen.getByRole('button', { name: /Other 1/ }))
+    expect(screen.queryByText('NPM Sidechat')).toBeNull()
+    expect(screen.getByText('Quiet plugin')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /All 3/ }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search installed plugins' }), { target: { value: 'sidechat_tool' } })
+    expect(screen.getByText('NPM Sidechat')).toBeTruthy()
+    expect(screen.queryByText('Built-in Sidechat')).toBeNull()
+  })
+
+  it('opens the configuration section from the installed list', async () => {
+    mocks.reload.mockResolvedValueOnce([builtinPlugin])
+    const listener = vi.fn()
+    window.addEventListener('psm:settings-navigate', listener)
+    render(<PsmPluginsSettings />)
+    await screen.findByText('Built-in Sidechat')
+    const dispatch = vi.spyOn(window, 'dispatchEvent')
+    fireEvent.click(screen.getByRole('button', { name: 'Configure' }))
+    expect(dispatch.mock.calls.some(([event]) => (event as CustomEvent).detail?.section === 'psm-plugin:builtin.sidechat')).toBe(true)
+    dispatch.mockRestore()
+    window.removeEventListener('psm:settings-navigate', listener)
   })
 
   it('keeps marketplace search lazy outside the marketplace menu', async () => {

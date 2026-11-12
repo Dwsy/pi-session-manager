@@ -174,6 +174,13 @@ export const settings = {
     diagnosticsMaintenance: "Cache, debug and invoke transport diagnostics",
   },
   psmPlugins: {
+    searchInstalled: "Search installed plugins",
+    filterTags: "Filter by tag",
+    allTags: "All",
+    noMatchingPlugins: "No plugins match your search or filter.",
+    showMore: "Show more",
+    configure: "Configure",
+    tag: { interface: "Interface", commands: "Commands", tools: "Tools", other: "Other" },
     title: "PSM Plugins",
     description: "{{count}} plugins discovered",
     discovered: "Discovered",

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
@@ -174,9 +174,23 @@ function formatPublishedDate(value: string | null | undefined) {
   }).format(date);
 }
 
+type PluginTag = "interface" | "commands" | "tools" | "other";
+
+function pluginTags(plugin: PsmPluginStatus): PluginTag[] {
+  const tags: PluginTag[] = [];
+  if ((plugin.appViews?.length ?? 0) || (plugin.appSidebarViews?.length ?? 0) || (plugin.toolRenderers?.length ?? 0)) tags.push("interface");
+  if (plugin.commands.length) tags.push("commands");
+  if (plugin.tools.length) tags.push("tools");
+  return tags.length ? tags : ["other"];
+}
+
 export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPluginsSettingsProps) {
   const { t } = useTranslation();
   const [plugins, setPlugins] = useState<PsmPluginStatus[]>([]);
+  const [pluginQuery, setPluginQuery] = useState("");
+  const [selectedTag, setSelectedTag] = useState<PluginTag | "all">("all");
+  const [visibleCount, setVisibleCount] = useState(8);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const [draftSettingsByPluginId, setDraftSettingsByPluginId] = useState<Record<string, Record<string, PsmPluginSettingValue>>>({});
   const [paths, setPaths] = useState<PsmPluginPaths | null>(null);
   const [loading, setLoading] = useState(false);
@@ -206,6 +220,32 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
     () => plugins.filter((plugin) => plugin.id !== "npm-discovery"),
     [plugins],
   );
+  const tagLabel = (tag: PluginTag) => t(`settings.psmPlugins.tag.${tag}`, {
+    interface: "Interface", commands: "Commands", tools: "Tools", other: "Other",
+  }[tag]);
+  const availableTags = useMemo(() => (["interface", "commands", "tools", "other"] as PluginTag[])
+    .filter((tag) => visiblePlugins.some((plugin) => pluginTags(plugin).includes(tag))), [visiblePlugins]);
+  const filteredPlugins = visiblePlugins.filter((plugin) => {
+    const query = pluginQuery.trim().toLocaleLowerCase();
+    const searchable = [plugin.name, t(`${pluginI18nBase(plugin)}.name`, plugin.name), plugin.id, plugin.packageName ?? "", sourceLabel(plugin), ...plugin.commands, ...plugin.tools, ...pluginTags(plugin).map(tagLabel)];
+    return (selectedTag === "all" || pluginTags(plugin).includes(selectedTag))
+      && (!query || searchable.some((value) => value.toLocaleLowerCase().includes(query)));
+  });
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || typeof IntersectionObserver === "undefined") return;
+    let active = true;
+    const observer = new IntersectionObserver((entries) => {
+      if (active && entries.some((entry) => entry.isIntersecting)) {
+        active = false;
+        observer.disconnect();
+        setVisibleCount((count) => Math.min(count + 8, filteredPlugins.length));
+      }
+    }, { rootMargin: "0px 0px 160px 0px" });
+    observer.observe(target);
+    return () => { active = false; observer.disconnect(); };
+  }, [visibleCount, filteredPlugins.length, pluginQuery, selectedTag, mode, pluginId]);
+
   const installedNpmPackages = useMemo(
     () => new Set(
       visiblePlugins
@@ -663,6 +703,14 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
         toggleSize="sm"
         className={updatingId === plugin.id ? "opacity-60" : ""}
       />
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {pluginTags(plugin).map((tag) => <span key={tag} className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{tagLabel(tag)}</span>)}
+        {!pluginId && ((plugin.manifest?.configuration?.properties?.length ?? 0) > 0 || (plugin.permissions?.length ?? 0) > 0 || plugin.manifest?.defaultEnabled === false) && (
+          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent(SETTINGS_NAVIGATE_EVENT, { detail: { section: `psm-plugin:${plugin.id}` } }))} className="ml-auto inline-flex min-h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground hover:bg-surface-hover">
+            <SlidersHorizontal className="h-3.5 w-3.5" />{t("settings.psmPlugins.configure", "Configure")}
+          </button>
+        )}
+      </div>
       {plugin.diagnostics.length > 0 && (
         <div className="mt-2 space-y-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
           {plugin.diagnostics.map((diagnostic, index) => (
@@ -1471,12 +1519,26 @@ export default function PsmPluginsSettings({ pluginId, mode = "manage" }: PsmPlu
       <div className="space-y-4">
         {renderError()}
         {renderStatsCards()}
+        <div className="space-y-3 rounded-lg border border-border/60 bg-background/45 p-3">
+          <label className="relative block">
+            <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input value={pluginQuery} onChange={(event) => { setPluginQuery(event.target.value); setVisibleCount(8); }} aria-label={t("settings.psmPlugins.searchInstalled", "Search installed plugins")} className="h-10 w-full rounded-md border border-border bg-surface pl-9 pr-3 text-sm text-foreground outline-none focus:border-info" />
+          </label>
+          <div className="flex flex-wrap gap-2" aria-label={t("settings.psmPlugins.filterTags", "Filter by tag")}>
+            {(["all", ...availableTags] as const).map((tag) => (
+              <button key={tag} type="button" aria-pressed={selectedTag === tag} onClick={() => { setSelectedTag(tag); setVisibleCount(8); }} className={`rounded-full border px-3 py-1 text-xs font-medium ${selectedTag === tag ? "border-info bg-info/10 text-foreground" : "border-border text-muted-foreground hover:bg-surface-hover"}`}>
+                {tag === "all" ? t("settings.psmPlugins.allTags", "All") : tagLabel(tag)} <span className="opacity-70">{tag === "all" ? visiblePlugins.length : visiblePlugins.filter((plugin) => pluginTags(plugin).includes(tag)).length}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         {renderPluginList(
           t("settings.psmPlugins.installedTitle", "Installed plugins"),
           t("settings.psmPlugins.installedHint", "Enable, inspect diagnostics, rebuild or remove from one compact list."),
-          visiblePlugins,
-          t("settings.psmPlugins.empty", "No PSM plugins discovered."),
+          filteredPlugins.slice(0, visibleCount),
+          visiblePlugins.length ? t("settings.psmPlugins.noMatchingPlugins", "No plugins match your search or filter.") : t("settings.psmPlugins.empty", "No PSM plugins discovered."),
         )}
+        {filteredPlugins.length > visibleCount && <div ref={loadMoreRef}><button type="button" onClick={() => setVisibleCount((count) => count + 8)} className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground hover:bg-surface-hover">{t("settings.psmPlugins.showMore", "Show more")} ({filteredPlugins.length - visibleCount})</button></div>}
       </div>
     );
   }

@@ -62,7 +62,7 @@ export default function SettingsSidebar({
   const hasNoResults = !!trimmedQuery && searchResults.length === 0;
   const [collapsedSections, setCollapsedSections] = useState<
     Set<SettingsSection>
-  >(new Set());
+  >(new Set(["psm-plugins"]));
 
   const filteredGroups = useMemo(() => {
     if (!trimmedQuery || hasSearchResults) return menuGroups;

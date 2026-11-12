@@ -172,6 +172,13 @@ export const settings = {
     diagnosticsMaintenance: "缓存、调试与 invoke 通道诊断",
   },
   psmPlugins: {
+    searchInstalled: "搜索已安装插件",
+    filterTags: "按标签筛选",
+    allTags: "全部",
+    noMatchingPlugins: "没有符合搜索或筛选条件的插件。",
+    showMore: "显示更多",
+    configure: "配置",
+    tag: { interface: "界面", commands: "命令", tools: "工具", other: "其他" },
     title: "PSM 插件",
     description: "已发现 {{count}} 个插件",
     discovered: "已发现",

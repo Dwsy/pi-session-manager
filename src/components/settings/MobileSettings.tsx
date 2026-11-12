@@ -74,6 +74,7 @@ export default function MobileSettings({
 }: MobileSettingsProps) {
   const { t } = useTranslation();
   const [showDetail, setShowDetail] = useState(false);
+  const [pluginsExpanded, setPluginsExpanded] = useState(false);
   const [animating, setAnimating] = useState(false);
   const [mobileSearchQuery, setMobileSearchQuery] = useState("");
   const [mobileSearchResults, setMobileSearchResults] = useState<SettingsSearchResult[]>([]);
@@ -218,7 +219,7 @@ export default function MobileSettings({
                   onClick={() => handleAreaClick(area.id)}
                   className={`focus-ring min-h-[36px] truncate border-r border-border px-2 text-xs font-medium last:border-r-0 ${
                     activeArea === area.id
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-secondary text-secondary-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
@@ -289,7 +290,7 @@ export default function MobileSettings({
                 filteredMobileGroups.map((group) => {
                 const items = group.sections
                   .map((id) => sectionMap.get(id))
-                  .filter(Boolean);
+                  .filter((item) => item && (pluginsExpanded || !item.id.startsWith("psm-plugin:")));
 
                 if (items.length === 0) return null;
 
@@ -305,8 +306,8 @@ export default function MobileSettings({
                         const isPluginChild = item.id.startsWith("psm-plugin:");
 
                         return (
+                          <div key={item.id} className="flex items-center">
                           <button
-                            key={item.id}
                             type="button"
                             onClick={() => handleSectionClick(item.id)}
                             className={`w-full flex items-center gap-3 text-left motion-color focus-ring ${
@@ -331,8 +332,10 @@ export default function MobileSettings({
                             <span className="flex-1 text-left">
                               {t(item.labelKey, item.fallbackLabel)}
                             </span>
-                            {!isPluginChild && <ChevronRight className="h-4 w-4 text-muted-foreground/50" />}
+                            {!isPluginChild && item.id !== "psm-plugins" && <ChevronRight className="h-4 w-4 text-muted-foreground/50" />}
                           </button>
+                          {item.id === "psm-plugins" && <button type="button" aria-expanded={pluginsExpanded} aria-label={pluginsExpanded ? t("common.collapse", "Collapse") : t("common.expand", "Expand")} onClick={() => setPluginsExpanded((value) => !value)} className="focus-ring flex h-10 w-10 shrink-0 items-center justify-center text-muted-foreground"><ChevronRight className={`h-4 w-4 ${pluginsExpanded ? "rotate-90" : ""}`} /></button>}
+                          </div>
                         );
                       })}
                     </div>
