@@ -599,16 +599,18 @@ export function GlobalMapCanvas({
 
   function handleClick(event: React.MouseEvent<HTMLCanvasElement>): void {
     if (suppressClickRef.current) {
+      // A drag just ended; don't treat it as a navigation click.
       suppressClickRef.current = false;
       return;
     }
     const target = resolveTarget(event);
-    if (target) onSelectNode(targetNode(target).uid);
-  }
-
-  function handleDoubleClick(event: React.MouseEvent<HTMLCanvasElement>): void {
-    const target = resolveTarget(event);
-    if (target) onActivateNode(targetNode(target).uid);
+    // One click jumps to the transcript, matching the outline list. Drag
+    // suppression above keeps pan gestures from navigating accidentally.
+    if (target) {
+      const uid = targetNode(target).uid;
+      onSelectNode(uid);
+      onActivateNode(uid);
+    }
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLCanvasElement>): void {
@@ -647,7 +649,6 @@ export function GlobalMapCanvas({
           if (!dragRef.current) scheduleHoverClose();
         }}
         onClick={handleClick}
-        onDoubleClick={handleDoubleClick}
         onKeyDown={handleKeyDown}
         tabIndex={mode === "atlas" ? 0 : -1}
         aria-label="Pi branch segment map"

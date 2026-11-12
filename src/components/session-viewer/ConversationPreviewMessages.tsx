@@ -1003,9 +1003,11 @@ const ConversationPreviewMessages = forwardRef<
               key={turn.id}
               data-index={virtualRow.index}
               ref={rowVirtualizer.measureElement}
-              className="absolute left-0 top-0 w-full"
+              className="absolute left-0 w-full"
               style={{
-                transform: `translateY(${virtualRow.start}px)`,
+                // A transform shifts sticky process headers by the virtual row
+                // offset. Position the row directly so they stick to the scroller.
+                top: `${virtualRow.start}px`,
                 paddingBottom:
                   virtualRow.index === turns.length - 1 ? 0 : TURN_GAP_PX,
               }}

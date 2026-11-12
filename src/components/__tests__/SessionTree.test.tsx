@@ -290,13 +290,11 @@ describe("SessionTree", () => {
     expect(screen.getByText(/label.*Raw label/i)).not.toBeNull();
   });
 
-  it("selects on click and navigates raw label entries on double click through the target node", () => {
+  it("navigates raw label entries on a single click through the target node", () => {
     const { onNodeClick } = renderSessionTree({ filter: "all" });
 
+    // One click must both select and jump; needing a double click felt broken.
     fireEvent.click(screen.getByText(/label.*Raw label/i));
-    expect(onNodeClick).not.toHaveBeenCalled();
-
-    fireEvent.doubleClick(screen.getByText(/label.*Raw label/i));
     expect(onNodeClick).toHaveBeenCalledWith("assistant-1", "user-1");
   });
 
@@ -343,10 +341,8 @@ describe("SessionTree", () => {
       .find((element) => element.closest(".branch-entry-row"));
 
     expect(rootTreeText).toBeTruthy();
+    // A single click on an earlier branch node jumps to its newest ending.
     fireEvent.click(rootTreeText!.closest(".branch-entry-row")!);
-    expect(onNodeClick).not.toHaveBeenCalled();
-
-    fireEvent.doubleClick(rootTreeText!.closest(".branch-entry-row")!);
     expect(onNodeClick).toHaveBeenCalledWith("branch-b-assistant", "root-user");
   });
 

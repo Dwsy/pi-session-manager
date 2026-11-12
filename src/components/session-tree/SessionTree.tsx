@@ -48,7 +48,9 @@ import SessionTreeSearch, {
   type SessionTreeSearchRef,
 } from "./SessionTreeSearch";
 
-const ROW_HEIGHT = 40;
+// 44px gives the two-line row enough breathing room; keep in sync with
+// .branch-segment-row / .branch-entry-row height in _branch-atlas.less.
+const ROW_HEIGHT = 44;
 const OVERSCAN = 10;
 const MAP_COLLAPSED_STORAGE_KEY = "pi-session-manager:branch-map-collapsed";
 const FILTERS: Array<{
@@ -578,7 +580,6 @@ const SessionTree = memo(
                       sticky
                       collapsed={collapsed.has(item.segment.uid)}
                       onToggle={() => toggleSegment(item.segment.uid)}
-                      onSelect={() => selectNode(item.segment.start.uid)}
                       onActivate={() => activateNode(item.segment.end.uid)}
                     />
                   ))}
@@ -596,7 +597,6 @@ const SessionTree = memo(
                     top={index * ROW_HEIGHT}
                     collapsed={collapsed.has(item.segment.uid)}
                     onToggle={() => toggleSegment(item.segment.uid)}
-                    onSelect={() => selectNode(item.segment.start.uid)}
                     onActivate={() => activateNode(item.segment.end.uid)}
                   />
                 );
@@ -611,7 +611,6 @@ const SessionTree = memo(
                   activeLeaf={item.node.uid === activeLeafUid}
                   activePath={activePath.has(item.node.uid)}
                   searchActive={Boolean(search)}
-                  onSelect={() => selectNode(item.node.uid)}
                   onActivate={() => activateNode(item.node.uid)}
                   onFocus={() => setFocusedUid(item.node.uid)}
                 />
@@ -788,13 +787,18 @@ export function computeStickySegmentHeaders(
     .map((level) => byLevel.get(level)!);
 }
 
+/**
+ * A single click jumps to the transcript. activateNode also sets selection and
+ * focus, so the old click=select / double-click=activate split only made the
+ * outline feel broken. The fold button stops propagation to avoid navigating
+ * while collapsing a segment.
+ */
 function SegmentRow({
   item,
   top,
   sticky = false,
   collapsed,
   onToggle,
-  onSelect,
   onActivate,
 }: {
   item: SegmentTreeItem;
@@ -802,7 +806,6 @@ function SegmentRow({
   sticky?: boolean;
   collapsed: boolean;
   onToggle: () => void;
-  onSelect: () => void;
   onActivate: () => void;
 }) {
   const { t } = useTranslation();
@@ -824,8 +827,7 @@ function SegmentRow({
       role="treeitem"
       aria-level={item.indent + 1}
       aria-expanded={!collapsed}
-      onClick={onSelect}
-      onDoubleClick={onActivate}
+      onClick={onActivate}
     >
       <BranchRails
         continuation={item.ancestorContinuation}
@@ -854,12 +856,12 @@ function SegmentRow({
       <span className="branch-segment-code">{segment.code}</span>
       <div className="branch-segment-copy">
         <div>
-          <strong>
+          <span className="branch-segment-kind">
             {segment.level === 0
               ? t("components.branchMap.segment.mainLine", "Main line")
               : t("components.branchMap.segment.branch", "Branch")}
-          </strong>
-          <span>
+          </span>
+          <span className="branch-segment-summary">
             {truncate(segment.firstUserSummary || segment.start.summary, 120)}
           </span>
         </div>
@@ -911,6 +913,7 @@ function SegmentRow({
   );
 }
 
+/** Single click jumps; see SegmentRow. activateNode handles select + focus. */
 function EntryRow({
   item,
   top,
@@ -919,7 +922,6 @@ function EntryRow({
   activeLeaf,
   activePath,
   searchActive,
-  onSelect,
   onActivate,
   onFocus,
 }: {
@@ -930,7 +932,6 @@ function EntryRow({
   activeLeaf: boolean;
   activePath: boolean;
   searchActive: boolean;
-  onSelect: () => void;
   onActivate: () => void;
   onFocus: () => void;
 }) {
@@ -969,8 +970,7 @@ function EntryRow({
       aria-selected={selected}
       tabIndex={focused ? 0 : -1}
       onFocus={onFocus}
-      onClick={onSelect}
-      onDoubleClick={onActivate}
+      onClick={onActivate}
     >
       <BranchRails
         continuation={item.ancestorContinuation}

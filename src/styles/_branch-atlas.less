@@ -1,11 +1,19 @@
 // Branch Atlas surfaces share one visual language across tree, map, and timeline.
 .branch-outline-shell {
-  --branch-rail: rgb(var(--color-muted-foreground) / 0.42);
-  --branch-rail-soft: rgb(var(--color-border) / 0.48);
-  --branch-dim-text: rgb(var(--color-foreground) / 0.62);
-  --branch-faint-text: rgb(var(--color-foreground) / 0.48);
+  // Opaque surfaces only. These rows float over a virtualized list: any alpha
+  // here lets the row underneath bleed through and produces the doubled-text
+  // artifact seen in the outline panel.
+  --branch-surface: rgb(var(--color-card));
+  --branch-surface-raised: rgb(var(--color-popover));
+  --branch-surface-sunken: rgb(var(--color-secondary));
+  --branch-rail: rgb(var(--color-muted-foreground) / 0.38);
+  --branch-rail-soft: rgb(var(--color-border) / 0.6);
+  --branch-dim-text: rgb(var(--color-foreground) / 0.66);
+  --branch-faint-text: rgb(var(--color-foreground) / 0.5);
+  --branch-ease: cubic-bezier(0.23, 1, 0.32, 1);
   min-width: 0;
   container-type: inline-size;
+  background: rgb(var(--color-background));
 }
 
 .branch-outline-controls {
@@ -138,11 +146,6 @@
   accent-color: var(--accent);
 }
 
-.branch-outline-scroll {
-  position: relative;
-  background: rgb(var(--color-background));
-}
-
 .branch-virtual-spacer {
   position: relative;
   min-width: 100%;
@@ -168,37 +171,51 @@
   position: absolute;
   inset-inline: 0;
   display: flex;
-  height: 40px;
+  height: 44px;
   min-width: 0;
   align-items: center;
-  padding-right: 8px;
+  padding-right: 10px;
   cursor: default;
   user-select: none;
+  // Both layers MUST be opaque: they are stacked above other virtual rows.
+  background: rgb(var(--color-background));
   transition:
-    background-color var(--motion-duration-fast) var(--motion-ease-standard),
-    box-shadow var(--motion-duration-fast) var(--motion-ease-standard);
+    background-color 140ms var(--branch-ease),
+    box-shadow 140ms var(--branch-ease);
 }
 
 .branch-segment-row {
   z-index: 2;
-  border-bottom: 1px solid rgb(var(--color-border) / 0.52);
-  background: rgb(var(--color-card) / 0.72);
+  gap: 2px;
+  border-bottom: 1px solid rgb(var(--color-border) / 0.7);
+  // Segment headers are a distinct raised surface, not tinted glass.
+  background: var(--branch-surface);
 }
 
 .branch-segment-row.is-sticky-header {
   inset-inline: 0;
   transform: none;
-  background: rgb(var(--color-card) / 0.96);
-  box-shadow: 0 1px 0 rgb(var(--color-border) / 0.62);
+  z-index: 12;
+  background: var(--branch-surface-raised);
+  border-bottom-color: rgb(var(--color-ring) / 0.32);
+  box-shadow:
+    inset 3px 0 var(--accent),
+    0 1px 0 rgb(var(--color-border) / 0.8),
+    0 8px 18px -10px rgb(0 0 0 / 0.34);
 }
 
-.branch-segment-row:hover,
+.branch-segment-row:hover {
+  background: var(--branch-surface-sunken);
+}
+
 .branch-entry-row:hover {
-  background-color: rgb(var(--color-secondary) / 0.6);
+  background: var(--branch-surface-sunken);
 }
 
 .branch-segment-row.is-active-lineage {
-  background: rgb(var(--color-secondary) / 0.58);
+  // Opaque, but a distinct surface so the current branch reads at a glance.
+  background: var(--branch-surface-sunken);
+  box-shadow: inset 3px 0 var(--accent);
 }
 
 .branch-segment-row.is-active-terminal,
@@ -207,35 +224,46 @@
 }
 
 .branch-entry-row.is-active-path {
-  background: rgb(var(--color-secondary) / 0.34);
+  // Active path is a structural state, not a colored fill. Tinting the whole
+  // row with the accent (#0d9488 teal) dyed nearly every linear row green and
+  // fought with the transcript. Keep the surface neutral; the accent lives on
+  // the rail + left edge only (see .branch-rails .current-rail below).
+  background: var(--branch-surface);
+  box-shadow: inset 2px 0 rgb(var(--color-ring) / 0.55);
 }
 
 .branch-entry-row.is-selected {
   z-index: 3;
-  background: rgb(var(--color-secondary) / 0.58);
-  box-shadow: inset 2px 0 rgb(var(--color-ring) / 0.72);
-}
-
-.branch-entry-row.is-focused {
-  outline: none;
-  box-shadow: inset 0 0 0 1px rgb(var(--color-ring) / 0.44);
-}
-
-.branch-entry-row.is-selected.is-active-leaf {
+  background: var(--branch-surface-raised);
   box-shadow:
     inset 2px 0 var(--accent),
     inset 0 0 0 1px rgb(var(--color-ring) / 0.34);
 }
 
+.branch-entry-row.is-focused {
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgb(var(--color-ring) / 0.7);
+}
+
+.branch-entry-row.is-selected.is-active-leaf {
+  box-shadow:
+    inset 3px 0 var(--accent),
+    inset 0 0 0 1px rgb(var(--color-ring) / 0.4);
+}
+
 .branch-entry-row.is-match {
-  background: rgb(var(--color-warning) / 0.1);
-  box-shadow: inset 2px 0 rgb(var(--color-warning) / 0.55);
+  // Search hits deserve a raised neutral surface, not another colored fill.
+  background: var(--branch-surface-raised);
+  box-shadow: inset 2px 0 rgb(var(--color-warning) / 0.8);
 }
 
 .branch-rails {
   position: relative;
   align-self: stretch;
   flex: 0 0 auto;
+  // A subtle gutter separates the tree rails from the content column.
+  margin-right: 8px;
+  border-right: 1px solid rgb(var(--color-border) / 0.34);
 }
 
 .branch-rails > i {
@@ -251,13 +279,39 @@
 
 .branch-rails .current-rail {
   background: var(--branch-rail);
+  // Every row gets a node marker on the active rail, turning a plain vertical
+  // line into an actual tree of connected points.
+  &::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    border: 1px solid var(--branch-rail);
+    border-radius: 50%;
+    background: rgb(var(--color-background));
+    content: "";
+    transform: translate(-50%, -50%);
+  }
 }
 
 .branch-segment-row.is-active-lineage .branch-rails .current-rail,
 .branch-entry-row.is-active-path .branch-rails .current-rail {
   width: 2px;
   background: var(--accent);
-  box-shadow: 0 0 7px rgb(var(--color-ring) / 0.4);
+
+  &::after {
+    width: 7px;
+    height: 7px;
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: 0 0 0 3px rgb(var(--color-ring) / 0.18);
+  }
+}
+
+.branch-entry-row.is-active-leaf .branch-rails .current-rail::after {
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
 .branch-rails .branch-elbow {
@@ -282,31 +336,38 @@
   background: transparent;
   color: rgb(var(--color-muted-foreground));
   transition:
-    background-color var(--motion-duration-fast) var(--motion-ease-standard),
-    color var(--motion-duration-fast) var(--motion-ease-standard);
+    background-color 140ms var(--branch-ease),
+    color 140ms var(--branch-ease),
+    transform 140ms var(--branch-ease);
+
+  &:active {
+    transform: scale(0.9);
+  }
 }
 
 .branch-segment-fold:hover {
-  background: rgb(var(--color-secondary) / 0.7);
+  background: rgb(var(--color-secondary));
   color: rgb(var(--color-foreground));
 }
 
 .branch-segment-code {
   min-width: 40px;
   flex: 0 0 auto;
-  margin-right: 6px;
-  padding: 2px 5px;
-  border: 1px solid rgb(var(--color-border) / 0.66);
+  margin-right: 8px;
+  padding: 3px 6px;
+  border: 1px solid rgb(var(--color-border) / 0.8);
   border-radius: 5px;
-  background: rgb(var(--color-secondary) / 0.42);
+  background: rgb(var(--color-background));
   color: var(--branch-dim-text);
-  font: 700 9.5px var(--font-family-mono, ui-monospace, monospace);
+  font: 700 10px var(--font-family-mono, ui-monospace, monospace);
+  letter-spacing: 0.02em;
   text-align: center;
 }
 
 .branch-segment-row.is-active-lineage .branch-segment-code {
-  border-color: rgb(var(--color-ring) / 0.56);
-  background: rgb(var(--color-ring) / 0.12);
+  // Keep the chip quiet: a tinted border rather than a solid accent block.
+  border-color: rgb(var(--color-ring) / 0.55);
+  background: rgb(var(--color-background));
   color: var(--accent);
 }
 
@@ -325,35 +386,68 @@
   gap: 5px;
 }
 
-.branch-segment-copy strong {
+// A segment header is a section label, not another record: a small caps label
+// plus a leading accent bar separates it from entry rows at a glance.
+.branch-segment-kind {
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
   color: rgb(var(--color-foreground));
-  font-size: 11.5px;
-  font-weight: 600;
-  transition: color var(--motion-duration-fast) var(--motion-ease-standard);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color 140ms var(--branch-ease);
+
+  &::before {
+    width: 3px;
+    height: 11px;
+    border-radius: 2px;
+    background: var(--accent);
+    content: "";
+  }
 }
 
-.branch-segment-row.is-active-lineage .branch-segment-copy strong {
+.branch-segment-row.is-active-lineage .branch-segment-kind {
   color: var(--accent);
 }
 
-.branch-segment-copy > div > span,
+.branch-segment-summary {
+  color: var(--branch-dim-text);
+  font-size: 11px;
+}
+
+.branch-segment-copy > div > span:not(.branch-segment-kind),
 .branch-entry-copy > div > span {
   min-width: 0;
   overflow: hidden;
-  color: var(--text-secondary);
+  color: rgb(var(--color-foreground));
   font-size: 11.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.branch-segment-copy > div > .branch-segment-summary {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--branch-dim-text);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Primary line carries the content; secondary metadata steps back instead of
+// competing with it. This is the main reason the old tree read as "a wall of
+// tiny grey text".
 .branch-segment-copy small,
 .branch-entry-copy small {
   display: block;
-  margin-top: 2px;
+  margin-top: 3px;
   overflow: hidden;
-  color: var(--branch-dim-text);
-  font: 9.5px var(--font-family-mono, ui-monospace, monospace);
+  color: var(--branch-faint-text);
+  font: 9.5px/1.3 var(--font-family-mono, ui-monospace, monospace);
+  letter-spacing: 0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -368,12 +462,13 @@
 }
 
 .branch-segment-state b {
-  padding: 2px 5px;
-  border-radius: 4px;
-  background: rgb(var(--color-ring) / 0.12);
+  padding: 3px 6px;
+  border: 1px solid rgb(var(--color-ring) / 0.38);
+  border-radius: 999px;
+  background: rgb(var(--color-background));
   color: var(--accent);
   font: 700 8.5px var(--font-family-mono, ui-monospace, monospace);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 
 .branch-segment-state span,
@@ -383,11 +478,12 @@
 }
 
 .branch-entry-sequence {
-  min-width: 38px;
+  min-width: 42px;
   flex: 0 0 auto;
-  margin-right: 5px;
+  margin-right: 6px;
   color: var(--branch-faint-text);
   font: 500 10px var(--font-family-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
@@ -397,27 +493,32 @@
   height: 20px;
   flex: 0 0 20px;
   place-items: center;
-  margin-right: 6px;
+  margin-right: 8px;
+  border: 1px solid rgb(var(--color-border) / 0.7);
   border-radius: 6px;
-  background: rgb(var(--color-secondary) / 0.72);
+  background: rgb(var(--color-background));
   color: var(--branch-dim-text);
-  font: 600 9.5px var(--font-family-mono, ui-monospace, monospace);
+  font: 700 9.5px var(--font-family-mono, ui-monospace, monospace);
 }
 
 .branch-entry-kind.kind-user {
-  background: rgb(var(--color-ring) / 0.13);
+  border-color: rgb(var(--color-ring) / 0.4);
+  background: rgb(var(--color-ring) / 0.14);
   color: var(--accent);
 }
 .branch-entry-kind.kind-assistant {
-  background: rgb(var(--color-success) / 0.11);
+  border-color: rgb(var(--color-success) / 0.34);
+  background: rgb(var(--color-success) / 0.13);
   color: rgb(var(--color-success));
 }
 .branch-entry-kind.kind-error {
-  background: rgb(var(--color-destructive) / 0.12);
+  border-color: rgb(var(--color-destructive) / 0.34);
+  background: rgb(var(--color-destructive) / 0.13);
   color: rgb(var(--color-destructive));
 }
 .branch-entry-kind.kind-compaction {
-  background: rgb(var(--color-info) / 0.12);
+  border-color: rgb(var(--color-info) / 0.34);
+  background: rgb(var(--color-info) / 0.13);
   color: rgb(var(--color-info));
 }
 
@@ -433,10 +534,11 @@
 
 .branch-fork-chip {
   flex: 0 0 auto;
-  margin-left: 5px;
-  padding: 2px 5px;
-  border-radius: 4px;
-  background: rgb(var(--color-warning) / 0.12);
+  margin-left: 6px;
+  padding: 2px 6px;
+  border: 1px solid rgb(var(--color-warning) / 0.42);
+  border-radius: 999px;
+  background: rgb(var(--color-warning) / 0.1);
   color: rgb(var(--color-warning));
   font: 700 8.5px var(--font-family-mono, ui-monospace, monospace);
   letter-spacing: 0.04em;
@@ -444,9 +546,16 @@
 
 .branch-path-dot {
   flex: 0 0 auto;
-  margin-left: 6px;
+  margin-left: 8px;
   color: var(--accent);
   font-size: 10px;
+}
+
+// Rows are click targets: acknowledge the press with a neutral sink, never a
+// flash of accent color across the full row.
+.branch-segment-row:active,
+.branch-entry-row:active {
+  background: var(--branch-surface-sunken);
 }
 
 .tree-empty {
@@ -481,6 +590,28 @@
 .branch-topology-quality {
   flex: 0 0 auto;
   color: rgb(var(--color-warning));
+}
+
+// The scroll area reads as an inset surface; the sticky segment header sits on
+// it as a raised card. Opaque at every layer, so nothing ever bleeds through.
+.branch-outline-scroll {
+  background: rgb(var(--color-background));
+  box-shadow: inset 0 1px 0 rgb(var(--color-border) / 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .branch-segment-row,
+  .branch-entry-row,
+  .branch-segment-fold,
+  .branch-segment-copy strong {
+    transition-duration: 0ms;
+  }
+
+  .branch-segment-row:active,
+  .branch-entry-row:active,
+  .branch-segment-fold:active {
+    background: var(--branch-surface-sunken);
+  }
 }
 
 @container (max-width: 340px) {
