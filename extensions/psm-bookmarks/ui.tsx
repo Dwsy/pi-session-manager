@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Bookmark,
-  Check,
   NotebookPen,
   Pencil,
   Target,
@@ -18,7 +17,12 @@ import {
   sessionPluginPanelActionButtonClass,
   sessionPluginPanelIconButtonClass,
 } from '../../src/components/session-viewer/SessionPluginPanel'
-import type { Bookmark as BookmarkModel, RegistryEntry } from './bookmark'
+import type {
+  Bookmark as BookmarkModel,
+  BookmarkChange,
+  BookmarkDiagnostics,
+  RegistryEntry,
+} from './bookmark'
 
 export interface I18nLike {
   language?: string
@@ -36,8 +40,10 @@ export interface BookmarkStoreLike {
   search(query: string): Promise<BookmarkModel[]>
   updateNote(id: string, sessionPath: string, note: string): Promise<void>
   remove(bookmark: BookmarkModel): Promise<void>
-  subscribe(listener: () => void): () => void
+  subscribe(listener: (change?: BookmarkChange) => void): () => void
   consumePendingNoteId(): string | null
+  /** Optional: views surface truncation notes when the store provides them. */
+  getDiagnostics?(): BookmarkDiagnostics
 }
 
 export interface BookmarkQuotable {
@@ -126,8 +132,14 @@ interface BookmarkActionsProps {
   onDelete?: () => void
   confirmingDelete: boolean
   onConfirmDelete: () => void
+  onCancelDelete: () => void
 }
 
+/**
+ * Actions are always visible (low contrast until hover) so keyboard and touch
+ * users can discover them. Delete confirmation replaces the icon row with two
+ * explicit, labelled buttons and is dismissible with Escape.
+ */
 function BookmarkActions({
   i18n,
   onJump,
@@ -135,9 +147,48 @@ function BookmarkActions({
   onDelete,
   confirmingDelete,
   onConfirmDelete,
+  onCancelDelete,
 }: BookmarkActionsProps) {
+  useEffect(() => {
+    if (!confirmingDelete) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        onCancelDelete()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [confirmingDelete, onCancelDelete])
+
+  if (confirmingDelete) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="whitespace-nowrap text-[10px] text-warning">
+          {t(i18n, 'deleteConfirm', 'Delete this bookmark?')}
+        </span>
+        <button
+          type="button"
+          className={`${sessionPluginPanelActionButtonClass} px-1.5 py-0.5 text-[10px] text-destructive`}
+          aria-label={t(i18n, 'delete', 'Delete')}
+          onClick={onConfirmDelete}
+        >
+          {t(i18n, 'delete', 'Delete')}
+        </button>
+        <button
+          type="button"
+          className={`${sessionPluginPanelActionButtonClass} px-1.5 py-0.5 text-[10px] text-muted-foreground`}
+          aria-label={t(i18n, 'cancel', 'Cancel')}
+          onClick={onCancelDelete}
+        >
+          {t(i18n, 'cancel', 'Cancel')}
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+    <div className="flex shrink-0 items-center gap-0.5 text-muted-foreground/60 transition-colors group-hover:text-muted-foreground focus-within:text-muted-foreground">
       {onJump && (
         <button
           type="button"
@@ -163,14 +214,43 @@ function BookmarkActions({
       {onDelete && (
         <button
           type="button"
-          className={`${sessionPluginPanelIconButtonClass} ${confirmingDelete ? 'text-warning' : ''}`}
-          title={confirmingDelete ? t(i18n, 'deleteConfirm', 'Delete this bookmark?') : t(i18n, 'delete', 'Delete')}
+          className={sessionPluginPanelIconButtonClass}
+          title={t(i18n, 'delete', 'Delete')}
           aria-label={t(i18n, 'delete', 'Delete')}
-          onClick={confirmingDelete ? onConfirmDelete : onDelete}
+          onClick={onDelete}
         >
-          {confirmingDelete ? <Check className="h-3.5 w-3.5" /> : <Trash2 className="h-3.5 w-3.5" />}
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
+    </div>
+  )
+}
+
+/** Non-destructive inline notice: errors never replace the bookmark list. */
+export function InlineNotice({
+  i18n,
+  message,
+  onDismiss,
+}: {
+  i18n: I18nLike
+  message: string
+  onDismiss: () => void
+}) {
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/8 px-2.5 py-2 text-[11px] leading-relaxed text-destructive"
+    >
+      <span className="min-w-0 flex-1 break-words">{message}</span>
+      <button
+        type="button"
+        className={sessionPluginPanelIconButtonClass}
+        aria-label={t(i18n, 'cancel', 'Cancel')}
+        title={t(i18n, 'cancel', 'Cancel')}
+        onClick={onDismiss}
+      >
+        <X className="h-3 w-3" />
+      </button>
     </div>
   )
 }
@@ -186,6 +266,7 @@ interface BookmarkCardProps {
   onSaveNote: (note: string) => void
   onDelete: () => void
   onConfirmDelete: () => void
+  onCancelDelete: () => void
   onJump?: () => void
 }
 
@@ -200,6 +281,7 @@ function BookmarkCard({
   onSaveNote,
   onDelete,
   onConfirmDelete,
+  onCancelDelete,
   onJump,
 }: BookmarkCardProps) {
   return (
@@ -215,6 +297,7 @@ function BookmarkCard({
           onDelete={onDelete}
           confirmingDelete={confirmingDelete}
           onConfirmDelete={onConfirmDelete}
+          onCancelDelete={onCancelDelete}
         />
       </div>
 
@@ -286,29 +369,36 @@ export function BookmarksPanel({
   const sessionPathRef = useRef(session.path)
   sessionPathRef.current = session.path
 
-  const load = useCallback(async () => {
-    const path = sessionPathRef.current
-    try {
-      const items = await store.listForSession(path)
-      if (sessionPathRef.current !== path) return
-      setBookmarks(items)
-      setError(null)
-      const pendingId = store.consumePendingNoteId()
-      if (pendingId && items.some((item) => item.id === pendingId)) setEditingId(pendingId)
-    } catch (cause) {
-      if (sessionPathRef.current !== path) return
-      setError(cause instanceof Error ? cause.message : String(cause))
-    } finally {
-      setLoading(false)
-    }
-  }, [store])
+  const load = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      const path = sessionPathRef.current
+      // A background refresh keeps the existing list on screen: editing one
+      // note must not blank the whole panel or flash a loading state.
+      if (!options.silent) setLoading(true)
+      try {
+        const items = await store.listForSession(path)
+        if (sessionPathRef.current !== path) return
+        setBookmarks(items)
+        setError(null)
+        const pendingId = store.consumePendingNoteId()
+        if (pendingId && items.some((item) => item.id === pendingId)) setEditingId(pendingId)
+      } catch (cause) {
+        if (sessionPathRef.current !== path) return
+        setError(cause instanceof Error ? cause.message : String(cause))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [store],
+  )
 
   useEffect(() => {
     setLoading(true)
     setEditingId(null)
     setConfirmingDeleteId(null)
     void load()
-    return store.subscribe(() => void load())
+    // store.subscribe passes a change; any mutation triggers a silent refresh.
+    return store.subscribe(() => void load({ silent: true }))
   }, [store, load, session.path])
 
   const onDelete = useCallback(
@@ -332,13 +422,17 @@ export function BookmarksPanel({
         onClose={onClose}
       />
       <SessionPluginPanelBody className="flex flex-col gap-2">
-        {loading ? (
+        {/* Errors are a dismissible strip, never a replacement for the list. */}
+        {error && (
+          <InlineNotice
+            i18n={i18n}
+            message={t(i18n, 'loadFailed', 'Failed: {{message}}', { message: error })}
+            onDismiss={() => setError(null)}
+          />
+        )}
+        {loading && bookmarks.length === 0 ? (
           <SessionPluginPanelState>{t(i18n, 'loading', 'Loading…')}</SessionPluginPanelState>
-        ) : error ? (
-          <SessionPluginPanelState tone="error">
-            {t(i18n, 'loadFailed', 'Failed to load bookmarks: {{message}}', { message: error })}
-          </SessionPluginPanelState>
-        ) : bookmarks.length === 0 ? (
+        ) : bookmarks.length === 0 && !error ? (
           <SessionPluginPanelState>
             <div className="flex flex-col items-center gap-1.5 py-6">
               <Bookmark className="h-7 w-7 text-info/50" aria-hidden="true" />
@@ -376,6 +470,7 @@ export function BookmarksPanel({
                 setEditingId(null)
                 setConfirmingDeleteId(bookmark.id)
               }}
+              onCancelDelete={() => setConfirmingDeleteId(null)}
               onConfirmDelete={() => void onDelete(bookmark)}
               onJump={() => onJump(bookmark.anchor.entryId)}
             />
@@ -405,20 +500,33 @@ export function BookmarkHighlightPopover({
   const [bookmark, setBookmark] = useState<BookmarkModel | null>(null)
   const [editing, setEditing] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Data-aware: reloads on every store change so edits made here (or in the
-  // session panel) never leave a stale popover behind.
+  // session panel) never leave a stale popover behind. Opening a highlight is
+  // a read action — it must NOT steal focus with an auto-opened note editor.
   const load = useCallback(async () => {
-    const items = await store.listForSession(sessionPath)
-    const found = items.find((item) => item.id === bookmarkId) ?? null
-    setBookmark(found)
-    if (found && !found.note) setEditing(true)
+    try {
+      const items = await store.listForSession(sessionPath)
+      setBookmark(items.find((item) => item.id === bookmarkId) ?? null)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    }
   }, [store, sessionPath, bookmarkId])
 
   useEffect(() => {
     void load()
     return store.subscribe(() => void load())
   }, [load, store])
+
+  const saveNote = async (note: string) => {
+    setEditing(false)
+    try {
+      await store.updateNote(bookmarkId, sessionPath, note)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    }
+  }
 
   if (!bookmark) return null
 
@@ -439,36 +547,50 @@ export function BookmarkHighlightPopover({
         </button>
       </div>
 
+      {error && (
+        <InlineNotice i18n={i18n} message={error} onDismiss={() => setError(null)} />
+      )}
+
       {editing ? (
         <NoteEditor
           initial={bookmark.note ?? ''}
           i18n={i18n}
-          onSave={async (note) => {
-            setEditing(false)
-            await store.updateNote(bookmark.id, bookmark.sessionPath, note)
-          }}
+          onSave={(note) => void saveNote(note)}
           onCancel={() => setEditing(false)}
         />
       ) : (
         <>
-          {bookmark.note && (
+          {bookmark.note ? (
             <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
               <NotebookPen className="mt-0.5 h-3 w-3 shrink-0 text-info/80" aria-hidden="true" />
               <span className="min-w-0 break-words">{bookmark.note}</span>
             </p>
+          ) : (
+            <button
+              type="button"
+              className={`${sessionPluginPanelActionButtonClass} self-start px-2 py-1 text-[11px] text-info`}
+              onClick={() => setEditing(true)}
+            >
+              {t(i18n, 'addNote', 'Add a note…')}
+            </button>
           )}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] text-muted-foreground/70">
               {formatTime(bookmark.updatedAt, i18n.language ?? 'en-US')}
             </span>
             <BookmarkActions
               i18n={i18n}
-              onEditNote={() => setEditing(true)}
+              onEditNote={bookmark.note ? () => setEditing(true) : undefined}
               onDelete={() => setConfirmingDelete(true)}
               confirmingDelete={confirmingDelete}
+              onCancelDelete={() => setConfirmingDelete(false)}
               onConfirmDelete={async () => {
-                await store.remove(bookmark)
-                onClose()
+                try {
+                  await store.remove(bookmark)
+                  onClose()
+                } catch (cause) {
+                  setError(cause instanceof Error ? cause.message : String(cause))
+                }
               }}
             />
           </div>

@@ -37,7 +37,11 @@ interface AppSurfaceData {
 }
 
 export default function activate(ctx: PsmPluginHostContext) {
-  const store = new BookmarkStore(ctx.psm.records, ctx.manifest.id)
+  const store = new BookmarkStore(ctx.psm.records, ctx.manifest.id, {
+    // Surface truncated reads/evictions in the host log instead of silently
+    // dropping bookmarks from the visible list.
+    onWarning: (message) => ctx.log.warn(message),
+  })
 
   const notifySaveFailure = (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error)
@@ -203,9 +207,18 @@ export default function activate(ctx: PsmPluginHostContext) {
         i18n: ctx.i18n,
         active: Boolean(props.active),
         aiTidy,
-        onSelectSession: (sessionPath: string) => {
+        onSelectSession: (sessionPath: string): boolean => {
           const target = surface?.sessions?.find((item) => item.path === sessionPath)
-          if (target) surface?.onSelectSession?.(target)
+          if (target && surface?.onSelectSession) {
+            surface.onSelectSession(target)
+            return true
+          }
+          // Never a silent no-op: the explorer shows a visible notice and the
+          // host log explains which session could not be resolved.
+          ctx.log.warn(
+            `Cannot open bookmark's session: ${sessionPath} is not in the current session list (deleted, renamed, or not loaded).`,
+          )
+          return false
         },
       })
     },
@@ -223,7 +236,7 @@ export default function activate(ctx: PsmPluginHostContext) {
   ctx.registerCommand({
     id: 'builtin.bookmarks.open',
     title: ctx.i18n.t('plugins.bookmarks.appTitle', 'Bookmark Explorer'),
-    description: 'Search and organize transcript text bookmarks',
+    description: ctx.i18n.t('plugins.bookmarks.commandOpenDesc', 'Search and organize transcript text bookmarks'),
     category: 'Bookmarks',
     icon: 'bookmark',
     keywords: ['bookmark', '书签', 'highlight', 'annotation', 'signet'],
@@ -237,7 +250,7 @@ export default function activate(ctx: PsmPluginHostContext) {
   ctx.registerCommand({
     id: 'builtin.bookmarks.save',
     title: ctx.i18n.t('plugins.bookmarks.saveAction', 'Bookmark'),
-    description: 'Bookmark the active transcript text selection',
+    description: ctx.i18n.t('plugins.bookmarks.commandSaveDesc', 'Bookmark the active transcript text selection'),
     category: 'Bookmarks',
     icon: 'bookmark',
     keywords: ['bookmark', 'save', '收藏', 'save selection'],

@@ -3,7 +3,7 @@
 import React from 'react'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Bookmark, RegistryEntry } from './bookmark'
 import { explorerState } from './explorerState'
@@ -115,21 +115,79 @@ describe('BookmarksAppView', () => {
     expect(container.textContent).not.toContain('beta delta')
   })
 
-  it('searches bookmarks across sessions', async () => {
+  it('debounces search and keeps current results while typing', async () => {
+    vi.useFakeTimers()
+    try {
+      const store = createStore()
+      const { container } = await render(
+        <BookmarksAppView store={store} i18n={i18n} active />,
+      )
+      await flush()
+      const input = container.querySelector('input')!
+      for (const char of ['b', 'be', 'bet', 'beta']) {
+        await act(async () => {
+          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+          setter.call(input, char)
+          input.dispatchEvent(new Event('input', { bubbles: true }))
+        })
+      }
+      // No FTS query fired per keystroke; existing rows remain visible.
+      expect(store.search).not.toHaveBeenCalled()
+      expect(container.textContent).toContain('beta delta')
+
+      await act(async () => {
+        vi.advanceTimersByTime(250)
+      })
+      await flush()
+      expect(store.search).toHaveBeenCalledTimes(1)
+      expect(store.search).toHaveBeenCalledWith('beta')
+      expect(container.textContent).toContain('Search across every session')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('shows a visible notice when opening a session fails', async () => {
+    // In "By session" grouping the session link is redundant; switch to All.
+    explorerState.set({ grouping: 'all' })
+    const onSelectSession = vi.fn(() => false)
+    const { container } = await render(
+      <BookmarksAppView
+        store={createStore()}
+        i18n={i18n}
+        active
+        onSelectSession={onSelectSession}
+      />,
+    )
+    await flush()
+    const openButton = container.querySelector<HTMLButtonElement>(
+      'button[title^="Open session"]',
+    )!
+    await act(async () => {
+      openButton.click()
+    })
+    expect(onSelectSession).toHaveBeenCalled()
+    expect(container.textContent).toContain('no longer available')
+  })
+
+  it('offers a cancel path for delete confirmation', async () => {
     const store = createStore()
     const { container } = await render(
       <BookmarksAppView store={store} i18n={i18n} active />,
     )
     await flush()
-    const input = container.querySelector('input')!
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
-      setter.call(input, 'beta')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      container.querySelector<HTMLButtonElement>('button[title="Delete"]')!.click()
     })
-    await flush()
-    expect(store.search).toHaveBeenCalledWith('beta')
-    expect(container.textContent).toContain('Search across every session')
+    expect(container.textContent).toContain('Delete this bookmark?')
+    expect(store.remove).not.toHaveBeenCalled()
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Cancel')!
+        .click()
+    })
+    expect(container.textContent).not.toContain('Delete this bookmark?')
+    expect(store.remove).not.toHaveBeenCalled()
   })
 
   it('runs AI organization on the visible bookmarks', async () => {

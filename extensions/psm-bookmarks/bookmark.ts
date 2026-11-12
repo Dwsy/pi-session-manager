@@ -20,6 +20,31 @@ export const REGISTRY_RECORD_TYPE = 'bookmark.registry'
 export const BOOKMARK_SCHEMA_VERSION = 1
 export const REGISTRY_ID = 'builtin.bookmarks.registry'
 export const REGISTRY_MAX_ENTRIES = 2000
+/** Record read ceilings. Hitting one is reported through diagnostics, never hidden. */
+export const SESSION_LIST_LIMIT = 1000
+export const SEARCH_LIMIT = 500
+
+/** Describes a completed mutation so views can refresh only what changed. */
+export interface BookmarkChange {
+  type: 'save' | 'note' | 'remove'
+  id: string
+  sessionPath: string
+}
+
+/** Truncation state exposed to the UI and the host log. */
+export interface BookmarkDiagnostics {
+  /** Registry is at its cap; older entries have stopped appearing in the explorer. */
+  registryAtCap: boolean
+  /** Entries evicted from the registry by the most recent mutation. */
+  registryEvicted: number
+  sessionListAtCap: boolean
+  searchAtCap: boolean
+}
+
+export interface BookmarkStoreOptions {
+  /** Host logging hook; receives a message whenever a limit drops data. */
+  onWarning?: (message: string) => void
+}
 
 export interface BookmarkPayload {
   anchor: {
@@ -263,10 +288,43 @@ export function registryEntryFromBookmark(bookmark: Bookmark): RegistryEntry {
   }
 }
 
+export interface RegistryWriteResult {
+  entries: RegistryEntry[]
+  /** Number of older entries dropped because the registry hit its cap. */
+  evicted: number
+}
+
+/** Insert-or-replace an entry, newest first, reporting cap evictions. */
+export function registryUpsertTracked(
+  entries: RegistryEntry[],
+  entry: RegistryEntry,
+): RegistryWriteResult {
+  const without = entries.filter((item) => item.id !== entry.id)
+  const merged = [entry, ...without]
+  const capped = merged.slice(0, REGISTRY_MAX_ENTRIES)
+  return { entries: capped, evicted: Math.max(0, merged.length - REGISTRY_MAX_ENTRIES) }
+}
+
 /** Insert-or-replace an entry, newest first, capped at REGISTRY_MAX_ENTRIES. */
 export function registryUpsert(entries: RegistryEntry[], entry: RegistryEntry): RegistryEntry[] {
-  const without = entries.filter((item) => item.id !== entry.id)
-  return [entry, ...without].slice(0, REGISTRY_MAX_ENTRIES)
+  return registryUpsertTracked(entries, entry).entries
+}
+
+/**
+ * Two selections refer to the same spot only when the *whole* text quote
+ * matches. `exact` alone is not enough: the same sentence can appear several
+ * times in one message, and host anchoring relies on prefix/suffix to tell
+ * them apart. Comparing only `exact` silently swallowed those bookmarks.
+ */
+export function sameAnchor(a: Pick<Bookmark, 'anchor'>, b: Pick<Bookmark, 'anchor'>): boolean {
+  const qa = a.anchor.textQuote
+  const qb = b.anchor.textQuote
+  return (
+    a.anchor.entryId === b.anchor.entryId &&
+    qa.exact === qb.exact &&
+    (qa.prefix ?? '') === (qb.prefix ?? '') &&
+    (qa.suffix ?? '') === (qb.suffix ?? '')
+  )
 }
 
 export function registryRemove(entries: RegistryEntry[], id: string): RegistryEntry[] {
@@ -287,25 +345,60 @@ function registryFromRecord(record: PluginRecord | undefined): RegistryEntry[] {
   )
 }
 
-/** Records-backed bookmark store with change notifications for open views. */
+type BookmarkListener = (change?: BookmarkChange) => void
+
+/**
+ * Records-backed bookmark store with change notifications for open views.
+ *
+ * All read-modify-write mutations go through `this.queue` so rapid, overlapping
+ * saves/notes/deletes cannot overwrite each other's registry snapshot.
+ */
 export class BookmarkStore {
-  private readonly listeners = new Set<() => void>()
+  private readonly listeners = new Set<BookmarkListener>()
   private pendingNoteId: string | null = null
+  private queue: Promise<unknown> = Promise.resolve()
+  private diagnostics: BookmarkDiagnostics = {
+    registryAtCap: false,
+    registryEvicted: 0,
+    sessionListAtCap: false,
+    searchAtCap: false,
+  }
 
   constructor(
     private readonly client: RecordsClientLike,
     private readonly pluginId: string,
+    private readonly options: BookmarkStoreOptions = {},
   ) {}
 
-  subscribe(listener: () => void): () => void {
+  /** Subscribe to completed mutations. The change argument is optional for compatibility. */
+  subscribe(listener: BookmarkListener): () => void {
     this.listeners.add(listener)
     return () => {
       this.listeners.delete(listener)
     }
   }
 
-  private notify(): void {
-    for (const listener of [...this.listeners]) listener()
+  private notify(change: BookmarkChange): void {
+    for (const listener of [...this.listeners]) listener(change)
+  }
+
+  /** Read current truncation state (for the explorer's visible notice). */
+  getDiagnostics(): BookmarkDiagnostics {
+    return { ...this.diagnostics }
+  }
+
+  private warn(message: string): void {
+    this.options.onWarning?.(message)
+  }
+
+  /**
+   * Serialize a mutation. Each task's read-modify-write completes before the
+   * next one starts; failures never poison the queue for later tasks.
+   */
+  private enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(task, task)
+    this.queue = run.catch(() => undefined)
+    return run
   }
 
   /** Bookmark whose note editor should auto-focus once rendered. */
@@ -321,8 +414,15 @@ export class BookmarkStore {
       scopeId: sessionPath,
       recordType: BOOKMARK_RECORD_TYPE,
       pluginId: this.pluginId,
-      limit: 500,
+      limit: SESSION_LIST_LIMIT,
     })
+    const atCap = records.length >= SESSION_LIST_LIMIT
+    if (atCap && !this.diagnostics.sessionListAtCap) {
+      this.warn(
+        `Bookmark list for ${sessionPath} reached the ${SESSION_LIST_LIMIT}-record limit; older bookmarks may not be shown.`,
+      )
+    }
+    this.diagnostics.sessionListAtCap = atCap
     return records
       .map(bookmarkFromRecord)
       .filter((bookmark): bookmark is Bookmark => bookmark !== null)
@@ -340,7 +440,9 @@ export class BookmarkStore {
       limit: 5,
     })
     const registryRecord = records.find((record) => record.id === REGISTRY_ID)
-    return registryFromRecord(registryRecord)
+    const entries = registryFromRecord(registryRecord)
+    this.diagnostics.registryAtCap = entries.length >= REGISTRY_MAX_ENTRIES
+    return entries
   }
 
   async search(query: string): Promise<Bookmark[]> {
@@ -348,8 +450,13 @@ export class BookmarkStore {
       query,
       recordType: BOOKMARK_RECORD_TYPE,
       pluginId: this.pluginId,
-      limit: 100,
+      limit: SEARCH_LIMIT,
     })
+    const atCap = records.length >= SEARCH_LIMIT
+    if (atCap && !this.diagnostics.searchAtCap) {
+      this.warn(`Bookmark search reached the ${SEARCH_LIMIT}-result limit; refine the query to see more.`)
+    }
+    this.diagnostics.searchAtCap = atCap
     return records
       .map(bookmarkFromRecord)
       .filter((bookmark): bookmark is Bookmark => bookmark !== null)
@@ -357,48 +464,60 @@ export class BookmarkStore {
   }
 
   /**
-   * Save a bookmark. Identical quote in the same entry is treated as a repeat
-   * selection and returns the existing bookmark untouched.
+   * Save a bookmark. Only a fully identical selection (same entry and whole
+   * text quote, including context) is a repeat; the same words at a different
+   * position are a distinct bookmark with its own highlight.
    */
-  async save(bookmark: Bookmark, options: { withNote?: boolean } = {}): Promise<Bookmark> {
-    const existing = (await this.listForSession(bookmark.sessionPath)).find(
-      (item) =>
-        item.anchor.entryId === bookmark.anchor.entryId &&
-        item.anchor.textQuote.exact === bookmark.anchor.textQuote.exact,
-    )
-    const saved = existing ?? bookmark
-    await this.client.upsert(bookmarkToRecordParams(saved, this.pluginId))
-    await this.syncRegistry((entries) => registryUpsert(entries, registryEntryFromBookmark(saved)))
-    if (options.withNote) this.pendingNoteId = saved.id
-    this.notify()
-    return saved
-  }
-
-  async updateNote(id: string, sessionPath: string, note: string): Promise<void> {
-    const bookmark = (await this.listForSession(sessionPath)).find((item) => item.id === id)
-    if (!bookmark) throw new Error(`bookmark not found: ${id}`)
-    const updated: Bookmark = { ...bookmark, note: note.trim() || undefined, updatedAt: new Date().toISOString() }
-    await this.client.upsert(bookmarkToRecordParams(updated, this.pluginId))
-    await this.syncRegistry((entries) => registryUpsert(entries, registryEntryFromBookmark(updated)))
-    this.notify()
-  }
-
-  async remove(bookmark: Bookmark): Promise<void> {
-    await this.client.upsert({
-      ...bookmarkToRecordParams(bookmark, this.pluginId),
-      // The records client has no delete; tombstoning keeps removal inside
-      // records:write while every read path drops the record.
-      searchableText: '',
-      payload: { deleted: true, deletedAt: new Date().toISOString() },
+  save(bookmark: Bookmark, options: { withNote?: boolean } = {}): Promise<Bookmark> {
+    return this.enqueue(async () => {
+      const existing = (await this.listForSession(bookmark.sessionPath)).find((item) =>
+        sameAnchor(item, bookmark),
+      )
+      const saved = existing ?? bookmark
+      await this.client.upsert(bookmarkToRecordParams(saved, this.pluginId))
+      await this.syncRegistry((entries) => registryUpsertTracked(entries, registryEntryFromBookmark(saved)))
+      if (options.withNote) this.pendingNoteId = saved.id
+      this.notify({ type: 'save', id: saved.id, sessionPath: saved.sessionPath })
+      return saved
     })
-    await this.syncRegistry((entries) => registryRemove(entries, bookmark.id))
-    this.notify()
+  }
+
+  updateNote(id: string, sessionPath: string, note: string): Promise<void> {
+    return this.enqueue(async () => {
+      const bookmark = (await this.listForSession(sessionPath)).find((item) => item.id === id)
+      if (!bookmark) throw new Error(`bookmark not found: ${id}`)
+      const updated: Bookmark = { ...bookmark, note: note.trim() || undefined, updatedAt: new Date().toISOString() }
+      await this.client.upsert(bookmarkToRecordParams(updated, this.pluginId))
+      await this.syncRegistry((entries) => registryUpsertTracked(entries, registryEntryFromBookmark(updated)))
+      this.notify({ type: 'note', id: updated.id, sessionPath: updated.sessionPath })
+    })
+  }
+
+  remove(bookmark: Bookmark): Promise<void> {
+    return this.enqueue(async () => {
+      await this.client.upsert({
+        ...bookmarkToRecordParams(bookmark, this.pluginId),
+        // The records client has no delete; tombstoning keeps removal inside
+        // records:write while every read path drops the record.
+        searchableText: '',
+        payload: { deleted: true, deletedAt: new Date().toISOString() },
+      })
+      await this.syncRegistry((entries) => ({ entries: registryRemove(entries, bookmark.id), evicted: 0 }))
+      this.notify({ type: 'remove', id: bookmark.id, sessionPath: bookmark.sessionPath })
+    })
   }
 
   private async syncRegistry(
-    transform: (entries: RegistryEntry[]) => RegistryEntry[],
+    transform: (entries: RegistryEntry[]) => RegistryWriteResult,
   ): Promise<void> {
-    const entries = transform(await this.listRecent())
+    const { entries, evicted } = transform(await this.listRecent())
+    this.diagnostics.registryAtCap = entries.length >= REGISTRY_MAX_ENTRIES
+    this.diagnostics.registryEvicted += evicted
+    if (evicted > 0) {
+      this.warn(
+        `Bookmark explorer index is full (${REGISTRY_MAX_ENTRIES}); ${evicted} older bookmark(s) dropped from the list. Their records are still stored.`,
+      )
+    }
     await this.client.upsert({
       id: REGISTRY_ID,
       pluginId: this.pluginId,

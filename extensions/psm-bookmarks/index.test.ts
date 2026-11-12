@@ -198,6 +198,64 @@ describe('bookmarks plugin activation', () => {
     expect(upserts.some((item) => item.recordType === 'bookmark.text-quote')).toBe(true)
   })
 
+  it('opens a bookmark session through the host surface data', async () => {
+    const { ctx, captured } = makeCtx()
+    activate(ctx)
+
+    const onSelectSession = vi.fn()
+    const view = captured.appViews[0]!
+    const element = view.render({
+      viewId: view.id,
+      active: true,
+      data: {
+        sessions: [{ path: '/tmp/session.jsonl' }],
+        onSelectSession,
+      },
+    }) as { props: { onSelectSession: (path: string) => boolean } }
+
+    expect(element.props.onSelectSession('/tmp/session.jsonl')).toBe(true)
+    expect(onSelectSession).toHaveBeenCalledWith({ path: '/tmp/session.jsonl' })
+    expect(ctx.log.warn).not.toHaveBeenCalled()
+  })
+
+  it('reports (instead of hiding) a bookmark session that cannot be opened', async () => {
+    const { ctx, captured } = makeCtx()
+    activate(ctx)
+
+    const view = captured.appViews[0]!
+    const element = view.render({
+      viewId: view.id,
+      active: true,
+      data: { sessions: [], onSelectSession: vi.fn() },
+    }) as { props: { onSelectSession: (path: string) => boolean } }
+
+    expect(element.props.onSelectSession('/gone/session.jsonl')).toBe(false)
+    expect(ctx.log.warn).toHaveBeenCalledWith(
+      expect.stringContaining('/gone/session.jsonl'),
+    )
+  })
+
+  it('forwards store truncation warnings to the host log', async () => {
+    const { ctx, captured, records } = makeCtx()
+    // A session list that hits the read ceiling must produce a host warning.
+    vi.spyOn(records, 'listForScope').mockImplementation(async (params) => {
+      if (params.recordType === 'bookmark.text-quote') {
+        return Array.from({ length: 1000 }, () => ({
+          id: 'x', plugin_id: 'builtin.bookmarks', scope_type: 'session',
+          scope_id: '/tmp/session.jsonl', record_type: 'bookmark.text-quote',
+          schema_version: 1, payload_json: '', payload: {}, updated_at: '',
+        }))
+      }
+      return []
+    })
+    activate(ctx)
+
+    const provider = captured.highlightProviders[0]!
+    await provider.resolveHighlights({ session: { path: '/tmp/session.jsonl' } })
+
+    expect(ctx.log.warn).toHaveBeenCalledWith(expect.stringContaining('limit'))
+  })
+
   it('runs AI organization through host-managed agent sessions', async () => {
     const { ctx, captured } = makeCtx()
     activate(ctx)

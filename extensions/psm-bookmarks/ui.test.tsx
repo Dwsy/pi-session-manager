@@ -147,7 +147,23 @@ describe('BookmarksPanel', () => {
     expect(store.updateNote).toHaveBeenCalledWith('bm-1', '/tmp/session.jsonl', 'updated note')
   })
 
-  it('requires confirmation before deleting', async () => {
+  it('keeps action buttons visible without hover', async () => {
+    const { container } = await render(
+      <BookmarksPanel
+        store={createStore()}
+        i18n={i18n}
+        session={{ path: '/tmp/session.jsonl' }}
+        onJump={() => undefined}
+      />,
+    )
+    await flush()
+    // No opacity-0 / group-hover gating on the action row anymore.
+    const jump = container.querySelector<HTMLButtonElement>('button[title="Jump to text"]')!
+    expect(jump).not.toBeNull()
+    expect(jump.closest('.opacity-0')).toBeNull()
+  })
+
+  it('requires an explicit confirm and offers a cancel path', async () => {
     const store = createStore()
     const { container } = await render(
       <BookmarksPanel
@@ -162,15 +178,114 @@ describe('BookmarksPanel', () => {
       container.querySelector<HTMLButtonElement>('button[title="Delete"]')!.click()
     })
     expect(store.remove).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('Delete this bookmark?')
+
+    // Cancel returns to the normal row without deleting.
     await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[title="Delete this bookmark?"]')!.click()
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Cancel')!
+        .click()
+    })
+    expect(store.remove).not.toHaveBeenCalled()
+
+    // Re-enter and confirm with the labelled Delete button.
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[title="Delete"]')!.click()
+    })
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Delete')!
+        .click()
     })
     expect(store.remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'bm-1' }))
+  })
+
+  it('cancels delete confirmation with Escape', async () => {
+    const store = createStore()
+    const { container } = await render(
+      <BookmarksPanel
+        store={store}
+        i18n={i18n}
+        session={{ path: '/tmp/session.jsonl' }}
+        onJump={() => undefined}
+      />,
+    )
+    await flush()
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[title="Delete"]')!.click()
+    })
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(container.textContent).not.toContain('Delete this bookmark?')
+    expect(store.remove).not.toHaveBeenCalled()
+  })
+
+  it('refreshes silently on a store change without flashing loading', async () => {
+    let listener: (() => void) | null = null
+    const store = createStore({
+      subscribe: vi.fn((cb: () => void) => {
+        listener = cb
+        return () => undefined
+      }),
+    })
+    const { container } = await render(
+      <BookmarksPanel
+        store={store}
+        i18n={i18n}
+        session={{ path: '/tmp/session.jsonl' }}
+        onJump={() => undefined}
+      />,
+    )
+    await flush()
+    expect(container.textContent).toContain('beta delta')
+
+    await act(async () => {
+      listener?.()
+      await Promise.resolve()
+    })
+    // Existing list stays on screen; no "Loading…" flash.
+    expect(container.textContent).toContain('beta delta')
+    expect(container.textContent).not.toContain('Loading…')
+  })
+
+  it('shows a load error as a strip without removing the list', async () => {
+    let call = 0
+    const store = createStore({
+      listForSession: vi.fn(async () => {
+        call += 1
+        if (call === 1) return [bookmark]
+        throw new Error('boom')
+      }),
+    })
+    const { container } = await render(
+      <BookmarksPanel
+        store={store}
+        i18n={i18n}
+        session={{ path: '/tmp/session.jsonl' }}
+        onJump={() => undefined}
+      />,
+    )
+    await flush()
+    await act(async () => {
+      await store.listForSession('/tmp/session.jsonl').catch(() => undefined)
+    })
+    // Simulate a failing background refresh through the subscription path.
+    const listener = (store.subscribe as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as
+      | (() => void)
+      | undefined
+    await act(async () => {
+      listener?.()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(container.textContent).toContain('beta delta')
+    expect(container.textContent).toContain('boom')
   })
 })
 
 describe('BookmarkHighlightPopover', () => {
-  it('edits the note inline and keeps data in sync through the store', async () => {
+  it('opens in read mode without stealing focus, and edits only on demand', async () => {
     const store = createStore({
       listForSession: vi.fn(async () => [{ ...bookmark, note: undefined }]),
     })
@@ -185,7 +300,15 @@ describe('BookmarkHighlightPopover', () => {
       />,
     )
     await flush()
-    // No note yet -> editor opens focused.
+    // Clicking a highlight is a read action: no auto-focused textarea.
+    expect(container.querySelector('textarea')).toBeNull()
+    expect(document.activeElement?.tagName).not.toBe('TEXTAREA')
+
+    await act(async () => {
+      Array.from(container.querySelectorAll('button'))
+        .find((button) => button.textContent === 'Add a note…')!
+        .click()
+    })
     expect(container.querySelector('textarea')).not.toBeNull()
 
     await act(async () => {
