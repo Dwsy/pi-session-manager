@@ -162,6 +162,36 @@ export interface SessionEntry {
   targetId?: string;
 }
 
+export interface SystemPromptSection {
+  name: string;
+  text: string;
+}
+
+export interface SystemPromptTool {
+  name: string;
+  description: string;
+  parameters?: unknown;
+}
+
+/**
+ * Replayed system prompt state at one `role: "system"` message in a Pi JSONL
+ * session. `sections` is the ordered effective section map and `tools` is the
+ * effective tool set after applying each version's added/removed lists.
+ */
+export interface SystemPromptSnapshot {
+  id: string;
+  timestamp: string;
+  version: number;
+  content: string;
+  prompt: string;
+  sections: SystemPromptSection[];
+  tools: SystemPromptTool[];
+  changedSections: string[];
+  removedSections: string[];
+  toolsAdded: string[];
+  toolsRemoved: string[];
+}
+
 export interface SessionChunk {
   content: string;
   next_offset: number;

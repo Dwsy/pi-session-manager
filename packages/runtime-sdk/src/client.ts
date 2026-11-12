@@ -31,7 +31,6 @@ import type {
   PsmSessionListParams,
   PsmSessionOpenOptions,
   PsmSessionReadChunkOptions,
-  PsmSystemPromptSnapshot,
   PsmWindowOpenParams,
 } from './types'
 
@@ -261,9 +260,6 @@ export function createPluginCapabilityClient(options: CreatePsmClientOptions): P
           offset: readOptions?.offset,
           maxBytes: readOptions?.maxBytes,
         })
-      },
-      readSystemPromptSnapshots(sessionPath) {
-        return invoke<PsmSystemPromptSnapshot[]>('get_session_system_prompt_snapshots', { path: sessionPath })
       },
       getLabels(sessionPath) {
         return invoke<Record<string, string>>('get_session_labels', {

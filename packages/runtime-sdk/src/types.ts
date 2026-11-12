@@ -814,25 +814,6 @@ export interface PsmSessionReadChunkOptions {
   maxBytes?: number;
 }
 
-/** Ordered effective section after one system-message version. */
-export interface PsmSystemPromptSection {
-  name: string;
-  text: string;
-}
-
-/** Full replayed prompt state at one system-message version in a session. */
-export interface PsmSystemPromptSnapshot {
-  id: string;
-  timestamp: string;
-  version: number;
-  prompt: string;
-  sections: PsmSystemPromptSection[];
-  changedSections: string[];
-  removedSections: string[];
-  toolsAdded: string[];
-  toolsRemoved: string[];
-}
-
 export interface PsmSessionOpenOptions {
   target?: "browser" | "terminal";
   cwd?: string;
@@ -854,9 +835,6 @@ export interface PsmSessionsClient {
     sessionPath: string,
     options?: PsmSessionReadChunkOptions,
   ): Promise<PsmSessionChunk>;
-  readSystemPromptSnapshots(
-    sessionPath: string,
-  ): Promise<PsmSystemPromptSnapshot[]>;
   getLabels(sessionPath: string): Promise<Record<string, string>>;
   open(sessionPath: string, options?: PsmSessionOpenOptions): Promise<void>;
 }

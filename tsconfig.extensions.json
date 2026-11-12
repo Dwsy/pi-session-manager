@@ -9,9 +9,7 @@
     "extensions/psm-mesh/**/*.ts",
     "extensions/psm-mesh/**/*.tsx",
     "extensions/psm-project-identity/**/*.ts",
-    "extensions/psm-project-icons/**/*.ts",
-    "extensions/psm-system-prompt-snapshot/**/*.ts",
-    "extensions/psm-system-prompt-snapshot/**/*.tsx"
+    "extensions/psm-project-icons/**/*.ts"
   ],
   "exclude": [
     "extensions/psm-bookmarks/**/*.test.ts",
