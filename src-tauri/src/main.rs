@@ -494,6 +494,7 @@ fn main() {
             pi_session_manager::set_tray_language,
             pi_session_manager::open_session_in_terminal,
             pi_session_manager::update_macos_dock_recent_sessions,
+            pi_session_manager::trigger_timeline_haptic,
             pi_session_manager::list_available_terminals,
             pi_session_manager::scan_skills,
             pi_session_manager::scan_prompts,

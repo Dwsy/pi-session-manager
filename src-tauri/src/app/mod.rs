@@ -86,6 +86,7 @@ pub fn run() {
             set_lightweight_mode,
             open_session_in_terminal,
             update_macos_dock_recent_sessions,
+            trigger_timeline_haptic,
             list_available_terminals,
             scan_skills,
             scan_prompts,
@@ -256,7 +257,7 @@ mod tests {
         let handler_set = handlers.iter().copied().collect::<BTreeSet<_>>();
         let dispatch_set = crate::dispatch::capability_command_catalog().collect::<BTreeSet<_>>();
 
-        assert_eq!(handlers.len(), 175);
+        assert_eq!(handlers.len(), 176);
         assert_eq!(handler_set.len(), handlers.len());
 
         let dispatch_only = dispatch_set.difference(&handler_set).copied().collect::<Vec<_>>();
@@ -303,6 +304,7 @@ mod tests {
                 "send_notification",
                 "set_lightweight_mode",
                 "set_window_zoom_level",
+                "trigger_timeline_haptic",
                 "update_macos_dock_recent_sessions",
             ]
         );

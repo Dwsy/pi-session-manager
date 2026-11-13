@@ -43,6 +43,28 @@ pub fn update_macos_dock_recent_sessions(app: AppHandle, sessions: Vec<DockRecen
     Ok(())
 }
 
+/// Subtle native feedback for a user-initiated timeline dot hover.
+#[tauri::command]
+pub async fn trigger_timeline_haptic(app: AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        app.run_on_main_thread(move || {
+            let _ = sender.send(macos::perform_timeline_haptic());
+        })
+        .map_err(|error| error.to_string())?;
+        return receiver
+            .await
+            .map_err(|_| "macOS haptic dispatch was cancelled".to_string())?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Ok(())
+    }
+}
+
 #[cfg(target_os = "macos")]
 pub fn install() -> Result<(), String> {
     macos::install()
@@ -66,6 +88,19 @@ mod macos {
 
     thread_local! {
         static DOCK_MENU: RefCell<Option<Submenu>> = const { RefCell::new(None) };
+    }
+
+    pub fn perform_timeline_haptic() -> Result<(), String> {
+        let manager = AnyClass::get(c"NSHapticFeedbackManager")
+            .ok_or("NSHapticFeedbackManager is unavailable")?;
+        let performer: *mut AnyObject = unsafe { msg_send![manager, defaultPerformer] };
+        if performer.is_null() {
+            return Err("No haptic performer for the current input device".to_string());
+        }
+        // AppKit Generic pattern = 0 (noticeable click), perform immediately = 1.
+        // This call runs on the AppKit main thread.
+        let _: () = unsafe { msg_send![performer, performFeedbackPattern: 0isize, performanceTime: 1usize] };
+        Ok(())
     }
 
     pub fn install() -> Result<(), String> {

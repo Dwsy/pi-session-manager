@@ -37,7 +37,7 @@ pub mod terminal;
 #[cfg(feature = "gui")]
 pub mod tray;
 #[cfg(feature = "gui")]
-pub use macos_dock::update_macos_dock_recent_sessions;
+pub use macos_dock::{trigger_timeline_haptic, update_macos_dock_recent_sessions};
 
 // Window dimension constants and helpers (shared between main.rs and tray.rs)
 pub const DEFAULT_WINDOW_WIDTH: f64 = 1400.0;
