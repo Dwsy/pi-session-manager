@@ -53,7 +53,7 @@ pub async fn trigger_timeline_haptic(app: AppHandle) -> Result<(), String> {
             let _ = sender.send(macos::perform_timeline_haptic());
         })
         .map_err(|error| error.to_string())?;
-        return receiver.await.map_err(|_| "macOS haptic dispatch was cancelled".to_string())?;
+        receiver.await.map_err(|_| "macOS haptic dispatch was cancelled".to_string())?
     }
 
     #[cfg(not(target_os = "macos"))]
