@@ -148,7 +148,7 @@ function SessionViewerContent({
   } = useSessionView();
   const isMobile = useIsMobile();
   const { copyText } = useClipboard();
-  const { cmdFBehavior, scrollMarkersEnabled } = useSessionViewerSettingsState({
+  const { cmdFBehavior, scrollMarkersEnabled, timelineNavEnabled } = useSessionViewerSettingsState({
     previewMode,
   });
 
@@ -606,6 +606,7 @@ function SessionViewerContent({
         onPointerUp: handleMarkersPointerUp,
         onPointerLeave: handleMarkersPointerLeave,
         scrollMarkersEnabled,
+        timelineNavEnabled,
       }}
       panels={{
         showSystemPromptDialog,

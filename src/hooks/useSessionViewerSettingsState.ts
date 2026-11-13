@@ -24,5 +24,6 @@ export function useSessionViewerSettingsState({
   return {
     cmdFBehavior,
     scrollMarkersEnabled,
+    timelineNavEnabled,
   };
 }

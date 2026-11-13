@@ -26,13 +26,8 @@ import { normalizePiContent } from "@/utils/session";
 import { requestToolReview } from "@/contexts/toolReviewBus";
 import { estimateSessionEntrySize } from "@/hooks/useSessionViewerVirtualScroll";
 import SessionEntryRenderer from "./SessionEntryRenderer";
-
-interface ConversationPreviewTurn {
-  id: string;
-  userEntry?: SessionEntry;
-  processEntries: SessionEntry[];
-  assistantEntry?: SessionEntry;
-}
+import { buildConversationPreviewTurns, type ConversationPreviewTurn } from "@/utils/conversationTurns";
+export { buildConversationPreviewTurns } from "@/utils/conversationTurns";
 
 export type ConversationFoldMode = "wholeTurn" | "toolGroups";
 
@@ -48,6 +43,8 @@ export interface ConversationPreviewMessagesProps {
   scrollElementRef?: RefObject<HTMLDivElement | null>;
   /** Live follow: scroll to bottom on new turns while the flag stays set. */
   pendingScrollToBottomRef?: MutableRefObject<boolean>;
+  /** Reports the user message at the top of the visible conversation turn. */
+  onActiveUserEntryIdChange?: (entryId: string | null) => void;
 }
 
 export interface ConversationPreviewMessagesHandle {
@@ -64,71 +61,6 @@ export interface ConversationPreviewMessagesHandle {
 const TURN_GAP_PX = 12;
 const TURN_OVERSCAN = 3;
 const DEFAULT_TURN_HEIGHT_PX = 480;
-
-function isPromptMessage(entry: SessionEntry): boolean {
-  const role = entry.message?.role;
-  return (
-    entry.type === "message" &&
-    (role === "user" || role === "developer" || role === "system")
-  );
-}
-
-function isAssistantMessage(entry: SessionEntry): boolean {
-  return entry.type === "message" && entry.message?.role === "assistant";
-}
-
-function hasAssistantText(entry: SessionEntry): boolean {
-  if (!isAssistantMessage(entry)) return false;
-  return normalizePiContent(entry.message?.content).some(
-    (item) => item.type === "text" && Boolean(item.text?.trim()),
-  );
-}
-
-export function buildConversationPreviewTurns(
-  entries: SessionEntry[],
-): ConversationPreviewTurn[] {
-  const turns: ConversationPreviewTurn[] = [];
-  let current: ConversationPreviewTurn | null = null;
-
-  for (const entry of entries) {
-    if (isPromptMessage(entry)) {
-      if (current) turns.push(current);
-      current = {
-        id: entry.id,
-        userEntry: entry,
-        processEntries: [],
-      };
-      continue;
-    }
-
-    if (!current) {
-      current = {
-        id: entry.id,
-        processEntries: [],
-      };
-    }
-
-    if (hasAssistantText(entry)) {
-      if (current.assistantEntry) {
-        current.processEntries.push(current.assistantEntry);
-      }
-      current.assistantEntry = entry;
-      continue;
-    }
-
-    // Once more process work appears, the previous text response was an
-    // intermediate boundary rather than the turn's final assistant message.
-    // Flush it before the new entry so V2 grouping sees the real chronology.
-    if (current.assistantEntry) {
-      current.processEntries.push(current.assistantEntry);
-      current.assistantEntry = undefined;
-    }
-    current.processEntries.push(entry);
-  }
-
-  if (current) turns.push(current);
-  return turns;
-}
 
 function getEntrySummaryKeys(entry: SessionEntry, fallback: string): string[] {
   if (entry.type === "message") {
@@ -483,20 +415,47 @@ export function buildToolCallPreviewSegments(
   return segments;
 }
 
-function splitProcessEntries(entries: SessionEntry[]): {
-  modelChanges: SessionEntry[];
-  foldableEntries: SessionEntry[];
-} {
-  const modelChanges: SessionEntry[] = [];
-  const foldableEntries: SessionEntry[] = [];
+/**
+ * Context-boundary entries never disappear into the process fold: a model
+ * switch, a compaction summary or a branch summary describes the transcript
+ * itself, so burying it inside "process · bash ×18" hides the most important
+ * context. They are not hoisted either — the process runs before and after
+ * them stay in place so the turn keeps its chronology.
+ */
+const STANDALONE_PROCESS_TYPES = new Set<SessionEntry["type"]>([
+  "model_change",
+  "compaction",
+  "branch_summary",
+]);
+
+export type ProcessFoldBlock =
+  | { kind: "entry"; entry: SessionEntry }
+  | { kind: "fold"; entries: SessionEntry[] };
+
+export function buildProcessFoldBlocks(
+  entries: SessionEntry[],
+): ProcessFoldBlock[] {
+  const blocks: ProcessFoldBlock[] = [];
+  let run: SessionEntry[] = [];
+
+  const flush = () => {
+    if (run.length > 0) {
+      blocks.push({ kind: "fold", entries: run });
+      run = [];
+    }
+  };
+
   for (const entry of entries) {
-    if (entry.type === "model_change") {
-      modelChanges.push(entry);
+    if (STANDALONE_PROCESS_TYPES.has(entry.type)) {
+      flush();
+      blocks.push({ kind: "entry", entry });
     } else {
-      foldableEntries.push(entry);
+      run.push(entry);
     }
   }
-  return { modelChanges, foldableEntries };
+  flush();
+
+  return blocks;
 }
 
 function ToolGroupedProcessEntries({
@@ -620,7 +579,16 @@ function estimateTurnHeight(
 
   let processHeight: number;
   if (foldMode === "wholeTurn") {
-    processHeight = 64; // collapsed whole-turn process summary
+    // Each run of process work collapses to one summary row; the context
+    // boundary entries (model change / compaction / branch summary) stay.
+    processHeight = buildProcessFoldBlocks(turn.processEntries).reduce(
+      (sum, block) =>
+        sum +
+        (block.kind === "entry"
+          ? estimateSessionEntrySize(block.entry, undefined, false)
+          : 64),
+      0,
+    );
   } else {
     processHeight = 0;
     for (const segment of buildToolCallPreviewSegments(turn.processEntries)) {
@@ -654,9 +622,10 @@ function ConversationPreviewTurnView({
   expandedGroupIds: Set<string>;
   onToggleGroup: (groupId: string) => void;
 }) {
-  // Legacy whole-turn folding keeps model_change visible outside its summary.
-  const { modelChanges, foldableEntries } = useMemo(
-    () => splitProcessEntries(turn.processEntries),
+  // Whole-turn folding folds each run of process work, while context-boundary
+  // entries (model change, compaction, branch summary) stay rendered in place.
+  const processBlocks = useMemo(
+    () => buildProcessFoldBlocks(turn.processEntries),
     [turn.processEntries],
   );
 
@@ -683,58 +652,68 @@ function ConversationPreviewTurnView({
         />
       ) : (
         <>
-          {modelChanges.map((entry, index) => (
-            <SessionEntryRenderer
-              key={`${entry.id}:${entry.type}:${index}`}
-              entry={entry}
-              toolResultByCallId={toolResultByCallId}
-              searchQuery={searchQuery}
-              isStreaming={entry.id === streamingId}
-              previewMode={false}
-              processEntries={turn.processEntries}
-            />
-          ))}
+          {processBlocks.map((block, blockIndex) => {
+            if (block.kind === "entry") {
+              const entry = block.entry;
+              return (
+                <SessionEntryRenderer
+                  key={`sl:${entry.id}:${entry.type}:${blockIndex}`}
+                  entry={entry}
+                  toolResultByCallId={toolResultByCallId}
+                  searchQuery={searchQuery}
+                  isStreaming={entry.id === streamingId}
+                  previewMode={false}
+                  processEntries={turn.processEntries}
+                />
+              );
+            }
 
-          {!expanded && foldableEntries.length > 0 && (
-            <CollapsedProcessSummary
-              entries={foldableEntries}
-              expanded={expanded}
-              onToggle={onToggle}
-              toolResultByCallId={toolResultByCallId}
-            />
-          )}
+            const foldKey = `fold:${block.entries[0]?.id ?? blockIndex}:${blockIndex}`;
 
-          {expanded && foldableEntries.length > 0 && (
-            <div className="conversation-preview-process">
-              <div className="conversation-preview-process__header">
+            if (!expanded) {
+              return (
                 <CollapsedProcessSummary
-                  entries={foldableEntries}
-                  expanded={expanded}
+                  key={foldKey}
+                  entries={block.entries}
+                  expanded={false}
                   onToggle={onToggle}
                   toolResultByCallId={toolResultByCallId}
                 />
+              );
+            }
+
+            return (
+              <div key={foldKey} className="conversation-preview-process">
+                <div className="conversation-preview-process__header">
+                  <CollapsedProcessSummary
+                    entries={block.entries}
+                    expanded
+                    onToggle={onToggle}
+                    toolResultByCallId={toolResultByCallId}
+                  />
+                </div>
+                <div className="conversation-preview-process__list" role="list">
+                  {block.entries.map((entry, index) => (
+                    <div
+                      key={`${entry.id}:${entry.type}:${index}`}
+                      className="conversation-preview-process__entry"
+                      data-process-kind={getProcessEntryKind(entry)}
+                      role="listitem"
+                    >
+                      <SessionEntryRenderer
+                        entry={entry}
+                        toolResultByCallId={toolResultByCallId}
+                        searchQuery={searchQuery}
+                        isStreaming={entry.id === streamingId}
+                        previewMode={false}
+                        processEntries={turn.processEntries}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="conversation-preview-process__list" role="list">
-                {foldableEntries.map((entry, index) => (
-                  <div
-                    key={`${entry.id}:${entry.type}:${index}`}
-                    className="conversation-preview-process__entry"
-                    data-process-kind={getProcessEntryKind(entry)}
-                    role="listitem"
-                  >
-                    <SessionEntryRenderer
-                      entry={entry}
-                      toolResultByCallId={toolResultByCallId}
-                      searchQuery={searchQuery}
-                      isStreaming={entry.id === streamingId}
-                      previewMode={false}
-                      processEntries={turn.processEntries}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            );
+          })}
         </>
       )}
 
@@ -766,6 +745,7 @@ const ConversationPreviewMessages = forwardRef<
     foldMode = "toolGroups",
     scrollElementRef,
     pendingScrollToBottomRef,
+    onActiveUserEntryIdChange,
   },
   ref,
 ) {
@@ -986,6 +966,30 @@ const ConversationPreviewMessages = forwardRef<
   }, [scrollTargetId, scrollToEntryId, setScrollTargetId]);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
+
+  // Conversation mode has its own turn virtualizer. The outer flat-entry
+  // virtualizer cannot identify the active turn (and includes overscan rows).
+  useEffect(() => {
+    if (!onActiveUserEntryIdChange) return;
+
+    const visibleOffset = Math.max(
+      0,
+      (rowVirtualizer.scrollOffset ?? 0) - getContentOffsetTop(),
+    );
+    const firstVisibleIndex =
+      rowVirtualizer.getVirtualItems().find((row) => row.start + row.size > visibleOffset)
+        ?.index ?? 0;
+
+    let activeUserId: string | null = null;
+    for (let index = firstVisibleIndex; index >= 0; index -= 1) {
+      const user = turns[index]?.userEntry;
+      if (user?.message?.role === "user") {
+        activeUserId = user.id;
+        break;
+      }
+    }
+    onActiveUserEntryIdChange(activeUserId);
+  }, [getContentOffsetTop, onActiveUserEntryIdChange, rowVirtualizer, rowVirtualizer.scrollOffset, turns]);
 
   return (
     <div className="conversation-preview-messages px-1 py-1">

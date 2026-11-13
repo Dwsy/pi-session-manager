@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -15,6 +16,7 @@ import { useTranslation } from "react-i18next";
 
 import SessionHeader from "@/components/session-viewer/SessionHeader";
 import SessionScrollMarkers from "@/components/session-viewer/SessionScrollMarkers";
+import SessionTimelineNav from "@/components/session-viewer/SessionTimelineNav";
 import { useSessionView } from "@/contexts/SessionViewContext";
 import type { SessionSearchTarget } from "@/hooks/useSessionViewerInMessageSearch";
 import {
@@ -23,6 +25,7 @@ import {
   useSessionViewerVirtualScroll,
 } from "@/hooks/useSessionViewerVirtualScroll";
 import { useSessionViewerSearchHighlight } from "@/hooks/useSessionViewerSearchHighlight";
+import { useSessionTimelineNav } from "@/hooks/useSessionTimelineNav";
 import type { ScrollMarker } from "@/hooks/useSessionScrollMarkers";
 import type { LegacySessionStats, SessionEntry, SessionInfo } from "@/types";
 import SessionEntryRenderer from "./SessionEntryRenderer";
@@ -86,6 +89,7 @@ export interface SessionViewerMessagesProps {
   onPointerUp: (event: ReactPointerEvent) => void;
   onPointerLeave: (event: ReactPointerEvent) => void;
   isScrollMarkersFeatureEnabled: boolean;
+  isTimelineNavEnabled?: boolean;
   isLive: boolean;
   previewMode?: boolean;
   previewVariant?: SessionPreviewVariant;
@@ -129,6 +133,7 @@ const SessionViewerMessages = forwardRef<
   onPointerUp,
   onPointerLeave,
   isScrollMarkersFeatureEnabled,
+  isTimelineNavEnabled = false,
   isLive,
   previewMode = false,
   previewVariant = "conversation",
@@ -169,6 +174,7 @@ const SessionViewerMessages = forwardRef<
   // ConversationPreviewMessages, so the flat entry virtualizer cannot address them.
   const conversationRef = useRef<ConversationPreviewMessagesHandle>(null);
   const isConversationMode = previewVariant !== "none";
+  const [conversationActiveUserEntryId, setConversationActiveUserEntryId] = useState<string | null>(null);
   const handleScrollToTop = useCallback(() => {
     if (isConversationMode) {
       conversationRef.current?.scrollToTop();
@@ -194,6 +200,32 @@ const SessionViewerMessages = forwardRef<
   );
 
   const virtualRows = rowVirtualizer.getVirtualItems();
+
+  const timelineNavItems = useSessionTimelineNav({
+    entries: renderableEntries,
+    enabled: !!isTimelineNavEnabled,
+    previewFallback: t("session.userMessage", "User message"),
+  });
+
+  const activeTimelineEntryId = useMemo(() => {
+    if (!isTimelineNavEnabled || timelineNavItems.items.length === 0) {
+      return null;
+    }
+    if (isConversationMode) {
+      return conversationActiveUserEntryId ?? timelineNavItems.items[0].entryId;
+    }
+    // The virtualizer includes overscan rows before the viewport. Find the
+    // first genuinely visible row instead of using virtualRows[0].
+    const visibleOffset = rowVirtualizer.scrollOffset ?? 0;
+    const firstVisibleIndex =
+      virtualRows.find((row) => row.start + row.size > visibleOffset)?.index ?? 0;
+    const currentItem =
+      [...timelineNavItems.items]
+        .reverse()
+        .find((item) => item.index <= firstVisibleIndex) ??
+      timelineNavItems.items[0];
+    return currentItem?.entryId ?? null;
+  }, [conversationActiveUserEntryId, isConversationMode, isTimelineNavEnabled, rowVirtualizer.scrollOffset, timelineNavItems.items, virtualRows]);
 
   // Centered scroll affordances.
   // "scroll to bottom" is revealed when the pointer enters the bottom 10% of the visible area (and we're not at bottom).
@@ -423,6 +455,7 @@ const SessionViewerMessages = forwardRef<
             previewVariant !== "none" ? (
               <ConversationPreviewMessages
                 ref={conversationRef}
+                onActiveUserEntryIdChange={isTimelineNavEnabled ? setConversationActiveUserEntryId : undefined}
                 entries={renderableEntries}
                 toolResultByCallId={toolResultByCallId}
                 searchQuery={searchQuery}
@@ -492,6 +525,13 @@ const SessionViewerMessages = forwardRef<
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerLeave}
+        />
+      )}
+      {isTimelineNavEnabled && timelineNavItems.items.length >= 2 && (
+        <SessionTimelineNav
+          items={timelineNavItems.items}
+          activeEntryId={activeTimelineEntryId}
+          onNavigate={(entryId) => setScrollTargetId(entryId)}
         />
       )}
     </div>

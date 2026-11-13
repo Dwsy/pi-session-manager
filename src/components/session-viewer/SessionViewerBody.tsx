@@ -91,6 +91,7 @@ export interface SessionViewerBodyScrollMarkersProps {
   onPointerUp: (event: ReactPointerEvent) => void;
   onPointerLeave: (event: ReactPointerEvent) => void;
   scrollMarkersEnabled: boolean;
+  timelineNavEnabled?: boolean;
 }
 
 export interface SessionViewerBodyPanelsProps {
@@ -247,6 +248,7 @@ export default function SessionViewerBody({
                   onPointerUp={scrollMarkers.onPointerUp}
                   onPointerLeave={scrollMarkers.onPointerLeave}
                   isScrollMarkersFeatureEnabled={previewMode ? false : scrollMarkers.scrollMarkersEnabled}
+                  isTimelineNavEnabled={previewMode ? false : (scrollMarkers.timelineNavEnabled ?? false)}
                   previewMode={previewMode}
                   previewVariant={previewVariant}
                 />

@@ -12,7 +12,9 @@ vi.mock('@/components/pi-live/PiLiveChatInput', () => ({
 }))
 
 vi.mock('@/components/session-viewer/SessionViewerMessages', () => ({
-  default: () => <div data-testid="messages" />,
+  default: ({ isTimelineNavEnabled }: { isTimelineNavEnabled?: boolean }) => (
+    <div data-testid="messages" data-timeline-enabled={String(isTimelineNavEnabled)} />
+  ),
 }))
 
 vi.mock('@/components/session-viewer/SessionViewerSearchBar', () => ({
@@ -122,6 +124,22 @@ function renderBody(overrides: Partial<Parameters<typeof SessionViewerBody>[0]> 
 }
 
 describe('SessionViewerBody', () => {
+  it('passes timeline navigation through and disables it for previews', () => {
+    const props = createBodyProps();
+    const { rerender } = render(
+      <SessionViewerBody {...props} scrollMarkers={{ ...props.scrollMarkers, timelineNavEnabled: true }} />,
+    );
+    expect(screen.getByTestId('messages').getAttribute('data-timeline-enabled')).toBe('true');
+    rerender(
+      <SessionViewerBody
+        {...props}
+        previewMode
+        scrollMarkers={{ ...props.scrollMarkers, timelineNavEnabled: true }}
+      />,
+    );
+    expect(screen.getByTestId('messages').getAttribute('data-timeline-enabled')).toBe('false');
+  });
+
   it('renders the built-in desktop session tree as an embedded panel in the stable content stage', () => {
     renderBody({
       layoutSlots: {

@@ -10,11 +10,13 @@ import { registerBuiltinToolPlugins } from "@/plugins/tools-render";
 import type { SessionEntry } from "@/types";
 import ConversationPreviewMessages, {
   buildConversationPreviewTurns,
+  buildProcessFoldBlocks,
   buildToolCallPreviewSegments,
 } from "./ConversationPreviewMessages";
 
 const virtualState = vi.hoisted(() => ({
   window: Number.POSITIVE_INFINITY,
+  offset: 0,
 }));
 
 // jsdom has no layout engine, so the real virtualizer renders nothing. This stub
@@ -32,6 +34,7 @@ vi.mock("@tanstack/react-virtual", () => ({
           size: 200,
         })),
       getTotalSize: () => count * 200,
+      scrollOffset: virtualState.offset,
       measureElement: () => undefined,
       scrollToIndex: () => undefined,
       measure: () => undefined,
@@ -112,6 +115,7 @@ describe("buildConversationPreviewTurns", () => {
 
   beforeEach(() => {
     virtualState.window = Number.POSITIVE_INFINITY;
+    virtualState.offset = 0;
     registerBuiltinToolPlugins();
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: false,
@@ -150,6 +154,35 @@ describe("buildConversationPreviewTurns", () => {
 
     expect(screen.getByText("Search prompt")).toBeTruthy();
     expect(screen.getByText("Search response")).toBeTruthy();
+  });
+
+  it("tracks the active user turn from the conversation virtualizer", () => {
+    const entries = [
+      message("user-1", "user", "First"),
+      message("answer-1", "assistant", "Response"),
+      message("user-2", "user", "Second"),
+      message("answer-2", "assistant", "Response"),
+    ];
+    const onActiveUserEntryIdChange = vi.fn();
+    const renderConversation = () => (
+      <Providers>
+        <ConversationPreviewMessages
+          entries={entries}
+          toolResultByCallId={new Map()}
+          searchQuery=""
+          streamingId={null}
+          scrollTargetId={null}
+          setScrollTargetId={() => {}}
+          onActiveUserEntryIdChange={onActiveUserEntryIdChange}
+        />
+      </Providers>
+    );
+    const view = render(renderConversation());
+    expect(onActiveUserEntryIdChange).toHaveBeenLastCalledWith("user-1");
+
+    virtualState.offset = 220;
+    view.rerender(renderConversation());
+    expect(onActiveUserEntryIdChange).toHaveBeenLastCalledWith("user-2");
   });
 
   it("starts a visible turn from a developer message", () => {
@@ -557,5 +590,52 @@ describe("buildConversationPreviewTurns", () => {
     );
     expect(screen.queryByText("Show")).toBeNull();
     expect(screen.getByText("Hide")).toBeTruthy();
+  });
+});
+
+describe("buildProcessFoldBlocks", () => {
+  it("keeps a compaction out of the process fold and preserves order", () => {
+    const entries = [
+      toolCall("tc-1", "bash"),
+      toolResult("tr-1", "tc-1"),
+      {
+        type: "compaction",
+        id: "cmp-1",
+        timestamp: "2026-05-19T00:00:00.000Z",
+        tokensBefore: 128000,
+        summary: "Earlier context summary",
+      } as unknown as SessionEntry,
+      toolCall("tc-2", "bash"),
+    ];
+
+    const blocks = buildProcessFoldBlocks(entries);
+
+    expect(blocks.map((block) => block.kind)).toEqual(["fold", "entry", "fold"]);
+    const standalone = blocks[1];
+    expect(standalone?.kind).toBe("entry");
+    expect(standalone?.kind === "entry" ? standalone.entry.type : null).toBe(
+      "compaction",
+    );
+  });
+
+  it("leaves model change and branch summary unfolded as well", () => {
+    const entries = [
+      {
+        type: "model_change",
+        id: "mc-1",
+        provider: "x",
+        modelId: "y",
+      } as unknown as SessionEntry,
+      toolCall("tc-1", "bash"),
+      {
+        type: "branch_summary",
+        id: "bs-1",
+        summary: "s",
+      } as unknown as SessionEntry,
+    ];
+
+    const blocks = buildProcessFoldBlocks(entries);
+
+    expect(blocks.map((block) => block.kind)).toEqual(["entry", "fold", "entry"]);
   });
 });
