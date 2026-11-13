@@ -53,9 +53,7 @@ pub async fn trigger_timeline_haptic(app: AppHandle) -> Result<(), String> {
             let _ = sender.send(macos::perform_timeline_haptic());
         })
         .map_err(|error| error.to_string())?;
-        return receiver
-            .await
-            .map_err(|_| "macOS haptic dispatch was cancelled".to_string())?;
+        return receiver.await.map_err(|_| "macOS haptic dispatch was cancelled".to_string())?;
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -91,8 +89,7 @@ mod macos {
     }
 
     pub fn perform_timeline_haptic() -> Result<(), String> {
-        let manager = AnyClass::get(c"NSHapticFeedbackManager")
-            .ok_or("NSHapticFeedbackManager is unavailable")?;
+        let manager = AnyClass::get(c"NSHapticFeedbackManager").ok_or("NSHapticFeedbackManager is unavailable")?;
         let performer: *mut AnyObject = unsafe { msg_send![manager, defaultPerformer] };
         if performer.is_null() {
             return Err("No haptic performer for the current input device".to_string());

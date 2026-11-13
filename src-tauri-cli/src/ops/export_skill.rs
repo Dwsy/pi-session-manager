@@ -207,10 +207,7 @@ pub fn export_skill_to_dir(opts: ExportSkillOptions) -> Result<PathBuf> {
     if out_path.exists() && !opts.force {
         if let Ok(entries) = fs::read_dir(&out_path) {
             if entries.count() > 0 {
-                return Err(anyhow!(
-                    "Target directory already exists and is not empty: {}. Use --force to overwrite.",
-                    out_path.display()
-                ));
+                return Err(anyhow!("Target directory already exists and is not empty: {}. Use --force to overwrite.", out_path.display()));
             }
         }
     }
@@ -237,43 +234,26 @@ pub fn install_skill_to_agents(dest: Option<String>, force: bool) -> Result<Path
         Some(d) => PathBuf::from(d),
         None => default_agents_skill_dir()?,
     };
-    export_skill_to_dir(ExportSkillOptions {
-        output_dir: Some(target.to_string_lossy().to_string()),
-        force,
-    })
+    export_skill_to_dir(ExportSkillOptions { output_dir: Some(target.to_string_lossy().to_string()), force })
 }
 
 pub async fn execute_install_skill(dest: Option<String>, force: bool) -> Result<()> {
     let target_dir = install_skill_to_agents(dest, force)?;
     let lang = crate::i18n::current_language();
-    println!(
-        "{} {}",
-        "✓".green().bold(),
-        crate::i18n::get_text("skill_installed", lang)
-            .replace("{path}", &target_dir.display().to_string())
-            .green()
-            .bold()
-    );
+    println!("{} {}", "✓".green().bold(), crate::i18n::get_text("skill_installed", lang).replace("{path}", &target_dir.display().to_string()).green().bold());
     println!("  Installed files:");
     println!("    • {}/SKILL.md", target_dir.display());
     println!("    • {}/references/recall-guide.md", target_dir.display());
     println!("    • {}/references/stats-analysis.md", target_dir.display());
     println!("    • {}/references/session-inspection.md", target_dir.display());
     println!("    • {}/references/kanban-workflow.md", target_dir.display());
-    println!(
-        "\n{}",
-        "The skill is now available to all agents discovering ~/.agents/skills/.".dimmed()
-    );
+    println!("\n{}", "The skill is now available to all agents discovering ~/.agents/skills/.".dimmed());
     Ok(())
 }
 
 pub async fn execute_export_skill(opts: ExportSkillOptions) -> Result<()> {
     let target_dir = export_skill_to_dir(opts)?;
-    println!(
-        "{} {}",
-        "✓ PSM Skill exported successfully to:".green().bold(),
-        target_dir.display().to_string().cyan().bold()
-    );
+    println!("{} {}", "✓ PSM Skill exported successfully to:".green().bold(), target_dir.display().to_string().cyan().bold());
     println!("  Generated:");
     println!("    • {}/SKILL.md", target_dir.display());
     println!("    • {}/references/recall-guide.md", target_dir.display());
@@ -301,10 +281,7 @@ mod tests {
         let temp = tempdir().unwrap();
         let target = temp.path().join("psm-tools");
 
-        let opts = ExportSkillOptions {
-            output_dir: Some(target.to_str().unwrap().to_string()),
-            force: true,
-        };
+        let opts = ExportSkillOptions { output_dir: Some(target.to_str().unwrap().to_string()), force: true };
 
         let result = export_skill_to_dir(opts).unwrap();
         assert!(result.join("SKILL.md").exists());

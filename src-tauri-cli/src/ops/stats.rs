@@ -49,17 +49,7 @@ pub struct StatsOptions {
 pub fn summarize_details(target_label: &str, session_count: usize, details: &SessionDetails) -> StatsSummary {
     let mut model_breakdown = HashMap::new();
     for (model, usage) in &details.model_usage {
-        model_breakdown.insert(
-            model.clone(),
-            ModelBreakdown {
-                messages: usage.messages,
-                input_tokens: usage.input_tokens,
-                output_tokens: usage.output_tokens,
-                cache_read_tokens: usage.cache_read_tokens,
-                cache_write_tokens: usage.cache_write_tokens,
-                cost: usage.cost,
-            },
-        );
+        model_breakdown.insert(model.clone(), ModelBreakdown { messages: usage.messages, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cache_read_tokens: usage.cache_read_tokens, cache_write_tokens: usage.cache_write_tokens, cost: usage.cost });
     }
 
     StatsSummary {
@@ -84,8 +74,7 @@ pub fn summarize_details(target_label: &str, session_count: usize, details: &Ses
 }
 
 pub fn stats_from_file(path: &Path) -> Result<StatsSummary> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| anyhow!("Failed to read session file {}: {}", path.display(), e))?;
+    let content = fs::read_to_string(path).map_err(|e| anyhow!("Failed to read session file {}: {}", path.display(), e))?;
     let details = parse_session_details(&content);
     Ok(summarize_details(&path.display().to_string(), 1, &details))
 }
@@ -130,8 +119,7 @@ pub async fn execute_stats(opts: StatsOptions) -> Result<()> {
         }
     } else {
         // Query local sessions directory by default
-        let sessions_dir = pi_session_manager::paths::pi_agent_sessions_dir()
-            .map_err(|e| anyhow!("Failed to locate sessions directory: {e}"))?;
+        let sessions_dir = pi_session_manager::paths::pi_agent_sessions_dir().map_err(|e| anyhow!("Failed to locate sessions directory: {e}"))?;
         if sessions_dir.exists() {
             stats_from_directory(&sessions_dir)?
         } else {
@@ -148,37 +136,17 @@ pub async fn execute_stats(opts: StatsOptions) -> Result<()> {
     println!("{}", "═════════════════════════════════════════════════════".blue());
     println!("  Sessions Analyzed:  {}", summary.total_sessions.to_string().yellow().bold());
     println!("  Total Messages:     {}", summary.total_messages.to_string().cyan());
-    println!(
-        "  Message Breakdown:  {} user, {} assistant, {} tool results",
-        summary.user_messages.to_string().cyan(),
-        summary.assistant_messages.to_string().cyan(),
-        summary.tool_results.to_string().cyan()
-    );
+    println!("  Message Breakdown:  {} user, {} assistant, {} tool results", summary.user_messages.to_string().cyan(), summary.assistant_messages.to_string().cyan(), summary.tool_results.to_string().cyan());
     println!("{}", "─────────────────────────────────────────────────────".dimmed());
-    println!(
-        "  Total Tokens:       {}",
-        format!("{}", summary.total_tokens).yellow().bold()
-    );
-    println!(
-        "  Token Details:      in: {} | out: {} | cache_read: {} | cache_write: {}",
-        summary.input_tokens, summary.output_tokens, summary.cache_read_tokens, summary.cache_write_tokens
-    );
-    println!(
-        "  Estimated Cost:     {}",
-        format!("${:.4}", summary.total_cost).green().bold()
-    );
+    println!("  Total Tokens:       {}", format!("{}", summary.total_tokens).yellow().bold());
+    println!("  Token Details:      in: {} | out: {} | cache_read: {} | cache_write: {}", summary.input_tokens, summary.output_tokens, summary.cache_read_tokens, summary.cache_write_tokens);
+    println!("  Estimated Cost:     {}", format!("${:.4}", summary.total_cost).green().bold());
 
     if !summary.model_breakdown.is_empty() {
         println!("{}", "─────────────────────────────────────────────────────".dimmed());
         println!("{}", "  Models Used:".bold());
         for (model, u) in &summary.model_breakdown {
-            println!(
-                "    • {:<32} {:>5} msgs | {:>10} toks | ${:.4}",
-                model.cyan(),
-                u.messages,
-                format!("{}", u.input_tokens + u.output_tokens),
-                u.cost
-            );
+            println!("    • {:<32} {:>5} msgs | {:>10} toks | ${:.4}", model.cyan(), u.messages, format!("{}", u.input_tokens + u.output_tokens), u.cost);
         }
     }
 

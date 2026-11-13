@@ -524,37 +524,16 @@ pub async fn run() -> Result<()> {
 
     match cli.command {
         Some(Commands::Recall { query, target, before, after, max, json }) => {
-            crate::ops::recall::execute_recall(crate::ops::recall::RecallOptions {
-                query,
-                target,
-                before,
-                after,
-                max_results: max,
-                max_chars_per_entry: 1200,
-                json,
-            }).await?;
+            crate::ops::recall::execute_recall(crate::ops::recall::RecallOptions { query, target, before, after, max_results: max, max_chars_per_entry: 1200, json }).await?;
         }
         Some(Commands::Stats { target, cwd, from, to, json }) => {
-            crate::ops::stats::execute_stats(crate::ops::stats::StatsOptions {
-                target,
-                cwd,
-                from,
-                to,
-                json,
-            }).await?;
+            crate::ops::stats::execute_stats(crate::ops::stats::StatsOptions { target, cwd, from, to, json }).await?;
         }
         Some(Commands::Inspect { path, scope, json }) => {
-            crate::ops::inspect::execute_inspect(crate::ops::inspect::InspectOptions {
-                file_path: path,
-                scope,
-                json,
-            }).await?;
+            crate::ops::inspect::execute_inspect(crate::ops::inspect::InspectOptions { file_path: path, scope, json }).await?;
         }
         Some(Commands::ExportSkill { output_dir, force }) => {
-            crate::ops::export_skill::execute_export_skill(crate::ops::export_skill::ExportSkillOptions {
-                output_dir,
-                force,
-            }).await?;
+            crate::ops::export_skill::execute_export_skill(crate::ops::export_skill::ExportSkillOptions { output_dir, force }).await?;
         }
         Some(Commands::InstallSkill { dest, force }) => {
             crate::ops::export_skill::execute_install_skill(dest, force).await?;
@@ -751,19 +730,7 @@ pub async fn run() -> Result<()> {
                     println!("{}", serde_json::to_string_pretty(&data)?.green());
                 }
                 Err(_) => {
-                    let data = pi_session_manager::domain::session_search::full_text_search(
-                        query,
-                        "all".to_string(),
-                        None,
-                        None,
-                        0,
-                        20,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                    ).await.map_err(|e| anyhow!("Search failed: {e}"))?;
+                    let data = pi_session_manager::domain::session_search::full_text_search(query, "all".to_string(), None, None, 0, 20, None, None, None, None, None).await.map_err(|e| anyhow!("Search failed: {e}"))?;
                     println!("{}", serde_json::to_string_pretty(&data)?.green());
                 }
             }

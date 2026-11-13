@@ -31,14 +31,7 @@ pub enum Language {
 
 impl Language {
     /// Array of all supported languages.
-    pub const ALL: [Language; 6] = [
-        Language::ZhCn,
-        Language::EnUs,
-        Language::JaJp,
-        Language::DeDe,
-        Language::FrFr,
-        Language::EsEs,
-    ];
+    pub const ALL: [Language; 6] = [Language::ZhCn, Language::EnUs, Language::JaJp, Language::DeDe, Language::FrFr, Language::EsEs];
 
     /// Standard language identifier code (e.g. "zh-CN", "en-US").
     pub const fn as_str(&self) -> &'static str {
@@ -64,17 +57,10 @@ impl Language {
             return None;
         }
 
-        let base = trimmed
-            .split(['.', '@'])
-            .next()
-            .unwrap_or(trimmed)
-            .trim()
-            .to_ascii_lowercase();
+        let base = trimmed.split(['.', '@']).next().unwrap_or(trimmed).trim().to_ascii_lowercase();
 
         match base.as_str() {
-            "zh-cn" | "zh_cn" | "zh" | "cn" | "zh-hans" | "zh-hant" | "zh-tw" | "zh-hk" | "chinese" => {
-                Some(Language::ZhCn)
-            }
+            "zh-cn" | "zh_cn" | "zh" | "cn" | "zh-hans" | "zh-hant" | "zh-tw" | "zh-hk" | "chinese" => Some(Language::ZhCn),
             "en-us" | "en_us" | "en" | "us" | "en-gb" | "en_gb" | "gb" | "english" => Some(Language::EnUs),
             "ja-jp" | "ja_jp" | "ja" | "jp" | "japanese" => Some(Language::JaJp),
             "de-de" | "de_de" | "de" | "german" | "deutsch" => Some(Language::DeDe),
@@ -373,20 +359,12 @@ pub fn msg_non_json_response(url: &str, lang: Language) -> String {
 }
 
 pub fn msg_request_failed(url: &str, err: &str, lang: Language) -> String {
-    get_text("request_failed", lang)
-        .replace("{url}", url)
-        .replace("{error}", err)
+    get_text("request_failed", lang).replace("{url}", url).replace("{error}", err)
 }
 
 pub fn msg_server_http_error(status: u16, detail: &str, lang: Language) -> String {
-    let detail_str = if detail.is_empty() {
-        String::new()
-    } else {
-        format!("\n  {}", detail)
-    };
-    get_text("server_http_error", lang)
-        .replace("{status}", &status.to_string())
-        .replace("{detail}", &detail_str)
+    let detail_str = if detail.is_empty() { String::new() } else { format!("\n  {}", detail) };
+    get_text("server_http_error", lang).replace("{status}", &status.to_string()).replace("{detail}", &detail_str)
 }
 
 pub fn msg_session_deleted(path: &str, lang: Language) -> String {
@@ -434,9 +412,7 @@ pub fn msg_recall_none_found(query: &str, lang: Language) -> String {
 }
 
 pub fn msg_recall_results(count: usize, query: &str, lang: Language) -> String {
-    get_text("recall_results", lang)
-        .replace("{count}", &count.to_string())
-        .replace("{query}", query)
+    get_text("recall_results", lang).replace("{count}", &count.to_string()).replace("{query}", query)
 }
 
 pub fn msg_stats_summary(target: &str, lang: Language) -> String {
@@ -516,9 +492,7 @@ mod tests {
     #[test]
     fn test_env_detection_order_and_fallback() {
         let env_table = [("LANG", "zh_CN.UTF-8"), ("LC_ALL", "en_US.UTF-8")];
-        let detected = detect_from_env_lookup(|k| {
-            env_table.iter().find(|(key, _)| *key == k).map(|(_, v)| v.to_string())
-        });
+        let detected = detect_from_env_lookup(|k| env_table.iter().find(|(key, _)| *key == k).map(|(_, v)| v.to_string()));
         assert_eq!(detected, Language::EnUs);
     }
 

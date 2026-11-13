@@ -45,11 +45,7 @@ pub struct InspectOptions {
 
 impl Default for InspectOptions {
     fn default() -> Self {
-        Self {
-            file_path: String::new(),
-            scope: "active".to_string(),
-            json: false,
-        }
+        Self { file_path: String::new(), scope: "active".to_string(), json: false }
     }
 }
 
@@ -148,11 +144,7 @@ pub fn inspect_session_file(path_str: &str, _scope: &str) -> Result<InspectRepor
                                     let tool_call_id = c.get("toolCallId").and_then(Value::as_str).map(String::from);
                                     let text = c.get("text").or_else(|| c.get("content")).and_then(Value::as_str).unwrap_or("");
                                     let error_snippet: String = text.chars().take(200).collect();
-                                    tool_failures.push(ToolFailure {
-                                        tool_name: name.to_string(),
-                                        tool_call_id,
-                                        error_snippet,
-                                    });
+                                    tool_failures.push(ToolFailure { tool_name: name.to_string(), tool_call_id, error_snippet });
                                 }
                             }
                         }
@@ -163,11 +155,7 @@ pub fn inspect_session_file(path_str: &str, _scope: &str) -> Result<InspectRepor
                         let name = msg.get("name").or_else(|| msg.get("toolName")).and_then(Value::as_str).unwrap_or("unknown");
                         let text = msg.get("content").and_then(Value::as_str).unwrap_or("");
                         let error_snippet: String = text.chars().take(200).collect();
-                        tool_failures.push(ToolFailure {
-                            tool_name: name.to_string(),
-                            tool_call_id: msg.get("toolCallId").and_then(Value::as_str).map(String::from),
-                            error_snippet,
-                        });
+                        tool_failures.push(ToolFailure { tool_name: name.to_string(), tool_call_id: msg.get("toolCallId").and_then(Value::as_str).map(String::from), error_snippet });
                     }
 
                     // Usage
@@ -276,12 +264,7 @@ pub async fn execute_inspect(opts: InspectOptions) -> Result<()> {
         println!("{}", "─────────────────────────────────────────────────────".dimmed());
         println!("{}", format!("  ⚠ Tool Errors Encountered ({}):", report.tool_failures.len()).red().bold());
         for (i, fail) in report.tool_failures.iter().enumerate().take(5) {
-            println!(
-                "    {}. [{}] {}",
-                i + 1,
-                fail.tool_name.yellow(),
-                fail.error_snippet.red()
-            );
+            println!("    {}. [{}] {}", i + 1, fail.tool_name.yellow(), fail.error_snippet.red());
         }
         if report.tool_failures.len() > 5 {
             println!("    ... and {} more tool failure(s)", report.tool_failures.len() - 5);
