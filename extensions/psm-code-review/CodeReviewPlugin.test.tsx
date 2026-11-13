@@ -20,6 +20,7 @@ function assistantToolEntry(content: NonNullable<SessionEntry['message']>['conte
 function createHostContext(entries: SessionEntry[]) {
   const registeredCommands: Array<{ id: string; run: (args: Record<string, unknown>, context?: unknown) => unknown }> = []
   const toolbarItems: Array<{ id: string; render: (props: unknown) => unknown }> = []
+  const sessionPanels: Array<{ id: string; title: string; side?: string; render: (props: unknown) => unknown }> = []
   const ctx = {
     manifest,
     psm: {
@@ -42,7 +43,9 @@ function createHostContext(entries: SessionEntry[]) {
       registerSessionToolbarItem: vi.fn((item) => {
         toolbarItems.push(item)
       }),
-      registerSessionPanel: vi.fn(),
+      registerSessionPanel: vi.fn((panel) => {
+        sessionPanels.push(panel)
+      }),
       registerSessionTreeView: vi.fn(),
       registerSessionMainView: vi.fn(),
       registerToolRenderer: vi.fn(),
@@ -50,10 +53,38 @@ function createHostContext(entries: SessionEntry[]) {
   }
 
   activate(ctx as never)
-  return { ctx, registeredCommands, toolbarItems }
+  return { ctx, registeredCommands, toolbarItems, sessionPanels }
 }
 
 describe('code review plugin', () => {
+  it('registers a right-side session panel alongside the modal toolbar', () => {
+    const { toolbarItems, sessionPanels } = createHostContext([
+      assistantToolEntry([
+        {
+          type: 'toolCall',
+          id: 'call-write',
+          name: 'write',
+          arguments: {
+            file_path: 'src/example.ts',
+            content: 'export const value = 1;',
+          },
+        },
+      ]),
+    ])
+
+    // Two entries: modal button (no panelId) + panel picker item (panelId)
+    expect(toolbarItems).toMatchObject([
+      { id: 'builtin.code-review.toolbar' },
+      { id: 'builtin.code-review.panel-toolbar', panelId: 'builtin.code-review.panel' },
+    ])
+    expect(sessionPanels).toHaveLength(1)
+    expect(sessionPanels[0]).toMatchObject({
+      id: 'builtin.code-review.panel',
+      side: 'right',
+    })
+    expect(typeof sessionPanels[0].render).toBe('function')
+  })
+
   it('registers a session toolbar contribution and inspect command', async () => {
     const { registeredCommands, toolbarItems } = createHostContext([
       assistantToolEntry([
@@ -73,7 +104,7 @@ describe('code review plugin', () => {
       id: 'builtin.code-review',
       permissions: ['sessions:read'],
     })
-    expect(toolbarItems).toMatchObject([{ id: 'builtin.code-review.toolbar' }])
+    expect(toolbarItems.map((item) => item.id)).toContain('builtin.code-review.toolbar')
 
     const command = registeredCommands.find((item) => item.id === 'code-review.inspect')
     expect(command).toBeTruthy()

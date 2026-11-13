@@ -1,4 +1,4 @@
-import { GitBranch, Loader2 } from 'lucide-react'
+import { GitBranch, Loader2, PanelRightOpen } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
   PsmCapabilityClient,
@@ -13,38 +13,45 @@ import type { SessionEntry } from '@/types'
 import { subscribeToolReview } from '@/contexts/toolReviewBus'
 import { manifest } from './manifest'
 import ToolCallReviewModal from './ToolCallReviewModal'
+import CodeReviewPanel from './CodeReviewPanel'
+import { buildToolResultByCallId, readSessionEntries } from './sessionData'
 import { extractFileOperations } from './tool-review/model'
 
 export { manifest }
+
+const PANEL_ID = 'builtin.code-review.panel'
 
 function optionalString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value : undefined
 }
 
-function normalizeEntries(entries: unknown[]): SessionEntry[] {
-  return entries.filter((entry): entry is SessionEntry => {
-    return Boolean(entry && typeof entry === 'object' && 'id' in entry && 'type' in entry)
-  })
-}
-
-function buildToolResultByCallId(entries: SessionEntry[]) {
-  const byCallId = new Map<string, SessionEntry>()
-
-  for (const entry of entries) {
-    if (entry.message?.role !== 'toolResult') continue
-    const toolCallId = entry.message.toolCallId
-    if (toolCallId) byCallId.set(toolCallId, entry)
-  }
-
-  return byCallId
-}
-
-async function readSessionEntries(client: PsmCapabilityClient, sessionPath: string) {
-  return normalizeEntries(await client.sessions.readEntries(sessionPath))
-}
-
 function resolveSessionPath(args: Record<string, unknown>, context?: PsmPluginCommandContext) {
   return optionalString(args.sessionPath ?? args.path) ?? context?.selectedSession?.path
+}
+
+function CodeReviewPanelToggleButton({
+  i18n,
+  open,
+  onToggle,
+}: {
+  i18n: PsmPluginI18nClient
+  open: boolean
+  onToggle: () => void
+}) {
+  const title = i18n.t('session.codeReview.panelTitle', 'Code Review')
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={open}
+      title={title}
+      aria-label={title}
+      className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-border/70 bg-secondary px-2 text-xs text-muted-foreground transition-colors hover:bg-secondary-hover hover:text-foreground focus-ring"
+    >
+      <PanelRightOpen className="h-3.5 w-3.5" aria-hidden="true" />
+      <span className="font-medium">{title}</span>
+    </button>
+  )
 }
 
 function CodeReviewToolbarButton({
@@ -222,6 +229,38 @@ export default function activate(ctx: PsmPluginHostContext) {
         i18n={ctx.i18n}
         settings={ctx.settings}
         session={props.session}
+      />
+    ),
+  })
+
+  // Separate contribution for the right-side panel entry. Carrying `panelId`
+  // routes it into the host's panel picker card grid (pin/unpin), which is how
+  // the modal button and the side panel stay available at the same time.
+  ctx.ui.registerSessionToolbarItem({
+    id: 'builtin.code-review.panel-toolbar',
+    title: ctx.i18n.t('session.codeReview.panelTitle', 'Code Review'),
+    panelId: PANEL_ID,
+    render: (props) => (
+      <CodeReviewPanelToggleButton
+        i18n={ctx.i18n}
+        open={Boolean(props.panelOpen)}
+        onToggle={props.togglePanel ?? (() => {})}
+      />
+    ),
+  })
+
+  ctx.ui.registerSessionPanel({
+    id: PANEL_ID,
+    title: ctx.i18n.t('session.codeReview.panelTitle', 'Code Review'),
+    side: 'right',
+    render: (props) => (
+      <CodeReviewPanel
+        client={ctx.psm}
+        settings={ctx.settings}
+        session={props.session}
+        panelOpen={props.panelOpen}
+        width={props.width}
+        onClose={props.closePanel ?? (() => {})}
       />
     ),
   })

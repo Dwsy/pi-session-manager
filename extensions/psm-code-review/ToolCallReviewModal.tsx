@@ -83,6 +83,9 @@ interface ToolCallReviewModalProps {
   error?: string | null;
   diffConfig?: DiffConfig;
   initialToolCallId?: string;
+  variant?: 'modal' | 'panel';
+  /** Force the stacked list→detail layout (right-side panel at narrow widths). */
+  narrow?: boolean;
 }
 
 const TOOL_CONFIG: Record<
@@ -1225,6 +1228,8 @@ export default function ToolCallReviewModal({
   error = null,
   diffConfig,
   initialToolCallId,
+  variant = 'modal',
+  narrow,
 }: ToolCallReviewModalProps) {
   const { t } = useTranslation();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1441,6 +1446,8 @@ export default function ToolCallReviewModal({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        // Panel mode leaves Escape to the host shell; the modal owns it.
+        if (variant === "panel") return;
         event.preventDefault();
         event.stopImmediatePropagation();
         if (inspectorOpen) {
@@ -1481,7 +1488,7 @@ export default function ToolCallReviewModal({
 
     document.addEventListener("keydown", handleKeyDown, { capture: true });
     return () => document.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [contentExpanded, filteredOperations, inspectorOpen, isOpen, onClose, selectedId]);
+  }, [contentExpanded, filteredOperations, inspectorOpen, isOpen, onClose, selectedId, variant]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -1580,20 +1587,21 @@ export default function ToolCallReviewModal({
 
   if (!isOpen) return null;
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-background/60 p-2 ui-enter-fade sm:p-3"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
+  const isPanel = variant === "panel";
+  const stackLayout = narrow ?? isPanel;
+
+  const shell = (
       <div
-        className="relative flex h-[calc(100dvh_-_16px_-_40px)] w-[calc(100vw_-_16px_-_40px)] flex-col overflow-hidden rounded-[8px] border border-border/70 bg-background text-foreground shadow-[0_20px_56px_-30px_rgba(var(--shadow-rgb),0.58),0_0_0_1px_rgba(var(--highlight-rgb),0.04)] ui-enter-fade ui-enter-zoom sm:h-[min(1120px,calc(100dvh_-_24px_-_40px))] sm:w-[min(1960px,calc(100vw_-_24px_-_40px))]"
-        role="dialog"
-        data-tool-call-review-modal="true"
-        aria-modal="true"
-        aria-labelledby="tool-call-review-title"
-        onMouseDown={(event) => event.stopPropagation()}
+        className={
+          isPanel
+            ? "relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-background text-foreground"
+            : "relative flex h-[calc(100dvh_-_16px_-_40px)] w-[calc(100vw_-_16px_-_40px)] flex-col overflow-hidden rounded-[8px] border border-border/70 bg-background text-foreground shadow-[0_20px_56px_-30px_rgba(var(--shadow-rgb),0.58),0_0_0_1px_rgba(var(--highlight-rgb),0.04)] ui-enter-fade ui-enter-zoom sm:h-[min(1120px,calc(100dvh_-_24px_-_40px))] sm:w-[min(1960px,calc(100vw_-_24px_-_40px))]"
+        }
+        role={isPanel ? undefined : "dialog"}
+        data-tool-call-review-modal={isPanel ? undefined : "true"}
+        aria-modal={isPanel ? undefined : "true"}
+        aria-labelledby={`tool-call-review-title-${variant}`}
+        onMouseDown={isPanel ? undefined : (event) => event.stopPropagation()}
       >
         <div className="relative flex min-h-[44px] flex-shrink-0 items-center gap-2 border-b border-border/55 bg-[rgb(var(--color-surface-dark)/0.66)] px-4 py-2">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[rgb(var(--highlight-rgb)/0.08)]" />
@@ -1603,7 +1611,7 @@ export default function ToolCallReviewModal({
               aria-hidden="true"
             />
             <h2
-              id="tool-call-review-title"
+              id={`tool-call-review-title-${variant}`}
               className="truncate text-[14px] font-semibold text-foreground"
             >
               {t("components.toolCallReview.title", "Tool Call Review")}
@@ -1682,11 +1690,11 @@ export default function ToolCallReviewModal({
           </div>
         ) : (
           <div
-            className={`flex min-h-0 flex-1 flex-col overflow-hidden ${contentExpanded ? "" : "md:flex-row"}`}
+            className={`flex min-h-0 flex-1 flex-col overflow-hidden ${contentExpanded || stackLayout ? "" : "md:flex-row"}`}
             data-tool-review-content-expanded={contentExpanded ? "true" : "false"}
           >
             {!contentExpanded && (
-              <aside className="flex h-[min(320px,42dvh)] min-h-0 flex-shrink-0 flex-col border-b border-border/55 bg-background ui-enter-fade md:h-auto md:w-[320px] md:border-b-0 md:border-r xl:w-[352px]">
+              <aside className={`flex min-h-0 flex-shrink-0 flex-col border-border/55 bg-background ui-enter-fade ${stackLayout ? "h-[min(320px,42dvh)] border-b" : "h-[min(320px,42dvh)] border-b md:h-auto md:w-[320px] md:border-b-0 md:border-r xl:w-[352px]"}`}>
                 <div className="flex flex-col gap-1.5 border-b border-border/45 bg-[rgb(var(--color-surface-dark)/0.38)] p-1.5">
                   <FilterBar
                     activeFilter={activeFilter}
@@ -1806,6 +1814,16 @@ export default function ToolCallReviewModal({
           </div>
         )}
       </div>
+  );
+
+  return isPanel ? shell : createPortal(
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-background/60 p-2 ui-enter-fade sm:p-3"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      {shell}
     </div>,
     document.body,
   );
