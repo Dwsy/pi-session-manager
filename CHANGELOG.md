@@ -16,6 +16,35 @@ All notable changes to Pi Session Manager will be documented in this file.
 - **Mermaid diagrams render as SVG**: code fences tagged `mermaid` are now compiled by [Ondine](https://ondine.sh) (Rust/WASM) into real SVG instead of the previous Unicode box drawing, so every supported diagram type — flowchart, sequence, class, state, ER, pie, gantt, git, quadrant, mindmap and more — shows a proper diagram. The Rendered/Mermaid toolbar toggle is unchanged, and a diagram that fails to compile (unknown type or syntax error) still falls back to the highlighted source block. Diagrams inherit the active light/dark theme through `--ondine-*` tokens, so no recompilation is needed on theme switch.
 - Dropped the `lovely-mermaid` dependency; the size-optimised Ondine compiler ships as base64 WebAssembly in its own `diagram-vendor` bundle chunk.
 
+## [0.9.2] - 2026-11-13
+
+### Added
+
+- **Code review right-side panel** — the code-review plugin now registers a right-hand session panel that shares the review body with the toolbar modal (`variant="panel"`), so the review can stay open alongside the modal. The modal gains `modal`/`panel` variants and a stacked list→detail layout for narrow widths.
+- **Timeline hover haptics** — a native timeline hover force-touch command (`trigger_timeline_haptic`) gives subtle macOS trackpad feedback when hovering timeline dots; no-op off macOS and in web previews.
+- **Project identity badges** — project identity badges, icon plugins, and a scan allowlist (`da2223e3`).
+- **Pi Mesh plugin** — cross-session agent awareness via the new `pi-mesh` plugin, plus backend commands exposing mesh, system prompt, project detection, and live agent controls.
+- **Pi Notes two-pane browser** — interactive two-pane notes browser with agent tools.
+- **Cross-session bookmarks explorer** — full cross-session bookmark explorer with session/project grouping and sidebar, plus text-selection bookmarks, inline notes, and default-off quality pass.
+- **System prompt snapshot** — inline snapshot extension and the inlined snapshot plugin in the core dialog.
+- **Tool output sections** — tool outputs are now sectioned and chat panes are scrollable.
+- **Plugin search & filtering** — search, tag filter, and collapsible sidebar for PSM plugins.
+- **Third-party proxy** — made opt-in and scoped `Referer` to proxy hosts (PR #68).
+
+### Changed
+
+- **Session viewer refactor** — `buildConversationPreviewTurns` extracted into `utils/conversationTurns` so the timeline nav reuses the viewer's exact turn boundaries. Timeline nav now carries title/excerpt labels, and whole-turn folding keeps context boundaries (model change, compaction, branch summary) visible.
+- **Unified theme token engine** — fixed schema mismatch, coverage gaps, and preview drift across themes.
+- **Quieter UI** — structural dividers no longer paint a saturated border on every hairline; sidebar background matches the session view across all themes; filter chips get proper contrast; branch-atlas rows use opaque backgrounds with sticky headers and a drag-vs-click guard.
+- **Selection polish** — per-line highlight strips, popover edge safety, and native selection styling.
+- **Syncs** — app shell, extension, plugin-host runtime, and plugin SDK synced to current contracts.
+
+### Fixed
+
+- Apply the appearance font scale before the first paint.
+- Align `@tauri-apps/api` with the Tauri crate version.
+- Remove a needless `return` in the new haptic command (clippy `needless_return`).
+
 ## [0.9.0] - 2026-10-20
 
 ### Added
@@ -97,38 +126,6 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 - Model testing now falls back to an installed `pi` or `omp` CLI when the bundled Pi AI helper script is unavailable, while rejecting unsupported tool-bearing requests explicitly.
 - Preserved OMP session metadata chains when normalizing session entries.
-
-## [Unreleased]
-
-### Added
-
-- Added a plugin-backed project session Tree for selected projects, with Day, Status, and Labels grouping modes, an inline mode selector, compact metadata rows, and direct session navigation.
-- Added shared session Status/Labels metadata actions to the plugin context-menu surface, plus a Pi session-metadata skill that keeps workflow Status separate from GitHub-style Labels.
-- **Full CASR provider coverage** — session support grew from 10 to 18 providers, adding Aider, Amp, ChatGPT, Cline, OpenClaw, Vibe, Kiro CLI and Grok Build. All are scannable, browsable and usable as conversion sources and targets
-  - Upgraded the vendored CASR crate from 0.2.2 to upstream 0.3.0, which brings the official Antigravity, Kiro and Grok readers/writers, and replayed PSM's local fixes for Claude Code tool results, legacy Codex tool calls, and the current OpenCode SQLite schema
-  - Added `casr_min/providers/vendored.rs`, which owns path matching for the delegated providers and forwards reads to CASR instead of maintaining a second set of parsers
-  - Session discovery now recognizes non-JSONL session containers for Aider (markdown transcript), Amp and ChatGPT (JSON) and Cline (task directory)
-
-### Changed
-
-- Kanban cards and project Tree rows now share the same session context menu, including resume/open, favorite, rename/delete, workflow Status, and Labels actions.
-- Tightened project/Explorer/list sticky surfaces to use opaque backgrounds, and stabilized Kanban column scrolling with reserved thin-scrollbar space and clearer Tree row hover/12px typography.
-- Provider detection no longer lets CASR pick the reader by itself. PSM identifies the provider from the path and calls that reader explicitly, so a permissive JSONL parser can no longer claim a session that lives outside a known provider root
-- The scanner and the file watcher now share one `is_session_candidate_path` gate instead of two copies of the same extension checks
-
-### Performance
-
-- Project session views now request the backend's 500-session maximum per page, while Day/Status grouping appends into existing groups instead of repeatedly copying arrays, reducing incremental date-group renders and grouping overhead.
-
-### Fixed
-
-- Markdown math now recognizes standard LaTeX `\(...\)` and `\[...\]` delimiters in addition to `$...$` and `$$...$$`, so common model-generated formulas render through KaTeX instead of appearing as escaped source.
-- Cursor and Antigravity were missing from the resume-target validator and the conversion dialog's i18n tables, so selecting them silently fell back to Pi
-
-- **OMP (oh-my-pi) session support** — the Pi fork's sessions (`~/.omp/agent/sessions`) are now scanned, parsed, and shown with their own source badge/icon alongside Pi and other external agents
-  - Added `Omp` to the backend provider registry (`ProviderKind` / `SessionBridgeSource`) with `omp --session` resume and `~/.omp/...` session roots
-  - Added `omp` binary to export command candidates
-  - Added OMP source detection, AgentIcon (from the omp icon.svg), i18n strings, and resume-target support in the frontend
 
 ## [0.7.0] - 2026-07-14
 
