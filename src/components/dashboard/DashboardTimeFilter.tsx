@@ -28,12 +28,12 @@ export default function DashboardTimeFilter({ selection, options, rangeLabel, re
   const moveWeek = (offsetWeeks: number) => onChange(shiftDashboardWeekSelection(selection, offsetWeeks))
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded border border-border/70 bg-card/35 px-2.5 py-2">
-      <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/75 bg-card/95 px-3 py-2 shadow-[shadow:var(--shadow-card)]">
+      <div className="flex items-center gap-1.5 text-[11px] font-medium leading-4 text-muted-foreground">
         <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
         <span>{t('dashboard.timeFilter.title', 'Time range')}</span>
       </div>
-      <div className="flex max-w-full overflow-x-auto rounded border border-border" role="group" aria-label={t('dashboard.timeFilter.granularity', 'Time granularity')}>
+      <div className="grid w-full grid-cols-3 overflow-hidden rounded-md border border-border/75 bg-surface/65 sm:inline-flex sm:w-auto" role="group" aria-label={t('dashboard.timeFilter.granularity', 'Time granularity')}>
         {GRANULARITIES.map((granularity) => {
           const active = selection.granularity === granularity
           return (
@@ -42,22 +42,22 @@ export default function DashboardTimeFilter({ selection, options, rangeLabel, re
               type="button"
               onClick={() => updateGranularity(granularity)}
               aria-pressed={active}
-              className={`focus-ring flex h-7 shrink-0 items-center gap-1 border-r border-border px-2 text-[10px] last:border-r-0 ${active ? 'theme-accent-bg-soft theme-accent-ring theme-accent-fg font-semibold' : 'bg-background/20 font-medium text-foreground/80 hover:bg-muted/40 hover:text-foreground'}`}
+              className={`focus-ring flex h-7 min-w-0 shrink-0 items-center justify-center gap-1 whitespace-nowrap border-b border-r border-border/75 px-1.5 text-[11px] leading-4 first:rounded-l-[5px] last:rounded-r-[5px] sm:justify-start sm:border-b-0 sm:px-2.5 [&:nth-child(n+4)]:border-b-0 [&:nth-child(3)]:border-r-0 sm:[&:nth-child(3)]:border-r last:border-r-0 motion-color ${active ? 'theme-accent-bg-soft theme-accent-ring theme-accent-fg font-semibold' : 'font-medium text-foreground/85 hover:bg-secondary/75 hover:text-foreground'}`}
             >
               {active ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} aria-hidden="true" /> : null}
-              <span>{t(`dashboard.timeFilter.${granularity}`, granularity)}</span>
+              <span className="truncate">{t(`dashboard.timeFilter.${granularity}`, granularity)}</span>
             </button>
           )
         })}
       </div>
 
       {isWeek ? (
-        <div className="flex overflow-hidden rounded border border-border" role="group" aria-label={t('dashboard.timeFilter.weekNavigation', 'Week navigation')}>
-          <button type="button" onClick={() => moveWeek(-1)} className="focus-ring flex h-7 items-center gap-1 border-r border-border bg-background/20 px-2 text-[10px] font-medium text-foreground/80 hover:bg-muted/40 hover:text-foreground">
+        <div className="flex overflow-hidden rounded-md border border-border/75 bg-surface/65" role="group" aria-label={t('dashboard.timeFilter.weekNavigation', 'Week navigation')}>
+          <button type="button" onClick={() => moveWeek(-1)} className="focus-ring flex h-7 items-center gap-1 border-r border-border/75 px-2.5 text-[11px] font-medium leading-4 text-foreground/85 hover:bg-secondary/75 hover:text-foreground motion-color">
             <ChevronLeft className="h-3 w-3" aria-hidden="true" />
             {t('dashboard.timeFilter.previousWeek', 'Previous week')}
           </button>
-          <button type="button" onClick={() => moveWeek(1)} className="focus-ring flex h-7 items-center gap-1 bg-background/20 px-2 text-[10px] font-medium text-foreground/80 hover:bg-muted/40 hover:text-foreground">
+          <button type="button" onClick={() => moveWeek(1)} className="focus-ring flex h-7 items-center gap-1 px-2.5 text-[11px] font-medium leading-4 text-foreground/85 hover:bg-secondary/75 hover:text-foreground motion-color">
             {t('dashboard.timeFilter.nextWeek', 'Next week')}
             <ChevronRight className="h-3 w-3" aria-hidden="true" />
           </button>
@@ -65,30 +65,30 @@ export default function DashboardTimeFilter({ selection, options, rangeLabel, re
       ) : (
         <>
           {needsYear ? (
-            <select value={selection.year} onChange={(event) => onChange({ ...selection, year: Number(event.target.value) })} aria-label={t('dashboard.timeFilter.year', 'Year')} className="focus-ring h-7 rounded border border-border bg-background px-2 text-[10px] text-foreground">
+            <select value={selection.year} onChange={(event) => onChange({ ...selection, year: Number(event.target.value) })} aria-label={t('dashboard.timeFilter.year', 'Year')} className="focus-ring h-7 rounded-md border border-border/75 bg-surface px-2 text-[11px] leading-4 tabular-nums text-foreground">
               {options.years.map((year) => <option key={year} value={year}>{year}</option>)}
             </select>
           ) : null}
           {needsMonth ? (
-            <select value={selection.month} onChange={(event) => onChange({ ...selection, month: Number(event.target.value) })} aria-label={t('dashboard.timeFilter.month', 'Month')} className="focus-ring h-7 rounded border border-border bg-background px-2 text-[10px] text-foreground">
+            <select value={selection.month} onChange={(event) => onChange({ ...selection, month: Number(event.target.value) })} aria-label={t('dashboard.timeFilter.month', 'Month')} className="focus-ring h-7 rounded-md border border-border/75 bg-surface px-2 text-[11px] leading-4 tabular-nums text-foreground">
               {options.months.map((month) => <option key={month} value={month}>{t('dashboard.timeFilter.monthValue', 'Month {{month}}', { month })}</option>)}
             </select>
           ) : null}
           {needsDay ? (
-            <select value={selection.day} onChange={(event) => onChange({ ...selection, day: Number(event.target.value) })} aria-label={t('dashboard.timeFilter.day', 'Day')} className="focus-ring h-7 rounded border border-border bg-background px-2 text-[10px] text-foreground">
+            <select value={selection.day} onChange={(event) => onChange({ ...selection, day: Number(event.target.value) })} aria-label={t('dashboard.timeFilter.day', 'Day')} className="focus-ring h-7 rounded-md border border-border/75 bg-surface px-2 text-[11px] leading-4 tabular-nums text-foreground">
               {options.days.map((day) => <option key={day} value={day}>{t('dashboard.timeFilter.dayValue', 'Day {{day}}', { day })}</option>)}
             </select>
           ) : null}
         </>
       )}
 
-      <div className="min-w-0 flex-1 text-right text-[10px] text-muted-foreground">
-        {rangeLabel ? <span className="mr-2 text-foreground">{rangeLabel}</span> : null}
+      <div className="min-w-0 flex-1 text-right text-[11px] leading-4 tabular-nums text-muted-foreground">
+        {rangeLabel ? <span className="mr-2 font-medium text-foreground">{rangeLabel}</span> : null}
         <span>{t('dashboard.timeFilter.resultCount', '{{count}} / {{total}} sessions', { count: resultCount, total: totalCount })}</span>
       </div>
 
       {selection.granularity !== 'recent' ? (
-        <button type="button" onClick={() => updateGranularity('recent')} className="focus-ring flex h-7 items-center gap-1 rounded border border-border px-2 text-[10px] text-muted-foreground hover:bg-muted/30 hover:text-foreground">
+        <button type="button" onClick={() => updateGranularity('recent')} className="focus-ring flex h-7 items-center gap-1 rounded-md border border-border/75 bg-surface/75 px-2.5 text-[11px] leading-4 text-muted-foreground hover:bg-secondary hover:text-foreground motion-color">
           <RotateCcw className="h-3 w-3" aria-hidden="true" />
           {t('dashboard.timeFilter.reset', 'Default range')}
         </button>
