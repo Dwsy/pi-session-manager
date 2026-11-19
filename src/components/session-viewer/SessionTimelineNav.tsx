@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { triggerTimelineHoverHaptic } from "@/utils/timelineHaptics";
@@ -52,6 +52,7 @@ function SessionTimelineNav({
   onNavigate,
 }: SessionTimelineNavProps) {
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
+  const mouseLandingRef = useRef<string | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sampled = useMemo(() => sampleItems(items, MAX_TIMELINE_DOTS), [items]);
 
@@ -91,18 +92,45 @@ function SessionTimelineNav({
     [closePreview, onNavigate],
   );
 
-  const showPreview = useCallback((event: SyntheticEvent<HTMLButtonElement>, item: TimelineNavItem) => {
+  const showPreview = useCallback((dot: Element, item: TimelineNavItem) => {
     cancelPreviewClose();
-    const dot = event.currentTarget.getBoundingClientRect();
-    const centerY = dot.top + dot.height / 2;
+    const bounds = dot.getBoundingClientRect();
+    const centerY = bounds.top + bounds.height / 2;
     const top = Math.min(Math.max(centerY, 90), Math.max(90, window.innerHeight - 90));
     setHoverPreview({
       item,
-      right: window.innerWidth - dot.left + PREVIEW_GAP,
+      right: window.innerWidth - bounds.left + PREVIEW_GAP,
       top,
-      width: Math.min(PREVIEW_WIDTH, Math.max(180, dot.left - PREVIEW_GAP - 16)),
+      width: Math.min(PREVIEW_WIDTH, Math.max(180, bounds.left - PREVIEW_GAP - 16)),
     });
   }, [cancelPreviewClose]);
+
+  const handleTrackMouseMove = (event: MouseEvent<HTMLDivElement>) => {
+    const ticks = event.currentTarget.children;
+    const firstTick = ticks[0]?.getBoundingClientRect();
+    if (!firstTick?.height) return;
+
+    // Ticks are contiguous and equal in height. The first tick's viewport
+    // position includes the scroll offset, even when that tick is clipped.
+    const index = Math.floor((event.clientY - firstTick.top) / firstTick.height);
+    const item = sampled[index];
+    if (!item) return;
+
+    if (mouseLandingRef.current !== item.entryId) {
+      mouseLandingRef.current = item.entryId;
+      triggerTimelineHoverHaptic();
+    }
+    if (hoverPreview?.item === item) {
+      cancelPreviewClose();
+    } else {
+      showPreview(ticks[index], item);
+    }
+  };
+
+  const handleTrackMouseLeave = () => {
+    mouseLandingRef.current = null;
+    schedulePreviewClose();
+  };
 
   // A single user prompt is not a timeline. This guard also covers callers
   // that bypass useSessionTimelineNav and supply items directly.
@@ -128,6 +156,8 @@ function SessionTimelineNav({
 
         <div
           className="flex max-h-[65vh] w-9 flex-col items-end overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          onMouseMove={handleTrackMouseMove}
+          onMouseLeave={handleTrackMouseLeave}
           onScroll={closePreview}
         >
           {sampled.map((item, index) => {
@@ -138,12 +168,7 @@ function SessionTimelineNav({
                 key={item.entryId}
                 type="button"
                 onClick={() => navigate(item.entryId)}
-                onMouseEnter={(event) => {
-                  showPreview(event, item);
-                  triggerTimelineHoverHaptic();
-                }}
-                onMouseLeave={schedulePreviewClose}
-                onFocus={(event) => showPreview(event, item)}
+                onFocus={(event) => showPreview(event.currentTarget, item)}
                 onBlur={schedulePreviewClose}
                 className="group/tick flex h-[14px] w-9 shrink-0 items-center justify-end rounded-l-lg pr-[5px] transition-colors duration-150 hover:bg-secondary/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring"
                 aria-current={isCurrent ? "true" : undefined}
