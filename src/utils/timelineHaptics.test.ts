@@ -31,7 +31,7 @@ describe("triggerTimelineHoverHaptic", () => {
     triggerTimelineHoverHaptic();
     triggerTimelineHoverHaptic();
     expect(invoke).toHaveBeenCalledTimes(3);
-    expect(invoke).toHaveBeenCalledWith("trigger_timeline_haptic");
+    expect(invoke).toHaveBeenCalledWith("trigger_timeline_haptic", { options: { style: "edc", strength: "strong" } });
     now.mockRestore();
   });
 });
