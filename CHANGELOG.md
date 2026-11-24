@@ -8,6 +8,7 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 - Restore the scan toggles for Antigravity and Cursor in settings. Neither provider can be selected as the default target for resuming sessions.
 - Group Antigravity sessions under the project folders recorded in their conversation summaries. Clear the session cache and restart after updating to refresh previously indexed sessions.
+- Align the frontend Tauri API with the 2.12 runtime required by the deep-link plugin so local builds pass the version check.
 
 ## [0.9.1] - 2026-10-31
 
