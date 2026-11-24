@@ -350,7 +350,7 @@ mod tests {
                 assert_eq!(canonical.workspace.as_deref(), Some(workspace.as_path()));
 
                 let (info, _) = crate::core::scanner::parse_session_info(&path).expect("scan transcript");
-                assert_eq!(info.cwd, workspace.to_string_lossy());
+                assert_eq!(Path::new(&info.cwd), workspace.as_path());
                 assert!(crate::domain::session_list::session_matches_project_filter(&info, &workspace.to_string_lossy()));
             }
         }
