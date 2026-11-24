@@ -4,6 +4,8 @@
 
 use std::path::{Path, PathBuf};
 
+use reqwest::Url;
+use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use serde_json::{json, Map, Value};
 
 use crate::domain::casr_min::model::{parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall};
@@ -83,10 +85,11 @@ pub fn read_session_from_str(path: &Path, content: &str) -> Result<CanonicalSess
     reindex_messages(&mut messages);
 
     let session_id = conversation_uuid_from_path(path).unwrap_or_else(|| path.file_stem().and_then(|stem| stem.to_str()).unwrap_or("unknown").to_string());
+    let workspace = read_workspace(path, &session_id)?;
     let model_name = detect_model(&records);
     let title = messages.iter().find(|message| message.role == MessageRole::User).map(|message| truncate_title(&message.content, 100));
 
-    Ok(CanonicalSession { session_id, provider_slug: "antigravity".to_string(), workspace: None, title, started_at, ended_at, messages, metadata: json!({ "source": "antigravity", "model": model_name }), source_path: path.to_path_buf(), model_name })
+    Ok(CanonicalSession { session_id, provider_slug: "antigravity".to_string(), workspace, title, started_at, ended_at, messages, metadata: json!({ "source": "antigravity", "model": model_name }), source_path: path.to_path_buf(), model_name })
 }
 
 pub fn render_session(session: &CanonicalSession, _target_session_id: &str) -> Result<String, String> {
@@ -126,14 +129,29 @@ fn base_root() -> PathBuf {
 }
 
 fn conversation_uuid_from_path(path: &Path) -> Option<String> {
-    // .../brain/<uuid>/.system_generated/logs/transcript.jsonl
-    path.parent() // logs
-        .and_then(Path::parent) // .system_generated
-        .and_then(Path::parent) // <uuid>
-        .and_then(|dir| dir.file_name())
-        .and_then(|name| name.to_str())
-        .filter(|name| !name.trim().is_empty())
-        .map(String::from)
+    path.ancestors().find(|dir| dir.parent().and_then(Path::file_name).is_some_and(|name| name == "brain")).and_then(|dir| dir.file_name()).and_then(|name| name.to_str()).filter(|name| !name.trim().is_empty()).map(String::from)
+}
+
+fn read_workspace(path: &Path, session_id: &str) -> Result<Option<PathBuf>, String> {
+    let Some(root) = path.ancestors().find(|dir| dir.file_name().is_some_and(|name| name == "brain")).and_then(Path::parent) else {
+        return Ok(None);
+    };
+    let db_path = root.join("conversation_summaries.db");
+    if !db_path.try_exists().map_err(|e| format!("Antigravity: failed to inspect workspace metadata {}: {e}", db_path.display()))? {
+        return Ok(None);
+    }
+
+    let conn = Connection::open_with_flags(&db_path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|e| format!("Antigravity: failed to open workspace metadata {}: {e}", db_path.display()))?;
+    let workspace_uris: Option<String> = conn.query_row("SELECT workspace_uris FROM conversation_summaries WHERE conversation_id = ?1", [session_id], |row| row.get(0)).optional().map_err(|e| format!("Antigravity: failed to read workspace for {session_id}: {e}"))?;
+    let Some(workspace_uris) = workspace_uris else {
+        return Ok(None);
+    };
+    let workspaces: Vec<String> = serde_json::from_str(&workspace_uris).map_err(|e| format!("Antigravity: invalid workspace metadata for {session_id}: {e}"))?;
+    let Some(uri) = workspaces.first() else {
+        return Ok(None);
+    };
+    let url = Url::parse(uri).map_err(|e| format!("Antigravity: invalid workspace URI for {session_id}: {e}"))?;
+    url.to_file_path().map(Some).map_err(|_| format!("Antigravity: workspace URI for {session_id} is not a local file path"))
 }
 
 fn extract_tagged_blocks(content: &str, tag: &str) -> Vec<String> {
@@ -305,6 +323,56 @@ mod tests {
         assert_eq!(session.messages[1].role, MessageRole::Assistant);
         assert_eq!(session.messages[2].role, MessageRole::Tool);
         assert_eq!(session.model_name.as_deref(), Some("Gemini 3.1 Pro (High)"));
+        assert_eq!(session.workspace, None);
+    }
+
+    #[test]
+    fn scanned_transcripts_use_their_conversation_workspace() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.path().join("antigravity-cli");
+        std::fs::create_dir_all(&root).expect("mkdir");
+        let conn = rusqlite::Connection::open(root.join("conversation_summaries.db")).expect("open summaries");
+        conn.execute("CREATE TABLE conversation_summaries (conversation_id TEXT PRIMARY KEY, workspace_uris TEXT NOT NULL)", []).expect("create summaries");
+
+        let content = r#"{"step_index":1,"source":"USER_EXPLICIT","type":"USER_INPUT","created_at":"2026-11-23T21:00:00Z","content":"<USER_REQUEST>hello agy</USER_REQUEST>"}"#;
+        for (id, directory) in [("documents-session", "Documents"), ("project-session", "My Projects/日本語")] {
+            let workspace = temp.path().join(directory);
+            let uri = reqwest::Url::from_file_path(&workspace).expect("workspace URI");
+            conn.execute("INSERT INTO conversation_summaries VALUES (?1, ?2)", rusqlite::params![id, serde_json::to_string(&[uri.as_str()]).unwrap()]).expect("insert summary");
+
+            for log in ["transcript.jsonl", "transcript_full.jsonl", "chunks/transcript/00000000.jsonl"] {
+                let path = root.join("brain").join(id).join(".system_generated/logs").join(log);
+                std::fs::create_dir_all(path.parent().unwrap()).expect("mkdir logs");
+                std::fs::write(&path, content).expect("write transcript");
+
+                let (_, canonical) = crate::domain::session_bridge::read_canonical_session_from_path(&path).expect("read canonical");
+                assert_eq!(canonical.session_id, id);
+                assert_eq!(canonical.workspace.as_deref(), Some(workspace.as_path()));
+
+                let (info, _) = crate::core::scanner::parse_session_info(&path).expect("scan transcript");
+                assert_eq!(info.cwd, workspace.to_string_lossy());
+                assert!(crate::domain::session_list::session_matches_project_filter(&info, &workspace.to_string_lossy()));
+            }
+        }
+    }
+
+    #[test]
+    fn distinguishes_missing_workspace_metadata_from_invalid_metadata() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join("brain/session/.system_generated/logs/transcript.jsonl");
+        let content = r#"{"step_index":1,"source":"USER_EXPLICIT","type":"USER_INPUT","content":"hello"}"#;
+        let conn = rusqlite::Connection::open(temp.path().join("conversation_summaries.db")).expect("open summaries");
+        conn.execute("CREATE TABLE conversation_summaries (conversation_id TEXT PRIMARY KEY, workspace_uris TEXT NOT NULL)", []).expect("create summaries");
+
+        assert_eq!(read_session_from_str(&path, content).expect("no summary").workspace, None);
+        conn.execute("INSERT INTO conversation_summaries VALUES ('session', '[]')", []).expect("insert summary");
+        assert_eq!(read_session_from_str(&path, content).expect("no workspaces").workspace, None);
+
+        for invalid in ["not-json", r#"["https://example.com/project"]"#] {
+            conn.execute("UPDATE conversation_summaries SET workspace_uris = ?1", [invalid]).expect("update summary");
+            let error = read_session_from_str(&path, content).expect_err("invalid metadata must be reported");
+            assert!(error.contains("workspace"), "{error}");
+        }
     }
 
     #[test]

@@ -50,6 +50,8 @@ Two readers coexist. Which one runs is decided in `session_bridge::read_canonica
 
 Eight providers (Aider, Amp, ChatGPT, Cline, OpenClaw, Vibe, Kiro, Grok) have no hand-written casr_min reader at all. `casr_min/providers/vendored.rs` owns their path matching — the scanner classifies files by path and cannot afford to build the CASR registry per file — and forwards reads to CASR. Conversions to these providers, including dry runs, are performed entirely by the CASR writer.
 
+Project directories for Antigravity come from `conversation_summaries.db` in the Antigravity data directory (normally `~/.gemini/antigravity-cli`). The reader opens the database read-only, matches `conversation_id` to the UUID under `brain/`, and converts the first URI in `workspace_uris` to a local path. Missing summaries or empty workspace lists leave the project unspecified, but malformed metadata produces a read error.
+
 ## Main Rendering Path
 
 For external session files, PSM should prefer the Rust conversion path:
