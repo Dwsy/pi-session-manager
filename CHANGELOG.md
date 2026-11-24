@@ -4,6 +4,10 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Restore the scan toggles for Antigravity and Cursor in settings. Neither provider can be selected as the default target for resuming sessions.
+
 ## [0.9.1] - 2026-10-31
 
 ### Fixed

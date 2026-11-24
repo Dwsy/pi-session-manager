@@ -22,37 +22,28 @@ export default function ExternalSessionsSettings({
     SessionProviderInfo[]
   >([]);
 
-  const otherAgentProviders = useMemo(
-    () =>
-      supportedProviders.filter(
-        (provider) => provider.slug !== "pi" && provider.capabilities.canScan,
-      ),
-    [supportedProviders],
-  );
   const enabledProviders = useMemo(
     () => new Set(settings.session.externalSessionProviders ?? []),
     [settings.session.externalSessionProviders],
   );
-  const convertTargets = useMemo(
+  const mergedProviders = useMemo(
     () =>
       supportedProviders
-        .filter((provider) => provider.capabilities.canConvertTarget)
+        .filter(
+          (provider) =>
+            provider.capabilities.canConvertTarget
+            || (mode !== "resume" && provider.capabilities.canScan),
+        )
         .sort((a, b) => {
           if (a.slug === "pi") return -1;
           if (b.slug === "pi") return 1;
           return a.display_name.localeCompare(b.display_name);
-        }),
-    [supportedProviders],
-  );
-  const mergedProviders = useMemo(
-    () =>
-      convertTargets.map((provider) => ({
-        ...provider,
-        canScan: provider.slug !== "pi" && otherAgentProviders.some(
-          (item) => item.slug === provider.slug,
-        ),
-      })),
-    [convertTargets, otherAgentProviders],
+        })
+        .map((provider) => ({
+          ...provider,
+          canScan: provider.slug !== "pi" && provider.capabilities.canScan,
+        })),
+    [supportedProviders, mode],
   );
   const promptEnabled = settings.session.externalResumePromptEnabled !== false;
   const selectedResumeTarget = promptEnabled
@@ -227,6 +218,8 @@ export default function ExternalSessionsSettings({
                   return (
                     <div
                       key={provider.slug}
+                      role="group"
+                      aria-label={provider.display_name}
                       className={`grid items-center gap-3 px-4 py-3 max-md:grid-cols-[minmax(0,1fr)_auto] ${
                         mode === "resume"
                           ? "grid-cols-[minmax(0,1fr)_140px]"
@@ -282,36 +275,38 @@ export default function ExternalSessionsSettings({
                         </div>
                       )}
 
-                      <div className="flex items-center justify-center max-md:col-span-2 max-md:justify-start">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleResumeTargetToggle(provider.slug, !resumeChecked)
-                          }
-                          className={`inline-flex min-w-[124px] items-center justify-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
-                            resumeChecked
-                              ? "settings-accent-bg-soft settings-accent-ring settings-accent-fg border-transparent"
-                              : "border-border/60 bg-background/40 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
-                          }`}
-                        >
-                          {resumeChecked ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 settings-accent-fg" />
-                          ) : (
-                            <Circle className="h-3.5 w-3.5" />
-                          )}
-                          <span>
-                            {resumeChecked
-                              ? t(
-                                  "settings.externalSessions.defaultResumeSelected",
-                                  "Selected",
-                                )
-                              : t(
-                                  "settings.externalSessions.setAsDefaultResume",
-                                  "Set default",
-                                )}
-                          </span>
-                        </button>
-                      </div>
+                      {provider.capabilities.canConvertTarget && (
+                        <div className="flex items-center justify-center max-md:col-span-2 max-md:justify-start">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleResumeTargetToggle(provider.slug, !resumeChecked)
+                            }
+                            className={`inline-flex min-w-[124px] items-center justify-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
+                              resumeChecked
+                                ? "settings-accent-bg-soft settings-accent-ring settings-accent-fg border-transparent"
+                                : "border-border/60 bg-background/40 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
+                            }`}
+                          >
+                            {resumeChecked ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 settings-accent-fg" />
+                            ) : (
+                              <Circle className="h-3.5 w-3.5" />
+                            )}
+                            <span>
+                              {resumeChecked
+                                ? t(
+                                    "settings.externalSessions.defaultResumeSelected",
+                                    "Selected",
+                                  )
+                                : t(
+                                    "settings.externalSessions.setAsDefaultResume",
+                                    "Set default",
+                                  )}
+                            </span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
