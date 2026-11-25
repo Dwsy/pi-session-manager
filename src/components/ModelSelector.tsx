@@ -219,7 +219,8 @@ export default function ModelSelector({
       top: openUpward ? Math.max(8, rect.top - maxHeight - 8) : rect.bottom + 8,
       width,
       maxHeight,
-      zIndex: 1300,
+      // This body portal must stack above the Settings dialog (10000).
+      zIndex: 10001,
       visibility: 'visible',
     })
   }, [])
