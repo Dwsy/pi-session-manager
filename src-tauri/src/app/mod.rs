@@ -265,6 +265,7 @@ mod tests {
             dispatch_only,
             vec![
                 "get_agent_usage_status",
+                "invoke_model_agent",
                 "invoke_model_text",
                 "invoke_model_text_stream",
                 "plugin_live_agents_list",

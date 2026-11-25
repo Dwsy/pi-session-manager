@@ -26,8 +26,8 @@ import type { ToolRenderPlugin } from '@/plugins/tools-render/types'
 import { appPsmTransport } from './appTransport'
 import {
   createPsmAgentBridge,
-  createPsmAgentBridgeCapabilities,
   createPsmAgentHostModelResolver,
+  type PsmAgentBridgeCapabilities,
 } from './agentBridge'
 import { psmRuntimeEventBus } from './eventBus'
 import { sessionEntryTransformers } from './sessionEntryTransformers'
@@ -76,7 +76,7 @@ interface ActivePlugin {
 
 interface PsmPluginHostServices {
   loadConfig(): Promise<PsmPluginsConfig>
-  createAgentBridge?(params: { pluginId: string; permissions: PsmPermissionContext['permissions'] }): PsmAgentClient
+  createAgentBridge?(params: { pluginId: string; permissions: PsmPermissionContext['permissions']; capabilities: PsmAgentBridgeCapabilities }): PsmAgentClient
   listNpmEntries(): Promise<Array<{
     packageName: string
     packageVersion?: string | null
@@ -108,12 +108,12 @@ interface PsmPluginHostOptions {
 
 const defaultServices: PsmPluginHostServices = {
   loadConfig: loadPsmPluginConfig,
-  createAgentBridge: ({ pluginId, permissions }) => createPsmAgentBridge({
+  createAgentBridge: ({ pluginId, permissions, capabilities }) => createPsmAgentBridge({
     pluginId,
     permissions: permissions ?? [],
     transport: appPsmTransport,
     resolveHostModel: createPsmAgentHostModelResolver(appPsmTransport),
-    capabilities: createPsmAgentBridgeCapabilities(appPsmTransport),
+    capabilities,
   }),
   listNpmEntries: listNpmPsmPluginEntries,
   listPathEntries: listPathPsmPluginEntries,
@@ -804,17 +804,16 @@ export class PsmPluginHost {
       permissions: effectivePermissions,
     }
     const transport = this.createRuntimePermissionTransport(manifest, configEntry, permissions)
+    // Agent tools use the same permission-scoped capabilities as direct plugin calls.
+    const capabilities = createPluginCapabilityClient({ transport, permissions })
+    const agent = this.services.createAgentBridge?.({ pluginId: manifest.id, permissions: effectivePermissions, capabilities })
     const cleanup: Array<() => void | Promise<void>> = []
 
     const context: PsmPluginHostContext = {
       manifest,
       permissions,
       events: createPluginEventsClient(manifest.id, permissions, cleanup),
-      psm: createPluginCapabilityClient({
-        transport,
-        permissions,
-        agent: this.services.createAgentBridge?.({ pluginId: manifest.id, permissions: effectivePermissions }),
-      }),
+      psm: { ...capabilities, agent: agent ?? capabilities.agent },
       settings: settingsClient(settings),
       i18n: i18nClient(),
       log: loggerClient(manifest.id),

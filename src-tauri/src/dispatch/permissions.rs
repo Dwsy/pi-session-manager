@@ -83,7 +83,7 @@ fn required_permissions_for_command(command: &str) -> &'static [PluginPermission
         "create_tag" | "assign_tag" | "remove_tag_from_session" => &[PluginPermission::TagsWrite],
         "read_psm_plugin_json_config" => &[PluginPermission::ConfigRead],
         "write_psm_plugin_json_config" => &[PluginPermission::ConfigWrite],
-        "invoke_model_text" | "invoke_model_text_stream" => &[PluginPermission::ModelInvoke],
+        "invoke_model_text" | "invoke_model_text_stream" | "invoke_model_agent" => &[PluginPermission::ModelInvoke],
         "list_model_options_fast" => &[PluginPermission::ModelInvoke],
         "plugin_agent_create_session" | "plugin_agent_run" | "plugin_agent_abort" | "plugin_agent_dispose" => &[PluginPermission::AgentInvoke],
         "plugin_window_open" | "plugin_window_close" => &[PluginPermission::WindowsOpen],

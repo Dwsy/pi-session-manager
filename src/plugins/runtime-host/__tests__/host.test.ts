@@ -579,7 +579,7 @@ describe('PsmPluginHost', () => {
     })
   })
 
-  it('injects the default Pi Agent bridge when no service override is provided', async () => {
+  it('uses plugin-scoped capabilities in the default Pi Agent bridge', async () => {
     const host = new PsmPluginHost({
       builtinEntries: [
         {
@@ -592,15 +592,18 @@ describe('PsmPluginHost', () => {
                 id: 'builtin.default-agent-plugin',
                 name: 'Default Agent Plugin',
                 version: '1.0.0',
-                permissions: ['agent:invoke', 'model:invoke'],
+                permissions: ['agent:invoke', 'model:invoke', 'search:read'],
               },
               activate: (ctx: any) => {
-                ctx.registerCommand('agent.default.create', async () => ctx.psm.agent.createSession({
-                  purpose: 'semantic-search',
-                  model: { provider: 'openai', id: 'gpt-5.5' },
-                  tools: [],
-                  storage: { scope: 'plugin' },
-                }))
+                ctx.registerCommand('agent.default.search', async () => {
+                  const { sessionId } = await ctx.psm.agent.createSession({
+                    purpose: 'semantic-search',
+                    model: { provider: 'openai', id: 'gpt-5.5' },
+                    tools: [{ name: 'psm.search.fulltext', permission: 'search:read' }],
+                    storage: { scope: 'plugin' },
+                  })
+                  return ctx.psm.agent.run({ sessionId, prompt: 'find the fixture' })
+                })
               },
             }
           },
@@ -614,10 +617,19 @@ describe('PsmPluginHost', () => {
 
     await host.reload()
 
-    await expect(host.executeCommand('agent.default.create')).resolves.toMatchObject({
-      storageScope: 'plugin',
-      model: { provider: 'openai', id: 'gpt-5.5' },
+    const answer = (content: unknown[], stopReason: 'stop' | 'toolUse') => ({
+      role: 'assistant', content, api: 'test', model: 'gpt-5.5', provider: 'openai', stopReason, timestamp: 0,
     })
+    vi.mocked(appInvoke)
+      .mockResolvedValueOnce(answer([{ type: 'toolCall', id: 'search', name: 'psm.search.fulltext', arguments: { query: 'fixture' } }], 'toolUse'))
+      .mockResolvedValueOnce({ hits: [], total_hits: 0, has_more: false })
+      .mockResolvedValueOnce(answer([{ type: 'text', text: 'searched' }], 'stop'))
+
+    await expect(host.executeCommand('agent.default.search')).resolves.toMatchObject({ text: 'searched' })
+    expect(appInvoke).toHaveBeenCalledWith('full_text_search', expect.objectContaining({
+      query: 'fixture',
+      __psm: { pluginId: 'builtin.default-agent-plugin', permissions: ['agent:invoke', 'model:invoke', 'search:read'] },
+    }))
   })
 
   it('returns a cached command snapshot between reload notifications', async () => {

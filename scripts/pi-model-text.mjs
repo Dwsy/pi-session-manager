@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { randomUUID } from 'node:crypto'
 import { ModelRuntime } from '@earendil-works/pi-coding-agent'
 
 function readStdin() {
@@ -37,6 +38,25 @@ function requestMessages(request) {
   ]
 }
 
+/** Match only OpenCode Go on the official service, like the Rust settings probe's `opencode_go::is_go_url`. */
+function isOpenCodeGoUrl(base) {
+  let url
+  try {
+    url = new URL(base)
+  } catch {
+    return false
+  }
+  return url.protocol === 'https:' && url.hostname === 'opencode.ai' && url.port === ''
+    && ['/inference/go', '/zen/go'].some((prefix) => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))
+}
+
+/** Provider failures resolve as an assistant message; text callers must see them as a failed request. */
+function assertCompleted(message) {
+  if (message.stopReason === 'error' || message.stopReason === 'aborted') {
+    throw new Error(message.errorMessage || `Pi AI request ${message.stopReason}`)
+  }
+}
+
 function resolveModel(runtime, provider, modelId) {
   if (provider && modelId) {
     const model = runtime.getModel(provider, modelId)
@@ -67,38 +87,34 @@ async function main() {
     tools: Array.isArray(request.tools) ? request.tools : undefined,
   }
 
+  // OpenCode Go rejects requests without a conversation ID. Agents pass one stable ID per session;
+  // plain text calls get a fresh one. Send it only to official Go routes, never to proxies or other providers.
+  const sessionId = request.sessionId || `psm-${randomUUID()}`
+  const headers = isOpenCodeGoUrl(auth.baseUrl || model.baseUrl) ? { ...auth.headers, 'x-opencode-session': sessionId } : auth.headers
+
   const options = {
     apiKey: auth.apiKey,
-    headers: auth.headers,
+    headers,
     baseUrl: auth.baseUrl,
     reasoning: request.reasoning,
     maxTokens: request.maxTokens,
   }
 
   if (request.stream) {
+    // Agent callers receive raw Pi events, errors included, and own the terminal message themselves.
     const eventStream = runtime.streamSimple(model, context, options)
-    let finalMessage = null
     for await (const event of eventStream) {
       if (request.protocol === 'pi-agent') {
         writeEvent(event)
-        if (event.type === 'done') finalMessage = event.message
-        if (event.type === 'error') finalMessage = event.error
-        continue
-      }
-      if (event.type === 'text_delta') {
+      } else if (event.type === 'text_delta') {
         writeEvent({ type: 'delta', delta: event.delta })
-      } else if (event.type === 'done') {
-        finalMessage = event.message
-      } else if (event.type === 'error') {
-        finalMessage = event.error
-        writeEvent({ type: 'error', error: event.error.errorMessage || 'Pi AI stream failed' })
       }
     }
-    if (request.protocol === 'pi-agent') {
-      finalMessage ||= await eventStream.result()
-      return
-    }
-    finalMessage ||= await eventStream.result()
+    if (request.protocol === 'pi-agent') return
+
+    // Text callers get a failed helper run instead of an empty successful answer.
+    const finalMessage = await eventStream.result()
+    assertCompleted(finalMessage)
     writeEvent({
       type: 'done',
       response: {
@@ -111,6 +127,7 @@ async function main() {
   }
 
   const message = await runtime.completeSimple(model, context, options)
+  assertCompleted(message)
   writeEvent({
     type: 'done',
     response: {

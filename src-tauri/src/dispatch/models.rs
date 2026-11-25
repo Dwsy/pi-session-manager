@@ -23,6 +23,7 @@ pub(super) const COMMANDS: &[&str] = &[
     "test_models_batch",
     "invoke_model_text",
     "invoke_model_text_stream",
+    "invoke_model_agent",
     "get_pi_live_sessions",
     "get_pi_agent_entries",
     "pi_agent_steer",
@@ -149,6 +150,7 @@ pub(super) async fn dispatch(app_state: &Option<DispatchAppState>, command: &str
                     let result = crate::invoke_model_text(system_prompt, prompt, provider, model, reasoning).await?;
                     Ok(to_val(result, "serialize result")?)
                 }
+                "invoke_model_agent" => crate::invoke_model_agent(payload.clone()).await,
                 "invoke_model_text_stream" => {
                     #[cfg(feature = "gui")]
                     {
