@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { homeDir, join } from "@tauri-apps/api/path";
 import {
   open as openDialog,
@@ -7,6 +7,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { invoke } from "@/transport";
 import { useClipboard } from "@/hooks/useClipboard";
+import type { ModelOption } from "@/types";
 import type {
   ModelConfigShape,
   ModelConfigBackupMeta,
@@ -42,6 +43,8 @@ import {
   mergeModelCost,
   type CatalogModelOption,
 } from "./catalog";
+import { usesOpenCodeGoCatalog } from "./opencodeGo";
+import type { ProviderRemoteModel } from "./providerModels";
 
 export function useModelConfig() {
   const { t } = useTranslation();
@@ -81,6 +84,8 @@ export function useModelConfig() {
   const [copySourceProvider, setCopySourceProvider] = useState("");
   const [showCatalogModal, setShowCatalogModal] = useState(false);
   const [showRemoteModelsModal, setShowRemoteModelsModal] = useState(false);
+  const [piGoModels, setPiGoModels] = useState<string[] | null>(null);
+  const [loadingPiGoModels, setLoadingPiGoModels] = useState(false);
   const [newProviderName, setNewProviderName] = useState("");
 
   const [showImportModal, setShowImportModal] = useState(false);
@@ -110,6 +115,28 @@ export function useModelConfig() {
     ? config.providers[selectedProvider]
     : undefined;
   const selectedProviderModels = selectedProviderEntry?.models ?? [];
+  const showPiGoModels = selectedProvider === "opencode-go" && usesOpenCodeGoCatalog(selectedProvider, selectedProviderEntry?.baseUrl);
+  /** Refresh the installed models used by both Go model lists. */
+  const refreshPiGoModels = useCallback(async () => {
+    setLoadingPiGoModels(true);
+    try {
+      const available = await invoke<ModelOption[]>("list_model_options_full", { useConfigProfile: true });
+      const ids = available.filter(({ provider }) => provider === "opencode-go").map(({ model }) => model);
+      const models = ids.length ? ids : null;
+      setPiGoModels(models);
+      return models;
+    } catch {
+      setPiGoModels(null);
+      return null;
+    } finally {
+      setLoadingPiGoModels(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showPiGoModels) void refreshPiGoModels();
+  }, [refreshPiGoModels, showPiGoModels]);
+
   const selectedModelIndex = Number.parseInt(selectedModel, 10);
   const selectedModelEntry = Number.isInteger(selectedModelIndex)
     ? selectedProviderModels[selectedModelIndex]
@@ -443,7 +470,8 @@ export function useModelConfig() {
       return;
     }
 
-    const nextProvider = createDefaultProvider();
+    // Pi already owns the Go provider's auth and per-model routes.
+    const nextProvider: ProviderEntry = name === "opencode-go" ? { models: [] } : createDefaultProvider();
     setConfig((prev) => ({
       ...prev,
       providers: {
@@ -615,7 +643,7 @@ export function useModelConfig() {
       );
       return;
     }
-    if (!selectedProviderEntry?.baseUrl?.trim()) {
+    if (!selectedProviderEntry?.baseUrl?.trim() && !usesOpenCodeGoCatalog(selectedProvider)) {
       pushFeedback(
         "warning",
         t(
@@ -626,11 +654,12 @@ export function useModelConfig() {
       setConfigDetailTab("provider");
       return;
     }
+    if (showPiGoModels) void refreshPiGoModels();
     setShowRemoteModelsModal(true);
   }
 
   async function addModelsFromRemote(
-    selected: Array<{ id: string; name?: string | null }>,
+    selected: ProviderRemoteModel[],
   ) {
     if (!selectedProvider || selected.length === 0) {
       setShowRemoteModelsModal(false);
@@ -639,20 +668,26 @@ export function useModelConfig() {
 
     setBusy("remote-models-add");
     try {
-      let catalog = null as Awaited<
-        ReturnType<typeof fetchModelsDevCatalog>
-      > | null;
-      try {
-        catalog = await fetchModelsDevCatalog();
-      } catch (error) {
-        console.warn("models.dev enrich skipped:", error);
-      }
-
       const existingIds = new Set(
         selectedProviderModels
           .map((model) => model.id.trim().toLowerCase())
           .filter(Boolean),
       );
+
+      // Recheck at confirmation so a newly built-in model keeps Pi's compatibility settings.
+      const goCatalog = selected.every((item) => item.modelConfig !== undefined);
+      if (goCatalog && showPiGoModels) {
+        const current = await refreshPiGoModels();
+        if (!current) return;
+        for (const id of current) existingIds.add(id.toLowerCase());
+        if (selected.every(({ id }) => existingIds.has(id.toLowerCase()))) return;
+      }
+
+      // Go includes metadata in the list itself. Keep the existing enrichment for generic providers.
+      const catalog = goCatalog ? null : await fetchModelsDevCatalog().catch((error) => {
+        console.warn("models.dev enrich skipped:", error);
+        return null;
+      });
 
       const nextModels = [...selectedProviderModels];
       let added = 0;
@@ -671,7 +706,10 @@ export function useModelConfig() {
           continue;
         }
 
-        if (catalog) {
+        if (item.modelConfig) {
+          nextModels.push(item.modelConfig);
+          enriched += 1;
+        } else if (catalog) {
           const built = buildModelEntryFromRemote(
             item,
             catalog,
@@ -710,6 +748,8 @@ export function useModelConfig() {
           { added, skipped, enriched },
         ),
       );
+    } catch (error) {
+      pushFeedback("error", asErrorMessage(error));
     } finally {
       setBusy(null);
     }
@@ -1038,6 +1078,7 @@ export function useModelConfig() {
         createBackup: true,
       });
       await loadAll({ showSpinner: false });
+      if (showPiGoModels) void refreshPiGoModels();
       pushFeedback(
         "success",
         t(
@@ -1557,6 +1598,9 @@ export function useModelConfig() {
     setShowCatalogModal,
     showRemoteModelsModal,
     setShowRemoteModelsModal,
+    piGoModels,
+    loadingPiGoModels: showPiGoModels && loadingPiGoModels,
+    refreshPiGoModels,
     newProviderName,
     setNewProviderName,
     showImportModal,

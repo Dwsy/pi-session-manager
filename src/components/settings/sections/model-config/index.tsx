@@ -67,6 +67,9 @@ export default function ModelConfigCenter() {
     setShowCatalogModal,
     showRemoteModelsModal,
     setShowRemoteModelsModal,
+    piGoModels,
+    loadingPiGoModels,
+    refreshPiGoModels,
     newProviderName,
     setNewProviderName,
     showImportModal,
@@ -289,6 +292,7 @@ export default function ModelConfigCenter() {
             openCopyProviderModal={openCopyProviderModal}
             openAddProviderModal={openAddProviderModal}
             selectedProviderModels={selectedProviderModels}
+            piGoModels={piGoModels}
             selectedModel={selectedModel}
             setSelectedModel={setSelectedModel}
             addModel={addModel}
@@ -388,6 +392,9 @@ export default function ModelConfigCenter() {
         providerName={selectedProvider}
         providerEntry={selectedProviderEntry}
         existingModelIds={selectedProviderModels.map((model) => model.id)}
+        piGoModels={piGoModels}
+        loadingPiGoModels={loadingPiGoModels}
+        refreshPiGoModels={refreshPiGoModels}
         onClose={() => setShowRemoteModelsModal(false)}
         onConfirm={addModelsFromRemote}
         onRequestRemoveExisting={requestDeleteModelsByIds}

@@ -11,6 +11,7 @@ import {
 import { ModelIcon } from "@/components/session-viewer/ModelIcon";
 import { ModalShell } from "../ui/ModalShell";
 import type { ProviderEntry } from "../types";
+import { OPENCODE_GO_MODELS_URL, usesOpenCodeGoCatalog } from "../opencodeGo";
 import {
   fetchProviderRemoteModels,
   type ProviderRemoteModel,
@@ -25,6 +26,10 @@ interface ProviderRemoteModelsModalProps {
   providerName: string;
   providerEntry?: ProviderEntry;
   existingModelIds: string[];
+  /** Available Pi model IDs, or null until the provider could be listed. */
+  piGoModels: string[] | null;
+  loadingPiGoModels: boolean;
+  refreshPiGoModels: () => Promise<string[] | null>;
   onClose: () => void;
   onConfirm: (models: ProviderRemoteModel[]) => void;
   /** Unchecked already-added models → parent confirms bulk delete. */
@@ -36,6 +41,9 @@ export function ProviderRemoteModelsModal({
   providerName,
   providerEntry,
   existingModelIds,
+  piGoModels,
+  loadingPiGoModels,
+  refreshPiGoModels,
   onClose,
   onConfirm,
   onRequestRemoveExisting,
@@ -52,6 +60,10 @@ export function ProviderRemoteModelsModal({
   const [pendingRemoveIds, setPendingRemoveIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const goCatalog = usesOpenCodeGoCatalog(providerName, providerEntry?.baseUrl);
+  const checkPiModels = providerName === "opencode-go" && goCatalog;
+  const canSelect = !loading && (!checkPiModels || (!loadingPiGoModels && piGoModels !== null));
+  const piGoModelIds = useMemo(() => new Set(piGoModels?.map((id) => id.toLowerCase())), [piGoModels]);
 
   const existingIdSet = useMemo(
     () =>
@@ -96,10 +108,17 @@ export function ProviderRemoteModelsModal({
     );
   }, [modelFilter, models]);
 
-  const selectableModels = filteredModels.filter(
-    (model) => !existingIdSet.has(model.id.trim().toLowerCase()),
-  );
-  const selectedCount = selectedModelIds.size;
+  /** Keep Pi-supplied entries separate from editable models.json entries. */
+  function availableInPi(key: string) {
+    return checkPiModels && !existingIdSet.has(key) && piGoModelIds.has(key);
+  }
+
+  const selectableModels = filteredModels.filter((model) => {
+    const key = model.id.toLowerCase();
+    return canSelect && !existingIdSet.has(key) && !availableInPi(key);
+  });
+  const selectedModels = models.filter((model) => selectedModelIds.has(model.id) && !availableInPi(model.id.toLowerCase()));
+  const selectedCount = selectedModels.length;
   const pendingRemoveCount = pendingRemoveIds.size;
   const existingVisibleIds = useMemo(
     () =>
@@ -110,7 +129,7 @@ export function ProviderRemoteModelsModal({
   );
 
   async function loadRemoteModels() {
-    if (!providerEntry?.baseUrl?.trim()) {
+    if (!providerEntry || (!providerEntry.baseUrl?.trim() && !usesOpenCodeGoCatalog(providerName))) {
       setError(
         t(
           "settings.modelConfigCenter.feedback.remoteModelsNeedBaseUrl",
@@ -122,6 +141,7 @@ export function ProviderRemoteModelsModal({
 
     setLoading(true);
     setError(null);
+    setSelectedModelIds(new Set());
     try {
       const data = await fetchProviderRemoteModels(providerName, providerEntry);
       setResult(data);
@@ -135,7 +155,7 @@ export function ProviderRemoteModelsModal({
 
   function toggleModel(model: ProviderRemoteModel) {
     const key = model.id.trim().toLowerCase();
-    if (!key) return;
+    if (!key || availableInPi(key)) return;
     // Existing: uncheck → pending remove; re-check → cancel pending
     if (existingIdSet.has(key)) {
       setPendingRemoveIds((prev) => {
@@ -146,6 +166,7 @@ export function ProviderRemoteModelsModal({
       });
       return;
     }
+    if (!canSelect) return;
     setSelectedModelIds((prev) => {
       const next = new Set(prev);
       if (next.has(model.id)) next.delete(model.id);
@@ -184,7 +205,7 @@ export function ProviderRemoteModelsModal({
   }
 
   function handleConfirm() {
-    onConfirm(models.filter((model) => selectedModelIds.has(model.id)));
+    if (canSelect && selectedCount > 0) onConfirm(selectedModels);
   }
 
   if (!open) return null;
@@ -226,13 +247,13 @@ export function ProviderRemoteModelsModal({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={selectedCount === 0}
+            disabled={!canSelect || selectedCount === 0}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all focus-ring disabled:opacity-50"
           >
             <CloudDownload className="h-4 w-4" />
             {t(
               "settings.modelConfigCenter.actions.addSelectedModels",
-              "添加所选模型",
+              "Add selected models",
             )}
           </button>
         </>
@@ -242,8 +263,11 @@ export function ProviderRemoteModelsModal({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => void loadRemoteModels()}
-            disabled={loading}
+            onClick={() => {
+              if (checkPiModels) void refreshPiGoModels();
+              void loadRemoteModels();
+            }}
+            disabled={loading || (checkPiModels && loadingPiGoModels)}
             className="inline-flex h-7 items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 text-[11px] font-medium text-foreground hover:bg-surface transition-colors focus-ring disabled:opacity-60"
           >
             {loading ? (
@@ -264,7 +288,7 @@ export function ProviderRemoteModelsModal({
           >
             {t(
               "settings.modelConfigCenter.actions.selectVisibleModels",
-              "全选可见",
+              "Select visible",
             )}
           </button>
           <button
@@ -312,9 +336,9 @@ export function ProviderRemoteModelsModal({
               { count: pendingRemoveCount },
             )}
           </button>
-          {result?.url ? (
+          {result?.url || goCatalog ? (
             <span className="max-w-full truncate font-mono text-[11px] text-muted-foreground">
-              GET {result.url}
+              GET {result?.url ?? OPENCODE_GO_MODELS_URL}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
@@ -328,6 +352,12 @@ export function ProviderRemoteModelsModal({
           <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-300">
             {error}
           </div>
+        )}
+
+        {checkPiModels && result && !loading && !loadingPiGoModels && piGoModels === null && (
+          <p role="status" className="text-xs text-muted-foreground">
+            {t("settings.modelConfigCenter.feedback.openCodeGoNeedsPi", "Connect OpenCode Go in Pi, then refresh. PSM needs to identify the models Pi already provides before it can add new ones.")}
+          </p>
         )}
 
         <div className="overflow-hidden rounded-lg border border-border/50">
@@ -357,15 +387,18 @@ export function ProviderRemoteModelsModal({
               </div>
             ) : (
               filteredModels.map((model) => {
-                const exists = existingIdSet.has(model.id.trim().toLowerCase());
+                const key = model.id.toLowerCase();
+                const exists = existingIdSet.has(key);
+                const alreadyInPi = availableInPi(key);
                 const pendingRemove = pendingRemoveIds.has(model.id);
                 const checked = exists
                   ? !pendingRemove
-                  : selectedModelIds.has(model.id);
+                  : alreadyInPi || selectedModelIds.has(model.id);
                 return (
                   <button
                     key={model.id}
                     type="button"
+                    disabled={alreadyInPi || (!exists && !canSelect)}
                     onClick={() => toggleModel(model)}
                     title={
                       exists
@@ -408,6 +441,11 @@ export function ProviderRemoteModelsModal({
                             )}
                           </span>
                         )}
+                        {alreadyInPi && (
+                          <span className="rounded border border-border/50 px-1 py-px text-[9px] text-muted-foreground">
+                            {t("settings.modelConfigCenter.status.availableInPi", "Available in Pi")}
+                          </span>
+                        )}
                         {pendingRemove && (
                           <span className="rounded border border-red-500/30 px-1 py-px text-[9px] text-red-600 dark:text-red-300">
                             {t(
@@ -420,6 +458,16 @@ export function ProviderRemoteModelsModal({
                       <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 font-mono text-[10px] text-muted-foreground">
                         {model.name ? <span>{model.name}</span> : null}
                         {model.ownedBy ? <span>{model.ownedBy}</span> : null}
+                        {model.modelConfig && (
+                          <>
+                            <span>{model.modelConfig.api}</span>
+                            {model.modelConfig.contextWindow !== undefined && (
+                              <span>
+                                {t("settings.modelConfigCenter.fields.contextWindow", "Context Window")} {model.modelConfig.contextWindow.toLocaleString()}
+                              </span>
+                            )}
+                          </>
+                        )}
                       </div>
                     </div>
                   </button>

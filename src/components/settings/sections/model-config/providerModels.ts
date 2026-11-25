@@ -1,10 +1,13 @@
-import type { ProviderEntry } from "./types";
+import { buildOpenCodeGoModel, OPENCODE_GO_MODELS_URL, usesOpenCodeGoCatalog, type GoModelMetadata } from "./opencodeGo";
+import type { ModelEntry, ProviderEntry } from "./types";
 
+/** A selectable provider result, with a ready-to-save model when the API supplies routing metadata. */
 export interface ProviderRemoteModel {
   id: string;
   name?: string | null;
   ownedBy?: string | null;
   created?: number | null;
+  modelConfig?: ModelEntry;
 }
 
 export interface ProviderRemoteModelsResult {
@@ -114,18 +117,24 @@ export async function fetchProviderRemoteModels(
   provider: ProviderEntry,
   options: { timeoutMs?: number } = {},
 ): Promise<ProviderRemoteModelsResult> {
+  const openCodeGo = usesOpenCodeGoCatalog(providerName, provider.baseUrl);
+  // Pi assigns Go and Zen different built-ins and credential identities.
+  if (openCodeGo && providerName === "opencode") {
+    throw new Error("Import OpenCode Go models into the opencode-go provider");
+  }
   const api = provider.api?.trim() || "openai-completions";
-  if (api === "google-generative-ai") {
+  if (!openCodeGo && api === "google-generative-ai") {
     throw new Error(
       "google-generative-ai remote model listing is not supported yet",
     );
   }
 
-  const url = resolveModelsUrl(provider.baseUrl ?? "");
+  const url = openCodeGo ? OPENCODE_GO_MODELS_URL : resolveModelsUrl(provider.baseUrl ?? "");
   const headers = new Headers();
   headers.set("Accept", "application/json");
 
-  if (provider.headers) {
+  // Go's public catalog requires no key. Only forward custom headers for the configured endpoint.
+  if (!openCodeGo && provider.headers) {
     for (const [key, value] of Object.entries(provider.headers)) {
       if (key.trim() && value != null) {
         headers.set(key, String(value));
@@ -133,7 +142,7 @@ export async function fetchProviderRemoteModels(
     }
   }
 
-  const apiKey = provider.apiKey?.trim()
+  const apiKey = !openCodeGo && provider.apiKey?.trim()
     ? await resolveDynamicValue(provider.apiKey)
     : "";
 
@@ -189,6 +198,11 @@ export async function fetchProviderRemoteModels(
       const model = parseRemoteModel(entry);
       if (!model) continue;
       if (seen.has(model.id)) continue;
+      if (openCodeGo) {
+        const modelConfig = buildOpenCodeGoModel(model.id, model.name, entry as GoModelMetadata);
+        if (!modelConfig) continue;
+        model.modelConfig = modelConfig;
+      }
       seen.add(model.id);
       models.push(model);
     }

@@ -23,6 +23,7 @@ import {
 import SettingsField from "@/components/settings/SettingsField";
 import SettingsInput from "@/components/settings/SettingsInput";
 import { ModelIcon } from "@/components/session-viewer/ModelIcon";
+import { usesOpenCodeGoCatalog } from "../opencodeGo";
 import {
   MODEL_INPUT_TYPE_OPTIONS,
   MODEL_THINKING_LEVEL_OPTIONS,
@@ -60,6 +61,8 @@ interface ConfigureTabProps {
   openCopyProviderModal: (provider: string) => void;
   openAddProviderModal: () => void;
   selectedProviderModels: ModelEntry[];
+  /** Pi's Go model IDs, shown alongside local model definitions. */
+  piGoModels?: string[] | null;
   selectedModel: string;
   setSelectedModel: (model: string) => void;
   addModel: () => void;
@@ -95,6 +98,7 @@ export function ConfigureTab({
   openCopyProviderModal,
   openAddProviderModal,
   selectedProviderModels,
+  piGoModels,
   selectedModel,
   setSelectedModel,
   addModel,
@@ -147,6 +151,16 @@ export function ConfigureTab({
         .includes(query),
     );
   }, [modelFilter, selectedProviderModels]);
+
+  // A local definition takes the editable row. The other models come from Pi.
+  const goProvider = config.providers["opencode-go"];
+  const configuredGoIds = new Set(goProvider?.models?.map(({ id }) => id.trim().toLowerCase()));
+  const piOnlyModels = goProvider && usesOpenCodeGoCatalog("opencode-go", goProvider.baseUrl)
+    ? piGoModels?.filter((id) => !configuredGoIds.has(id.toLowerCase())) ?? []
+    : [];
+  const selectedPiModels = selectedProvider === "opencode-go" ? piOnlyModels : [];
+  const filteredPiModels = selectedPiModels.filter((id) => id.toLowerCase().includes(modelFilter.trim().toLowerCase()));
+  const selectedModelCount = selectedProviderModels.length + selectedPiModels.length;
 
   const compactFieldProps = {
     className: "space-y-1.5",
@@ -309,7 +323,7 @@ export function ConfigureTab({
         <div className="p-1 space-y-0.5 overflow-y-auto max-h-[200px] lg:max-h-none flex-1">
           {filteredProviderNames.map((provider) => {
             const isSelected = provider === selectedProvider;
-            const modelsCount = config.providers[provider]?.models?.length || 0;
+            const modelsCount = (config.providers[provider]?.models?.length ?? 0) + (provider === "opencode-go" ? piOnlyModels.length : 0);
             const apiType = config.providers[provider]?.api || "openai";
 
             return (
@@ -373,7 +387,7 @@ export function ConfigureTab({
               {t("settings.modelConfigCenter.sections.models", "Models")}
             </span>
             <span className="rounded-full border border-border/40 bg-background/50 px-1.5 py-px font-mono text-[10px] text-foreground">
-              {selectedProviderModels.length}
+              {selectedModelCount}
             </span>
           </button>
           <div className="flex shrink-0 items-center gap-0.5">
@@ -496,10 +510,20 @@ export function ConfigureTab({
             );
           })}
 
-          {filteredModels.length === 0 && (
+          {filteredPiModels.map((id) => (
+            <div key={id} className="flex items-center gap-1.5 rounded-md border border-transparent px-2 py-1.5 text-muted-foreground">
+              <ModelIcon model={id} size={12} className="shrink-0" />
+              <span className="min-w-0 flex-1 truncate text-xs" title={id}>{id}</span>
+              <span className="shrink-0 rounded border border-border/50 px-1 text-[9px]">
+                {t("settings.modelConfigCenter.status.availableInPi", "Available in Pi")}
+              </span>
+            </div>
+          ))}
+
+          {filteredModels.length === 0 && filteredPiModels.length === 0 && (
             <div className="py-12 text-center text-xs text-muted-foreground">
               {selectedProvider
-                ? selectedProviderModels.length === 0
+                ? selectedModelCount === 0
                   ? t(
                       "settings.modelConfigCenter.empty.noModels",
                       "This provider has no models yet",
