@@ -75,7 +75,7 @@ pub struct TimelineHapticOptions {
     pub strength: HapticStrength,
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum HapticStyle {
     /// Double tooth: strong -> 45ms -> medium. Matches Alma's EDC feel.
@@ -156,7 +156,7 @@ mod macos {
         use objc2_core_foundation::{CFBoolean, CFNumber, CFNumberType, CFRetained, CFString, CFType};
         use std::ffi::{c_char, c_int, c_void};
         use std::ptr::{self, NonNull};
-        use std::sync::{mpsc, Mutex, OnceLock};
+        use std::sync::{mpsc, Mutex, MutexGuard, OnceLock};
         use std::thread;
         use std::time::Duration;
 
@@ -172,6 +172,10 @@ mod macos {
         const APPKIT_LEVEL_CHANGE: isize = 2; // NSHapticFeedbackPatternLevelChange
         const APPKIT_NOW: usize = 1; // NSHapticFeedbackPerformanceTimeNow
 
+        // IOKit symbols below are declared directly rather than through a
+        // crate, so the framework has to be named here — without it the
+        // linker resolves nothing and the whole binary fails to link.
+        #[link(name = "IOKit", kind = "framework")]
         extern "C-unwind" {
             fn dlopen(path: *const c_char, mode: c_int) -> *mut c_void;
             fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
@@ -220,19 +224,19 @@ mod macos {
                     return None;
                 }
 
-                let create = match symbol(library, "MTActuatorCreateFromDeviceID") {
+                let create = match symbol(library, b"MTActuatorCreateFromDeviceID\0") {
                     Some(value) => value,
                     None => return close_library(library),
                 };
-                let open = match symbol(library, "MTActuatorOpen") {
+                let open = match symbol(library, b"MTActuatorOpen\0") {
                     Some(value) => value,
                     None => return close_library(library),
                 };
-                let close = match symbol(library, "MTActuatorClose") {
+                let close = match symbol(library, b"MTActuatorClose\0") {
                     Some(value) => value,
                     None => return close_library(library),
                 };
-                let actuate = match symbol(library, "MTActuatorActuate") {
+                let actuate = match symbol(library, b"MTActuatorActuate\0") {
                     Some(value) => value,
                     None => return close_library(library),
                 };
@@ -389,7 +393,7 @@ mod macos {
                         if actuator.is_none() {
                             log::debug!("Private trackpad actuator unavailable; using AppKit haptics fallback");
                         }
-                        let mut start = std::time::Instant::now();
+                        let mut start;
                         for message in receiver {
                             match message {
                                 Message::Tick(sequence) => {
