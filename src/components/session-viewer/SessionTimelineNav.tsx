@@ -80,7 +80,13 @@ function SessionTimelineNav({
 
   const currentIndex = useMemo(() => {
     const sourceIndex = items.find((item) => item.entryId === activeEntryId)?.index ?? items[0]?.index ?? 0;
-    const index = sampled.findLastIndex((item) => item.index <= sourceIndex);
+    let index = -1;
+    for (let i = sampled.length - 1; i >= 0; i -= 1) {
+      if (sampled[i].index <= sourceIndex) {
+        index = i;
+        break;
+      }
+    }
     return Math.max(0, index);
   }, [activeEntryId, items, sampled]);
 

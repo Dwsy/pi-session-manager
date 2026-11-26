@@ -1,6 +1,6 @@
 /**
  * Reactive hook that returns the current resolved Shiki theme name.
- * Re-renders when data-code-theme or theme-dark/theme-light class changes.
+ * Re-renders when data-code-theme, active chat theme markers, or theme-dark/theme-light class changes.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { resolveShikiTheme } from '@/utils/codeThemes'
@@ -16,14 +16,14 @@ export function useResolvedCodeTheme(): string {
   useEffect(() => {
     const root = document.documentElement
 
-    // Watch for data-code-theme changes AND theme-dark/theme-light class toggles
+    // Watch for data-code-theme, active Pi/Base46/Codex chat theme markers, and theme-dark/theme-light class toggles
     const observer = new MutationObserver(() => {
       setTheme(resolve())
     })
 
     observer.observe(root, {
       attributes: true,
-      attributeFilter: ['data-code-theme', 'class'],
+      attributeFilter: ['data-code-theme', 'data-chat-theme', 'data-chat-theme-scheme', 'class'],
     })
 
     return () => observer.disconnect()
