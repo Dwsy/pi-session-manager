@@ -264,7 +264,7 @@ describe("pi-session-bridge commands", () => {
     const { registerAll } = await import("./commands.js");
     registerAll(pi);
 
-    await handlers.get("kanban")!("", ctx);
+    await handlers.get("kanban")!("quick", ctx);
 
     expect(custom).toHaveBeenCalledWith(expect.any(Function), { overlay: true });
     expect(setSessionStatus).toHaveBeenCalledWith("sid", "tag-1", 0);
@@ -303,7 +303,7 @@ describe("pi-session-bridge commands", () => {
       ui: { notify: vi.fn(), input: vi.fn(), custom },
     } as unknown as ExtensionContext;
     const command = handlers.get("kanban")!;
-    const pending = command("", ctx);
+    const pending = command("quick", ctx);
     await new Promise((resolve) => setTimeout(resolve, 0));
     return { component: captured!, ctx, close: () => pending };
   }

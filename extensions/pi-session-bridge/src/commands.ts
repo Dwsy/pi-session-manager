@@ -6,8 +6,13 @@
 import type { ExtensionAPI, ExtensionContext, ThemeColor } from "@earendil-works/pi-coding-agent";
 import * as connMgr from "./connection-manager.js";
 import * as kanbanStore from "./kanban-store.js";
+import { mapKanbanStatusColorToTheme } from "./kanban-board-model.js";
+import { runKanbanTuiLoop } from "./kanban-tui.js";
 import { openPsmSession } from "./open-psm.js";
+import { showPsmControlPanel } from "./psm-tui.js";
 import type { LabelItem, StatusItem } from "./types.js";
+
+export { mapKanbanStatusColorToTheme };
 
 export type CommandHandler = (args: string, ctx: ExtensionContext) => Promise<void>;
 
@@ -176,30 +181,6 @@ function color(theme: CustomTheme, name: ThemeColor, text: string): string {
 
 function bold(theme: CustomTheme, text: string): string {
   return theme.bold(text);
-}
-
-/** Host status colors are business/UI tokens, not Pi theme tokens. */
-export function mapKanbanStatusColorToTheme(statusColor: string | null | undefined): ThemeColor {
-  switch (statusColor) {
-    case "success":
-    case "emerald":
-      return "success";
-    case "warning":
-    case "amber":
-      return "warning";
-    case "destructive":
-      return "error";
-    case "slate":
-      return "muted";
-    case "info":
-    case "purple":
-    case "pink":
-    case "indigo":
-    case "cyan":
-    case "ring":
-    default:
-      return "accent";
-  }
 }
 
 function statusThemeColor(status: StatusItem): ThemeColor {
@@ -531,7 +512,15 @@ async function openInPsmCommand(args: string, ctx: ExtensionContext) {
 
 register("open-in-psm", "Open current session in Pi Session Manager", openInPsmCommand);
 
-register("psm", "PSM bridge connection panel", async (_args, ctx) => {
+register("psm", "PSM bridge control center", async (_args, ctx) => {
+  const sid = getActiveSessionId(ctx);
+  if (ctx.hasUI && typeof ctx.ui.custom === "function") {
+    const result = await showPsmControlPanel(ctx, sid);
+    if (result === "open-kanban" && sid) {
+      await runKanbanTuiLoop(ctx, sid, { onMutate: refreshCompletionNames });
+    }
+    return;
+  }
   const conn = connMgr.getConnection();
   const state = conn?.state ?? "disconnected";
   const live = connMgr.isLiveEnabled();
@@ -557,7 +546,7 @@ register("psm", "PSM bridge connection panel", async (_args, ctx) => {
   }
 });
 
-register("kanban", "Manage current session Kanban Status and Labels", async (args, ctx) => {
+register("kanban", "Project-level Horizontal Kanban Board (Status, Labels, Drag & Manage)", async (args, ctx) => {
   const sid = getActiveSessionId(ctx);
   if (!sid) {
     ctx.ui.notify("No session", "error");
@@ -565,7 +554,7 @@ register("kanban", "Manage current session Kanban Status and Labels", async (arg
   }
 
   const trimmed = args.trim();
-  if (trimmed) {
+  if (trimmed && trimmed !== "quick" && trimmed !== "all" && trimmed !== "manage") {
     await runKanbanArgs(trimmed, ctx, sid);
     return;
   }
@@ -575,38 +564,46 @@ register("kanban", "Manage current session Kanban Status and Labels", async (arg
     return;
   }
 
-  while (true) {
-    const result = await showKanbanPanel(ctx, sid);
-    if (!result) return;
+  if (trimmed === "quick") {
+    while (true) {
+      const result = await showKanbanPanel(ctx, sid);
+      if (!result) return;
 
-    if (result === "new-status") {
-      const name = (await ctx.ui.input("New Kanban status name"))?.trim();
+      if (result === "new-status") {
+        const name = (await ctx.ui.input("New Kanban status name"))?.trim();
+        if (!name) continue;
+        try {
+          const status = await kanbanStore.createStatus(name, "info");
+          await kanbanStore.setSessionStatus(sid, status.id, 0);
+          connMgr.notifyPsmStatusChange(sid);
+          refreshCompletionNames();
+          ctx.ui.notify(`Created status: ${status.name}`, "info");
+        } catch (err) {
+          ctx.ui.notify(`Failed to create status: ${err}`, "error");
+          return;
+        }
+        continue;
+      }
+
+      const name = (await ctx.ui.input("New label name"))?.trim();
       if (!name) continue;
+      const colorValue = (await ctx.ui.input("Label color (#RRGGBB)", "#0969da"))?.trim() || "#0969da";
+      const description = (await ctx.ui.input("Label description (optional)"))?.trim() || "";
       try {
-        const status = await kanbanStore.createStatus(name, "info");
-        await kanbanStore.setSessionStatus(sid, status.id, 0);
-        connMgr.notifyPsmStatusChange(sid);
+        const label = await kanbanStore.createLabel(name, colorValue, description);
+        await kanbanStore.assignLabel(sid, label.id);
         refreshCompletionNames();
-        ctx.ui.notify(`Created status: ${status.name}`, "info");
+        ctx.ui.notify(`Created label: ${label.name}`, "info");
       } catch (err) {
-        ctx.ui.notify(`Failed to create status: ${err}`, "error");
+        ctx.ui.notify(`Failed to create label: ${err}`, "error");
         return;
       }
-      continue;
-    }
-
-    const name = (await ctx.ui.input("New label name"))?.trim();
-    if (!name) continue;
-    const colorValue = (await ctx.ui.input("Label color (#RRGGBB)", "#0969da"))?.trim() || "#0969da";
-    const description = (await ctx.ui.input("Label description (optional)"))?.trim() || "";
-    try {
-      const label = await kanbanStore.createLabel(name, colorValue, description);
-      await kanbanStore.assignLabel(sid, label.id);
-      refreshCompletionNames();
-      ctx.ui.notify(`Created label: ${label.name}`, "info");
-    } catch (err) {
-      ctx.ui.notify(`Failed to create label: ${err}`, "error");
-      return;
     }
   }
+
+  await runKanbanTuiLoop(ctx, sid, {
+    initialView: trimmed === "manage" ? "manage" : "board",
+    allProjects: trimmed === "all",
+    onMutate: refreshCompletionNames,
+  });
 }, kanbanCompletions);
