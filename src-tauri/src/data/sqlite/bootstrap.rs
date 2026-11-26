@@ -3,7 +3,7 @@ use super::legacy_fts::drop_sessions_fts_triggers;
 use super::message_index::ensure_message_fts_schema;
 use super::migrations::apply_migrations;
 use super::schema::{ensure_app_version_info_table, ensure_schema_version_table, get_app_version_info, get_current_version, set_app_version_info, LATEST_SCHEMA_VERSION};
-use rusqlite::OpenFlags;
+use rusqlite::{OpenFlags, TransactionBehavior};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -144,7 +144,7 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
     if let Some(parent) = db_path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Failed to create database parent dir: {e}"))?;
     }
-    let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {e}"))?;
+    let mut conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {e}"))?;
 
     let init_result = (|| -> Result<(), String> {
         // Enable WAL mode for better concurrency and reliability
@@ -373,16 +373,18 @@ fn open_and_init_db(db_path: &Path, config: &Config) -> Result<Connection, Strin
             }
         }
 
-        // Apply versioned schema migrations if needed
-        let current_version = get_current_version(&conn)?;
+        // Lock before reading the version so concurrent initializers cannot run the same migrations.
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|e| format!("Failed to begin schema migration transaction: {e}"))?;
+        let current_version = get_current_version(&tx)?;
         if current_version < LATEST_SCHEMA_VERSION {
-            apply_migrations(&conn, current_version)?;
+            apply_migrations(&tx, current_version)?;
         }
 
         // Update app version info after successful migrations
         let now = Utc::now().to_rfc3339();
-        let final_schema_version = get_current_version(&conn)?;
-        set_app_version_info(&conn, current_app_version, final_schema_version, &now)?;
+        let final_schema_version = get_current_version(&tx)?;
+        set_app_version_info(&tx, current_app_version, final_schema_version, &now)?;
+        tx.commit().map_err(|e| format!("Failed to commit schema migrations: {e}"))?;
 
         conn.execute("CREATE INDEX IF NOT EXISTS idx_message_entries_entry_id ON message_entries(entry_id)", []).map_err(|e| format!("Failed to create entry_id index on message_entries: {e}"))?;
 
@@ -459,6 +461,46 @@ pub struct VersionDowngradeInfo {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn concurrent_initializers_complete_migrations() {
+        let temp_dir = tempdir().expect("tempdir");
+        let db_path = temp_dir.path().join("sessions.db");
+        let seed = Connection::open(&db_path).expect("open database");
+        seed.execute_batch("PRAGMA journal_mode=WAL;").expect("enable WAL");
+        drop(seed);
+
+        let start = std::sync::Barrier::new(2);
+        let initialize = || {
+            start.wait();
+            init_db_with_path(&db_path, &Config::default())
+        };
+        std::thread::scope(|scope| {
+            let first = scope.spawn(initialize);
+            let second = scope.spawn(initialize);
+            for thread in [first, second] {
+                let conn = thread.join().expect("initializer panicked").expect("concurrent initialization");
+                assert_eq!(get_current_version(&conn).expect("schema version"), LATEST_SCHEMA_VERSION);
+            }
+        });
+    }
+
+    #[test]
+    fn failed_migration_rolls_back_schema_changes() {
+        let temp_dir = tempdir().expect("tempdir");
+        let db_path = temp_dir.path().join("sessions.db");
+        let seed = Connection::open(&db_path).expect("open database");
+        ensure_schema_version_table(&seed).expect("seed schema version");
+        seed.execute_batch("CREATE TRIGGER reject_schema_version BEFORE UPDATE ON schema_version BEGIN SELECT RAISE(ABORT, 'migration blocked'); END;").expect("block version updates");
+        drop(seed);
+
+        let error = init_db_with_path(&db_path, &Config::default()).expect_err("migration must fail");
+        assert!(error.contains("migration blocked"), "unexpected error: {error}");
+        let conn = Connection::open(&db_path).expect("reopen database");
+        assert_eq!(get_current_version(&conn).expect("schema version"), 0);
+        let added_columns: i64 = conn.query_row("SELECT COUNT(*) FROM pragma_table_info('tags') WHERE name IN ('auto_rules', 'parent_id')", [], |row| row.get(0)).expect("inspect tags schema");
+        assert_eq!(added_columns, 0);
+    }
 
     #[test]
     fn uses_primary_db_for_local_mode() {
