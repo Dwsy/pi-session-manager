@@ -4,11 +4,22 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-26
+
+### Added
+
+- **Appearance theme gallery** — add an interactive theme gallery to Appearance settings with live theme marker updates in session view.
+- **Pi Session Bridge TUIs** — add a shared TUI kit, horizontal project Kanban board (`/kanban`) with editable statuses and labels, PSM control center (`/psm`), and offline session loading fallback.
+- **Timeline trackpad haptics** — drive macOS timeline haptics via the private trackpad actuator with a single pulse per landing.
+
 ### Fixed
 
-- Restore the scan toggles for Antigravity and Cursor in settings. Neither provider can be selected as the default target for resuming sessions.
-- Group Antigravity sessions under the project folders recorded in their conversation summaries. Clear the session cache and restart after updating to refresh previously indexed sessions.
-- Align the frontend Tauri API with the 2.12 runtime required by the deep-link plugin so local builds pass the version check.
+- **Web Semantic Search** — restore agent tools and full message history via `invoke_model_agent`, enforce host-defined tool permissions, bound browser tool output size, and send `x-opencode-session` to official OpenCode Go routes (PR #79).
+- **Model picker layering** — raise `ModelSelector` portal above the Settings dialog overlay (PR #77).
+- **OpenCode Go discovery & usage** — load live chat models and per-model routes from `/inference/go`, distinguish Pi built-in models (`Available in Pi`), and read 5-hour/weekly/monthly allowances directly from Go (PR #75).
+- **Antigravity visibility & project grouping** — restore scan toggles for Antigravity and Cursor, group Antigravity sessions by project folders from `conversation_summaries.db`, and serialize concurrent SQLite schema migrations (PR #73).
+- **Tauri 2.12.4 version pin** — align `tauri` and `@tauri-apps/api` to `2.12.4` across `package.json`, `pnpm-lock.yaml`, `package-lock.json`, and `src-tauri/Cargo.toml`.
+- **UI & build fixes** — round active dashboard time-filter buttons, drop `findLastIndex` in session view, and repair timeline haptic Rust build.
 
 ## [0.9.1] - 2026-10-31
 
