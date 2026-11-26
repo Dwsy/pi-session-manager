@@ -75,6 +75,19 @@ pub async fn invoke_model_text_stream(app_state: crate::app_state::SharedAppStat
     }
 }
 
+/// Run one nonstreaming Pi agent model turn and return its terminal `AssistantMessage`.
+///
+/// `request` carries the agent's full message history, tool definitions, and optional
+/// `sessionId`. Tool calls come back untouched so the caller's agent owns the tool loop.
+/// Provider failures return the message with `stopReason: "error"`; helper failures are `Err`.
+pub async fn invoke_model_agent(mut request: serde_json::Value) -> Result<serde_json::Value, String> {
+    // Reuse the agent event protocol of the stream route and keep only its terminal message.
+    let payload = request.as_object_mut().ok_or("Agent model request must be an object")?;
+    payload.insert("stream".into(), true.into());
+    payload.insert("protocol".into(), "pi-agent".into());
+    run_pi_model_agent_helper(pi_model_text_script_path()?, request, |_| {}).await
+}
+
 #[cfg(feature = "gui")]
 pub async fn invoke_model_agent_stream(app_state: crate::app_state::SharedAppState, request_id: String, mut request: serde_json::Value) -> Result<serde_json::Value, String> {
     let event_name = format!("psm-ai-stream:{request_id}");
@@ -164,7 +177,6 @@ where
     run_pi_cli_agent_stream(request, on_event).await
 }
 
-#[cfg(feature = "gui")]
 async fn run_pi_model_agent_helper<F>(script: std::path::PathBuf, request: serde_json::Value, mut on_event: F) -> Result<serde_json::Value, String>
 where
     F: FnMut(&serde_json::Value) + Send,
@@ -204,7 +216,7 @@ where
         return Err(helper_error.or(if stderr.is_empty() { None } else { Some(stderr) }).unwrap_or_else(|| format!("Pi AI helper exited with {}", output.status)));
     }
 
-    Ok(final_response.unwrap_or(serde_json::Value::Null))
+    final_response.ok_or_else(|| "Pi AI helper did not return a final message".to_string())
 }
 
 #[cfg(feature = "gui")]

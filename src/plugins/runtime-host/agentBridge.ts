@@ -290,13 +290,23 @@ function createOpenSessionTool(capabilities?: PsmAgentBridgeCapabilities): PsmAg
   }
 }
 
-function createRuntimeTools(params: PsmAgentCreateSessionParams, capabilities?: PsmAgentBridgeCapabilities): PsmAgentRuntimeTool[] {
-  const byName: Record<string, () => PsmAgentRuntimeTool> = {
-    'psm.search.fulltext': () => createSearchTool(capabilities),
-    'psm.sessions.readEntries': () => createReadEntriesTool(capabilities),
-    'psm.sessions.open': () => createOpenSessionTool(capabilities),
+/** Resolve selected tools against the host's permission for each capability. */
+function createRuntimeTools(params: PsmAgentCreateSessionParams, options: PsmAgentBridgeOptions, permissions: Set<PsmPermission>): PsmAgentRuntimeTool[] {
+  const byName = new Map<string, [PsmPermission, typeof createSearchTool]>([
+    ['psm.search.fulltext', ['search:read', createSearchTool]],
+    ['psm.sessions.readEntries', ['sessions:read', createReadEntriesTool]],
+    ['psm.sessions.open', ['sessions:read', createOpenSessionTool]],
+  ])
+  const tools: PsmAgentRuntimeTool[] = []
+  for (const descriptor of params.tools) {
+    assertPermission(options.pluginId, permissions, descriptor.permission, 'tool permission')
+    const registered = byName.get(descriptor.name)
+    if (!registered) continue
+    const [required, createTool] = registered
+    assertPermission(options.pluginId, permissions, required, 'tool permission')
+    tools.push(createTool(options.capabilities))
   }
-  return params.tools.map((tool) => byName[tool.name]?.()).filter((tool): tool is PsmAgentRuntimeTool => Boolean(tool))
+  return tools
 }
 
 function stringifyToolResult(result: unknown) {
@@ -455,6 +465,28 @@ function pushStreamError(stream: ReturnType<typeof createAssistantMessageEventSt
   })
 }
 
+/** Keep browser tool output within the HTTP body budget while retaining every tool call/result pair. */
+function webModelMessages(messages: Message[]): Message[] {
+  // Budget UTF-16 units well below Axum's 2 MiB limit even at six JSON bytes per escaped unit.
+  // Spend the shared budget on recent results first and reserve room for multiple tools.
+  let remaining = 128 * 1024
+  const bounded = [...messages]
+  for (let index = bounded.length - 1; index >= 0; index -= 1) {
+    const message = bounded[index]
+    if (message.role !== 'toolResult') continue
+    const { details: _details, ...result } = message
+    const text = toolResultText(message)
+    const limit = Math.min(remaining, 32 * 1024)
+    const excerpt = text.slice(0, limit).replace(/[\uD800-\uDBFF]$/, '')
+    remaining -= excerpt.length
+    bounded[index] = {
+      ...result,
+      content: [{ type: 'text', text: excerpt.length < text.length ? `${excerpt}\n[Tool output truncated]` : excerpt }],
+    }
+  }
+  return bounded
+}
+
 function createPsmStreamFn(transport: PsmTransport, modelRef: PsmAgentModelRef): StreamFn {
   return (_model, context, options) => {
     const stream = createAssistantMessageEventStream()
@@ -477,6 +509,7 @@ function createPsmStreamFn(transport: PsmTransport, modelRef: PsmAgentModelRef):
     }
     options?.signal?.addEventListener('abort', abortListener, { once: true })
 
+    // Resend history and tools each turn. OpenCode Go uses the stable agent session ID to route those turns together.
     const payload = {
       protocol: 'pi-agent',
       systemPrompt: context.systemPrompt ?? '',
@@ -484,6 +517,7 @@ function createPsmStreamFn(transport: PsmTransport, modelRef: PsmAgentModelRef):
       provider: modelRef.provider,
       model: modelRef.id,
       reasoning: options?.reasoning,
+      sessionId: options?.sessionId,
       messages: context.messages,
       tools: context.tools,
     }
@@ -517,10 +551,20 @@ function createPsmStreamFn(transport: PsmTransport, modelRef: PsmAgentModelRef):
       return stream
     }
 
-    void transport.invoke<PsmAiTextResponse>('invoke_model_text', payload).then((response) => {
+    // Without a stream channel (web), run one nonstreaming turn and replay its terminal Pi message,
+    // tool calls and provider errors included, so the upstream Agent keeps owning the tool loop.
+    void transport.invoke<AssistantMessage>('invoke_model_agent', {
+      ...payload,
+      messages: webModelMessages(context.messages),
+    }).then((message) => {
       if (complete) return
-      pushLegacyStreamEvent(stream, modelRef, { type: 'done', response }, legacyState)
+      if (message.stopReason === 'pending') throw new Error('PSM agent model returned an unfinished pending response')
       finish()
+      if (message.stopReason === 'error' || message.stopReason === 'aborted') {
+        stream.push({ type: 'error', reason: message.stopReason, error: message })
+      } else {
+        stream.push({ type: 'done', reason: message.stopReason, message })
+      }
     }).catch((error) => {
       if (complete) return
       finish()
@@ -624,41 +668,6 @@ async function runAgentSession(session: ActiveAgentSession, params: PsmAgentRunP
   return session.agent.state.messages.slice(before)
 }
 
-export function createPsmAgentBridgeCapabilities(transport: PsmTransport): PsmAgentBridgeCapabilities {
-  return {
-    search: {
-      fulltext(params) {
-        return transport.invoke('full_text_search', {
-          query: params.query,
-          roleFilter: params.roleFilter ?? 'all',
-          globPattern: params.globPattern,
-          projectPath: params.projectPath,
-          page: params.page ?? 0,
-          pageSize: params.pageSize ?? 20,
-          matchMode: params.matchMode,
-          sortOrder: params.sortOrder,
-          sourceFilter: params.sourceFilter,
-          from: params.from,
-          to: params.to,
-        })
-      },
-    },
-    sessions: {
-      async readEntries(sessionPath, options) {
-        const entries = await transport.invoke<unknown[]>('get_session_entries', { path: sessionPath })
-        return options?.limit === undefined ? entries : entries.slice(0, options.limit)
-      },
-      async open(sessionPath, options) {
-        if (options?.target === 'terminal') {
-          await transport.invoke('open_session_in_terminal', { path: sessionPath })
-          return
-        }
-        await transport.invoke('open_session_in_browser', { path: sessionPath })
-      },
-    },
-  }
-}
-
 export function createPsmAgentBridge(options: PsmAgentBridgeOptions): PsmAgentBridge {
   const permissions = new Set(options.permissions)
   const sessions = new Map<string, ActiveAgentSession>()
@@ -668,9 +677,7 @@ export function createPsmAgentBridge(options: PsmAgentBridgeOptions): PsmAgentBr
     async createSession(params) {
       assertPermission(options.pluginId, permissions, 'agent:invoke')
       assertPermission(options.pluginId, permissions, 'model:invoke')
-      for (const tool of params.tools) {
-        assertPermission(options.pluginId, permissions, tool.permission, 'tool permission')
-      }
+      const tools = createRuntimeTools(params, options, permissions)
 
       const resolveHostModel = options.resolveHostModel ?? (
         options.transport ? createPsmAgentHostModelResolver(options.transport) : async () => undefined
@@ -694,7 +701,7 @@ export function createPsmAgentBridge(options: PsmAgentBridgeOptions): PsmAgentBr
           systemPrompt: params.systemPrompt ?? '',
           model: toPiModel(model),
           thinkingLevel: normalizeThinkingLevel(params.thinkingLevel),
-          tools: toPiAgentTools(createRuntimeTools(params, options.capabilities)),
+          tools: toPiAgentTools(tools),
         },
       })
 

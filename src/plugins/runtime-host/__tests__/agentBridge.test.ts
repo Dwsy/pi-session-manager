@@ -139,7 +139,11 @@ describe('createPsmAgentBridge', () => {
     })).rejects.toThrow('Plugin permission denied')
   })
 
-  it('rejects tools whose required permission is missing', async () => {
+  it.each([
+    ['psm.search.fulltext', 'search:read'],
+    ['psm.sessions.readEntries', 'sessions:read'],
+    ['psm.sessions.open', 'sessions:read'],
+  ])('rejects %s when the plugin lacks %s', async (name, required) => {
     const bridge = createPsmAgentBridge({
       pluginId: 'builtin.semantic-search',
       permissions: ['agent:invoke', 'model:invoke'],
@@ -149,9 +153,9 @@ describe('createPsmAgentBridge', () => {
 
     await expect(bridge.createSession({
       purpose: 'semantic-search',
-      tools: [{ name: 'psm.search.fulltext', permission: 'search:read' }],
+      tools: [{ name, permission: 'model:invoke' }],
       storage: { scope: 'plugin' },
-    })).rejects.toThrow('missing tool permission')
+    })).rejects.toThrow(`missing tool permission ${required}`)
   })
 
   it('runs the upstream Pi Agent and returns controlled tool results', async () => {
@@ -291,9 +295,111 @@ describe('createPsmAgentBridge', () => {
         provider: 'openai',
         model: 'gpt-5.5',
         prompt: 'hello',
+        sessionId: handle.sessionId,
       }),
       expect.any(Object),
     )
+  })
+
+  it('runs the tool loop over a nonstreaming transport with full history and a stable session ID', async () => {
+    const fulltext = vi.fn(async () => ({ hits: [{ session_path: '/repo/auth.jsonl' }], total_hits: 1, has_more: false }))
+    const turns: Array<Record<string, unknown>> = []
+    // Web transport: no stream channel, so every model turn goes through one invoke round trip.
+    const transport: PsmTransport = {
+      invoke: vi.fn(async (command: string, payload?: Record<string, unknown>) => {
+        if (command !== 'invoke_model_agent') throw new Error(`unexpected command: ${command}`)
+        turns.push(payload ?? {})
+        if (turns.length === 1) {
+          return assistant([{ type: 'toolCall', id: 'call-search', name: 'psm.search.fulltext', arguments: { query: 'auth' } }], 'toolUse')
+        }
+        return assistant([{ type: 'text', text: 'found /repo/auth.jsonl' }])
+      }) as PsmTransport['invoke'],
+    }
+
+    const bridge = createPsmAgentBridge({
+      pluginId: 'builtin.semantic-search',
+      permissions: ['agent:invoke', 'model:invoke', 'search:read'],
+      transport,
+      resolveHostModel: async () => ({ provider: 'opencode-go', id: 'glm-5.3-flash' }),
+      capabilities: { search: { fulltext } },
+    })
+    const handle = await bridge.createSession({
+      purpose: 'semantic-search',
+      tools: [{ name: 'psm.search.fulltext', permission: 'search:read' }],
+      storage: { scope: 'memory' },
+    })
+    const result = await bridge.run({ sessionId: handle.sessionId, prompt: 'find auth sessions' })
+
+    expect(result.text).toBe('found /repo/auth.jsonl')
+    expect(fulltext).toHaveBeenCalledWith(expect.objectContaining({ query: 'auth' }))
+    expect(turns).toHaveLength(2)
+    for (const turn of turns) {
+      expect(turn.sessionId).toBe(handle.sessionId)
+      expect(turn.tools).toEqual([expect.objectContaining({ name: 'psm.search.fulltext' })])
+    }
+    expect(turns[1].messages).toEqual([
+      expect.objectContaining({ role: 'user' }),
+      expect.objectContaining({ role: 'assistant', content: [expect.objectContaining({ type: 'toolCall', id: 'call-search' })] }),
+      expect.objectContaining({
+        role: 'toolResult',
+        toolCallId: 'call-search',
+        content: [{ type: 'text', text: expect.stringContaining('/repo/auth.jsonl') }],
+      }),
+    ])
+  })
+
+  it('keeps large tool results local and sends bounded excerpts with their call IDs', async () => {
+    const entries = [{ content: '🚀'.repeat(650_000) }]
+    const calls = Array.from({ length: 5 }, (_, index) => ({
+      type: 'toolCall' as const,
+      id: `read-${index}`,
+      name: 'psm.sessions.readEntries',
+      arguments: { sessionPath: `/repo/session-${index}.jsonl` },
+    }))
+    const invoke = vi.fn()
+      .mockResolvedValueOnce(assistant(calls, 'toolUse'))
+      .mockResolvedValueOnce(assistant([{ type: 'text', text: 'reviewed sessions' }]))
+    const bridge = createPsmAgentBridge({
+      pluginId: 'builtin.semantic-search',
+      permissions: ['agent:invoke', 'model:invoke', 'sessions:read'],
+      transport: { invoke },
+      resolveHostModel: async () => ({ provider: 'opencode-go', id: 'glm-5.3-flash' }),
+      capabilities: { sessions: { readEntries: async () => entries, open: async () => {} } },
+    })
+    const handle = await bridge.createSession({
+      purpose: 'semantic-search',
+      tools: [{ name: 'psm.sessions.readEntries', permission: 'sessions:read' }],
+    })
+    const result = await bridge.run({ sessionId: handle.sessionId, prompt: 'review the matching sessions' })
+
+    expect(result.text).toBe('reviewed sessions')
+    expect(result.toolResults?.[0].result).toBe(entries)
+    const payload = invoke.mock.calls[1][1]
+    const wireSize = new TextEncoder().encode(JSON.stringify({ command: 'invoke_model_agent', payload })).length
+    expect(wireSize).toBeLessThan(1024 * 1024)
+    const toolResults = payload.messages.filter((message: { role: string }) => message.role === 'toolResult')
+    expect(toolResults.map((message: { toolCallId: string }) => message.toolCallId)).toEqual(calls.map((call) => call.id))
+    expect(toolResults[0].content[0].text).toBe('\n[Tool output truncated]')
+    expect(toolResults.at(-1).content[0].text).toContain('🚀')
+    expect(toolResults.at(-1)).not.toHaveProperty('details')
+  })
+
+  it('rejects a nonstreaming run with the provider error instead of empty text', async () => {
+    const transport: PsmTransport = {
+      invoke: vi.fn(async () => ({
+        ...assistant([], 'error'),
+        errorMessage: '400 MissingSessionID',
+      })) as PsmTransport['invoke'],
+    }
+    const bridge = createPsmAgentBridge({
+      pluginId: 'builtin.semantic-search',
+      permissions: ['agent:invoke', 'model:invoke'],
+      transport,
+      resolveHostModel: async () => ({ provider: 'opencode-go', id: 'glm-5.3-flash' }),
+    })
+    const handle = await bridge.createSession({ purpose: 'semantic-search', tools: [], storage: { scope: 'memory' } })
+
+    await expect(bridge.run({ sessionId: handle.sessionId, prompt: 'hi' })).rejects.toThrow('400 MissingSessionID')
   })
 
   it('streams text deltas from the upstream Pi Agent run', async () => {
