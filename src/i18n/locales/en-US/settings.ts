@@ -1283,6 +1283,7 @@ export const settings = {
       loadingCatalog: "Loading models.dev...",
       loadingRemoteModels: "Fetching provider /models ...",
       alreadyAdded: "Added",
+      availableInPi: "Available in Pi",
       pendingRemove: "Pending remove",
       manualSaveHint:
         "Manual save required. Click Save Config to persist changes.",
@@ -1517,6 +1518,7 @@ export const settings = {
       remoteModelsAdded:
         "Added {{added}} model(s) from provider API (skipped {{skipped}}, enriched {{enriched}})",
       remoteModelsNeedBaseUrl: "Current provider needs a Base URL first",
+      openCodeGoNeedsPi: "Connect OpenCode Go in Pi, then refresh. PSM needs to identify the models Pi already provides before it can add new ones.",
       pricingNeedModelId:
         "Current model needs a valid ID before pricing can be filled",
       pricingNotFound: "No pricing match found for {{id}}",

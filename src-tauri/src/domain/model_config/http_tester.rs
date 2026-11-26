@@ -1,6 +1,7 @@
 //! Model HTTP testing logic
 use crate::domain::model_config::reader::{get_models_json_path, read_models_config_internal};
 use crate::domain::model_config::types::ModelHttpTestResult;
+use crate::domain::opencode_go;
 use crate::utils::string::{join_url, shell_escape_single_quotes};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_TYPE};
 use serde_json::{Map, Value};
@@ -12,9 +13,8 @@ fn build_masked_curl_command(url: &str, headers: &HeaderMap, body: &str) -> Stri
     let mut parts = vec!["curl -sS -X POST".to_string(), format!("'{}'", shell_escape_single_quotes(url))];
 
     for (name, value) in headers {
-        let key = name.as_str().to_ascii_lowercase();
         let value_text = value.to_str().unwrap_or("");
-        let display_value = if key == "authorization" || key == "x-api-key" { "***" } else { value_text };
+        let display_value = if matches!(name.as_str(), "authorization" | "x-api-key" | "x-goog-api-key" | "api-key") { "***" } else { value_text };
         parts.push(format!("-H '{}: {}'", shell_escape_single_quotes(name.as_str()), shell_escape_single_quotes(display_value)));
     }
 
@@ -73,21 +73,24 @@ fn is_openai_reasoning_model(model: &str) -> bool {
     normalized.starts_with("o1") || normalized.starts_with("o3") || normalized.starts_with("o4") || normalized.starts_with("gpt-5")
 }
 
-fn build_openai_chat_attempts(base_url: &str, model: &str, prompt_text: &str) -> Vec<HttpTestAttempt> {
+fn build_openai_chat_attempts(base_url: &str, model: &str, prompt_text: &str, go: bool) -> Vec<HttpTestAttempt> {
     let mut attempts = Vec::with_capacity(2);
     let max_completion_tokens = if is_openai_reasoning_model(model) { 256 } else { 128 };
 
-    attempts.push(HttpTestAttempt {
-        request_style: "chat-completions:max_completion_tokens",
-        url: join_url(base_url, "chat/completions"),
-        body_value: serde_json::json!({
-            "model": model,
-            "messages": [{"role": "user", "content": prompt_text}],
-            "stream": false,
-            "max_completion_tokens": max_completion_tokens,
-        }),
-        extra_headers: Vec::new(),
-    });
+    // Go's Chat Completions adapter only needs the max_tokens form.
+    if !go {
+        attempts.push(HttpTestAttempt {
+            request_style: "chat-completions:max_completion_tokens",
+            url: join_url(base_url, "chat/completions"),
+            body_value: serde_json::json!({
+                "model": model,
+                "messages": [{"role": "user", "content": prompt_text}],
+                "stream": false,
+                "max_completion_tokens": max_completion_tokens,
+            }),
+            extra_headers: Vec::new(),
+        });
+    }
 
     attempts.push(HttpTestAttempt {
         request_style: "chat-completions:max_tokens",
@@ -168,6 +171,19 @@ fn build_anthropic_messages_attempts(base_url: &str, model: &str, prompt_text: &
     ]
 }
 
+/// Build the Go Gemini probe using the model ID in the GenerateContent path.
+fn build_go_gemini_attempt(base_url: &str, model: &str, prompt_text: &str) -> HttpTestAttempt {
+    HttpTestAttempt {
+        request_style: "gemini:generate-content",
+        url: join_url(base_url, &format!("models/{}:generateContent", urlencoding::encode(model))),
+        body_value: serde_json::json!({
+            "contents": [{"role": "user", "parts": [{"text": prompt_text}]}],
+            "generationConfig": {"maxOutputTokens": 256},
+        }),
+        extra_headers: Vec::new(),
+    }
+}
+
 pub fn extract_response_preview(api: &str, response_text: &str) -> Option<String> {
     let parsed: Value = serde_json::from_str(response_text).ok()?;
     match api {
@@ -181,6 +197,7 @@ pub fn extract_response_preview(api: &str, response_text: &str) -> Option<String
                 .and_then(|items| items.iter().find_map(|item| item.get("content").and_then(|v| v.as_array()).and_then(|content| content.iter().find_map(|part| part.get("text").and_then(|v| v.as_str()).map(str::trim).filter(|value| !value.is_empty()).map(str::to_string)))))
         }),
         "anthropic-messages" => parsed.get("content").and_then(|v| v.as_array()).and_then(|items| items.iter().find_map(|item| item.get("text").and_then(|v| v.as_str()).map(str::trim).filter(|value| !value.is_empty()).map(str::to_string))),
+        "google-generative-ai" => parsed.pointer("/candidates/0/content/parts")?.as_array()?.iter().filter(|part| part.get("thought").and_then(Value::as_bool) != Some(true)).find_map(|part| part.get("text").and_then(Value::as_str).map(str::trim).filter(|text| !text.is_empty()).map(str::to_string)),
         _ => None,
     }
 }
@@ -230,12 +247,35 @@ pub async fn test_model_http_internal(provider: String, model: String, prompt: O
     let config = read_models_config_internal()?;
     let (provider_obj, model_obj) = extract_provider_and_model(&config, &provider, &model)?;
 
-    let base_url = provider_obj.get("baseUrl").and_then(|v| v.as_str()).ok_or_else(|| format!("Provider `{provider}` is missing baseUrl"))?.to_string();
+    // Prefer model-level routes and check that Go's saved SDK base reaches the expected wire route.
+    let entries = [model_obj, Some(provider_obj)];
+    let configured_base = entries.into_iter().flatten().filter_map(|entry| entry.get("baseUrl").and_then(Value::as_str)).map(str::trim).find(|base| !base.is_empty());
+    let is_go = configured_base.map(opencode_go::is_go_url).unwrap_or(provider == "opencode-go");
+    if is_go && provider == "opencode" {
+        return Err("Use the opencode-go provider to test an OpenCode Go model".to_string());
+    }
+    if is_go && !opencode_go::can_reuse_credentials(provider_obj) {
+        return Err("Configure the proxy and native OpenCode Go models under separate providers before testing".to_string());
+    }
+    let configured_api = entries.into_iter().flatten().filter_map(|entry| entry.get("api").and_then(Value::as_str)).map(str::trim).find(|api| !api.is_empty());
+    if is_go && configured_api.is_none() {
+        return Err("Set the API protocol for this OpenCode Go model in models.json, or import it from the Go catalog before testing".to_string());
+    }
+    let api = configured_api.unwrap_or("openai-completions").to_string();
+    let base_url = if is_go { opencode_go::verify_probe_base(configured_base, &api)? } else { configured_base.ok_or_else(|| format!("Provider `{provider}` is missing baseUrl"))? };
 
-    let api = model_obj.and_then(|obj| obj.get("api").and_then(|v| v.as_str())).or_else(|| provider_obj.get("api").and_then(|v| v.as_str())).unwrap_or("openai-completions").to_string();
-
-    let api_key_raw = provider_obj.get("apiKey").and_then(|v| v.as_str()).unwrap_or("");
-    let resolved_api_key = if api_key_raw.is_empty() { String::new() } else { resolve_dynamic_value(api_key_raw)? };
+    let api_key_raw = provider_obj.get("apiKey").and_then(Value::as_str).map(str::trim).unwrap_or("");
+    let resolved_api_key = if is_go && provider == "opencode-go" {
+        opencode_go::pi_api_key(Some(api_key_raw), resolve_dynamic_value)?.ok_or("Connect OpenCode Go in Pi before testing a model")?
+    } else if !api_key_raw.is_empty() {
+        if is_go {
+            opencode_go::resolve_key(api_key_raw, resolve_dynamic_value)?
+        } else {
+            resolve_dynamic_value(api_key_raw)?
+        }
+    } else {
+        String::new()
+    };
 
     let auth_header = provider_obj.get("authHeader").and_then(|v| v.as_bool()).unwrap_or(false);
 
@@ -244,23 +284,33 @@ pub async fn test_model_http_internal(provider: String, model: String, prompt: O
     let mut base_headers = parse_headers_json(provider_headers, model_headers)?;
     base_headers.entry(CONTENT_TYPE).or_insert_with(|| HeaderValue::from_static("application/json"));
 
-    if auth_header && !resolved_api_key.is_empty() {
+    if (auth_header || is_go) && !resolved_api_key.is_empty() {
         let bearer = format!("Bearer {resolved_api_key}");
         let value = HeaderValue::from_str(&bearer).map_err(|e| format!("Invalid authorization header value: {e}"))?;
         base_headers.insert(HeaderName::from_static("authorization"), value);
     }
 
-    if api == "anthropic-messages" && !resolved_api_key.is_empty() {
+    if api == "anthropic-messages" && !is_go && !resolved_api_key.is_empty() {
         let key_value = HeaderValue::from_str(&resolved_api_key).map_err(|e| format!("Invalid x-api-key header value: {e}"))?;
         base_headers.entry(HeaderName::from_static("x-api-key")).or_insert(key_value);
+    }
+
+    // Identify PSM and keep a single conversation identifier across attempts in this test.
+    if is_go {
+        let mut session_id = [0u8; 16];
+        getrandom::getrandom(&mut session_id).map_err(|e| format!("Create OpenCode Go test session: {e}"))?;
+        let session = format!("psm-{:032x}", u128::from_be_bytes(session_id));
+        base_headers.insert(reqwest::header::USER_AGENT, HeaderValue::from_static(concat!("pi-session-manager/", env!("CARGO_PKG_VERSION"))));
+        base_headers.insert(HeaderName::from_static("x-opencode-session"), HeaderValue::from_str(&session).map_err(|e| e.to_string())?);
     }
 
     let prompt_text = prompt.unwrap_or_else(|| "Reply with a concise health-check response that includes the word ok.".to_string());
 
     let attempts = match api.as_str() {
-        "openai-completions" => build_openai_chat_attempts(&base_url, &model, &prompt_text),
-        "openai-responses" => build_openai_responses_attempts(&base_url, &model, &prompt_text),
-        "anthropic-messages" => build_anthropic_messages_attempts(&base_url, &model, &prompt_text),
+        "openai-completions" => build_openai_chat_attempts(base_url, &model, &prompt_text, is_go),
+        "openai-responses" => build_openai_responses_attempts(base_url, &model, &prompt_text),
+        "anthropic-messages" => build_anthropic_messages_attempts(base_url, &model, &prompt_text),
+        "google-generative-ai" if is_go => vec![build_go_gemini_attempt(base_url, &model, &prompt_text)],
         "google-generative-ai" => return Err("google-generative-ai testing is not supported yet in model HTTP tester".to_string()),
         other => return Err(format!("Unsupported api type for HTTP test: {other}")),
     };
@@ -345,4 +395,24 @@ pub async fn test_model_http_internal(provider: String, model: String, prompt: O
     }
 
     last_result.ok_or_else(|| "No HTTP test attempt was generated".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn opencode_go_probe_rejects_stale_routes_and_masks_gemini_keys() {
+        assert!(opencode_go::verify_probe_base(Some("https://opencode.ai/zen/go/v1"), "anthropic-messages").is_err());
+        assert_eq!(opencode_go::verify_probe_base(Some("https://opencode.ai/inference/go/anthropic"), "anthropic-messages").unwrap(), "https://opencode.ai/inference/go/anthropic/v1");
+        let attempts = build_openai_chat_attempts("https://opencode.ai/inference/go/openai/v1", "deepseek-v4.1-flash", "hello", true);
+        assert_eq!(attempts.len(), 1);
+        assert_eq!(attempts[0].body_value["max_tokens"], 128);
+
+        let mut headers = HeaderMap::new();
+        headers.insert("x-goog-api-key", HeaderValue::from_static("gemini-secret"));
+        let command = build_masked_curl_command("https://opencode.ai/inference/go/google/v1beta", &headers, "{}");
+        assert!(command.contains("x-goog-api-key: ***"));
+        assert!(!command.contains("gemini-secret"));
+    }
 }

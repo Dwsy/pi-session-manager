@@ -11,6 +11,7 @@ pub mod casr_min;
 pub mod datasets;
 pub mod model_config;
 pub mod openbot_agents;
+mod opencode_go;
 pub mod pi_session;
 pub mod plugin_fs;
 pub mod project_detect;

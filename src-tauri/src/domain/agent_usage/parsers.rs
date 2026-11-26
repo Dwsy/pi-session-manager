@@ -352,26 +352,18 @@ pub fn parse_cursor_rows(payload: &Value) -> ParsedUsage {
     ParsedUsage { plan_name, rows: vec![metric("Monthly", Some(pct), first_date(payload, &["billingCycleEnd"]), Some(format!("${:.2} / ${:.2}", total_spend / 100.0, limit / 100.0)))] }
 }
 
-pub fn parse_opencode_go_rows(rows: &[(i64, f64)], now_ms: i64) -> Vec<AgentUsageMetric> {
-    const SESSION_LIMIT: f64 = 12.0;
-    const WEEKLY_LIMIT: f64 = 30.0;
-    const MONTHLY_LIMIT: f64 = 60.0;
-    const FIVE_HOURS_MS: i64 = 5 * 60 * 60 * 1000;
-    const WEEK_MS: i64 = 7 * 24 * 60 * 60 * 1000;
-
-    let session_cost = sum_range(rows, now_ms - FIVE_HOURS_MS, now_ms);
-    let weekly_start = start_of_utc_week(now_ms);
-    let weekly_cost = sum_range(rows, weekly_start, weekly_start + WEEK_MS);
-    let anchor_ms = rows.iter().map(|(created, _)| *created).min();
-    let (monthly_start, monthly_end) = start_of_anchor_month(now_ms, anchor_ms);
-    let monthly_cost = sum_range(rows, monthly_start, monthly_end);
-    let session_reset = next_rolling_reset(rows, now_ms, FIVE_HOURS_MS);
-
-    vec![
-        metric("Session", percent(session_cost, SESSION_LIMIT), Some(chrono::DateTime::from_timestamp_millis(session_reset).map(|dt| dt.to_rfc3339()).unwrap_or_default()), Some(format!("{session_cost:.2} / {SESSION_LIMIT} credits"))),
-        metric("Weekly", percent(weekly_cost, WEEKLY_LIMIT), Some(chrono::DateTime::from_timestamp_millis(weekly_start + WEEK_MS).map(|dt| dt.to_rfc3339()).unwrap_or_default()), Some(format!("{weekly_cost:.2} / {WEEKLY_LIMIT} credits"))),
-        metric("Monthly", percent(monthly_cost, MONTHLY_LIMIT), Some(chrono::DateTime::from_timestamp_millis(monthly_end).map(|dt| dt.to_rfc3339()).unwrap_or_default()), Some(format!("{monthly_cost:.2} / {MONTHLY_LIMIT} credits"))),
-    ]
+/// Read Go's reported allowance percentages and reset times in dashboard order.
+pub fn parse_opencode_go_rows(payload: &Value) -> ParsedUsage {
+    let rows = [("rolling", "5h"), ("weekly", "Weekly"), ("monthly", "Monthly")]
+        .into_iter()
+        .filter_map(|(key, label)| {
+            // A missing or malformed meter must not show as unused allowance.
+            let window = payload.get("usage")?.get(key)?;
+            let used = window.get("percent")?.as_u64().filter(|value| *value <= 100)?;
+            Some(metric(label, Some(used as f64), first_date(window, &["resetsAt"]), None))
+        })
+        .collect();
+    ParsedUsage { plan_name: None, rows }
 }
 
 fn metric(label: &str, used_percent: Option<f64>, reset_at: Option<String>, detail: Option<String>) -> AgentUsageMetric {
@@ -620,68 +612,6 @@ fn capture_two_numbers(text: &str, pattern: &str) -> Option<(f64, f64)> {
     Some((a, b))
 }
 
-fn sum_range(rows: &[(i64, f64)], start_ms: i64, end_ms: i64) -> f64 {
-    let mut total = 0.0;
-    for (created, cost) in rows {
-        if *created >= start_ms && *created < end_ms {
-            total += *cost;
-        }
-    }
-    (total * 10000.0).round() / 10000.0
-}
-
-fn start_of_utc_week(now_ms: i64) -> i64 {
-    let date = chrono::DateTime::from_timestamp_millis(now_ms).unwrap_or_else(chrono::Utc::now);
-    let weekday = date.weekday().num_days_from_monday() as i64;
-    let start = date.date_naive() - chrono::Duration::days(weekday);
-    start.and_hms_opt(0, 0, 0).map(|dt| dt.and_utc().timestamp_millis()).unwrap_or(now_ms)
-}
-
-fn days_in_utc_month(year: i32, month: u32) -> u32 {
-    let next_month = if month == 12 { 1 } else { month + 1 };
-    let next_year = if month == 12 { year + 1 } else { year };
-    let start = chrono::NaiveDate::from_ymd_opt(year, month, 1).unwrap();
-    let end = chrono::NaiveDate::from_ymd_opt(next_year, next_month, 1).unwrap();
-    (end - start).num_days() as u32
-}
-
-fn start_of_anchor_month(now_ms: i64, anchor_ms: Option<i64>) -> (i64, i64) {
-    let now = chrono::DateTime::from_timestamp_millis(now_ms).unwrap_or_else(chrono::Utc::now);
-    let Some(anchor_ms) = anchor_ms else {
-        let start = chrono::NaiveDate::from_ymd_opt(now.year(), now.month(), 1).and_then(|d| d.and_hms_opt(0, 0, 0)).map(|dt| dt.and_utc().timestamp_millis()).unwrap_or(now_ms);
-        let end = if now.month() == 12 { chrono::NaiveDate::from_ymd_opt(now.year() + 1, 1, 1) } else { chrono::NaiveDate::from_ymd_opt(now.year(), now.month() + 1, 1) }.and_then(|d| d.and_hms_opt(0, 0, 0)).map(|dt| dt.and_utc().timestamp_millis()).unwrap_or(now_ms);
-        return (start, end);
-    };
-    let anchor_day = chrono::DateTime::from_timestamp_millis(anchor_ms).map(|dt| dt.day()).unwrap_or(1);
-    let mut year = now.year();
-    let mut month = now.month();
-    let mut day = anchor_day.min(days_in_utc_month(year, month));
-    let mut start = chrono::NaiveDate::from_ymd_opt(year, month, day).and_then(|d| d.and_hms_opt(0, 0, 0)).map(|dt| dt.and_utc().timestamp_millis()).unwrap_or(now_ms);
-    if start > now_ms {
-        if month == 1 {
-            month = 12;
-            year -= 1;
-        } else {
-            month -= 1;
-        }
-        day = anchor_day.min(days_in_utc_month(year, month));
-        start = chrono::NaiveDate::from_ymd_opt(year, month, day).and_then(|d| d.and_hms_opt(0, 0, 0)).map(|dt| dt.and_utc().timestamp_millis()).unwrap_or(now_ms);
-    }
-    let (end_year, end_month) = if month == 12 { (year + 1, 1) } else { (year, month + 1) };
-    let end = chrono::NaiveDate::from_ymd_opt(end_year, end_month, anchor_day.min(days_in_utc_month(end_year, end_month))).and_then(|d| d.and_hms_opt(0, 0, 0)).map(|dt| dt.and_utc().timestamp_millis()).unwrap_or(now_ms);
-    (start, end)
-}
-
-fn next_rolling_reset(rows: &[(i64, f64)], now_ms: i64, window_ms: i64) -> i64 {
-    let mut latest = now_ms;
-    for (created, _) in rows {
-        if *created <= now_ms {
-            latest = latest.max(*created);
-        }
-    }
-    latest + window_ms
-}
-
 // Minimal regex helpers without adding a heavy dependency if regex_lite is unavailable.
 // Prefer a tiny hand-rolled approach for the two Amp patterns if needed.
 mod regex_lite {
@@ -773,5 +703,3 @@ mod regex_lite {
         Some(&text[..i])
     }
 }
-
-use chrono::{Datelike, Timelike};

@@ -53,7 +53,8 @@ pub(super) async fn dispatch(app_state: &Option<DispatchAppState>, command: &str
                     serde_json::to_value(result).map_err(|e| e.to_string())
                 }
                 "list_model_options_full" => {
-                    let result = crate::domain::model_config::list_model_options_full_internal().await?;
+                    let use_config_profile = payload.get("useConfigProfile").or_else(|| payload.get("use_config_profile")).and_then(Value::as_bool).unwrap_or(false);
+                    let result = crate::domain::model_config::list_model_options_full_internal(use_config_profile).await?;
                     serde_json::to_value(result).map_err(|e| e.to_string())
                 }
                 "load_model_config" => {

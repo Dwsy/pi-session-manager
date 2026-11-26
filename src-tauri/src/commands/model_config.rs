@@ -12,8 +12,8 @@ pub async fn list_model_options_fast() -> Result<Vec<ModelOption>, String> {
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
-pub async fn list_model_options_full() -> Result<Vec<ModelOption>, String> {
-    domain::list_model_options_full_internal().await
+pub async fn list_model_options_full(use_config_profile: Option<bool>) -> Result<Vec<ModelOption>, String> {
+    domain::list_model_options_full_internal(use_config_profile.unwrap_or(false)).await
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]
