@@ -91,4 +91,45 @@ describe("kanban file store", () => {
       env.cleanup();
     }
   });
+
+  it("supports moving/reordering cards, updating/reordering/deleting statuses, and editing/deleting labels", async () => {
+    const env = withHome();
+    try {
+      const store = await import("./kanban-store.js");
+      const todo = await store.createStatus("Todo", "info");
+      const doing = await store.createStatus("Doing", "warning");
+
+      await store.moveSessionInStatus("s1", todo.id, 0);
+      await store.moveSessionInStatus("s2", todo.id, 1);
+      await store.moveSessionInStatus("s2", todo.id, 0); // reorder s2 above s1
+
+      const marks = await store.getAllSessionStatuses();
+      expect(marks.find((m) => m.session_id === "s2")?.position).toBe(0);
+      expect(marks.find((m) => m.session_id === "s1")?.position).toBe(1);
+
+      await store.moveSessionInStatus("s1", doing.id, 0);
+      expect((await store.getSessionStatus("s1"))?.id).toBe(doing.id);
+
+      await store.updateStatus(todo.id, { name: "Backlog", color: "purple" });
+      await store.reorderStatuses([doing.id, todo.id]);
+      const statuses = await store.getAllStatuses();
+      expect(statuses.map((s) => s.name)).toEqual(["Doing", "Backlog"]);
+      expect(statuses[1]?.color).toBe("purple");
+
+      await store.deleteStatus(doing.id);
+      expect((await store.getAllStatuses()).map((s) => s.name)).toEqual(["Backlog"]);
+      expect(await store.getSessionStatus("s1")).toBeNull();
+
+      const lbl = await store.createLabel("bug", "#d1242f", "Bugs");
+      await store.assignLabel("s2", lbl.id);
+      await store.updateLabel(lbl.id, { name: "critical", description: "High prio" });
+      expect((await store.getAllLabels())[0]?.name).toBe("critical");
+
+      await store.deleteLabel(lbl.id);
+      expect(await store.getAllLabels()).toHaveLength(0);
+      expect(await store.getAllSessionLabels()).toHaveLength(0);
+    } finally {
+      env.cleanup();
+    }
+  });
 });

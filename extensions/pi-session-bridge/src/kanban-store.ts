@@ -276,6 +276,99 @@ export async function setSessionStatus(sessionId: string, statusId: string, posi
   writeMarksFile(file);
 }
 
+/**
+ * Move a session card into `targetStatusId` at `targetIndex` (0-based within that column),
+ * re-indexing positions cleanly so drag/reorder persists deterministically across PSM.
+ * Pass `targetStatusId = null` to clear the session's status (move to Unassigned).
+ */
+export async function moveSessionInStatus(
+  sessionId: string,
+  targetStatusId: string | null,
+  targetIndex = 0,
+): Promise<void> {
+  if (!targetStatusId) {
+    await clearSessionStatus(sessionId);
+    return;
+  }
+  const file = readMarksFile();
+  const allMarks = file.sessionTags.map(normalizeSessionStatus);
+  const others = allMarks.filter((mark) => mark.session_id !== sessionId);
+  const inTarget = others
+    .filter((mark) => mark.status_id === targetStatusId)
+    .sort((a, b) => a.position - b.position);
+  const outsideTarget = others.filter((mark) => mark.status_id !== targetStatusId);
+
+  const clampedIndex = Math.max(0, Math.min(targetIndex, inTarget.length));
+  const moved: SessionStatusItem = {
+    session_id: sessionId,
+    status_id: targetStatusId,
+    position: clampedIndex,
+    assigned_at: now(),
+  };
+  inTarget.splice(clampedIndex, 0, moved);
+  const reindexed = inTarget.map((mark, idx) => ({ ...mark, position: idx }));
+  file.sessionTags = [...outsideTarget, ...reindexed].map(serializeSessionStatus);
+  writeMarksFile(file);
+}
+
+export async function updateStatus(
+  statusId: string,
+  patch: { name?: string; color?: string; icon?: string },
+): Promise<StatusItem> {
+  const file = readStatusesFile();
+  const statuses = file.tags.map(normalizeStatus);
+  const target = statuses.find((item) => item.id === statusId);
+  if (!target) throw new Error(`Status not found: ${statusId}`);
+  if (patch.name !== undefined) {
+    const trimmed = patch.name.trim();
+    if (!trimmed) throw new Error("Status name is required");
+    target.name = trimmed;
+  }
+  if (patch.color !== undefined) target.color = patch.color;
+  if (patch.icon !== undefined) target.icon = patch.icon;
+  file.tags = statuses.map(serializeStatus);
+  writeStatusesFile(file);
+  return target;
+}
+
+export async function deleteStatus(statusId: string): Promise<void> {
+  const file = readStatusesFile();
+  const statuses = file.tags.map(normalizeStatus);
+  const target = statuses.find((item) => item.id === statusId);
+  if (!target) return;
+  if (target.is_builtin) throw new Error("Built-in status cannot be deleted");
+  file.tags = statuses.filter((item) => item.id !== statusId).map(serializeStatus);
+  writeStatusesFile(file);
+
+  const marksFile = readMarksFile();
+  marksFile.sessionTags = marksFile.sessionTags
+    .map(normalizeSessionStatus)
+    .filter((mark) => mark.status_id !== statusId)
+    .map(serializeSessionStatus);
+  writeMarksFile(marksFile);
+}
+
+export async function reorderStatuses(orderedIds: readonly string[]): Promise<StatusItem[]> {
+  const file = readStatusesFile();
+  const statuses = file.tags.map(normalizeStatus);
+  const byId = new Map(statuses.map((item) => [item.id, item]));
+  const ordered: StatusItem[] = [];
+  for (const id of orderedIds) {
+    const found = byId.get(id);
+    if (found) {
+      ordered.push(found);
+      byId.delete(id);
+    }
+  }
+  for (const remaining of byId.values()) {
+    ordered.push(remaining);
+  }
+  const reindexed = ordered.map((item, index) => ({ ...item, sort_order: index }));
+  file.tags = reindexed.map(serializeStatus);
+  writeStatusesFile(file);
+  return reindexed;
+}
+
 export async function getAllLabels(): Promise<LabelItem[]> {
   return readLabelsFile().labels.map(normalizeLabel);
 }
@@ -330,6 +423,44 @@ export async function clearSessionLabels(sessionId: string): Promise<void> {
   file.assignments = file.assignments
     .map(normalizeSessionLabel)
     .filter((item) => item.session_id !== sessionId)
+    .map(serializeSessionLabel);
+  writeLabelsFile(file);
+}
+
+export async function updateLabel(
+  labelId: string,
+  patch: { name?: string; color?: string; description?: string },
+): Promise<LabelItem> {
+  const file = readLabelsFile();
+  const labels = file.labels.map(normalizeLabel);
+  const target = labels.find((item) => item.id === labelId);
+  if (!target) throw new Error(`Label not found: ${labelId}`);
+  if (patch.name !== undefined) {
+    const trimmed = patch.name.trim();
+    if (!trimmed) throw new Error("Label name is required");
+    target.name = trimmed;
+  }
+  if (patch.color !== undefined && /^#[0-9a-fA-F]{6}$/.test(patch.color)) {
+    target.color = patch.color;
+  }
+  if (patch.description !== undefined) {
+    target.description = patch.description.trim();
+  }
+  target.updated_at = now();
+  file.labels = labels.map(serializeLabel);
+  writeLabelsFile(file);
+  return target;
+}
+
+export async function deleteLabel(labelId: string): Promise<void> {
+  const file = readLabelsFile();
+  file.labels = file.labels
+    .map(normalizeLabel)
+    .filter((item) => item.id !== labelId)
+    .map(serializeLabel);
+  file.assignments = file.assignments
+    .map(normalizeSessionLabel)
+    .filter((item) => item.label_id !== labelId)
     .map(serializeSessionLabel);
   writeLabelsFile(file);
 }
