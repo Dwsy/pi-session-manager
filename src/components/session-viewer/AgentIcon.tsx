@@ -1,5 +1,5 @@
-import { Amp, ClaudeCode, Cline, Codex, GeminiCLI, Grok, Kiro, OpenAI, OpenClaw, OpenCode } from "@lobehub/icons";
-import { Bot, Boxes, Orbit, Radio, Sparkles, Terminal } from "lucide-react";
+import { Amp, Antigravity, ClaudeCode, Cline, Codex, Cursor, GeminiCLI, Grok, Kiro, Mistral, OpenAI, OpenClaw, OpenCode } from "@lobehub/icons";
+import { Bot, Boxes, Terminal } from "lucide-react";
 import type { CSSProperties, SVGProps } from "react";
 
 interface AgentIconProps {
@@ -256,7 +256,7 @@ export function getAgentIconColor(source: string): string {
     case "openclaw":
       return OpenClaw.colorPrimary;
     case "vibe":
-      return "#F472B6";
+      return Mistral.colorPrimary;
     case "kiro":
       return Kiro.colorPrimary;
     case "grok":
@@ -295,12 +295,12 @@ export function AgentIcon({
     case "factory":
       return <Boxes className={className} size={size} style={style} />;
     case "clawdbot":
-      return <Bot className={className} size={size} style={style} />;
+      return <OpenClaw {...iconProps} />;
     case "cursor":
-      return <Sparkles className={className} size={size} style={style} />;
+      return <Cursor {...iconProps} />;
     case "antigravity":
     case "agy":
-      return <Orbit className={className} size={size} style={style} />;
+      return <Antigravity {...iconProps} />;
     case "amp":
       return <Amp {...iconProps} />;
     case "chatgpt":
@@ -313,11 +313,11 @@ export function AgentIcon({
       return <Kiro {...iconProps} />;
     case "grok":
       return <Grok {...iconProps} />;
-    // Aider and Vibe have no icon in @lobehub/icons yet.
+    case "vibe":
+      return <Mistral {...iconProps} />;
+    // Factory and Aider have no icon in @lobehub/icons yet.
     case "aider":
       return <Terminal className={className} size={size} style={style} />;
-    case "vibe":
-      return <Radio className={className} size={size} style={style} />;
     default:
       return <Bot className={className} size={size} style={style} />;
   }
@@ -351,19 +351,21 @@ export function AgentColorIcon({
     case "factory":
       return <Boxes className={className} size={size} style={style} />;
     case "clawdbot":
-      return <Bot className={className} size={size} style={style} />;
+      return <OpenClaw.Color {...iconProps} />;
     case "cursor":
-      return <Sparkles className={className} size={size} style={style} />;
+      return <Cursor {...iconProps} />;
     case "antigravity":
     case "agy":
-      return <Orbit className={className} size={size} style={style} />;
+      return <Antigravity.Color {...iconProps} />;
     case "amp":
       return <Amp.Color {...iconProps} />;
     case "openclaw":
       return <OpenClaw.Color {...iconProps} />;
     case "kiro":
       return <Kiro.Color {...iconProps} />;
-    // Cline, Grok and OpenAI ship mono-only glyphs in @lobehub/icons.
+    case "vibe":
+      return <Mistral.Color {...iconProps} />;
+    // Cline, Grok, Cursor and OpenAI ship mono-only glyphs in @lobehub/icons.
     case "chatgpt":
       return <OpenAI {...iconProps} />;
     case "cline":
@@ -372,8 +374,6 @@ export function AgentColorIcon({
       return <Grok {...iconProps} />;
     case "aider":
       return <Terminal className={className} size={size} style={style} />;
-    case "vibe":
-      return <Radio className={className} size={size} style={style} />;
     default:
       return <Bot className={className} size={size} style={style} />;
   }

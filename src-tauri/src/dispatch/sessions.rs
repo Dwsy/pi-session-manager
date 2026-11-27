@@ -16,6 +16,7 @@ pub(super) const COMMANDS: &[&str] = &[
     "get_session_labels",
     "detect_session_format",
     "list_supported_session_providers",
+    "get_session_resume_info",
     "convert_session_format",
     "get_session_by_path",
     "get_session_by_id",
@@ -124,6 +125,11 @@ pub(super) async fn dispatch(app_state: &Option<DispatchAppState>, command: &str
                 }
                 "list_supported_session_providers" => {
                     let result = crate::list_supported_session_providers().await?;
+                    Ok(to_val(result, "serialize result")?)
+                }
+                "get_session_resume_info" => {
+                    let path = extract(payload, "path")?;
+                    let result = crate::get_session_resume_info(path).await?;
                     Ok(to_val(result, "serialize result")?)
                 }
                 "convert_session_format" => {

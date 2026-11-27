@@ -7,7 +7,22 @@ use serde_json::{json, Value};
 use crate::domain::casr_min::model::{normalize_role, parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult};
 
 pub fn session_roots() -> Vec<PathBuf> {
-    crate::paths::existing_home_relative_dirs(&[".claude", "projects"])
+    let mut roots = Vec::new();
+    if let Ok(config_dir) = std::env::var("CLAUDE_CONFIG_DIR") {
+        let trimmed = config_dir.trim();
+        if !trimmed.is_empty() {
+            let projects = PathBuf::from(trimmed).join("projects");
+            if projects.is_dir() {
+                roots.push(projects);
+            }
+        }
+    }
+    for dir in crate::paths::existing_home_relative_dirs(&[".claude", "projects"]) {
+        if !roots.iter().any(|existing| existing == &dir) {
+            roots.push(dir);
+        }
+    }
+    roots
 }
 
 pub fn project_dir_key(workspace: &Path) -> String {

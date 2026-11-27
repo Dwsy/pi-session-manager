@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
 use crate::config::Config;
@@ -169,6 +171,9 @@ pub fn backing_file_path(path: &Path) -> PathBuf {
 /// a markdown transcript) that an extension check alone would discard. Both the
 /// initial scan and the file watcher gate on this, so they must not diverge.
 pub fn is_session_candidate_path(path: &Path) -> bool {
+    if crate::domain::casr_min::providers::antigravity::is_under_antigravity_store(path) {
+        return crate::domain::casr_min::providers::antigravity::is_discoverable_transcript_path(path);
+    }
     path.extension().is_some_and(|ext| ext == "jsonl")
         || is_gemini_session_file(path)
         || is_opencode_db_path(path)
@@ -185,7 +190,7 @@ pub fn is_gemini_session_file(path: &Path) -> bool {
 }
 
 pub fn is_antigravity_session_file(path: &Path) -> bool {
-    crate::domain::casr_min::providers::antigravity::is_transcript_path(path)
+    crate::domain::casr_min::providers::antigravity::is_discoverable_transcript_path(path)
 }
 
 pub fn is_aider_session_file(path: &Path) -> bool {
@@ -220,15 +225,74 @@ pub fn expand_cursor_session_paths(path: &Path) -> Vec<PathBuf> {
     crate::domain::casr_min::providers::cursor::list_session_paths_in_db(path).unwrap_or_else(|_| vec![path.to_path_buf()])
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct ConvertCacheKey {
+    source_path: String,
+    target_slug: &'static str,
+    file_size: u64,
+    modified_ns: u128,
+}
+
+fn convert_cache() -> &'static Mutex<HashMap<ConvertCacheKey, SessionBridgeConvertResult>> {
+    static CACHE: OnceLock<Mutex<HashMap<ConvertCacheKey, SessionBridgeConvertResult>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn build_convert_cache_key(path: &Path, target: SessionBridgeSource) -> Option<ConvertCacheKey> {
+    let backing = backing_file_path(path);
+    let meta = std::fs::metadata(backing).ok()?;
+    let modified_ns = meta.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?.as_nanos();
+    Some(ConvertCacheKey {
+        source_path: path.to_string_lossy().to_string(),
+        target_slug: target.slug(),
+        file_size: meta.len(),
+        modified_ns,
+    })
+}
+
+fn cached_result_still_exists(result: &SessionBridgeConvertResult) -> bool {
+    if result.written_paths.is_empty() {
+        return false;
+    }
+    result.written_paths.iter().all(|p| backing_file_path(Path::new(p)).exists())
+}
+
 pub fn convert_session_format(path: &Path, target: SessionBridgeSource, options: SessionBridgeConvertOptions) -> Result<SessionBridgeConvertResult, String> {
     if !target.can_convert_target() {
         return Err(format!("Provider {} is scan/source only and cannot be used as a conversion target", target.display_name()));
     }
+
+    let cache_key = if !options.dry_run && !options.force {
+        build_convert_cache_key(path, target)
+    } else {
+        None
+    };
+    if let Some(ref key) = cache_key {
+        if let Ok(guard) = convert_cache().lock() {
+            if let Some(cached) = guard.get(key) {
+                if cached_result_still_exists(cached) {
+                    return Ok(cached.clone());
+                }
+            }
+        }
+    }
+
     // Pi and OMP are written by casr_min; everything else is written by the
     // vendored CASR writer. Vendor-delegated providers have no casr_min writer
     // at all, so even their dry runs must go through the vendor.
     if !matches!(target, SessionBridgeSource::Pi | SessionBridgeSource::Omp) && (!options.dry_run || target.is_vendor_delegated()) {
-        return super::vendor::convert_session_format(path, target, options.force, options.dry_run);
+        let mut result = super::vendor::convert_session_format(path, target, options.force, options.dry_run)?;
+        let target_path = result.written_paths.first().map(PathBuf::from).unwrap_or_else(|| path.to_path_buf());
+        result.resume_command = super::resume::cli_command_for_target(target.into(), &result.target_session_id, &target_path);
+        if let Some(key) = cache_key {
+            if let Ok(mut guard) = convert_cache().lock() {
+                if guard.len() >= 256 {
+                    guard.clear();
+                }
+                guard.insert(key, result.clone());
+            }
+        }
+        return Ok(result);
     }
 
     let (source, canonical) = read_canonical_session_from_path(path)?;
@@ -250,7 +314,7 @@ pub fn convert_session_format(path: &Path, target: SessionBridgeSource, options:
 
     if !options.dry_run {
         let outcome = crate::domain::casr_min::bridge_ops::convert_canonical_session(source.into(), &canonical, target_kind, false, options.force)?;
-        return Ok(SessionBridgeConvertResult {
+        let result = SessionBridgeConvertResult {
             source_provider: source.display_name().to_string(),
             target_provider: target.display_name().to_string(),
             source_session_id: canonical.session_id.clone(),
@@ -259,7 +323,16 @@ pub fn convert_session_format(path: &Path, target: SessionBridgeSource, options:
             resume_command: outcome.resume_command,
             dry_run: false,
             warnings: outcome.warnings,
-        });
+        };
+        if let Some(key) = cache_key {
+            if let Ok(mut guard) = convert_cache().lock() {
+                if guard.len() >= 256 {
+                    guard.clear();
+                }
+                guard.insert(key, result.clone());
+            }
+        }
+        return Ok(result);
     }
 
     let plan = write_support::build_write_plan(&canonical, target_kind, chrono::Utc::now())?;

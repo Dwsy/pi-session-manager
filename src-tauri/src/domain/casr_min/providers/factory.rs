@@ -24,7 +24,7 @@ pub fn build_target_path(session: &CanonicalSession, target_session_id: &str) ->
 }
 
 pub fn resume_command(session_id: &str) -> String {
-    format!("factory --resume {session_id}")
+    format!("droid --resume {session_id}")
 }
 
 pub fn read_session(path: &Path) -> Result<CanonicalSession, String> {

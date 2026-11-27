@@ -49,7 +49,7 @@ describe("ExternalSessionsSettings", () => {
         />,
       );
 
-      await screen.findByText("Antigravity");
+      await screen.findByRole("group", { name: "Antigravity" });
 
       for (const [slug, name] of [
         ["antigravity", "Antigravity"],

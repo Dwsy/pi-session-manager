@@ -70,6 +70,7 @@ import {
   buildChangeDirAndRun,
   getConfiguredExternalResumeTarget,
   getFallbackExternalResumeTarget,
+  getSessionResumeInfo,
 } from "./utils/sessionResume";
 import { useOnboardingGate } from "./hooks/app/useOnboardingGate";
 import { SETTINGS_NAVIGATE_EVENT } from "./components/settings/navigation";
@@ -724,6 +725,33 @@ function App() {
           getTerminalScopeForSession(session),
         );
         return;
+      }
+      if (sourceSlug && target === sourceSlug) {
+        const nativeInfo = await getSessionResumeInfo(session.path);
+        if (nativeInfo?.can_native_resume && nativeInfo.resume_command) {
+          await openResumeCommandInTerminal(
+            session.path,
+            nativeInfo.cwd || session.cwd,
+            nativeInfo.resume_command,
+            getTerminalScopeForSession(session),
+          );
+          return;
+        }
+      }
+      if ((!sourceSlug || sourceSlug === "pi") && target === "omp") {
+        const nativeInfo = await getSessionResumeInfo(session.path);
+        const zeroCarry = nativeInfo?.carry_options?.find(
+          (opt) => opt.target_provider === "omp" && opt.zero_conversion && opt.command,
+        );
+        if (zeroCarry) {
+          await openResumeCommandInTerminal(
+            session.path,
+            session.cwd,
+            zeroCarry.command,
+            getTerminalScopeForSession(session),
+          );
+          return;
+        }
       }
 
       const result = await invoke<import("./types").SessionConvertResult>(

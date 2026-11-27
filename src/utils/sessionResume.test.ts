@@ -30,6 +30,8 @@ vi.mock("@/components/settings/types", () => ({
 
 import {
   buildOmpResumeCommand,
+  buildCopyResumeCommand,
+  buildCopyResumeCommandForTarget,
   openSessionInTerminalDirect,
 } from "./sessionResume";
 
@@ -65,5 +67,63 @@ describe("OMP session resume", () => {
       resumeCommand:
         'cd "/Users/demo/project" && omp --session "/Users/demo/.omp/agent/sessions/project/session.jsonl"',
     });
+  });
+
+  it("uses native resume command for Antigravity CLI without triggering conversion", async () => {
+    const agySession = {
+      id: "901d1db7-8590-4cb0-a7cb-35fac369d860",
+      path: "/Users/demo/.gemini/antigravity-cli/brain/901d1db7-8590-4cb0-a7cb-35fac369d860/.system_generated/logs/transcript_full.jsonl",
+      cwd: "/Users/demo/project",
+    } as SessionInfo;
+
+    mocks.invoke.mockResolvedValueOnce({
+      source_provider: "antigravity",
+      source_display_name: "Antigravity",
+      session_id: agySession.id,
+      cwd: agySession.cwd,
+      can_native_resume: true,
+      cli_installed: true,
+      resume_command: "cd '/Users/demo/project' && agy --conversation 901d1db7-8590-4cb0-a7cb-35fac369d860",
+      raw_command: "agy --conversation 901d1db7-8590-4cb0-a7cb-35fac369d860",
+      reason: null,
+      carry_options: [],
+    });
+
+    const cmd = await buildCopyResumeCommand(agySession);
+    expect(cmd).toBe("cd '/Users/demo/project' && agy --conversation 901d1db7-8590-4cb0-a7cb-35fac369d860");
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    expect(mocks.invoke).toHaveBeenCalledWith("get_session_resume_info", { path: agySession.path });
+  });
+
+  it("uses zero-conversion omp --fork when carrying a Pi session to OMP", async () => {
+    const piSession = {
+      id: "pi-1",
+      path: "/Users/demo/.pi/agent/sessions/proj/2026_pi-1.jsonl",
+      cwd: "/Users/demo/project",
+    } as SessionInfo;
+
+    mocks.invoke.mockResolvedValueOnce({
+      source_provider: "pi",
+      source_display_name: "Pi",
+      session_id: piSession.id,
+      cwd: piSession.cwd,
+      can_native_resume: true,
+      cli_installed: true,
+      resume_command: "cd '/Users/demo/project' && pi --session '/Users/demo/.pi/agent/sessions/proj/2026_pi-1.jsonl'",
+      raw_command: "pi --session '/Users/demo/.pi/agent/sessions/proj/2026_pi-1.jsonl'",
+      reason: null,
+      carry_options: [
+        {
+          target_provider: "omp",
+          target_display_name: "OMP",
+          command: "cd '/Users/demo/project' && omp --fork '/Users/demo/.pi/agent/sessions/proj/2026_pi-1.jsonl'",
+          zero_conversion: true,
+        },
+      ],
+    });
+
+    const cmd = await buildCopyResumeCommandForTarget(piSession, "omp");
+    expect(cmd).toBe("cd '/Users/demo/project' && omp --fork '/Users/demo/.pi/agent/sessions/proj/2026_pi-1.jsonl'");
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
   });
 });

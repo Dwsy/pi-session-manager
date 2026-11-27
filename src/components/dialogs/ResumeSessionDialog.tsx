@@ -10,9 +10,10 @@ import type {
   SessionInfo,
   SessionProviderInfo,
 } from "@/types";
-import { getSessionSourceTag } from "@/utils/session";
+import { getSessionSourceSlug, getSessionSourceTag } from "@/utils/session";
 import { getSessionListDisplayName } from "@/utils/sessionDisplay";
 import { listSupportedSessionProviders } from "@/utils/sessionProvidersApi";
+import { getSessionResumeInfo } from "@/utils/sessionResume";
 
 interface ResumeSessionDialogProps {
   session: SessionInfo;
@@ -42,11 +43,23 @@ export default function ResumeSessionDialog({
 
   useEffect(() => {
     let cancelled = false;
-    listSupportedSessionProviders().then((items) => {
-      if (cancelled) return;
+    const sourceSlug = getSessionSourceSlug(session.path);
+    const applyProviders = (
+      items: SessionProviderInfo[],
+      resumeInfo: Awaited<ReturnType<typeof getSessionResumeInfo>>,
+    ) => {
+      const canNativeSource = Boolean(
+        sourceSlug && resumeInfo?.can_native_resume && resumeInfo.source_provider === sourceSlug,
+      );
       const targets = items
-        .filter((item) => item.capabilities.canConvertTarget)
+        .filter(
+          (item) =>
+            item.capabilities.canConvertTarget
+            || (canNativeSource && item.slug === sourceSlug),
+        )
         .sort((a, b) => {
+          if (canNativeSource && a.slug === sourceSlug) return -1;
+          if (canNativeSource && b.slug === sourceSlug) return 1;
           if (a.slug === "pi") return -1;
           if (b.slug === "pi") return 1;
           return a.display_name.localeCompare(b.display_name);
@@ -57,11 +70,23 @@ export default function ResumeSessionDialog({
       } else {
         setTarget(defaultTarget);
       }
+    };
+
+    listSupportedSessionProviders().then((items) => {
+      if (cancelled) return;
+      applyProviders(items, null);
+      if (sourceSlug && sourceSlug !== "pi" && sourceSlug !== "omp") {
+        void getSessionResumeInfo(session.path).then((resumeInfo) => {
+          if (!cancelled && resumeInfo?.can_native_resume) {
+            applyProviders(items, resumeInfo);
+          }
+        });
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [defaultTarget]);
+  }, [defaultTarget, session.path]);
 
   const handleSubmit = async (selectedTarget = target) => {
     if (submitting) return;

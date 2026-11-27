@@ -1,6 +1,8 @@
-//! Antigravity (`agy`) reader adapted from franken_agent_detection.
+//! Antigravity (`agy` CLI & Antigravity Desktop / Insiders) reader.
 //!
-//! Primary path: `~/.gemini/antigravity-cli/brain/<uuid>/.system_generated/logs/transcript.jsonl`
+//! Supports both `transcript_full.jsonl` (agy 1.3.5+ / Desktop App) and legacy
+//! `transcript.jsonl` under `brain/<uuid>/.system_generated/logs/`, reading
+//! titles, previews, and workspace URIs from `conversation_summaries.db`.
 
 use std::path::{Path, PathBuf};
 
@@ -8,19 +10,76 @@ use reqwest::Url;
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
 use serde_json::{json, Map, Value};
 
-use crate::domain::casr_min::model::{parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall};
+use crate::domain::casr_min::model::{parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AntigravityClient {
+    Cli,
+    Desktop,
+    Insiders,
+}
+
+impl AntigravityClient {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Cli => "cli",
+            Self::Desktop => "desktop",
+            Self::Insiders => "insiders",
+        }
+    }
+}
+
+pub fn client_kind(path: &Path) -> AntigravityClient {
+    let normalized = path.to_string_lossy().replace('\\', "/");
+    if normalized.contains("/antigravity-insiders/") {
+        AntigravityClient::Insiders
+    } else if normalized.contains("/antigravity-cli/") {
+        AntigravityClient::Cli
+    } else if normalized.contains("/.gemini/antigravity/") || normalized.contains("/antigravity/brain/") {
+        AntigravityClient::Desktop
+    } else {
+        AntigravityClient::Cli
+    }
+}
+
+pub fn is_cli_session(path: &Path) -> bool {
+    matches!(client_kind(path), AntigravityClient::Cli)
+}
 
 pub fn session_roots() -> Vec<PathBuf> {
-    let base = base_root();
-    if !base.is_dir() {
-        return Vec::new();
+    let mut roots = Vec::new();
+    for base in candidate_base_roots() {
+        if !base.is_dir() {
+            continue;
+        }
+        let brain = base.join("brain");
+        let candidate = if brain.is_dir() { brain } else { base };
+        if !roots.iter().any(|existing| existing == &candidate) {
+            roots.push(candidate);
+        }
     }
-    let brain = base.join("brain");
-    if brain.is_dir() {
-        vec![brain]
-    } else {
-        vec![base]
+    roots
+}
+
+pub fn is_under_antigravity_store(path: &Path) -> bool {
+    let normalized = path.to_string_lossy().replace('\\', "/");
+    if normalized.contains("/.gemini/antigravity-cli/")
+        || normalized.contains("/antigravity-cli/")
+        || normalized.contains("/.gemini/antigravity/")
+        || normalized.contains("/.gemini/antigravity-insiders/")
+        || normalized.contains("/antigravity-insiders/")
+    {
+        return true;
     }
+    for var in ["CASS_ANTIGRAVITY_DATA_ROOT", "ANTIGRAVITY_HOME"] {
+        if let Ok(root) = std::env::var(var) {
+            let root = root.trim().replace('\\', "/");
+            if !root.is_empty() && normalized.starts_with(&root) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 pub fn matches_path(path: &Path) -> bool {
@@ -29,7 +88,29 @@ pub fn matches_path(path: &Path) -> bool {
 
 pub fn is_transcript_path(path: &Path) -> bool {
     let normalized = path.to_string_lossy().replace('\\', "/");
-    path.file_name().and_then(|value| value.to_str()) == Some("transcript.jsonl") && normalized.contains("/.system_generated/logs/") && (normalized.contains("/.gemini/antigravity-cli/") || normalized.contains("/antigravity-cli/"))
+    let file_name = path.file_name().and_then(|value| value.to_str()).unwrap_or_default();
+    let is_primary_name = matches!(file_name, "transcript_full.jsonl" | "transcript.jsonl");
+    let is_direct_logs_child = path.parent().and_then(Path::file_name).and_then(|v| v.to_str()) == Some("logs")
+        && path.parent().and_then(Path::parent).and_then(Path::file_name).and_then(|v| v.to_str()) == Some(".system_generated");
+    is_primary_name && is_direct_logs_child && (is_under_antigravity_store(path) || normalized.contains("/brain/"))
+}
+
+/// Whether `path` should be admitted during directory scanning.
+///
+/// Excludes `chunks/transcript/*.jsonl` shards and deduplicates `transcript.jsonl`
+/// when `transcript_full.jsonl` exists alongside it for the same conversation.
+pub fn is_discoverable_transcript_path(path: &Path) -> bool {
+    if !is_transcript_path(path) {
+        return false;
+    }
+    if path.file_name().and_then(|v| v.to_str()) == Some("transcript.jsonl") {
+        if let Some(parent) = path.parent() {
+            if parent.join("transcript_full.jsonl").is_file() {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 pub fn resume_command(session_id: &str) -> String {
@@ -85,11 +166,27 @@ pub fn read_session_from_str(path: &Path, content: &str) -> Result<CanonicalSess
     reindex_messages(&mut messages);
 
     let session_id = conversation_uuid_from_path(path).unwrap_or_else(|| path.file_stem().and_then(|stem| stem.to_str()).unwrap_or("unknown").to_string());
-    let workspace = read_workspace(path, &session_id)?;
+    let summary = read_summary(path, &session_id)?;
+    let workspace = summary.workspace;
     let model_name = detect_model(&records);
-    let title = messages.iter().find(|message| message.role == MessageRole::User).map(|message| truncate_title(&message.content, 100));
+    let client = client_kind(path);
+    let title = summary
+        .title
+        .or(summary.preview)
+        .or_else(|| messages.iter().find(|message| message.role == MessageRole::User).map(|message| truncate_title(&message.content, 100)));
 
-    Ok(CanonicalSession { session_id, provider_slug: "antigravity".to_string(), workspace, title, started_at, ended_at, messages, metadata: json!({ "source": "antigravity", "model": model_name }), source_path: path.to_path_buf(), model_name })
+    Ok(CanonicalSession {
+        session_id,
+        provider_slug: "antigravity".to_string(),
+        workspace,
+        title,
+        started_at,
+        ended_at,
+        messages,
+        metadata: json!({ "source": "antigravity", "client": client.as_str(), "model": model_name }),
+        source_path: path.to_path_buf(),
+        model_name,
+    })
 }
 
 pub fn render_session(session: &CanonicalSession, _target_session_id: &str) -> Result<String, String> {
@@ -114,44 +211,100 @@ pub fn render_session(session: &CanonicalSession, _target_session_id: &str) -> R
     Ok(lines.join("\n") + "\n")
 }
 
-fn base_root() -> PathBuf {
+fn candidate_base_roots() -> Vec<PathBuf> {
     if let Ok(root) = std::env::var("CASS_ANTIGRAVITY_DATA_ROOT") {
         if !root.trim().is_empty() {
-            return PathBuf::from(root);
+            return vec![PathBuf::from(root)];
         }
     }
     if let Ok(root) = std::env::var("ANTIGRAVITY_HOME") {
         if !root.trim().is_empty() {
-            return PathBuf::from(root);
+            return vec![PathBuf::from(root)];
         }
     }
-    dirs::home_dir().unwrap_or_default().join(".gemini").join("antigravity-cli")
+    let gemini_dir = dirs::home_dir().unwrap_or_default().join(".gemini");
+    vec![
+        gemini_dir.join("antigravity-cli"),
+        gemini_dir.join("antigravity"),
+        gemini_dir.join("antigravity-insiders"),
+    ]
 }
 
 fn conversation_uuid_from_path(path: &Path) -> Option<String> {
     path.ancestors().find(|dir| dir.parent().and_then(Path::file_name).is_some_and(|name| name == "brain")).and_then(|dir| dir.file_name()).and_then(|name| name.to_str()).filter(|name| !name.trim().is_empty()).map(String::from)
 }
 
-fn read_workspace(path: &Path, session_id: &str) -> Result<Option<PathBuf>, String> {
+#[derive(Default)]
+struct ConversationSummary {
+    title: Option<String>,
+    preview: Option<String>,
+    workspace: Option<PathBuf>,
+}
+
+fn read_summary(path: &Path, session_id: &str) -> Result<ConversationSummary, String> {
     let Some(root) = path.ancestors().find(|dir| dir.file_name().is_some_and(|name| name == "brain")).and_then(Path::parent) else {
-        return Ok(None);
+        return Ok(ConversationSummary::default());
     };
     let db_path = root.join("conversation_summaries.db");
     if !db_path.try_exists().map_err(|e| format!("Antigravity: failed to inspect workspace metadata {}: {e}", db_path.display()))? {
-        return Ok(None);
+        return Ok(ConversationSummary::default());
     }
 
     let conn = Connection::open_with_flags(&db_path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|e| format!("Antigravity: failed to open workspace metadata {}: {e}", db_path.display()))?;
-    let workspace_uris: Option<String> = conn.query_row("SELECT workspace_uris FROM conversation_summaries WHERE conversation_id = ?1", [session_id], |row| row.get(0)).optional().map_err(|e| format!("Antigravity: failed to read workspace for {session_id}: {e}"))?;
-    let Some(workspace_uris) = workspace_uris else {
-        return Ok(None);
+    let row: Option<(Option<String>, Option<String>, Option<String>)> = conn
+        .query_row(
+            "SELECT title, preview, workspace_uris FROM conversation_summaries WHERE conversation_id = ?1",
+            [session_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .optional()
+        .or_else(|_| {
+            conn.query_row(
+                "SELECT title, NULL, workspace_uris FROM conversation_summaries WHERE conversation_id = ?1",
+                [session_id],
+                |row| Ok((row.get(0)?, None, row.get(2)?)),
+            )
+            .optional()
+        })
+        .or_else(|_| {
+            conn.query_row(
+                "SELECT NULL, NULL, workspace_uris FROM conversation_summaries WHERE conversation_id = ?1",
+                [session_id],
+                |row| Ok((None, None, row.get(2)?)),
+            )
+            .optional()
+        })
+        .map_err(|e| format!("Antigravity: failed to read workspace for {session_id}: {e}"))?;
+
+    let Some((raw_title, raw_preview, workspace_uris)) = row else {
+        return Ok(ConversationSummary::default());
     };
-    let workspaces: Vec<String> = serde_json::from_str(&workspace_uris).map_err(|e| format!("Antigravity: invalid workspace metadata for {session_id}: {e}"))?;
-    let Some(uri) = workspaces.first() else {
-        return Ok(None);
+    let title = raw_title.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let preview = raw_preview.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let workspace = match workspace_uris {
+        None => None,
+        Some(uris_json) => {
+            let workspaces: Vec<String> = serde_json::from_str(&uris_json).map_err(|e| format!("Antigravity: invalid workspace metadata for {session_id}: {e}"))?;
+            if workspaces.is_empty() {
+                None
+            } else {
+                let mut resolved = None;
+                for uri in &workspaces {
+                    if let Ok(url) = Url::parse(uri) {
+                        if let Ok(file_path) = url.to_file_path() {
+                            resolved = Some(file_path);
+                            break;
+                        }
+                    }
+                }
+                if resolved.is_none() {
+                    return Err(format!("Antigravity: workspace URI for {session_id} is not a local file path"));
+                }
+                resolved
+            }
+        }
     };
-    let url = Url::parse(uri).map_err(|e| format!("Antigravity: invalid workspace URI for {session_id}: {e}"))?;
-    url.to_file_path().map(Some).map_err(|_| format!("Antigravity: workspace URI for {session_id} is not a local file path"))
+    Ok(ConversationSummary { title, preview, workspace })
 }
 
 fn extract_tagged_blocks(content: &str, tag: &str) -> Vec<String> {
@@ -257,14 +410,36 @@ fn record_to_message(rec: &Value) -> Option<CanonicalMessage> {
             Some(CanonicalMessage { idx: 0, role: MessageRole::User, content: body, timestamp: created, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) })
         }
         "PLANNER_RESPONSE" => {
-            if content.trim().is_empty() && thinking.is_none() {
+            let parsed_tool_calls = if tool_calls.and_then(Value::as_array).is_some_and(|a| !a.is_empty()) {
+                parse_tool_calls(tool_calls, step_type)
+            } else {
+                Vec::new()
+            };
+            if content.trim().is_empty() && thinking.is_none() && parsed_tool_calls.is_empty() {
                 return None;
             }
             let mut extra = Map::new();
             if let Some(t) = thinking {
                 extra.insert("thinking".to_string(), Value::String(t));
             }
-            Some(CanonicalMessage { idx: 0, role: MessageRole::Assistant, content, timestamp: created, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) })
+            Some(CanonicalMessage { idx: 0, role: MessageRole::Assistant, content, timestamp: created, author: None, tool_calls: parsed_tool_calls, tool_results: Vec::new(), extra: Value::Object(extra) })
+        }
+        "GENERIC" if source == "MODEL" => {
+            if content.trim().is_empty() {
+                return None;
+            }
+            let mut extra = Map::new();
+            extra.insert("agy_type".to_string(), Value::String(step_type.to_string()));
+            Some(CanonicalMessage {
+                idx: 0,
+                role: MessageRole::Tool,
+                content: content.clone(),
+                timestamp: created,
+                author: Some("tool_output".to_string()),
+                tool_calls: Vec::new(),
+                tool_results: vec![ToolResult { call_id: None, content, is_error: false }],
+                extra: Value::Object(extra),
+            })
         }
         "CONVERSATION_HISTORY" => None,
         "EPHEMERAL_MESSAGE" | "SYSTEM_MESSAGE" => {
@@ -379,6 +554,61 @@ mod tests {
     fn matches_transcript_path() {
         let path = Path::new("/Users/demo/.gemini/antigravity-cli/brain/abc/.system_generated/logs/transcript.jsonl");
         assert!(matches_path(path));
+        assert!(matches_path(Path::new("/Users/demo/.gemini/antigravity-cli/brain/abc/.system_generated/logs/transcript_full.jsonl")));
+        assert!(matches_path(Path::new("/Users/demo/.gemini/antigravity/brain/abc/.system_generated/logs/transcript_full.jsonl")));
+        assert!(matches_path(Path::new("/Users/demo/.gemini/antigravity-insiders/brain/abc/.system_generated/logs/transcript_full.jsonl")));
+        assert!(!matches_path(Path::new("/Users/demo/.gemini/antigravity-cli/brain/abc/.system_generated/logs/chunks/transcript/00000000.jsonl")));
         assert!(!matches_path(Path::new("/Users/demo/.gemini/tmp/hash/chats/session-x.json")));
+    }
+
+    #[test]
+    fn deduplicates_transcript_when_transcript_full_exists_and_distinguishes_clients() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let cli_logs = temp.path().join(".gemini/antigravity-cli/brain/sess-1/.system_generated/logs");
+        std::fs::create_dir_all(&cli_logs).expect("mkdir");
+        let full = cli_logs.join("transcript_full.jsonl");
+        let legacy = cli_logs.join("transcript.jsonl");
+        std::fs::write(&legacy, "{}").expect("write legacy");
+        assert!(is_discoverable_transcript_path(&legacy));
+        std::fs::write(&full, "{}").expect("write full");
+        assert!(is_discoverable_transcript_path(&full));
+        assert!(!is_discoverable_transcript_path(&legacy));
+
+        assert_eq!(client_kind(&full), AntigravityClient::Cli);
+        assert!(is_cli_session(&full));
+        let desktop = temp.path().join(".gemini/antigravity/brain/sess-2/.system_generated/logs/transcript_full.jsonl");
+        assert_eq!(client_kind(&desktop), AntigravityClient::Desktop);
+        assert!(!is_cli_session(&desktop));
+        let insiders = temp.path().join(".gemini/antigravity-insiders/brain/sess-3/.system_generated/logs/transcript_full.jsonl");
+        assert_eq!(client_kind(&insiders), AntigravityClient::Insiders);
+        assert!(!is_cli_session(&insiders));
+    }
+
+    #[test]
+    fn parses_planner_tool_calls_generic_results_and_summary_title() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.path().join(".gemini/antigravity-cli");
+        let logs = root.join("brain/sess-tools/.system_generated/logs");
+        std::fs::create_dir_all(&logs).expect("mkdir");
+        let conn = rusqlite::Connection::open(root.join("conversation_summaries.db")).expect("open db");
+        conn.execute("CREATE TABLE conversation_summaries (conversation_id TEXT PRIMARY KEY, title TEXT, preview TEXT, workspace_uris TEXT)", []).expect("create table");
+        conn.execute("INSERT INTO conversation_summaries VALUES ('sess-tools', 'Fix auth bug', 'preview text', '[]')", []).expect("insert");
+
+        let content = r#"
+{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","created_at":"2026-11-25T10:00:00Z","content":"<USER_REQUEST>read a.txt</USER_REQUEST>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-11-25T10:00:01Z","content":"","tool_calls":[{"name":"read_file","args":{"path":"a.txt"}}]}
+{"step_index":2,"source":"MODEL","type":"GENERIC","created_at":"2026-11-25T10:00:02Z","content":"1: hello"}
+{"step_index":3,"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-11-25T10:00:03Z","content":"Done."}
+"#;
+        let path = logs.join("transcript_full.jsonl");
+        let session = read_session_from_str(&path, content).expect("parse");
+        assert_eq!(session.title.as_deref(), Some("Fix auth bug"));
+        assert_eq!(session.messages.len(), 4);
+        assert_eq!(session.messages[1].role, MessageRole::Assistant);
+        assert_eq!(session.messages[1].tool_calls.len(), 1);
+        assert_eq!(session.messages[1].tool_calls[0].name, "read_file");
+        assert_eq!(session.messages[2].role, MessageRole::Tool);
+        assert_eq!(session.messages[2].tool_results.len(), 1);
+        assert_eq!(session.messages[2].tool_results[0].content, "1: hello");
     }
 }

@@ -434,6 +434,7 @@ fn main() {
             pi_session_manager::get_session_labels,
             pi_session_manager::detect_session_format,
             pi_session_manager::list_supported_session_providers,
+            pi_session_manager::get_session_resume_info,
             pi_session_manager::convert_session_format,
             pi_session_manager::get_session_by_path,
             pi_session_manager::get_session_by_id,

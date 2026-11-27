@@ -14,7 +14,7 @@ fn filter_session_stat_inputs_for_stats(sessions: Vec<stats::SessionStatsInput>)
 }
 
 // Re-export from domain
-pub use crate::domain::session_bridge::SessionBridgeConvertResult;
+pub use crate::domain::session_bridge::{SessionBridgeConvertResult, SessionCarryOption, SessionResumeInfo};
 pub use crate::domain::session_list::PaginatedSessionsResult;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -204,6 +204,11 @@ pub async fn list_supported_session_providers() -> Result<Vec<SessionProviderInf
             SessionProviderInfo { slug: source.slug().replace('_', "-"), display_name: source.display_name().to_string(), capabilities: SessionProviderCapabilities { can_scan: source.can_scan(), can_convert_target: source.can_convert_target() }, detected: !roots.is_empty(), roots }
         })
         .collect())
+}
+
+#[cfg_attr(feature = "gui", tauri::command)]
+pub async fn get_session_resume_info(path: String) -> Result<SessionResumeInfo, String> {
+    crate::domain::session_bridge::resolve_session_resume_info(std::path::Path::new(&path))
 }
 
 #[cfg_attr(feature = "gui", tauri::command)]

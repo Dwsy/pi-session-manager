@@ -1,10 +1,12 @@
 import { getPlatformDefaults, type TerminalType } from "@/components/settings/types";
 import { detectPlatform } from "@/components/settings/types";
+import { getRuntimeMode } from "@/runtime-data/runtimeMode";
 import { invoke, isTauri } from "@/transport";
 import type {
   SessionConvertResult,
   SessionConvertTarget,
   SessionInfo,
+  SessionResumeInfo,
 } from "@/types";
 import { getCachedSettings } from "@/utils/settingsApi";
 import { getSessionSourceSlug } from "@/utils/session";
@@ -147,6 +149,19 @@ export function getFallbackExternalResumeTarget(): SessionConvertTarget {
   return getConfiguredExternalResumeTarget() ?? "pi";
 }
 
+export async function getSessionResumeInfo(
+  sessionPath: string,
+): Promise<SessionResumeInfo | null> {
+  if (!sessionPath || (!isTauri() && getRuntimeMode() !== "backend")) return null;
+  try {
+    return await invoke<SessionResumeInfo>("get_session_resume_info", {
+      path: sessionPath,
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function buildCopyResumeCommand(
   session: SessionInfo,
   overrides: ResumeCommandOverrides = {},
@@ -157,6 +172,11 @@ export async function buildCopyResumeCommand(
   }
   if (sourceSlug === "omp") {
     return buildOmpResumeCommand(session, overrides);
+  }
+
+  const nativeInfo = await getSessionResumeInfo(session.path);
+  if (nativeInfo?.can_native_resume && nativeInfo.resume_command) {
+    return nativeInfo.resume_command;
   }
 
   const result = await invoke<SessionConvertResult>("convert_session_format", {
@@ -179,6 +199,23 @@ export async function buildCopyResumeCommandForTarget(
   }
   if (sourceSlug === "omp" && target === "omp") {
     return buildOmpResumeCommand(session, overrides);
+  }
+
+  if (sourceSlug && target === sourceSlug) {
+    const nativeInfo = await getSessionResumeInfo(session.path);
+    if (nativeInfo?.can_native_resume && nativeInfo.resume_command) {
+      return nativeInfo.resume_command;
+    }
+  }
+
+  if ((!sourceSlug || sourceSlug === "pi") && target === "omp") {
+    const nativeInfo = await getSessionResumeInfo(session.path);
+    const zeroCarry = nativeInfo?.carry_options?.find(
+      (opt) => opt.target_provider === "omp" && opt.zero_conversion && opt.command,
+    );
+    if (zeroCarry) {
+      return zeroCarry.command;
+    }
   }
 
   const result = await invoke<SessionConvertResult>("convert_session_format", {
@@ -210,14 +247,22 @@ export async function openSessionInTerminalDirect(
   const resumeCommand =
     overrides.resumeCommand ?? settings.terminal?.resumeCommand ?? "";
   const isOmpSession = sourceSlug === "omp";
+  let effectiveResumeCommand: string | null = isOmpSession
+    ? buildOmpResumeCommand(session, { resumeCommand })
+    : resumeCommand || null;
+
+  if (sourceSlug && sourceSlug !== "pi" && sourceSlug !== "omp" && !overrides.resumeCommand) {
+    const nativeInfo = await getSessionResumeInfo(session.path);
+    if (nativeInfo?.can_native_resume && nativeInfo.resume_command) {
+      effectiveResumeCommand = nativeInfo.resume_command;
+    }
+  }
 
   await invoke("open_session_in_terminal", {
     path: session.path,
     cwd: session.cwd,
     terminal: terminal === "custom" ? customCommand : terminal,
     piPath: isOmpSession ? "omp" : piPath || null,
-    resumeCommand: isOmpSession
-      ? buildOmpResumeCommand(session, { resumeCommand })
-      : resumeCommand || null,
+    resumeCommand: effectiveResumeCommand,
   });
 }

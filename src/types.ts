@@ -247,6 +247,26 @@ export interface SessionConvertResult {
   warnings: string[];
 }
 
+export interface SessionCarryOption {
+  target_provider: string;
+  target_display_name: string;
+  command: string;
+  zero_conversion: boolean;
+}
+
+export interface SessionResumeInfo {
+  source_provider: string;
+  source_display_name: string;
+  session_id: string;
+  cwd: string;
+  can_native_resume: boolean;
+  cli_installed: boolean;
+  resume_command?: string | null;
+  raw_command?: string | null;
+  reason?: string | null;
+  carry_options: SessionCarryOption[];
+}
+
 export interface Message {
   role: string;
   content: Content[];

@@ -6,11 +6,32 @@ use serde_json::{json, Value};
 use crate::domain::casr_min::model::{flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title, CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult};
 
 pub fn session_roots() -> Vec<PathBuf> {
-    crate::paths::existing_home_relative_dirs(&[".codex", "sessions"])
+    let mut roots = Vec::new();
+    if let Ok(codex_home) = std::env::var("CODEX_HOME") {
+        let trimmed = codex_home.trim();
+        if !trimmed.is_empty() {
+            let sessions = PathBuf::from(trimmed).join("sessions");
+            if sessions.is_dir() {
+                roots.push(sessions);
+            }
+        }
+    }
+    for dir in crate::paths::existing_home_relative_dirs(&[".codex", "sessions"]) {
+        if !roots.iter().any(|existing| existing == &dir) {
+            roots.push(dir);
+        }
+    }
+    roots
 }
 
 pub fn build_target_path(target_session_id: &str, now: DateTime<Utc>) -> Result<PathBuf, String> {
-    let sessions_dir = crate::paths::home_dir()?.join(".codex").join("sessions");
+    let codex_home = std::env::var("CODEX_HOME")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| crate::paths::home_dir().unwrap_or_default().join(".codex"));
+    let sessions_dir = codex_home.join("sessions");
     let date_dir = now.format("%Y/%m/%d").to_string();
     let stamp = now.format("%Y-%m-%dT%H-%M-%S").to_string();
     Ok(sessions_dir.join(date_dir).join(format!("rollout-{stamp}-{target_session_id}.jsonl")))
@@ -18,6 +39,114 @@ pub fn build_target_path(target_session_id: &str, now: DateTime<Utc>) -> Result<
 
 pub fn resume_command(session_id: &str) -> String {
     format!("codex resume {session_id}")
+}
+
+const CODEX_BUILTIN_PROVIDERS: [&str; 6] = ["openai", "amazon-bedrock", "amazon-bedrock-runtime", "gcp", "ollama", "lmstudio"];
+
+/// Resolve the Codex home directory owning `session_path` (parent of `sessions/` or `archived_sessions/`).
+pub fn codex_home_of(session_path: &Path) -> Option<PathBuf> {
+    session_path
+        .ancestors()
+        .find(|dir| dir.file_name().and_then(|n| n.to_str()).is_some_and(|n| matches!(n, "sessions" | "archived_sessions")))
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+}
+
+/// Build the Codex CLI resume command, injecting `-c model_provider=<saved>` when
+/// Codex 0.166+ would otherwise refuse to resume a thread started on a different
+/// configured provider (matching magpie's `codex_resume.go` logic).
+pub fn resolve_resume_command(session_id: &str, session_path: &Path) -> String {
+    let base = resume_command(session_id);
+    let Some(home) = codex_home_of(session_path) else {
+        return base;
+    };
+    let Some(saved) = saved_model_provider(&home, session_id, session_path) else {
+        return base;
+    };
+    if !is_safe_provider_name(&saved) {
+        return base;
+    }
+    let (active, configured_providers) = read_codex_config_providers(&home);
+    let active_provider = active.as_deref().unwrap_or("openai");
+    if saved == active_provider {
+        return base;
+    }
+    let is_known = CODEX_BUILTIN_PROVIDERS.contains(&saved.as_str()) || configured_providers.iter().any(|p| p == &saved);
+    if is_known {
+        format!("codex resume -c model_provider={saved} {session_id}")
+    } else {
+        base
+    }
+}
+
+fn is_safe_provider_name(name: &str) -> bool {
+    !name.is_empty() && name.len() <= 64 && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+}
+
+fn read_codex_config_providers(home: &Path) -> (Option<String>, Vec<String>) {
+    let config_path = home.join("config.toml");
+    let Ok(raw) = std::fs::read_to_string(config_path) else {
+        return (None, Vec::new());
+    };
+    let Ok(parsed) = raw.parse::<toml::Value>() else {
+        return (None, Vec::new());
+    };
+    let active = parsed.get("model_provider").and_then(toml::Value::as_str).map(str::trim).filter(|s| !s.is_empty()).map(String::from);
+    let providers = parsed
+        .get("model_providers")
+        .and_then(toml::Value::as_table)
+        .map(|table| table.keys().cloned().collect())
+        .unwrap_or_default();
+    (active, providers)
+}
+
+fn saved_model_provider(home: &Path, session_id: &str, session_path: &Path) -> Option<String> {
+    // 1. Check Codex state SQLite DBs (`state_*.sqlite` / `state.sqlite`) read-only.
+    if let Ok(entries) = std::fs::read_dir(home) {
+        let mut dbs: Vec<PathBuf> = entries
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("state") && n.ends_with(".sqlite"))
+            })
+            .collect();
+        dbs.sort();
+        dbs.reverse();
+        for db_path in dbs {
+            if let Ok(conn) = rusqlite::Connection::open_with_flags(
+                &db_path,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            ) {
+                let _ = conn.busy_timeout(std::time::Duration::from_millis(500));
+                if let Ok(provider) = conn.query_row("SELECT model_provider FROM threads WHERE id = ?1", [session_id], |row| row.get::<_, Option<String>>(0)) {
+                    if let Some(p) = provider.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) {
+                        return Some(p);
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Fallback to `session_meta.payload.model_provider` in the rollout head.
+    use std::io::{BufRead, BufReader};
+    let file = std::fs::File::open(session_path).ok()?;
+    let reader = BufReader::new(file);
+    for line in reader.lines().take(20).flatten() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Ok(value) = serde_json::from_str::<Value>(trimmed) {
+            if value.get("type").and_then(Value::as_str) == Some("session_meta") {
+                if let Some(p) = value.pointer("/payload/model_provider").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()) {
+                    return Some(p.to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 pub fn read_session(path: &Path) -> Result<CanonicalSession, String> {

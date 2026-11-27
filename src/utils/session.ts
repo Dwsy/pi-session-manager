@@ -1002,7 +1002,11 @@ export function getSessionSourceSlug(sessionPath: string): string | null {
     return 'pi'
   }
 
-  if (normalized.includes('/.omp/agent/sessions')) {
+  if (
+    normalized.includes('/.omp/agent/sessions')
+    || normalized.includes('/.omp/profiles/')
+    || normalized.includes('/omp/sessions/')
+  ) {
     return 'omp'
   }
 
@@ -1010,7 +1014,10 @@ export function getSessionSourceSlug(sessionPath: string): string | null {
     return 'claude-code'
   }
 
-  if (normalized.includes('/.codex/sessions')) {
+  if (
+    normalized.includes('/.codex/sessions')
+    || normalized.includes('/.codex/archived_sessions')
+  ) {
     return 'codex'
   }
 
@@ -1018,10 +1025,14 @@ export function getSessionSourceSlug(sessionPath: string): string | null {
     return 'opencode'
   }
 
-  // Antigravity lives under ~/.gemini/antigravity-cli, so check it before Gemini tmp.
+  // Antigravity lives under ~/.gemini/antigravity(-cli|-insiders), so check it before Gemini tmp.
   if (
     normalized.includes('/antigravity-cli/')
-    || (normalized.includes('/.system_generated/logs/transcript.jsonl')
+    || normalized.includes('/.gemini/antigravity/')
+    || normalized.includes('/.gemini/antigravity-insiders/')
+    || normalized.includes('/antigravity-insiders/')
+    || ((normalized.includes('/.system_generated/logs/transcript_full.jsonl')
+      || normalized.includes('/.system_generated/logs/transcript.jsonl'))
       && normalized.includes('antigravity'))
   ) {
     return 'antigravity'
@@ -1041,7 +1052,10 @@ export function getSessionSourceSlug(sessionPath: string): string | null {
 
   // Cline and Amp store sessions in an editor's globalStorage, which can be
   // Cursor's — check them before the Cursor rule or they get misattributed.
-  if (normalized.includes('/saoudrizwan.claude-dev/tasks/')) {
+  if (
+    normalized.includes('/saoudrizwan.claude-dev/tasks/')
+    || normalized.includes('/.cline/data/sessions/')
+  ) {
     return 'cline'
   }
 

@@ -170,9 +170,28 @@ impl ProviderKind {
         let normalized = path.to_string_lossy().replace('\\', "/");
         match self {
             Self::Pi => crate::paths::pi_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
-            Self::Omp => crate::paths::omp_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root)),
-            Self::ClaudeCode => normalized.contains("/.claude/projects/"),
-            Self::Codex => normalized.contains("/.codex/sessions/"),
+            Self::Omp => {
+                crate::paths::omp_agent_sessions_dir().ok().map(|path| path.to_string_lossy().replace('\\', "/")).is_some_and(|root| normalized.contains(&root))
+                    || normalized.contains("/.omp/profiles/")
+                    || normalized.contains("/omp/sessions/")
+            }
+            Self::ClaudeCode => {
+                normalized.contains("/.claude/projects/")
+                    || std::env::var("CLAUDE_CONFIG_DIR")
+                        .ok()
+                        .map(|v| v.trim().replace('\\', "/"))
+                        .filter(|v| !v.is_empty())
+                        .is_some_and(|root| normalized.starts_with(&root) && normalized.contains("/projects/"))
+            }
+            Self::Codex => {
+                normalized.contains("/.codex/sessions/")
+                    || normalized.contains("/.codex/archived_sessions/")
+                    || std::env::var("CODEX_HOME")
+                        .ok()
+                        .map(|v| v.trim().replace('\\', "/"))
+                        .filter(|v| !v.is_empty())
+                        .is_some_and(|root| normalized.starts_with(&root) && (normalized.contains("/sessions/") || normalized.contains("/archived_sessions/")))
+            }
             Self::OpenCode => opencode::matches_path(path),
             Self::Gemini => gemini::matches_path(path),
             Self::Factory => factory::matches_path(path),
@@ -263,7 +282,7 @@ impl ProviderKind {
             Self::Omp => omp_agent::resume_command(target_path),
             Self::ClaudeCode => claude_code::resume_command(target_session_id),
             Self::Codex => codex::resume_command(target_session_id),
-            Self::OpenCode => opencode::resume_command(),
+            Self::OpenCode => opencode::resume_command(target_session_id),
             Self::Gemini => gemini::resume_command(target_session_id),
             Self::Factory => factory::resume_command(target_session_id),
             Self::ClawdBot => clawdbot::resume_command(target_session_id),

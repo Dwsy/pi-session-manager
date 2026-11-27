@@ -50,7 +50,18 @@ Two readers coexist. Which one runs is decided in `session_bridge::read_canonica
 
 Eight providers (Aider, Amp, ChatGPT, Cline, OpenClaw, Vibe, Kiro, Grok) have no hand-written casr_min reader at all. `casr_min/providers/vendored.rs` owns their path matching — the scanner classifies files by path and cannot afford to build the CASR registry per file — and forwards reads to CASR. Conversions to these providers, including dry runs, are performed entirely by the CASR writer.
 
-Project directories for Antigravity come from `conversation_summaries.db` in the Antigravity data directory (normally `~/.gemini/antigravity-cli`). The reader opens the database read-only, matches `conversation_id` to the UUID under `brain/`, and converts the first URI in `workspace_uris` to a local path. Missing summaries or empty workspace lists leave the project unspecified, but malformed metadata produces a read error.
+Antigravity discovery covers `~/.gemini/antigravity-cli/brain` (CLI / `agy`), `~/.gemini/antigravity/brain` (Desktop App), and `~/.gemini/antigravity-insiders/brain` (Insiders), as well as `CASS_ANTIGRAVITY_DATA_ROOT` / `ANTIGRAVITY_HOME`. Discovery admits `brain/<uuid>/.system_generated/logs/transcript_full.jsonl` (preferred) and legacy `transcript.jsonl` while excluding `chunks/transcript/*.jsonl` shards and deduplicating `transcript.jsonl` when `transcript_full.jsonl` exists alongside it. Metadata (`title`, `preview`, `workspace_uris`) is read read-only from `conversation_summaries.db`. `PLANNER_RESPONSE` preserves `tool_calls` and `MODEL` `GENERIC` steps map to `Tool` results. Only Antigravity CLI sessions support native terminal resume (`agy --conversation <id>`); Desktop/Insiders sessions are read-only and can be converted to another CLI to continue.
+
+### Native Resume & Idempotent Conversion (`session_bridge/resume.rs`)
+
+Native resume commands and zero-conversion carry options are resolved centrally by `get_session_resume_info` (`src-tauri/src/domain/session_bridge/resume.rs`):
+
+- **OpenCode**: `opencode --session <id>`
+- **Factory (Droid)**: `droid --resume <id>`
+- **Codex**: `codex resume [-c model_provider=<saved>] <id>` (checks `state*.sqlite` / `session_meta` against `config.toml` for Codex 0.166+ provider matching)
+- **OMP**: discovers `~/.omp/profiles/*/agent/sessions` and `$XDG_DATA_HOME/omp/sessions`, emitting `omp --profile <name> --resume <id>` for profiled sessions; Pi sessions offer zero-conversion `omp --fork '<path>'` when `omp` is installed
+- **Antigravity CLI**: `agy --conversation <id>` (no hardcoded `--model`); Desktop / Insiders marked read-only
+- **Idempotent Conversion Cache**: `convert_session_format` caches non-dry-run, non-force conversions by `(source_path, target_slug, file_size, modified_ns)` so repeated clicks reuse the existing converted file while it remains on disk.
 
 ## Main Rendering Path
 

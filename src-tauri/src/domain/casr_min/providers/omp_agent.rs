@@ -12,7 +12,56 @@ use serde_json::Value;
 use crate::domain::casr_min::model::CanonicalSession;
 
 pub fn session_roots() -> Vec<PathBuf> {
-    crate::paths::omp_agent_sessions_dir().ok().filter(|p| p.is_dir()).map(|p| vec![p]).unwrap_or_default()
+    let mut roots = Vec::new();
+    if let Ok(default_dir) = crate::paths::omp_agent_sessions_dir() {
+        if default_dir.is_dir() {
+            roots.push(default_dir.clone());
+        }
+        // ~/.omp/profiles/<name>/agent/sessions
+        if let Some(omp_root) = default_dir.parent().and_then(Path::parent) {
+            let profiles_dir = omp_root.join("profiles");
+            if let Ok(entries) = std::fs::read_dir(profiles_dir) {
+                for entry in entries.flatten() {
+                    let candidate = entry.path().join("agent").join("sessions");
+                    if candidate.is_dir() && !roots.iter().any(|existing| existing == &candidate) {
+                        roots.push(candidate);
+                    }
+                }
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
+        let trimmed = xdg.trim();
+        if !trimmed.is_empty() {
+            let candidate = PathBuf::from(trimmed).join("omp").join("sessions");
+            if candidate.is_dir() && !roots.iter().any(|existing| existing == &candidate) {
+                roots.push(candidate);
+            }
+        }
+    }
+    roots
+}
+
+/// Extract OMP profile name from `~/.omp/profiles/<name>/agent/sessions/<cwd>/<file>.jsonl`.
+pub fn profile_from_path(path: &Path) -> Option<String> {
+    let normalized = path.to_string_lossy().replace('\\', "/");
+    let marker = "/.omp/profiles/";
+    let idx = normalized.find(marker)?;
+    let rest = &normalized[idx + marker.len()..];
+    let (profile, tail) = rest.split_once('/')?;
+    if !tail.starts_with("agent/sessions/") || profile.is_empty() {
+        return None;
+    }
+    let valid = profile.len() <= 64
+        && profile.chars().enumerate().all(|(i, c)| {
+            if i == 0 {
+                c.is_ascii_lowercase() || c.is_ascii_digit()
+            } else {
+                c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-')
+            }
+        });
+    valid.then(|| profile.to_string())
 }
 
 pub fn looks_like_session_content(content: &str) -> bool {
@@ -32,7 +81,11 @@ pub fn build_target_path(target_session_id: &str, now: chrono::DateTime<chrono::
 }
 
 pub fn resume_command(target_path: &Path) -> String {
-    format!("omp --session {}", shell_escape(target_path))
+    if let Some(profile) = profile_from_path(target_path) {
+        format!("omp --profile {profile} --session {}", shell_escape(target_path))
+    } else {
+        format!("omp --session {}", shell_escape(target_path))
+    }
 }
 
 pub fn read_session(path: &Path) -> Result<CanonicalSession, String> {
