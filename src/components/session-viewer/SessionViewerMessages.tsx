@@ -141,8 +141,10 @@ const SessionViewerMessages = forwardRef<
   scrollContentRef,
 }: SessionViewerMessagesProps, ref) {
   const { t } = useTranslation();
-  const { ensureToolExpandedForSearch } = useSessionView();
+  const { ensureToolExpandedForSearch, toolsExpanded, showThinking } = useSessionView();
   const showLoadingSpinner = useDelayedLoading(loading);
+
+  const isConversationMode = previewVariant !== "none";
 
   const {
     messagesContainerRef,
@@ -162,18 +164,20 @@ const SessionViewerMessages = forwardRef<
     setHasNewMessages,
     pendingScrollToBottomRef,
     expandedToolIds,
+    toolsExpanded,
+    showThinking,
+    enabled: !isConversationMode,
     sessionPath,
     isAtBottomRef,
     onReachBottom,
     previewMode,
-    handlesScrollTarget: previewVariant !== "none",
-    handlesScrollCommands: previewVariant !== "none",
+    handlesScrollTarget: isConversationMode,
+    handlesScrollCommands: isConversationMode,
   });
 
   // Conversation mode owns its scrolling: turn rows are virtualized inside
   // ConversationPreviewMessages, so the flat entry virtualizer cannot address them.
   const conversationRef = useRef<ConversationPreviewMessagesHandle>(null);
-  const isConversationMode = previewVariant !== "none";
   const [conversationActiveUserEntryId, setConversationActiveUserEntryId] = useState<string | null>(null);
   const handleScrollToTop = useCallback(() => {
     if (isConversationMode) {
@@ -199,7 +203,7 @@ const SessionViewerMessages = forwardRef<
     [isConversationMode, scrollToEntryId],
   );
 
-  const virtualRows = rowVirtualizer.getVirtualItems();
+  const virtualRows = isConversationMode ? [] : rowVirtualizer.getVirtualItems();
 
   const timelineNavItems = useSessionTimelineNav({
     entries: renderableEntries,
@@ -219,11 +223,14 @@ const SessionViewerMessages = forwardRef<
     const visibleOffset = rowVirtualizer.scrollOffset ?? 0;
     const firstVisibleIndex =
       virtualRows.find((row) => row.start + row.size > visibleOffset)?.index ?? 0;
-    const currentItem =
-      [...timelineNavItems.items]
-        .reverse()
-        .find((item) => item.index <= firstVisibleIndex) ??
-      timelineNavItems.items[0];
+    let currentItem = timelineNavItems.items[0];
+    for (let i = timelineNavItems.items.length - 1; i >= 0; i -= 1) {
+      const item = timelineNavItems.items[i];
+      if (item.index <= firstVisibleIndex) {
+        currentItem = item;
+        break;
+      }
+    }
     return currentItem?.entryId ?? null;
   }, [conversationActiveUserEntryId, isConversationMode, isTimelineNavEnabled, rowVirtualizer.scrollOffset, timelineNavItems.items, virtualRows]);
 
@@ -457,6 +464,7 @@ const SessionViewerMessages = forwardRef<
                 ref={conversationRef}
                 onActiveUserEntryIdChange={isTimelineNavEnabled ? setConversationActiveUserEntryId : undefined}
                 entries={renderableEntries}
+                sessionPath={sessionPath}
                 toolResultByCallId={toolResultByCallId}
                 searchQuery={searchQuery}
                 streamingId={streamingId}

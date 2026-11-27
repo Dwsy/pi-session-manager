@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import {
   forwardRef,
+  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -22,6 +23,7 @@ import { useTranslation } from "react-i18next";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 import type { SessionEntry } from "@/types";
+import { useSessionView } from "@/contexts/SessionViewContext";
 import { normalizePiContent } from "@/utils/session";
 import { requestToolReview } from "@/contexts/toolReviewBus";
 import { estimateSessionEntrySize } from "@/hooks/useSessionViewerVirtualScroll";
@@ -33,6 +35,7 @@ export type ConversationFoldMode = "wholeTurn" | "toolGroups";
 
 export interface ConversationPreviewMessagesProps {
   entries: SessionEntry[];
+  sessionPath?: string;
   toolResultByCallId: Map<string, SessionEntry>;
   searchQuery: string;
   streamingId: string | null;
@@ -601,7 +604,7 @@ function estimateTurnHeight(
   return 8 + userHeight + assistantHeight + processHeight + TURN_GAP_PX;
 }
 
-function ConversationPreviewTurnView({
+const ConversationPreviewTurnView = memo(function ConversationPreviewTurnView({
   turn,
   toolResultByCallId,
   searchQuery,
@@ -618,7 +621,7 @@ function ConversationPreviewTurnView({
   streamingId: string | null;
   foldMode: ConversationFoldMode;
   expanded: boolean;
-  onToggle: () => void;
+  onToggle: (turnId: string) => void;
   expandedGroupIds: Set<string>;
   onToggleGroup: (groupId: string) => void;
 }) {
@@ -628,6 +631,10 @@ function ConversationPreviewTurnView({
     () => buildProcessFoldBlocks(turn.processEntries),
     [turn.processEntries],
   );
+
+  const handleToggleTurn = useCallback(() => {
+    onToggle(turn.id);
+  }, [onToggle, turn.id]);
 
   return (
     <div className="conversation-preview-turn space-y-1.5" data-entry-id={turn.id}>
@@ -676,7 +683,7 @@ function ConversationPreviewTurnView({
                   key={foldKey}
                   entries={block.entries}
                   expanded={false}
-                  onToggle={onToggle}
+                  onToggle={handleToggleTurn}
                   toolResultByCallId={toolResultByCallId}
                 />
               );
@@ -688,7 +695,7 @@ function ConversationPreviewTurnView({
                   <CollapsedProcessSummary
                     entries={block.entries}
                     expanded
-                    onToggle={onToggle}
+                    onToggle={handleToggleTurn}
                     toolResultByCallId={toolResultByCallId}
                   />
                 </div>
@@ -729,7 +736,7 @@ function ConversationPreviewTurnView({
       )}
     </div>
   );
-}
+});
 
 const ConversationPreviewMessages = forwardRef<
   ConversationPreviewMessagesHandle,
@@ -737,6 +744,7 @@ const ConversationPreviewMessages = forwardRef<
 >(function ConversationPreviewMessages(
   {
     entries,
+    sessionPath,
     toolResultByCallId,
     searchQuery,
     streamingId,
@@ -749,6 +757,7 @@ const ConversationPreviewMessages = forwardRef<
   },
   ref,
 ) {
+  const { toolsExpanded, expandedToolIds, showThinking } = useSessionView();
   const turns = useMemo(
     () => buildConversationPreviewTurns(entries),
     [entries],
@@ -774,27 +783,57 @@ const ConversationPreviewMessages = forwardRef<
     return estimates;
   }, [turns, foldMode]);
 
+  const getItemKey = useCallback(
+    (index: number) => turns[index]?.id ?? index,
+    [turns],
+  );
+
   const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
     count: turns.length,
     getScrollElement: () => scrollElementRef?.current ?? null,
+    getItemKey,
     estimateSize: (index) =>
       turnEstimates.get(turns[index]?.id ?? "") ?? DEFAULT_TURN_HEIGHT_PX,
     overscan: TURN_OVERSCAN,
     lanes: 1,
     isScrollingResetDelay: 200,
-    useAnimationFrameWithResizeObserver: true,
+    useAnimationFrameWithResizeObserver: false,
   });
 
-  // Expanding/collapsing turns or tool groups changes row heights. Re-measure
-  // mounted rows synchronously so rows below reposition in the same frame —
-  // stale heights here are what made folded sections overlap.
+  // Reset expansion state and cached virtual measurements when switching sessions.
+  const prevSessionPathRef = useRef(sessionPath);
+  useEffect(() => {
+    if (prevSessionPathRef.current === sessionPath) return;
+    prevSessionPathRef.current = sessionPath;
+    setExpandedTurnIds(new Set());
+    setExpandedGroupIds(new Set());
+    rowVirtualizer.measure();
+  }, [sessionPath, rowVirtualizer]);
+
+  // Clear cached measurements when fold mode or global tool/thinking visibility changes.
+  const prevFoldLayoutKeyRef = useRef(`${foldMode}:${toolsExpanded}:${showThinking}`);
+  useLayoutEffect(() => {
+    const nextKey = `${foldMode}:${toolsExpanded}:${showThinking}`;
+    if (prevFoldLayoutKeyRef.current === nextKey) return;
+    prevFoldLayoutKeyRef.current = nextKey;
+    rowVirtualizer.measure();
+  }, [foldMode, toolsExpanded, showThinking, rowVirtualizer]);
+
+  // Expanding/collapsing turns, tool groups, or individual tools changes row heights.
+  // Re-measure mounted rows synchronously before paint so rows below reposition in
+  // the same frame — stale heights here are what made folded sections overlap.
   useLayoutEffect(() => {
     const content = contentRef.current;
     if (!content) return;
     content
       .querySelectorAll<HTMLDivElement>("[data-index]")
       .forEach((row) => rowVirtualizer.measureElement(row));
-  }, [expandedTurnIds, expandedGroupIds, rowVirtualizer]);
+  }, [
+    expandedTurnIds,
+    expandedGroupIds,
+    expandedToolIds,
+    rowVirtualizer,
+  ]);
 
   const toggleTurn = useCallback((turnId: string) => {
     setExpandedTurnIds((prev) => {
@@ -969,6 +1008,7 @@ const ConversationPreviewMessages = forwardRef<
 
   // Conversation mode has its own turn virtualizer. The outer flat-entry
   // virtualizer cannot identify the active turn (and includes overscan rows).
+  const lastActiveUserIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
     if (!onActiveUserEntryIdChange) return;
 
@@ -977,7 +1017,7 @@ const ConversationPreviewMessages = forwardRef<
       (rowVirtualizer.scrollOffset ?? 0) - getContentOffsetTop(),
     );
     const firstVisibleIndex =
-      rowVirtualizer.getVirtualItems().find((row) => row.start + row.size > visibleOffset)
+      virtualRows.find((row) => row.start + row.size > visibleOffset)
         ?.index ?? 0;
 
     let activeUserId: string | null = null;
@@ -988,8 +1028,11 @@ const ConversationPreviewMessages = forwardRef<
         break;
       }
     }
-    onActiveUserEntryIdChange(activeUserId);
-  }, [getContentOffsetTop, onActiveUserEntryIdChange, rowVirtualizer, rowVirtualizer.scrollOffset, turns]);
+    if (lastActiveUserIdRef.current !== activeUserId) {
+      lastActiveUserIdRef.current = activeUserId;
+      onActiveUserEntryIdChange(activeUserId);
+    }
+  }, [getContentOffsetTop, onActiveUserEntryIdChange, rowVirtualizer.scrollOffset, turns, virtualRows]);
 
   return (
     <div className="conversation-preview-messages px-1 py-1">
@@ -1023,7 +1066,7 @@ const ConversationPreviewMessages = forwardRef<
                 streamingId={streamingId}
                 foldMode={foldMode}
                 expanded={expandedTurnIds.has(turn.id)}
-                onToggle={() => toggleTurn(turn.id)}
+                onToggle={toggleTurn}
                 expandedGroupIds={expandedGroupIds}
                 onToggleGroup={toggleGroup}
               />

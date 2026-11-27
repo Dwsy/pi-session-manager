@@ -208,7 +208,21 @@ export function useSessionScrollMarkers({
   useLayoutEffect(() => {
     const runMeasure = () => {
       const tops = measureMarkerTops();
-      if (tops) setMeasuredTops(tops);
+      if (!tops) return;
+      setMeasuredTops((prev) => {
+        if (prev.size === tops.size) {
+          let unchanged = true;
+          for (const [id, ratio] of tops) {
+            const prevRatio = prev.get(id);
+            if (prevRatio === undefined || Math.abs(prevRatio - ratio) > 0.0005) {
+              unchanged = false;
+              break;
+            }
+          }
+          if (unchanged) return prev;
+        }
+        return tops;
+      });
     };
 
     runMeasure();
@@ -216,15 +230,28 @@ export function useSessionScrollMarkers({
     const content = scrollContentRef?.current;
     if (!content) return;
 
+    // Virtualized lists update total container height continuously while
+    // scrolling as rows are measured. Debounce ResizeObserver re-measurement so
+    // we do not force synchronous getBoundingClientRect() reflows every frame.
+    let debounceTimer: number | null = null;
     let rafId = 0;
     const observer = new ResizeObserver(() => {
+      if (debounceTimer !== null) {
+        window.clearTimeout(debounceTimer);
+      }
       cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(runMeasure);
+      debounceTimer = window.setTimeout(() => {
+        debounceTimer = null;
+        rafId = requestAnimationFrame(runMeasure);
+      }, 150);
     });
     observer.observe(content);
 
     return () => {
       observer.disconnect();
+      if (debounceTimer !== null) {
+        window.clearTimeout(debounceTimer);
+      }
       cancelAnimationFrame(rafId);
     };
   }, [scrollContainerRef, scrollContentRef, measureMarkerTops]);

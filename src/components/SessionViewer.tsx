@@ -288,19 +288,41 @@ function SessionViewerContent({
 
     let frames = 0;
     let rafId = 0;
+    let cancelledByUser = false;
+    const container = scrollMarkersContainerRef.current;
+
+    const cancelRestore = () => {
+      cancelledByUser = true;
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+
+    if (container) {
+      container.addEventListener("wheel", cancelRestore, { passive: true, once: true });
+      container.addEventListener("pointerdown", cancelRestore, { passive: true, once: true });
+      container.addEventListener("touchstart", cancelRestore, { passive: true, once: true });
+    }
+
     const attempt = () => {
-      const container = scrollMarkersContainerRef.current;
-      if (!container) return;
-      container.scrollTop = savedTop;
+      if (cancelledByUser) return;
+      const el = scrollMarkersContainerRef.current;
+      if (!el) return;
+      el.scrollTop = savedTop;
       frames += 1;
       // Virtualized rows settle their measured heights over a few frames;
       // keep re-applying until the position sticks or we give up.
-      if (Math.abs(container.scrollTop - savedTop) > 1.5 && frames < 60) {
+      if (Math.abs(el.scrollTop - savedTop) > 1.5 && frames < 20) {
         rafId = requestAnimationFrame(attempt);
       }
     };
     rafId = requestAnimationFrame(attempt);
-    return () => cancelAnimationFrame(rafId);
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (container) {
+        container.removeEventListener("wheel", cancelRestore);
+        container.removeEventListener("pointerdown", cancelRestore);
+        container.removeEventListener("touchstart", cancelRestore);
+      }
+    };
   }, [loading, previewMode, initialEntryId, session.path, pendingScrollToBottomRef]);
 
   const {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   Dispatch,
   MutableRefObject,
@@ -43,7 +43,7 @@ export function estimateSessionEntrySize(
         const textLength = textItems.reduce((sum, item) => sum + (item.text?.length ?? 0), 0)
         const baseHeight = role === 'user' ? 48 : 40
         const contentHeight = Math.ceil(textLength / 90) * 24
-        height = Math.min(baseHeight + contentHeight, 800)
+        height = Math.min(baseHeight + contentHeight, 1600)
       } else {
         // Normal mode: account for tool calls, thinking blocks, text
         const textLength = content.reduce((sum, item) => {
@@ -55,7 +55,7 @@ export function estimateSessionEntrySize(
         const hasTools = content.some((item) => item.type === 'toolCall')
         const baseHeight = hasTools ? 140 : 100
         const contentHeight = Math.ceil(textLength / 80) * 32
-        height = Math.min(baseHeight + contentHeight, 800)
+        height = Math.min(baseHeight + contentHeight, 1600)
       }
       break
     }
@@ -87,6 +87,9 @@ export interface UseSessionViewerVirtualScrollOptions {
   setHasNewMessages: Dispatch<SetStateAction<boolean>>
   pendingScrollToBottomRef: MutableRefObject<boolean>
   expandedToolIds: Set<string>
+  toolsExpanded?: boolean
+  showThinking?: boolean
+  enabled?: boolean
   sessionPath: string
   isAtBottomRef?: MutableRefObject<boolean>
   onReachBottom?: () => void
@@ -119,6 +122,9 @@ export function useSessionViewerVirtualScroll({
   setHasNewMessages,
   pendingScrollToBottomRef,
   expandedToolIds,
+  toolsExpanded = false,
+  showThinking = false,
+  enabled = true,
   sessionPath,
   isAtBottomRef: externalIsAtBottomRef,
   onReachBottom,
@@ -158,14 +164,20 @@ export function useSessionViewerVirtualScroll({
     [renderableEntries, previewMode],
   )
 
+  const getItemKey = useCallback(
+    (index: number) => renderableEntries[index]?.id ?? index,
+    [renderableEntries],
+  )
+
   const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
-    count: renderableEntries.length,
-    getScrollElement: () => messagesContainerRef.current,
+    count: enabled ? renderableEntries.length : 0,
+    getScrollElement: () => (enabled ? messagesContainerRef.current : null),
+    getItemKey,
     estimateSize: estimateEntrySize,
     overscan: ROW_OVERSCAN,
     lanes: 1,
     isScrollingResetDelay: 200,
-    useAnimationFrameWithResizeObserver: true,
+    useAnimationFrameWithResizeObserver: false,
     measureElement: (element, entry, instance) => {
       const height = measureElement(element, entry, instance)
       const entryId = element.getAttribute('data-entry-id')
@@ -180,7 +192,9 @@ export function useSessionViewerVirtualScroll({
   useEffect(() => {
     measuredHeightsRef.current.clear()
     hasTriggeredReachBottomRef.current = false
-    rowVirtualizer.measure()
+    if (enabled) {
+      rowVirtualizer.measure()
+    }
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = 0
     }
@@ -188,7 +202,7 @@ export function useSessionViewerVirtualScroll({
     isAtBottomRef.current = true
     setIsAtTop(true)
     isAtTopRef.current = true
-  }, [sessionPath, rowVirtualizer])
+  }, [sessionPath, rowVirtualizer, enabled])
 
   // Preview mode change: clear cache and let virtualizer re-estimate.
   // Do NOT call measure() here — React hasn't re-rendered with stripped content yet,
@@ -198,30 +212,25 @@ export function useSessionViewerVirtualScroll({
     hasTriggeredReachBottomRef.current = false
   }, [previewMode])
 
-  // When tools expand/collapse individually, re-measure with debounce to let DOM settle
-  useEffect(() => {
-    const container = messagesContainerRef.current
-    if (!container) return
+  // When global tool/thinking visibility changes, clear cached heights and
+  // re-measure so offscreen rows do not retain stale pre-toggle heights.
+  useLayoutEffect(() => {
+    if (!enabled) return
+    measuredHeightsRef.current.clear()
+    rowVirtualizer.measure()
+  }, [enabled, toolsExpanded, showThinking, rowVirtualizer])
 
-    // Save current scroll position relative to visible content
-    const scrollTop = container.scrollTop
-    const scrollRatio = container.scrollHeight > 0 ? scrollTop / container.scrollHeight : 0
-
-    const timeoutId = requestAnimationFrame(() => {
-      rowVirtualizer.measure()
-
-      // Restore scroll ratio after measurement to prevent jumping
-      requestAnimationFrame(() => {
-        if (container.scrollHeight > 0) {
-          const newScrollTop = container.scrollHeight * scrollRatio
-          container.scrollTop = newScrollTop
-        }
-      })
-    })
-    return () => {
-      cancelAnimationFrame(timeoutId)
-    }
-  }, [expandedToolIds, rowVirtualizer])
+  // When individual tools expand/collapse, re-measure mounted rows synchronously
+  // before paint so sibling rows reposition in the same frame without jumping.
+  useLayoutEffect(() => {
+    if (!enabled) return
+    const wrapper = messagesWrapperRef.current
+    if (!wrapper) return
+    measuredHeightsRef.current.clear()
+    wrapper
+      .querySelectorAll<HTMLDivElement>('[data-index]')
+      .forEach((row) => rowVirtualizer.measureElement(row))
+  }, [enabled, expandedToolIds, rowVirtualizer])
 
   useEffect(() => {
     if (handlesScrollCommands) return

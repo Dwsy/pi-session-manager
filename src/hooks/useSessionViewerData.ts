@@ -458,6 +458,7 @@ export function useSessionViewerData({
           return;
         }
 
+        const didHydrateMore = hasMore;
         if (hasMore) {
           setLoading(false);
           loadingMoreRef.current = true;
@@ -499,12 +500,17 @@ export function useSessionViewerData({
           return;
         }
 
+        if (!didHydrateMore) {
+          return;
+        }
+
         nextOffsetRef.current = nextOffset;
         fileSizeRef.current = fileSize;
         lineCountRef.current = totalLineCount;
 
-        pendingScrollToBottomRef.current =
-          !initialEntryId && openPosition === "bottom";
+        if (!initialEntryId && openPosition === "bottom" && isAtBottomRef.current) {
+          pendingScrollToBottomRef.current = true;
+        }
 
         setEntries(allEntries);
         setLineCount(totalLineCount);
