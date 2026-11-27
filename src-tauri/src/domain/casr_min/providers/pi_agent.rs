@@ -142,8 +142,9 @@ pub fn render_session(session: &CanonicalSession, target_session_id: &str) -> Re
 
     let mut parent_id: Option<String> = None;
     for msg in &session.messages {
+        let extra_thinking = msg.extra.get("thinking").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty());
         let has_tool_data = !msg.tool_calls.is_empty() || !msg.tool_results.is_empty();
-        if msg.content.trim().is_empty() && !has_tool_data {
+        if msg.content.trim().is_empty() && extra_thinking.is_none() && !has_tool_data {
             continue;
         }
 
@@ -160,6 +161,11 @@ pub fn render_session(session: &CanonicalSession, target_session_id: &str) -> Re
 
         let is_reasoning = is_reasoning_message(msg);
         let mut blocks = Vec::new();
+        if !is_reasoning {
+            if let Some(thinking_text) = extra_thinking {
+                blocks.push(json!({"type": "thinking", "thinking": thinking_text}));
+            }
+        }
         if !effective_content.trim().is_empty() {
             if is_reasoning {
                 blocks.push(json!({"type": "thinking", "thinking": effective_content}));

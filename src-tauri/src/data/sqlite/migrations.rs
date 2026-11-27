@@ -27,6 +27,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             18 => migration_18(conn)?,
             19 => migration_19(conn)?,
             20 => migration_20(conn)?,
+            21 => migration_21(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -465,6 +466,59 @@ fn migration_20(conn: &Connection) -> Result<(), String> {
     }
 
     info!("[migration:20] pruned {} empty tool-call-only rows from message_entries", deleted);
+    Ok(())
+}
+
+/// Migration to version 21: purge stale Antigravity chunk shards (`chunks/transcript*`)
+/// and duplicate `transcript.jsonl` rows when a sibling `transcript_full.jsonl` exists.
+fn migration_21(conn: &Connection) -> Result<(), String> {
+    let sessions_exists: bool = conn
+        .query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sessions'", [], |row| row.get::<_, i64>(0))
+        .map(|c| c > 0)
+        .unwrap_or(false);
+    if !sessions_exists {
+        return Ok(());
+    }
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT path FROM sessions
+             WHERE path LIKE '%/.system_generated/logs/chunks/%'
+                OR (path LIKE '%/.system_generated/logs/transcript.jsonl'
+                    AND EXISTS (
+                        SELECT 1 FROM sessions s2
+                        WHERE s2.path = REPLACE(sessions.path, '/transcript.jsonl', '/transcript_full.jsonl')
+                    ))",
+        )
+        .map_err(|e| format!("Migration 21 failed preparing stale antigravity query: {e}"))?;
+
+    let stale_paths: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|e| format!("Migration 21 failed querying stale antigravity paths: {e}"))?
+        .flatten()
+        .collect();
+
+    if stale_paths.is_empty() {
+        return Ok(());
+    }
+
+    for table_col in [("message_entries", "session_path"), ("session_details_cache", "path"), ("scan_state", "path"), ("sessions", "path")] {
+        let exists: bool = conn
+            .query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1", params![table_col.0], |row| row.get::<_, i64>(0))
+            .map(|c| c > 0)
+            .unwrap_or(false);
+        if !exists {
+            continue;
+        }
+        for chunk in stale_paths.chunks(500) {
+            let placeholders = (0..chunk.len()).map(|i| format!("?{}", i + 1)).collect::<Vec<_>>().join(", ");
+            let sql = format!("DELETE FROM {} WHERE {} IN ({placeholders})", table_col.0, table_col.1);
+            let params: Vec<&dyn rusqlite::ToSql> = chunk.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+            conn.execute(&sql, params.as_slice()).map_err(|e| format!("Migration 21 failed deleting from {}: {e}", table_col.0))?;
+        }
+    }
+
+    info!("[migration:21] purged {} stale Antigravity chunk/duplicate session rows", stale_paths.len());
     Ok(())
 }
 

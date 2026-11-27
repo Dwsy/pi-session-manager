@@ -4,6 +4,7 @@
 //! `transcript.jsonl` under `brain/<uuid>/.system_generated/logs/`, reading
 //! titles, previews, and workspace URIs from `conversation_summaries.db`.
 
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 
 use reqwest::Url;
@@ -151,14 +152,13 @@ pub fn read_session_from_str(path: &Path, content: &str) -> Result<CanonicalSess
     let mut messages = Vec::new();
     let mut started_at = None;
     let mut ended_at = None;
-    for record in ordered {
+    let mut pending_tool_calls: VecDeque<(String, String)> = VecDeque::new();
+    for (order_idx, record) in ordered.into_iter().enumerate() {
         if let Some(ts) = record.get("created_at").and_then(parse_timestamp) {
             started_at = Some(started_at.map_or(ts, |cur: i64| cur.min(ts)));
             ended_at = Some(ended_at.map_or(ts, |cur: i64| cur.max(ts)));
         }
-        if let Some(message) = record_to_message(record) {
-            messages.push(message);
-        }
+        record_to_messages(record, order_idx, &mut pending_tool_calls, &mut messages);
     }
     if messages.is_empty() {
         return Err(format!("Antigravity: transcript produced no messages: {}", path.display()));
@@ -348,28 +348,56 @@ fn model_from_settings(settings: &str) -> Option<String> {
 
 fn detect_model(records: &[Value]) -> Option<String> {
     for record in records {
-        if record.get("type").and_then(Value::as_str) != Some("USER_INPUT") {
-            continue;
-        }
-        let content = record.get("content").and_then(Value::as_str).unwrap_or("");
-        if let Some(settings) = extract_tagged_blocks(content, "USER_SETTINGS_CHANGE").into_iter().next() {
-            if let Some(model) = model_from_settings(&settings) {
-                return Some(model);
+        let step_type = record.get("type").and_then(Value::as_str);
+        if step_type == Some("USER_INPUT") {
+            let content = record.get("content").and_then(Value::as_str).unwrap_or("");
+            if let Some(settings) = extract_tagged_blocks(content, "USER_SETTINGS_CHANGE").into_iter().next() {
+                if let Some(model) = model_from_settings(&settings) {
+                    return Some(model);
+                }
+            }
+        } else if step_type == Some("PLANNER_RESPONSE") {
+            if let Some(model) = record.get("model").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()) {
+                return Some(model.to_string());
             }
         }
     }
     None
 }
 
-fn parse_tool_calls(tool_calls: Option<&Value>, step_type: &str) -> Vec<ToolCall> {
+fn unquote_nested_json_strings(value: Value) -> Value {
+    match value {
+        Value::String(s) => {
+            if s.len() >= 2 && s.starts_with('"') && s.ends_with('"') {
+                if let Ok(unquoted) = serde_json::from_str::<String>(&s) {
+                    return Value::String(unquoted);
+                }
+            }
+            Value::String(s)
+        }
+        Value::Object(map) => Value::Object(map.into_iter().map(|(k, v)| (k, unquote_nested_json_strings(v))).collect()),
+        Value::Array(items) => Value::Array(items.into_iter().map(unquote_nested_json_strings).collect()),
+        other => other,
+    }
+}
+
+fn parse_tool_calls(tool_calls: Option<&Value>, step_type: &str, step_key: i64) -> Vec<ToolCall> {
     let synthesized_name = step_type.to_ascii_lowercase();
     let Some(arr) = tool_calls.and_then(Value::as_array).filter(|a| !a.is_empty()) else {
         return vec![ToolCall { id: None, name: synthesized_name, arguments: Value::Null }];
     };
     arr.iter()
-        .map(|tc| {
+        .enumerate()
+        .map(|(tc_idx, tc)| {
             let name = tc.get("name").or_else(|| tc.get("tool_name")).or_else(|| tc.pointer("/function/name")).and_then(Value::as_str).filter(|s| !s.trim().is_empty()).map_or_else(|| synthesized_name.clone(), String::from);
-            let call_id = tc.get("id").or_else(|| tc.get("call_id")).or_else(|| tc.get("tool_call_id")).and_then(Value::as_str).map(String::from);
+            let call_id = tc
+                .get("id")
+                .or_else(|| tc.get("call_id"))
+                .or_else(|| tc.get("tool_call_id"))
+                .and_then(Value::as_str)
+                .filter(|s| !s.trim().is_empty())
+                .map(String::from)
+                .or_else(|| Some(format!("agy-step-{step_key}-tc-{tc_idx}")));
             let arguments = tc
                 .get("arguments")
                 .or_else(|| tc.get("args"))
@@ -378,7 +406,7 @@ fn parse_tool_calls(tool_calls: Option<&Value>, step_type: &str) -> Vec<ToolCall
                 .cloned()
                 .map(|raw| match raw {
                     Value::String(s) => serde_json::from_str::<Value>(&s).unwrap_or(Value::String(s)),
-                    other => other,
+                    other => unquote_nested_json_strings(other),
                 })
                 .unwrap_or(Value::Null);
             ToolCall { id: call_id, name, arguments }
@@ -386,10 +414,11 @@ fn parse_tool_calls(tool_calls: Option<&Value>, step_type: &str) -> Vec<ToolCall
         .collect()
 }
 
-fn record_to_message(rec: &Value) -> Option<CanonicalMessage> {
+fn record_to_messages(rec: &Value, order_idx: usize, pending_tool_calls: &mut VecDeque<(String, String)>, out: &mut Vec<CanonicalMessage>) {
     let source = rec.get("source").and_then(Value::as_str).unwrap_or("");
     let step_type = rec.get("type").and_then(Value::as_str).unwrap_or("");
     let created = rec.get("created_at").and_then(parse_timestamp);
+    let step_key = rec.get("step_index").and_then(Value::as_i64).unwrap_or(order_idx as i64);
     let content = rec.get("content").and_then(Value::as_str).unwrap_or("").to_string();
     let thinking = rec.get("thinking").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()).map(String::from);
     let tool_calls = rec.get("tool_calls").filter(|v| v.is_array());
@@ -398,7 +427,7 @@ fn record_to_message(rec: &Value) -> Option<CanonicalMessage> {
         "USER_INPUT" => {
             let (body, settings, metadata) = extract_user_request(&content);
             if body.trim().is_empty() {
-                return None;
+                return;
             }
             let mut extra = Map::new();
             if let Some(s) = settings {
@@ -407,72 +436,109 @@ fn record_to_message(rec: &Value) -> Option<CanonicalMessage> {
             if let Some(m) = metadata {
                 extra.insert("additional_metadata".to_string(), Value::String(m));
             }
-            Some(CanonicalMessage { idx: 0, role: MessageRole::User, content: body, timestamp: created, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) })
+            out.push(CanonicalMessage { idx: 0, role: MessageRole::User, content: body, timestamp: created, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) });
         }
         "PLANNER_RESPONSE" => {
             let parsed_tool_calls = if tool_calls.and_then(Value::as_array).is_some_and(|a| !a.is_empty()) {
-                parse_tool_calls(tool_calls, step_type)
+                parse_tool_calls(tool_calls, step_type, step_key)
             } else {
                 Vec::new()
             };
             if content.trim().is_empty() && thinking.is_none() && parsed_tool_calls.is_empty() {
-                return None;
+                return;
+            }
+            for tc in &parsed_tool_calls {
+                if let Some(id) = &tc.id {
+                    pending_tool_calls.push_back((id.clone(), tc.name.clone()));
+                }
             }
             let mut extra = Map::new();
             if let Some(t) = thinking {
                 extra.insert("thinking".to_string(), Value::String(t));
             }
-            Some(CanonicalMessage { idx: 0, role: MessageRole::Assistant, content, timestamp: created, author: None, tool_calls: parsed_tool_calls, tool_results: Vec::new(), extra: Value::Object(extra) })
+            if let Some(model) = rec.get("model").and_then(Value::as_str).filter(|s| !s.trim().is_empty()) {
+                extra.insert("model".to_string(), Value::String(model.to_string()));
+            }
+            let input_tokens = rec.get("input_tokens").and_then(Value::as_u64);
+            let output_tokens = rec.get("output_tokens").and_then(Value::as_u64);
+            let cache_read_tokens = rec.get("cache_read_tokens").and_then(Value::as_u64);
+            if input_tokens.is_some() || output_tokens.is_some() || cache_read_tokens.is_some() {
+                extra.insert(
+                    "usage".to_string(),
+                    json!({
+                        "input": input_tokens.unwrap_or(0),
+                        "output": output_tokens.unwrap_or(0),
+                        "cacheRead": cache_read_tokens.unwrap_or(0),
+                    }),
+                );
+            }
+            let author = rec.get("model").and_then(Value::as_str).filter(|s| !s.trim().is_empty()).map(String::from);
+            out.push(CanonicalMessage { idx: 0, role: MessageRole::Assistant, content, timestamp: created, author, tool_calls: parsed_tool_calls, tool_results: Vec::new(), extra: Value::Object(extra) });
         }
         "GENERIC" if source == "MODEL" => {
-            if content.trim().is_empty() {
-                return None;
-            }
+            let error_text = rec.get("error").and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty());
+            let is_error = rec.get("status").and_then(Value::as_str).is_some_and(|s| s.eq_ignore_ascii_case("ERROR")) || error_text.is_some();
+            let effective_content = if !content.trim().is_empty() {
+                content
+            } else if let Some(err) = error_text {
+                err.to_string()
+            } else {
+                let _ = pending_tool_calls.pop_front();
+                return;
+            };
+            let paired = pending_tool_calls.pop_front();
             let mut extra = Map::new();
             extra.insert("agy_type".to_string(), Value::String(step_type.to_string()));
-            Some(CanonicalMessage {
+            let (call_id, tool_name) = match paired {
+                Some((id, name)) => (Some(id), Some(name)),
+                None => (None, None),
+            };
+            if let Some(ref name) = tool_name {
+                extra.insert("toolName".to_string(), Value::String(name.clone()));
+            }
+            out.push(CanonicalMessage {
                 idx: 0,
                 role: MessageRole::Tool,
-                content: content.clone(),
+                content: effective_content.clone(),
                 timestamp: created,
-                author: Some("tool_output".to_string()),
+                author: tool_name.or_else(|| Some("tool_output".to_string())),
                 tool_calls: Vec::new(),
-                tool_results: vec![ToolResult { call_id: None, content, is_error: false }],
+                tool_results: vec![ToolResult { call_id, content: effective_content, is_error }],
                 extra: Value::Object(extra),
-            })
+            });
         }
-        "CONVERSATION_HISTORY" => None,
+        "CONVERSATION_HISTORY" | "CHECKPOINT" => {}
         "EPHEMERAL_MESSAGE" | "SYSTEM_MESSAGE" => {
             if content.trim().is_empty() {
-                return None;
+                return;
             }
             let mut extra = Map::new();
             extra.insert("agy_type".to_string(), Value::String(step_type.to_string()));
             let author = if step_type == "EPHEMERAL_MESSAGE" { "ephemeral" } else { "system" };
-            Some(CanonicalMessage { idx: 0, role: MessageRole::System, content, timestamp: created, author: Some(author.to_string()), tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) })
+            out.push(CanonicalMessage { idx: 0, role: MessageRole::System, content, timestamp: created, author: Some(author.to_string()), tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) });
         }
         _ => {
             if source == "MODEL" {
-                let tool_calls = parse_tool_calls(tool_calls, step_type);
+                let tool_calls = parse_tool_calls(tool_calls, step_type, step_key);
                 if content.trim().is_empty() && thinking.is_none() && tool_calls.is_empty() {
-                    return None;
+                    return;
                 }
                 let mut extra = Map::new();
                 extra.insert("agy_type".to_string(), Value::String(step_type.to_string()));
                 if let Some(t) = thinking {
                     extra.insert("thinking".to_string(), Value::String(t));
                 }
-                Some(CanonicalMessage { idx: 0, role: MessageRole::Tool, content, timestamp: created, author: Some(step_type.to_ascii_lowercase()), tool_calls, tool_results: Vec::new(), extra: Value::Object(extra) })
+                out.push(CanonicalMessage { idx: 0, role: MessageRole::Tool, content, timestamp: created, author: Some(step_type.to_ascii_lowercase()), tool_calls, tool_results: Vec::new(), extra: Value::Object(extra) });
             } else {
                 if content.trim().is_empty() {
-                    return None;
+                    return;
                 }
                 let mut extra = Map::new();
                 extra.insert("agy_type".to_string(), Value::String(step_type.to_string()));
                 if !source.is_empty() {
                     extra.insert("agy_source".to_string(), Value::String(source.to_string()));
                 }
-                Some(CanonicalMessage { idx: 0, role: MessageRole::System, content, timestamp: created, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) })
+                out.push(CanonicalMessage { idx: 0, role: MessageRole::System, content, timestamp: created, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) });
             }
         }
     }
