@@ -1086,13 +1086,7 @@ mod tests {
             timestamp: parse_test_timestamp("2026-04-09T10:01:00Z"),
             message: Some(crate::types::Message {
                 role: "assistant".to_string(),
-                content: vec![crate::types::Content {
-                    content_type: "toolCall".to_string(),
-                    id: Some("tc1".to_string()),
-                    name: Some("bash".to_string()),
-                    arguments: Some(serde_json::json!({"command": "ls"})),
-                    text: Some("bash".to_string()),
-                }],
+                content: vec![crate::types::Content { content_type: "toolCall".to_string(), id: Some("tc1".to_string()), name: Some("bash".to_string()), arguments: Some(serde_json::json!({"command": "ls"})), text: Some("bash".to_string()) }],
                 tool_call_id: None,
                 tool_name: None,
                 is_error: None,

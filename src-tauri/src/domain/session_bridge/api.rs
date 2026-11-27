@@ -242,12 +242,7 @@ fn build_convert_cache_key(path: &Path, target: SessionBridgeSource) -> Option<C
     let backing = backing_file_path(path);
     let meta = std::fs::metadata(backing).ok()?;
     let modified_ns = meta.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?.as_nanos();
-    Some(ConvertCacheKey {
-        source_path: path.to_string_lossy().to_string(),
-        target_slug: target.slug(),
-        file_size: meta.len(),
-        modified_ns,
-    })
+    Some(ConvertCacheKey { source_path: path.to_string_lossy().to_string(), target_slug: target.slug(), file_size: meta.len(), modified_ns })
 }
 
 fn cached_result_still_exists(result: &SessionBridgeConvertResult) -> bool {
@@ -262,11 +257,7 @@ pub fn convert_session_format(path: &Path, target: SessionBridgeSource, options:
         return Err(format!("Provider {} is scan/source only and cannot be used as a conversion target", target.display_name()));
     }
 
-    let cache_key = if !options.dry_run && !options.force {
-        build_convert_cache_key(path, target)
-    } else {
-        None
-    };
+    let cache_key = if !options.dry_run && !options.force { build_convert_cache_key(path, target) } else { None };
     if let Some(ref key) = cache_key {
         if let Ok(guard) = convert_cache().lock() {
             if let Some(cached) = guard.get(key) {

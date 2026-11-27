@@ -25,12 +25,7 @@ pub fn session_roots() -> Vec<PathBuf> {
 }
 
 pub fn build_target_path(target_session_id: &str, now: DateTime<Utc>) -> Result<PathBuf, String> {
-    let codex_home = std::env::var("CODEX_HOME")
-        .ok()
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .unwrap_or_else(|| crate::paths::home_dir().unwrap_or_default().join(".codex"));
+    let codex_home = std::env::var("CODEX_HOME").ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty()).map(PathBuf::from).unwrap_or_else(|| crate::paths::home_dir().unwrap_or_default().join(".codex"));
     let sessions_dir = codex_home.join("sessions");
     let date_dir = now.format("%Y/%m/%d").to_string();
     let stamp = now.format("%Y-%m-%dT%H-%M-%S").to_string();
@@ -45,11 +40,7 @@ const CODEX_BUILTIN_PROVIDERS: [&str; 6] = ["openai", "amazon-bedrock", "amazon-
 
 /// Resolve the Codex home directory owning `session_path` (parent of `sessions/` or `archived_sessions/`).
 pub fn codex_home_of(session_path: &Path) -> Option<PathBuf> {
-    session_path
-        .ancestors()
-        .find(|dir| dir.file_name().and_then(|n| n.to_str()).is_some_and(|n| matches!(n, "sessions" | "archived_sessions")))
-        .and_then(Path::parent)
-        .map(Path::to_path_buf)
+    session_path.ancestors().find(|dir| dir.file_name().and_then(|n| n.to_str()).is_some_and(|n| matches!(n, "sessions" | "archived_sessions"))).and_then(Path::parent).map(Path::to_path_buf)
 }
 
 /// Build the Codex CLI resume command, injecting `-c model_provider=<saved>` when
@@ -92,33 +83,18 @@ fn read_codex_config_providers(home: &Path) -> (Option<String>, Vec<String>) {
         return (None, Vec::new());
     };
     let active = parsed.get("model_provider").and_then(toml::Value::as_str).map(str::trim).filter(|s| !s.is_empty()).map(String::from);
-    let providers = parsed
-        .get("model_providers")
-        .and_then(toml::Value::as_table)
-        .map(|table| table.keys().cloned().collect())
-        .unwrap_or_default();
+    let providers = parsed.get("model_providers").and_then(toml::Value::as_table).map(|table| table.keys().cloned().collect()).unwrap_or_default();
     (active, providers)
 }
 
 fn saved_model_provider(home: &Path, session_id: &str, session_path: &Path) -> Option<String> {
     // 1. Check Codex state SQLite DBs (`state_*.sqlite` / `state.sqlite`) read-only.
     if let Ok(entries) = std::fs::read_dir(home) {
-        let mut dbs: Vec<PathBuf> = entries
-            .flatten()
-            .map(|e| e.path())
-            .filter(|p| {
-                p.file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with("state") && n.ends_with(".sqlite"))
-            })
-            .collect();
+        let mut dbs: Vec<PathBuf> = entries.flatten().map(|e| e.path()).filter(|p| p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with("state") && n.ends_with(".sqlite"))).collect();
         dbs.sort();
         dbs.reverse();
         for db_path in dbs {
-            if let Ok(conn) = rusqlite::Connection::open_with_flags(
-                &db_path,
-                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-            ) {
+            if let Ok(conn) = rusqlite::Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX) {
                 let _ = conn.busy_timeout(std::time::Duration::from_millis(500));
                 if let Ok(provider) = conn.query_row("SELECT model_provider FROM threads WHERE id = ?1", [session_id], |row| row.get::<_, Option<String>>(0)) {
                     if let Some(p) = provider.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) {

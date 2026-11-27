@@ -53,14 +53,7 @@ pub fn profile_from_path(path: &Path) -> Option<String> {
     if !tail.starts_with("agent/sessions/") || profile.is_empty() {
         return None;
     }
-    let valid = profile.len() <= 64
-        && profile.chars().enumerate().all(|(i, c)| {
-            if i == 0 {
-                c.is_ascii_lowercase() || c.is_ascii_digit()
-            } else {
-                c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-')
-            }
-        });
+    let valid = profile.len() <= 64 && profile.chars().enumerate().all(|(i, c)| if i == 0 { c.is_ascii_lowercase() || c.is_ascii_digit() } else { c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-') });
     valid.then(|| profile.to_string())
 }
 

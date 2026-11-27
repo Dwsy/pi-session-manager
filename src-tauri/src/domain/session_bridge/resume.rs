@@ -185,12 +185,7 @@ pub fn build_resume_info(source: SessionBridgeSource, provider: ProviderKind, se
     // Pi -> OMP zero-conversion fork (magpie `carry.go`): `omp --fork <pi_file>`
     if provider == ProviderKind::Pi && is_cli_installed_cached("omp") {
         let fork_run = format!("omp --fork {}", quote_path(path));
-        carry_options.push(SessionCarryOption {
-            target_provider: "omp".to_string(),
-            target_display_name: "OMP".to_string(),
-            command: wrap_in_cwd(cwd, &fork_run),
-            zero_conversion: true,
-        });
+        carry_options.push(SessionCarryOption { target_provider: "omp".to_string(), target_display_name: "OMP".to_string(), command: wrap_in_cwd(cwd, &fork_run), zero_conversion: true });
     }
 
     // Read-only desktop / editor stores without CLI resume support.
@@ -260,18 +255,7 @@ pub fn build_resume_info(source: SessionBridgeSource, provider: ProviderKind, se
     let cli_installed = cli_binary_for_provider(provider).is_some_and(is_cli_installed_cached);
     let full = wrap_in_cwd(cwd, &raw);
 
-    SessionResumeInfo {
-        source_provider,
-        source_display_name,
-        session_id: session_id.to_string(),
-        cwd: cwd.to_string(),
-        can_native_resume: true,
-        cli_installed,
-        resume_command: Some(full),
-        raw_command: Some(raw),
-        reason: None,
-        carry_options,
-    }
+    SessionResumeInfo { source_provider, source_display_name, session_id: session_id.to_string(), cwd: cwd.to_string(), can_native_resume: true, cli_installed, resume_command: Some(full), raw_command: Some(raw), reason: None, carry_options }
 }
 
 #[cfg(test)]
@@ -300,11 +284,7 @@ mod tests {
         let droid = cli_command_for_target(ProviderKind::Factory, "fac-42", Path::new("/tmp/.factory/sessions/a/fac-42.jsonl"));
         assert_eq!(droid, "droid --resume fac-42");
 
-        let omp_prof = cli_command_for_target(
-            ProviderKind::Omp,
-            "omp-77",
-            Path::new("/Users/demo/.omp/profiles/work/agent/sessions/proj/2026_omp-77.jsonl"),
-        );
+        let omp_prof = cli_command_for_target(ProviderKind::Omp, "omp-77", Path::new("/Users/demo/.omp/profiles/work/agent/sessions/proj/2026_omp-77.jsonl"));
         assert_eq!(omp_prof, "omp --profile work --resume omp-77");
     }
 
@@ -314,11 +294,7 @@ mod tests {
         let codex_home = temp.path().join(".codex");
         let sessions_dir = codex_home.join("sessions/2026/11/27");
         std::fs::create_dir_all(&sessions_dir).expect("mkdir");
-        std::fs::write(
-            codex_home.join("config.toml"),
-            "model_provider = \"magpie\"\n\n[model_providers.magpie]\nbase_url = \"http://localhost:8080\"\n\n[model_providers.custom]\nbase_url = \"https://api.example.com\"\n",
-        )
-        .expect("write config");
+        std::fs::write(codex_home.join("config.toml"), "model_provider = \"magpie\"\n\n[model_providers.magpie]\nbase_url = \"http://localhost:8080\"\n\n[model_providers.custom]\nbase_url = \"https://api.example.com\"\n").expect("write config");
         let rollout = sessions_dir.join("rollout-2026-11-27T10-00-00-thread-1.jsonl");
         std::fs::write(&rollout, "{\"type\":\"session_meta\",\"payload\":{\"id\":\"thread-1\",\"cwd\":\"/work\",\"model_provider\":\"custom\"}}\n").expect("write rollout");
 
@@ -328,13 +304,7 @@ mod tests {
 
     #[test]
     fn rejects_unsafe_session_id_characters() {
-        let info = build_resume_info(
-            SessionBridgeSource::ClaudeCode,
-            ProviderKind::ClaudeCode,
-            "abc; rm -rf /",
-            "/work",
-            Path::new("/Users/demo/.claude/projects/x/abc.jsonl"),
-        );
+        let info = build_resume_info(SessionBridgeSource::ClaudeCode, ProviderKind::ClaudeCode, "abc; rm -rf /", "/work", Path::new("/Users/demo/.claude/projects/x/abc.jsonl"));
         assert!(!info.can_native_resume);
         assert!(info.resume_command.is_none());
     }

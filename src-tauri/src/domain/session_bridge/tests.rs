@@ -489,12 +489,7 @@ CREATE TABLE part (
 
     let preview = preview_session_for_viewer(&virtual_path).expect("preview");
     let entries = preview.lines().skip(1).map(|line| serde_json::from_str::<Value>(line).expect("json line")).collect::<Vec<_>>();
-    let assistant_text = entries
-        .iter()
-        .filter(|entry| entry["message"]["role"] == "assistant")
-        .flat_map(|entry| entry["message"]["content"].as_array().into_iter().flatten())
-        .find(|content| content["type"] == "text" || content["type"] == "thinking")
-        .expect("assistant reasoning/text content");
+    let assistant_text = entries.iter().filter(|entry| entry["message"]["role"] == "assistant").flat_map(|entry| entry["message"]["content"].as_array().into_iter().flatten()).find(|content| content["type"] == "text" || content["type"] == "thinking").expect("assistant reasoning/text content");
     let rendered_reasoning = assistant_text["thinking"].as_str().or_else(|| assistant_text["text"].as_str()).unwrap_or_default();
     assert_eq!(rendered_reasoning, "Need to inspect current tables");
     let tool_call = entries.iter().flat_map(|entry| entry["message"]["content"].as_array().into_iter().flatten()).find(|content| content["type"] == "toolCall").expect("tool call content");

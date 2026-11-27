@@ -23,15 +23,7 @@ pub fn canonical_to_session_info(canonical: &CanonicalSession, path: &Path, modi
             continue;
         }
         message_count += 1;
-        let text = message
-            .content
-            .iter()
-            .filter(|item| item.content_type == "text")
-            .filter_map(|item| item.text.as_ref())
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-            .collect::<Vec<_>>()
-            .join("\n");
+        let text = message.content.iter().filter(|item| item.content_type == "text").filter_map(|item| item.text.as_ref()).map(|v| v.trim()).filter(|v| !v.is_empty()).collect::<Vec<_>>().join("\n");
         if text.is_empty() {
             continue;
         }
