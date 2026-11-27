@@ -61,6 +61,15 @@ export const session = {
   tabs: {
     close: '关闭标签页',
     live: '在线',
+    menuAriaLabel: '标签页操作',
+    pin: '固定标签页',
+    unpin: '取消固定标签页',
+    copyPath: '复制会话路径',
+    closeOthers: '关闭其他标签页',
+    closeToLeft: '关闭左侧标签页',
+    closeToRight: '关闭右侧标签页',
+    closeAll: '关闭所有标签页',
+    reopenClosed: '重新打开关闭的标签页',
   },
   toolbar: {
     outline: '大纲',

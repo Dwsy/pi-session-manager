@@ -452,6 +452,17 @@
   box-shadow: inset 0 0 0 1px rgb(var(--color-ring) / 0.32);
 }
 
+.session-context-menu__item:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.session-context-menu__item:disabled:hover,
+.session-context-menu__item:disabled:focus-visible {
+  background: transparent;
+  color: rgb(var(--color-muted-foreground));
+}
+
 .session-sort-menu__item--active {
   background: rgb(var(--color-secondary) / 0.58);
   color: rgb(var(--color-foreground));

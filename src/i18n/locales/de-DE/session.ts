@@ -12,6 +12,15 @@ export const session = {
   tabs: {
     close: 'Tab schließen',
     live: 'Aktiv',
+    menuAriaLabel: 'Tab-Aktionen',
+    pin: 'Tab anheften',
+    unpin: 'Tab lösen',
+    copyPath: 'Sitzungspfad kopieren',
+    closeOthers: 'Andere Tabs schließen',
+    closeToLeft: 'Tabs links schließen',
+    closeToRight: 'Tabs rechts schließen',
+    closeAll: 'Alle Tabs schließen',
+    reopenClosed: 'Geschlossenen Tab wieder öffnen',
   },
   toolbar: {
     outline: 'Gliederung',

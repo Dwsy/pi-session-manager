@@ -682,7 +682,16 @@ function App() {
     [activeAppViewId, sidebarMode, setSelectedSession, clearBadge, handleSelectSession],
   );
 
-  const { tabs: sessionTabsData, closeTab } = useSessionTabs({
+  const {
+    tabs: sessionTabsData,
+    closeTab,
+    closeOtherTabs,
+    closeTabsToLeft,
+    closeTabsToRight,
+    closeAllTabs,
+    togglePinTab,
+    reopenClosedTab,
+  } = useSessionTabs({
     sessions,
     selectedSession,
     enabled: multiTabEnabled,
@@ -694,9 +703,17 @@ function App() {
     ? {
         tabs: sessionTabsData.tabs,
         activeTabId: sessionTabsData.activeTabId,
+        pinnedTabIds: sessionTabsData.pinnedTabIds,
+        canReopenClosedTab: sessionTabsData.canReopenClosedTab,
         liveSessionIds,
         onSelect: handleSelectSessionFromMesh,
         onClose: closeTab,
+        onCloseOthers: closeOtherTabs,
+        onCloseToLeft: closeTabsToLeft,
+        onCloseToRight: closeTabsToRight,
+        onCloseAll: closeAllTabs,
+        onTogglePin: togglePinTab,
+        onReopenClosed: reopenClosedTab,
       }
     : undefined;
 

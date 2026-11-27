@@ -12,6 +12,15 @@ export const session = {
   tabs: {
     close: 'Fermer l\'onglet',
     live: 'En direct',
+    menuAriaLabel: 'Actions de l\'onglet',
+    pin: 'Épingler l\'onglet',
+    unpin: 'Désépingler l\'onglet',
+    copyPath: 'Copier le chemin de la session',
+    closeOthers: 'Fermer les autres onglets',
+    closeToLeft: 'Fermer les onglets à gauche',
+    closeToRight: 'Fermer les onglets à droite',
+    closeAll: 'Fermer tous les onglets',
+    reopenClosed: 'Rouvrir l\'onglet fermé',
   },
   toolbar: {
     outline: 'Plan',

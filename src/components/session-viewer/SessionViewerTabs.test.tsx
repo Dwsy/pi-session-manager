@@ -13,6 +13,11 @@ vi.mock("@/transport", () => ({
   isTauri: () => false,
 }));
 
+const copyTextMock = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock("@/hooks/useClipboard", () => ({
+  useClipboard: () => ({ copyText: copyTextMock }),
+}));
+
 import SessionViewerTabs, {
   type SessionViewerTabsProps,
 } from "./SessionViewerTabs";
@@ -133,5 +138,92 @@ describe("SessionViewerTabs", () => {
     // The dot itself must not pollute the accessible name.
     const liveTab = screen.getByTitle("beta-session");
     expect(liveTab.textContent).toContain("Live");
+  });
+
+  it("opens browser-style right-click context menu with accurate disabled states", () => {
+    const C = makeSession("gamma-session", "Gamma");
+    const props: SessionViewerTabsProps = {
+      ...baseProps(),
+      tabs: [A, B, C],
+      onCloseOthers: vi.fn(),
+      onCloseToLeft: vi.fn(),
+      onCloseToRight: vi.fn(),
+      onCloseAll: vi.fn(),
+      onTogglePin: vi.fn(),
+      onReopenClosed: vi.fn(),
+      canReopenClosedTab: false,
+    };
+
+    render(<SessionViewerTabs {...props} />);
+
+    // Right-click the first tab ("Alpha"): no tabs to the left, reopen disabled.
+    fireEvent.contextMenu(screen.getByTitle("Alpha"));
+
+    expect(screen.getByRole("menu")).toBeTruthy();
+    expect(
+      (screen.getByRole("menuitem", { name: "Close tabs to the left" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("menuitem", { name: "Close tabs to the right" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+    expect(
+      (screen.getByRole("menuitem", { name: "Reopen closed tab" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "Close tabs to the right" }));
+    expect(props.onCloseToRight).toHaveBeenCalledWith("alpha-session");
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("hides close button and ignores middle-click on pinned tabs, and allows unpinning via menu", () => {
+    const props: SessionViewerTabsProps = {
+      ...baseProps(),
+      pinnedTabIds: new Set(["alpha-session"]),
+      onTogglePin: vi.fn(),
+    };
+
+    const { container } = render(<SessionViewerTabs {...props} />);
+    const strip = getStrip(container)!;
+    const pinnedWrapper = strip.children[0] as HTMLElement;
+
+    expect(pinnedWrapper.getAttribute("data-pinned")).toBe("true");
+    // Only beta-session should have an inline close button.
+    expect(screen.getAllByLabelText("Close tab")).toHaveLength(1);
+
+    fireEvent(
+      pinnedWrapper,
+      new MouseEvent("auxclick", { bubbles: true, button: 1 }),
+    );
+    expect(props.onClose).not.toHaveBeenCalled();
+
+    fireEvent.contextMenu(screen.getByTitle("Alpha"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Unpin tab" }));
+    expect(props.onTogglePin).toHaveBeenCalledWith("alpha-session");
+  });
+
+  it("dismisses context menu on Escape and supports right-click on empty strip", () => {
+    const props: SessionViewerTabsProps = {
+      ...baseProps(),
+      canReopenClosedTab: true,
+      onReopenClosed: vi.fn(),
+      onCloseAll: vi.fn(),
+    };
+
+    const { container } = render(<SessionViewerTabs {...props} />);
+    const strip = getStrip(container)!;
+
+    fireEvent.contextMenu(strip);
+    const menu = screen.getByRole("menu");
+    expect(screen.getByRole("menuitem", { name: "Reopen closed tab" })).toBeTruthy();
+
+    fireEvent.keyDown(menu, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+
+    fireEvent.contextMenu(strip);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Reopen closed tab" }));
+    expect(props.onReopenClosed).toHaveBeenCalledTimes(1);
   });
 });

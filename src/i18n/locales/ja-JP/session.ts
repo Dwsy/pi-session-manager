@@ -12,6 +12,15 @@ export const session = {
   tabs: {
     close: 'タブを閉じる',
     live: 'ライブ',
+    menuAriaLabel: 'タブ操作',
+    pin: 'タブを固定',
+    unpin: 'タブの固定を解除',
+    copyPath: 'セッションパスをコピー',
+    closeOthers: '他のタブを閉じる',
+    closeToLeft: '左側のタブを閉じる',
+    closeToRight: '右側のタブを閉じる',
+    closeAll: 'すべてのタブを閉じる',
+    reopenClosed: '閉じたタブを開き直す',
   },
   toolbar: {
     outline: 'アウトライン',

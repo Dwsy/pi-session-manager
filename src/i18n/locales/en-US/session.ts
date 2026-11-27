@@ -61,6 +61,15 @@ export const session = {
   tabs: {
     close: 'Close tab',
     live: 'Live',
+    menuAriaLabel: 'Tab actions',
+    pin: 'Pin tab',
+    unpin: 'Unpin tab',
+    copyPath: 'Copy session path',
+    closeOthers: 'Close other tabs',
+    closeToLeft: 'Close tabs to the left',
+    closeToRight: 'Close tabs to the right',
+    closeAll: 'Close all tabs',
+    reopenClosed: 'Reopen closed tab',
   },
   toolbar: {
     outline: 'Outline',

@@ -183,4 +183,88 @@ describe("useSessionTabs", () => {
     expect(mocks.onCloseViewer).toHaveBeenCalledTimes(1);
     expect(mocks.onSelectSession).not.toHaveBeenCalled();
   });
+
+  it("pins tabs to the left and preserves pinned tabs on bulk close", () => {
+    const D = makeSession("d");
+    const view = renderTabs({
+      sessions: [A, B, C, D],
+      selectedSession: A,
+      enabled: true,
+    });
+    view.rerender({ sessions: [A, B, C, D], selectedSession: B, enabled: true });
+    view.rerender({ sessions: [A, B, C, D], selectedSession: C, enabled: true });
+    view.rerender({ sessions: [A, B, C, D], selectedSession: D, enabled: true });
+    expect(ids(view.result.current)).toEqual(["a", "b", "c", "d"]);
+
+    act(() => view.result.current.togglePinTab("c"));
+    expect(ids(view.result.current)).toEqual(["c", "a", "b", "d"]);
+    expect(view.result.current.tabs?.pinnedTabIds.has("c")).toBe(true);
+
+    // Close other tabs relative to "b" keeps pinned "c" and target "b".
+    act(() => view.result.current.closeOtherTabs("b"));
+    // Active tab "d" was closed, so focus moves to target "b".
+    expect(mocks.onSelectSession.mock.calls.at(-1)?.[0].id).toBe("b");
+    view.rerender({ sessions: [A, B, C, D], selectedSession: B, enabled: true });
+    expect(ids(view.result.current)).toEqual(["c", "b"]);
+  });
+
+  it("closes tabs to the left and right while skipping pinned tabs", () => {
+    const D = makeSession("d");
+    const view = renderTabs({
+      sessions: [A, B, C, D],
+      selectedSession: A,
+      enabled: true,
+    });
+    view.rerender({ sessions: [A, B, C, D], selectedSession: B, enabled: true });
+    view.rerender({ sessions: [A, B, C, D], selectedSession: C, enabled: true });
+    view.rerender({ sessions: [A, B, C, D], selectedSession: D, enabled: true });
+
+    act(() => view.result.current.togglePinTab("a"));
+    expect(ids(view.result.current)).toEqual(["a", "b", "c", "d"]);
+
+    act(() => view.result.current.closeTabsToLeft("c"));
+    expect(ids(view.result.current)).toEqual(["a", "c", "d"]);
+
+    act(() => view.result.current.closeTabsToRight("c"));
+    expect(mocks.onSelectSession.mock.calls.at(-1)?.[0].id).toBe("c");
+    view.rerender({ sessions: [A, B, C, D], selectedSession: C, enabled: true });
+    expect(ids(view.result.current)).toEqual(["a", "c"]);
+  });
+
+  it("reopens the most recently closed tab and selects it", () => {
+    const view = renderTabs({
+      sessions: [A, B, C],
+      selectedSession: A,
+      enabled: true,
+    });
+    view.rerender({ sessions: [A, B, C], selectedSession: B, enabled: true });
+    view.rerender({ sessions: [A, B, C], selectedSession: C, enabled: true });
+
+    expect(view.result.current.tabs?.canReopenClosedTab).toBe(false);
+
+    act(() => view.result.current.closeTab("b"));
+    expect(ids(view.result.current)).toEqual(["a", "c"]);
+    expect(view.result.current.tabs?.canReopenClosedTab).toBe(true);
+
+    act(() => view.result.current.reopenClosedTab());
+    expect(ids(view.result.current)).toEqual(["a", "b", "c"]);
+    expect(mocks.onSelectSession.mock.calls.at(-1)?.[0].id).toBe("b");
+    expect(view.result.current.tabs?.canReopenClosedTab).toBe(false);
+  });
+
+  it("closes all unpinned tabs and keeps pinned tabs open", () => {
+    const view = renderTabs({
+      sessions: [A, B],
+      selectedSession: A,
+      enabled: true,
+    });
+    view.rerender({ sessions: [A, B], selectedSession: B, enabled: true });
+    act(() => view.result.current.togglePinTab("a"));
+
+    act(() => view.result.current.closeAllTabs());
+    expect(mocks.onSelectSession.mock.calls.at(-1)?.[0].id).toBe("a");
+    expect(mocks.onCloseViewer).not.toHaveBeenCalled();
+    view.rerender({ sessions: [A, B], selectedSession: A, enabled: true });
+    expect(ids(view.result.current)).toEqual(["a"]);
+  });
 });

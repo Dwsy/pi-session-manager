@@ -12,6 +12,15 @@ export const session = {
   tabs: {
     close: 'Cerrar pestaña',
     live: 'En vivo',
+    menuAriaLabel: 'Acciones de pestaña',
+    pin: 'Fijar pestaña',
+    unpin: 'Desfijar pestaña',
+    copyPath: 'Copiar ruta de sesión',
+    closeOthers: 'Cerrar otras pestañas',
+    closeToLeft: 'Cerrar pestañas a la izquierda',
+    closeToRight: 'Cerrar pestañas a la derecha',
+    closeAll: 'Cerrar todas las pestañas',
+    reopenClosed: 'Volver a abrir pestaña cerrada',
   },
   toolbar: {
     outline: 'Esquema',
