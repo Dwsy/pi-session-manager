@@ -28,6 +28,7 @@ pub(crate) fn apply_migrations(conn: &Connection, from_version: i64) -> Result<(
             19 => migration_19(conn)?,
             20 => migration_20(conn)?,
             21 => migration_21(conn)?,
+            22 => migration_22(conn)?,
             _ => return Err(format!("Unknown migration version: {current}")),
         }
         // Update version after successful migration
@@ -431,36 +432,22 @@ fn migration_19(conn: &Connection) -> Result<(), String> {
 /// turns) and rebuilds `message_fts` if present. All user and assistant text messages
 /// are preserved in full without truncation so full-text search remains complete.
 fn migration_20(conn: &Connection) -> Result<(), String> {
-    let message_entries_exists: bool = conn
-        .query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, i64>(0))
-        .map(|c| c > 0)
-        .unwrap_or(false);
+    let message_entries_exists: bool = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='message_entries'", [], |row| row.get::<_, i64>(0)).map(|c| c > 0).unwrap_or(false);
     if !message_entries_exists {
         return Ok(());
     }
 
     fn table_has_column(conn: &Connection, table: &str, column: &str) -> Result<bool, String> {
         let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})")).map_err(|e| format!("Migration 20 failed reading {table} schema: {e}"))?;
-        let cols: Vec<String> = stmt
-            .query_map([], |row| row.get(1))
-            .map_err(|e| format!("Migration 20 failed querying {table} columns: {e}"))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("Migration 20 failed collecting {table} columns: {e}"))?;
+        let cols: Vec<String> = stmt.query_map([], |row| row.get(1)).map_err(|e| format!("Migration 20 failed querying {table} columns: {e}"))?.collect::<Result<Vec<_>, _>>().map_err(|e| format!("Migration 20 failed collecting {table} columns: {e}"))?;
         Ok(cols.iter().any(|name| name == column))
     }
 
     let has_label = table_has_column(conn, "message_entries", "label")?;
-    let delete_sql = if has_label {
-        "DELETE FROM message_entries WHERE TRIM(content) = '' AND (label IS NULL OR TRIM(label) = '')"
-    } else {
-        "DELETE FROM message_entries WHERE TRIM(content) = ''"
-    };
+    let delete_sql = if has_label { "DELETE FROM message_entries WHERE TRIM(content) = '' AND (label IS NULL OR TRIM(label) = '')" } else { "DELETE FROM message_entries WHERE TRIM(content) = ''" };
     let deleted = conn.execute(delete_sql, []).map_err(|e| format!("Migration 20 failed deleting empty message_entries: {e}"))?;
 
-    let fts_exists: bool = conn
-        .query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='message_fts'", [], |row| row.get::<_, i64>(0))
-        .map(|c| c > 0)
-        .unwrap_or(false);
+    let fts_exists: bool = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='message_fts'", [], |row| row.get::<_, i64>(0)).map(|c| c > 0).unwrap_or(false);
     if fts_exists && deleted > 0 {
         super::message_index::rebuild_message_fts_index(conn)?;
     }
@@ -469,13 +456,29 @@ fn migration_20(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
+fn purge_session_paths(conn: &Connection, paths: &[String], migration_num: i64) -> Result<(), String> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    for table_col in [("message_entries", "session_path"), ("session_details_cache", "path"), ("scan_state", "path"), ("sessions", "path")] {
+        let exists: bool = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1", params![table_col.0], |row| row.get::<_, i64>(0)).map(|c| c > 0).unwrap_or(false);
+        if !exists {
+            continue;
+        }
+        for chunk in paths.chunks(500) {
+            let placeholders = (0..chunk.len()).map(|i| format!("?{}", i + 1)).collect::<Vec<_>>().join(", ");
+            let sql = format!("DELETE FROM {} WHERE {} IN ({placeholders})", table_col.0, table_col.1);
+            let params: Vec<&dyn rusqlite::ToSql> = chunk.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+            conn.execute(&sql, params.as_slice()).map_err(|e| format!("Migration {migration_num} failed deleting from {}: {e}", table_col.0))?;
+        }
+    }
+    Ok(())
+}
+
 /// Migration to version 21: purge stale Antigravity chunk shards (`chunks/transcript*`)
 /// and duplicate `transcript.jsonl` rows when a sibling `transcript_full.jsonl` exists.
 fn migration_21(conn: &Connection) -> Result<(), String> {
-    let sessions_exists: bool = conn
-        .query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sessions'", [], |row| row.get::<_, i64>(0))
-        .map(|c| c > 0)
-        .unwrap_or(false);
+    let sessions_exists: bool = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sessions'", [], |row| row.get::<_, i64>(0)).map(|c| c > 0).unwrap_or(false);
     if !sessions_exists {
         return Ok(());
     }
@@ -492,33 +495,42 @@ fn migration_21(conn: &Connection) -> Result<(), String> {
         )
         .map_err(|e| format!("Migration 21 failed preparing stale antigravity query: {e}"))?;
 
-    let stale_paths: Vec<String> = stmt
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|e| format!("Migration 21 failed querying stale antigravity paths: {e}"))?
-        .flatten()
-        .collect();
+    let stale_paths: Vec<String> = stmt.query_map([], |row| row.get::<_, String>(0)).map_err(|e| format!("Migration 21 failed querying stale antigravity paths: {e}"))?.flatten().collect();
 
     if stale_paths.is_empty() {
         return Ok(());
     }
 
-    for table_col in [("message_entries", "session_path"), ("session_details_cache", "path"), ("scan_state", "path"), ("sessions", "path")] {
-        let exists: bool = conn
-            .query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1", params![table_col.0], |row| row.get::<_, i64>(0))
-            .map(|c| c > 0)
-            .unwrap_or(false);
-        if !exists {
-            continue;
-        }
-        for chunk in stale_paths.chunks(500) {
-            let placeholders = (0..chunk.len()).map(|i| format!("?{}", i + 1)).collect::<Vec<_>>().join(", ");
-            let sql = format!("DELETE FROM {} WHERE {} IN ({placeholders})", table_col.0, table_col.1);
-            let params: Vec<&dyn rusqlite::ToSql> = chunk.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
-            conn.execute(&sql, params.as_slice()).map_err(|e| format!("Migration 21 failed deleting from {}: {e}", table_col.0))?;
-        }
-    }
+    purge_session_paths(conn, &stale_paths, 21)?;
 
     info!("[migration:21] purged {} stale Antigravity chunk/duplicate session rows", stale_paths.len());
+    Ok(())
+}
+
+/// Migration to version 22: invalidate cached Antigravity sessions with empty name or
+/// first_message so subagent transcripts get re-indexed with their extracted opening prompt.
+fn migration_22(conn: &Connection) -> Result<(), String> {
+    let sessions_exists: bool = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sessions'", [], |row| row.get::<_, i64>(0)).map(|c| c > 0).unwrap_or(false);
+    if !sessions_exists {
+        return Ok(());
+    }
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT path FROM sessions
+             WHERE (path LIKE '%/antigravity%' OR path LIKE '%\\antigravity%')
+               AND (name IS NULL OR TRIM(name) = '' OR first_message IS NULL OR TRIM(first_message) = '')",
+        )
+        .map_err(|e| format!("Migration 22 failed preparing unnamed antigravity query: {e}"))?;
+
+    let paths: Vec<String> = stmt.query_map([], |row| row.get::<_, String>(0)).map_err(|e| format!("Migration 22 failed querying unnamed antigravity paths: {e}"))?.flatten().collect();
+
+    if paths.is_empty() {
+        return Ok(());
+    }
+
+    purge_session_paths(conn, &paths, 22)?;
+    info!("[migration:22] invalidated {} unnamed Antigravity session rows for re-indexing", paths.len());
     Ok(())
 }
 

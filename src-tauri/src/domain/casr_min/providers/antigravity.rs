@@ -64,12 +64,7 @@ pub fn session_roots() -> Vec<PathBuf> {
 
 pub fn is_under_antigravity_store(path: &Path) -> bool {
     let normalized = path.to_string_lossy().replace('\\', "/");
-    if normalized.contains("/.gemini/antigravity-cli/")
-        || normalized.contains("/antigravity-cli/")
-        || normalized.contains("/.gemini/antigravity/")
-        || normalized.contains("/.gemini/antigravity-insiders/")
-        || normalized.contains("/antigravity-insiders/")
-    {
+    if normalized.contains("/.gemini/antigravity-cli/") || normalized.contains("/antigravity-cli/") || normalized.contains("/.gemini/antigravity/") || normalized.contains("/.gemini/antigravity-insiders/") || normalized.contains("/antigravity-insiders/") {
         return true;
     }
     for var in ["CASS_ANTIGRAVITY_DATA_ROOT", "ANTIGRAVITY_HOME"] {
@@ -91,8 +86,7 @@ pub fn is_transcript_path(path: &Path) -> bool {
     let normalized = path.to_string_lossy().replace('\\', "/");
     let file_name = path.file_name().and_then(|value| value.to_str()).unwrap_or_default();
     let is_primary_name = matches!(file_name, "transcript_full.jsonl" | "transcript.jsonl");
-    let is_direct_logs_child = path.parent().and_then(Path::file_name).and_then(|v| v.to_str()) == Some("logs")
-        && path.parent().and_then(Path::parent).and_then(Path::file_name).and_then(|v| v.to_str()) == Some(".system_generated");
+    let is_direct_logs_child = path.parent().and_then(Path::file_name).and_then(|v| v.to_str()) == Some("logs") && path.parent().and_then(Path::parent).and_then(Path::file_name).and_then(|v| v.to_str()) == Some(".system_generated");
     is_primary_name && is_direct_logs_child && (is_under_antigravity_store(path) || normalized.contains("/brain/"))
 }
 
@@ -170,23 +164,9 @@ pub fn read_session_from_str(path: &Path, content: &str) -> Result<CanonicalSess
     let workspace = summary.workspace;
     let model_name = detect_model(&records);
     let client = client_kind(path);
-    let title = summary
-        .title
-        .or(summary.preview)
-        .or_else(|| messages.iter().find(|message| message.role == MessageRole::User).map(|message| truncate_title(&message.content, 100)));
+    let title = summary.title.or(summary.preview).or_else(|| messages.iter().find(|message| message.role == MessageRole::User).map(|message| truncate_title(&message.content, 100)));
 
-    Ok(CanonicalSession {
-        session_id,
-        provider_slug: "antigravity".to_string(),
-        workspace,
-        title,
-        started_at,
-        ended_at,
-        messages,
-        metadata: json!({ "source": "antigravity", "client": client.as_str(), "model": model_name }),
-        source_path: path.to_path_buf(),
-        model_name,
-    })
+    Ok(CanonicalSession { session_id, provider_slug: "antigravity".to_string(), workspace, title, started_at, ended_at, messages, metadata: json!({ "source": "antigravity", "client": client.as_str(), "model": model_name }), source_path: path.to_path_buf(), model_name })
 }
 
 pub fn render_session(session: &CanonicalSession, _target_session_id: &str) -> Result<String, String> {
@@ -223,11 +203,7 @@ fn candidate_base_roots() -> Vec<PathBuf> {
         }
     }
     let gemini_dir = dirs::home_dir().unwrap_or_default().join(".gemini");
-    vec![
-        gemini_dir.join("antigravity-cli"),
-        gemini_dir.join("antigravity"),
-        gemini_dir.join("antigravity-insiders"),
-    ]
+    vec![gemini_dir.join("antigravity-cli"), gemini_dir.join("antigravity"), gemini_dir.join("antigravity-insiders")]
 }
 
 fn conversation_uuid_from_path(path: &Path) -> Option<String> {
@@ -252,28 +228,10 @@ fn read_summary(path: &Path, session_id: &str) -> Result<ConversationSummary, St
 
     let conn = Connection::open_with_flags(&db_path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|e| format!("Antigravity: failed to open workspace metadata {}: {e}", db_path.display()))?;
     let row: Option<(Option<String>, Option<String>, Option<String>)> = conn
-        .query_row(
-            "SELECT title, preview, workspace_uris FROM conversation_summaries WHERE conversation_id = ?1",
-            [session_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )
+        .query_row("SELECT title, preview, workspace_uris FROM conversation_summaries WHERE conversation_id = ?1", [session_id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
         .optional()
-        .or_else(|_| {
-            conn.query_row(
-                "SELECT title, NULL, workspace_uris FROM conversation_summaries WHERE conversation_id = ?1",
-                [session_id],
-                |row| Ok((row.get(0)?, None, row.get(2)?)),
-            )
-            .optional()
-        })
-        .or_else(|_| {
-            conn.query_row(
-                "SELECT NULL, NULL, workspace_uris FROM conversation_summaries WHERE conversation_id = ?1",
-                [session_id],
-                |row| Ok((None, None, row.get(2)?)),
-            )
-            .optional()
-        })
+        .or_else(|_| conn.query_row("SELECT title, NULL, workspace_uris FROM conversation_summaries WHERE conversation_id = ?1", [session_id], |row| Ok((row.get(0)?, None, row.get(2)?))).optional())
+        .or_else(|_| conn.query_row("SELECT NULL, NULL, workspace_uris FROM conversation_summaries WHERE conversation_id = ?1", [session_id], |row| Ok((None, None, row.get(2)?))).optional())
         .map_err(|e| format!("Antigravity: failed to read workspace for {session_id}: {e}"))?;
 
     let Some((raw_title, raw_preview, workspace_uris)) = row else {
@@ -329,6 +287,28 @@ fn extract_user_request(content: &str) -> (String, Option<String>, Option<String
     let metadata = extract_tagged_blocks(content, "ADDITIONAL_METADATA").into_iter().next();
     let body = if requests.is_empty() { content.trim().to_string() } else { requests.join("\n\n") };
     (body, settings, metadata)
+}
+
+/// Extracts a parent-agent task prompt wrapped in an Antigravity subagent
+/// `<SYSTEM_MESSAGE>[Message] ... sender=<id> ... content=<prompt></SYSTEM_MESSAGE>`.
+/// Background command completion notifications (`sender=.../task-...`) return `None`.
+fn extract_subagent_parent_prompt(content: &str) -> Option<(String, String)> {
+    let start = content.find("[Message]")?;
+    let mut rest = &content[start + "[Message]".len()..];
+    if let Some(end) = rest.rfind("</SYSTEM_MESSAGE>") {
+        rest = &rest[..end];
+    }
+    let content_pos = rest.find(" content=")?;
+    let header = &rest[..content_pos];
+    let body = rest[content_pos + " content=".len()..].trim();
+    if body.is_empty() {
+        return None;
+    }
+    let sender = header.split_whitespace().find_map(|tok| tok.strip_prefix("sender=")).unwrap_or("").trim();
+    if sender.is_empty() || sender.contains("/task-") {
+        return None;
+    }
+    Some((sender.to_string(), body.to_string()))
 }
 
 fn model_from_settings(settings: &str) -> Option<String> {
@@ -390,14 +370,7 @@ fn parse_tool_calls(tool_calls: Option<&Value>, step_type: &str, step_key: i64) 
         .enumerate()
         .map(|(tc_idx, tc)| {
             let name = tc.get("name").or_else(|| tc.get("tool_name")).or_else(|| tc.pointer("/function/name")).and_then(Value::as_str).filter(|s| !s.trim().is_empty()).map_or_else(|| synthesized_name.clone(), String::from);
-            let call_id = tc
-                .get("id")
-                .or_else(|| tc.get("call_id"))
-                .or_else(|| tc.get("tool_call_id"))
-                .and_then(Value::as_str)
-                .filter(|s| !s.trim().is_empty())
-                .map(String::from)
-                .or_else(|| Some(format!("agy-step-{step_key}-tc-{tc_idx}")));
+            let call_id = tc.get("id").or_else(|| tc.get("call_id")).or_else(|| tc.get("tool_call_id")).and_then(Value::as_str).filter(|s| !s.trim().is_empty()).map(String::from).or_else(|| Some(format!("agy-step-{step_key}-tc-{tc_idx}")));
             let arguments = tc
                 .get("arguments")
                 .or_else(|| tc.get("args"))
@@ -439,11 +412,7 @@ fn record_to_messages(rec: &Value, order_idx: usize, pending_tool_calls: &mut Ve
             out.push(CanonicalMessage { idx: 0, role: MessageRole::User, content: body, timestamp: created, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) });
         }
         "PLANNER_RESPONSE" => {
-            let parsed_tool_calls = if tool_calls.and_then(Value::as_array).is_some_and(|a| !a.is_empty()) {
-                parse_tool_calls(tool_calls, step_type, step_key)
-            } else {
-                Vec::new()
-            };
+            let parsed_tool_calls = if tool_calls.and_then(Value::as_array).is_some_and(|a| !a.is_empty()) { parse_tool_calls(tool_calls, step_type, step_key) } else { Vec::new() };
             if content.trim().is_empty() && thinking.is_none() && parsed_tool_calls.is_empty() {
                 return;
             }
@@ -511,6 +480,15 @@ fn record_to_messages(rec: &Value, order_idx: usize, pending_tool_calls: &mut Ve
         "EPHEMERAL_MESSAGE" | "SYSTEM_MESSAGE" => {
             if content.trim().is_empty() {
                 return;
+            }
+            if step_type == "SYSTEM_MESSAGE" {
+                if let Some((sender, prompt_body)) = extract_subagent_parent_prompt(&content) {
+                    let mut extra = Map::new();
+                    extra.insert("agy_type".to_string(), Value::String(step_type.to_string()));
+                    extra.insert("subagent_sender".to_string(), Value::String(sender));
+                    out.push(CanonicalMessage { idx: 0, role: MessageRole::User, content: prompt_body, timestamp: created, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: Value::Object(extra) });
+                    return;
+                }
             }
             let mut extra = Map::new();
             extra.insert("agy_type".to_string(), Value::String(step_type.to_string()));
@@ -676,5 +654,22 @@ mod tests {
         assert_eq!(session.messages[2].role, MessageRole::Tool);
         assert_eq!(session.messages[2].tool_results.len(), 1);
         assert_eq!(session.messages[2].tool_results[0].content, "1: hello");
+    }
+
+    #[test]
+    fn promotes_subagent_parent_system_message_to_user_prompt_and_keeps_task_notifications_system() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join(".gemini/antigravity/brain/sub-1/.system_generated/logs/transcript_full.jsonl");
+        let content = r#"
+{"step_index":0,"source":"SYSTEM","type":"SYSTEM_MESSAGE","created_at":"2026-11-18T07:15:20Z","content":"The following is a <SYSTEM_MESSAGE>.\n\n<SYSTEM_MESSAGE>\n[Message] timestamp=2026-11-18T07:15:20Z sender=fa1ed216-7642-470f-91e6-abada95d5706 priority=MESSAGE_PRIORITY_HIGH content=Complete Task-4A alignment.\n</SYSTEM_MESSAGE>"}
+{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-11-18T07:15:21Z","content":"Working on Task-4A."}
+{"step_index":2,"source":"SYSTEM","type":"SYSTEM_MESSAGE","created_at":"2026-11-18T07:51:50Z","content":"<SYSTEM_MESSAGE>\n[Message] timestamp=2026-11-18T07:51:50Z sender=sub-1/task-717 priority=MESSAGE_PRIORITY_HIGH content=Task finished.\n</SYSTEM_MESSAGE>"}
+"#;
+        let session = read_session_from_str(&path, content).expect("parse");
+        assert_eq!(session.messages.len(), 3);
+        assert_eq!(session.messages[0].role, MessageRole::User);
+        assert_eq!(session.messages[0].content, "Complete Task-4A alignment.");
+        assert_eq!(session.title.as_deref(), Some("Complete Task-4A alignment."));
+        assert_eq!(session.messages[2].role, MessageRole::System);
     }
 }
