@@ -23,7 +23,15 @@ pub fn canonical_to_session_info(canonical: &CanonicalSession, path: &Path, modi
             continue;
         }
         message_count += 1;
-        let text = message.content.iter().filter_map(|item| item.text.as_ref()).map(|v| v.trim()).filter(|v| !v.is_empty()).collect::<Vec<_>>().join("\n");
+        let text = message
+            .content
+            .iter()
+            .filter(|item| item.content_type == "text")
+            .filter_map(|item| item.text.as_ref())
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n");
         if text.is_empty() {
             continue;
         }
@@ -48,8 +56,8 @@ pub fn canonical_to_session_info(canonical: &CanonicalSession, path: &Path, modi
         last_message,
         last_message_role,
         parent_session_path: None,
-        model: None,
-        models: None,
+        model: canonical.model_name.clone(),
+        models: canonical.model_name.clone().map(|m| vec![m]),
     }
 }
 
@@ -66,7 +74,7 @@ pub fn canonical_to_session_entries(canonical: &CanonicalSession) -> Vec<Session
             content.push(Content { content_type, id: None, name: None, arguments: None, text: Some(message.content.trim().to_string()) });
         }
         for tool_call in &message.tool_calls {
-            content.push(Content { content_type: "toolCall".to_string(), id: tool_call.id.clone(), name: Some(tool_call.name.clone()), arguments: Some(tool_call.arguments.clone()), text: Some(tool_call.name.clone()) });
+            content.push(Content { content_type: "toolCall".to_string(), id: tool_call.id.clone(), name: Some(tool_call.name.clone()), arguments: Some(tool_call.arguments.clone()), text: None });
         }
         let mut tool_call_id = None;
         let mut tool_name = None;

@@ -584,25 +584,28 @@ fn build_rows_from_session_entries(session_path: &str, entries: &[SessionEntry],
         let (visible_text, thinking_text) = extract_message_segments(message, include_thinking);
         let timestamp = entry.timestamp.to_rfc3339();
 
-        // Include label in search_text for FTS indexing
-        let search_content = match (&visible_text, &entry_label) {
-            (Some(text), Some(label)) => format!("[{}] {}", label, text),
-            (None, Some(label)) => format!("[{}]", label),
-            (Some(text), None) => text.clone(),
-            (None, None) => String::new(),
-        };
+        // Include label in search_text for FTS indexing; skip empty tool-call-only rows
+        // so SQLite only stores meaningful user/assistant text or labeled entries.
+        if visible_text.is_some() || entry_label.is_some() {
+            let search_content = match (&visible_text, &entry_label) {
+                (Some(text), Some(label)) => format!("[{}] {}", label, text),
+                (None, Some(label)) => format!("[{}]", label),
+                (Some(text), None) => text.clone(),
+                (None, None) => String::new(),
+            };
 
-        rows.push(MessageEntryRow {
-            row_id: build_row_id(session_path, &entry.id, &message.role),
-            entry_id: entry.id.clone(),
-            session_path: session_path.to_string(),
-            role: message.role.clone(),
-            source_type: message.role.clone(),
-            content: visible_text.clone().unwrap_or_default(),
-            search_text: crate::utils::normalize_search_text(&search_content),
-            timestamp: timestamp.clone(),
-            label: entry_label.clone(),
-        });
+            rows.push(MessageEntryRow {
+                row_id: build_row_id(session_path, &entry.id, &message.role),
+                entry_id: entry.id.clone(),
+                session_path: session_path.to_string(),
+                role: message.role.clone(),
+                source_type: message.role.clone(),
+                content: visible_text.clone().unwrap_or_default(),
+                search_text: crate::utils::normalize_search_text(&search_content),
+                timestamp: timestamp.clone(),
+                label: entry_label.clone(),
+            });
+        }
 
         if let Some(content) = thinking_text {
             rows.push(MessageEntryRow {
@@ -653,12 +656,10 @@ fn extract_message_segments(message: &crate::types::Message, include_thinking: b
             continue;
         }
 
-        if item.content_type == "thinking" {
-            if include_thinking {
-                thinking_parts.push(trimmed.to_string());
-            }
-        } else {
-            visible_parts.push(trimmed.to_string());
+        match item.content_type.as_str() {
+            "text" => visible_parts.push(trimmed.to_string()),
+            "thinking" if include_thinking => thinking_parts.push(trimmed.to_string()),
+            _ => {}
         }
     }
 
@@ -1074,5 +1075,53 @@ mod tests {
         assert_ne!(rows_a[0].row_id, rows_b[0].row_id);
         assert!(rows_a[0].row_id.contains("/tmp/a.jsonl"));
         assert!(rows_b[0].row_id.contains("/tmp/b.jsonl"));
+    }
+
+    #[test]
+    fn row_builder_skips_empty_tool_call_only_and_tool_result_entries() {
+        let tool_call_only = SessionEntry {
+            entry_type: "message".to_string(),
+            id: "a1".to_string(),
+            parent_id: None,
+            timestamp: parse_test_timestamp("2026-04-09T10:01:00Z"),
+            message: Some(crate::types::Message {
+                role: "assistant".to_string(),
+                content: vec![crate::types::Content {
+                    content_type: "toolCall".to_string(),
+                    id: Some("tc1".to_string()),
+                    name: Some("bash".to_string()),
+                    arguments: Some(serde_json::json!({"command": "ls"})),
+                    text: Some("bash".to_string()),
+                }],
+                tool_call_id: None,
+                tool_name: None,
+                is_error: None,
+                model: None,
+                provider: None,
+                usage: None,
+            }),
+            target_id: None,
+            label: None,
+            name: None,
+            provider: None,
+            model_id: None,
+        };
+        let tool_result = message_entry("t1", "2026-04-09T10:02:00Z", "toolResult", "huge raw stdout");
+        let system_msg = message_entry("s1", "2026-04-09T10:03:00Z", "system", "system prompt");
+        let user_msg = message_entry("u1", "2026-04-09T10:04:00Z", "user", "real user prompt");
+
+        let rows = build_rows_from_session_entries("/tmp/s.jsonl", &[tool_call_only, tool_result, system_msg, user_msg], false);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].entry_id, "u1");
+        assert_eq!(rows[0].content, "real user prompt");
+    }
+
+    #[test]
+    fn row_builder_preserves_full_long_messages_without_truncation() {
+        let long_text = format!("{} tail-keyword", "x".repeat(6000));
+        let rows = build_rows_from_session_entries("/tmp/s.jsonl", &[message_entry("u1", "2026-04-09T10:01:00Z", "user", &long_text)], false);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].content, long_text);
+        assert!(rows[0].search_text.contains("tail"));
     }
 }
