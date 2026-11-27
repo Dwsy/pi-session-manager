@@ -1,3 +1,4 @@
+import { FileText } from 'lucide-react'
 import type { Content } from '@/types'
 import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '@/plugins/tools-render/types'
 import { defaultResolveData } from '@/plugins/tools-render/utils/resolveData'
@@ -57,9 +58,7 @@ function ReadExecution({
         )}
         <span className="tool-header-meta">
           <span className="tool-name">
-            <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            <FileText className="tool-icon" strokeWidth={1.75} aria-hidden="true" />
             Read
           </span>
         </span>

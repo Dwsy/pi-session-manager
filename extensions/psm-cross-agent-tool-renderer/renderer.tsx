@@ -1,8 +1,10 @@
 import {
+  Bot,
+  Clock,
   FilePenLine,
+  FilePlus2,
   FileText,
   ListTodo,
-  PlusSquare,
   Search,
   Terminal,
   Wrench,
@@ -30,10 +32,12 @@ import {
 const ICON_BY_KIND: Partial<Record<CrossAgentKind, typeof Wrench>> = {
   shell: Terminal,
   read: FileText,
-  write: PlusSquare,
+  write: FilePlus2,
   edit: FilePenLine,
   search: Search,
   todo: ListTodo,
+  agent: Bot,
+  wait: Clock,
 };
 
 const PI_BUILTIN_TOOLS = new Set([
@@ -82,7 +86,7 @@ function CrossAgentToolRenderer({
           </span>
         )}
         <span className="tool-name inline-flex items-center gap-1.5">
-          <Icon className="h-4 w-4" />
+          <Icon className="tool-icon" strokeWidth={1.75} aria-hidden="true" />
           {title}
         </span>
         <span className="tool-path" title={primaryText}>

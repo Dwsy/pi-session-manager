@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { FilePenLine } from 'lucide-react'
 import { MultiFileDiff, type FileContents } from '@pierre/diffs/react'
 import { registerCustomTheme, RegisteredCustomThemes } from '@pierre/diffs'
 import type { Content } from '@/types'
@@ -205,9 +206,7 @@ function EditExecution({
         )}
         <span className="tool-header-meta">
           <span className="tool-name">
-            <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-            </svg>
+            <FilePenLine className="tool-icon" strokeWidth={1.75} aria-hidden="true" />
             Edit
           </span>
         </span>

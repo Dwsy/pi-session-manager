@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { Eye, X } from 'lucide-react'
+import { Eye, FilePlus2, X } from 'lucide-react'
 import type { Content } from '@/types'
 import type { ToolRenderPlugin, ToolRenderProps, ResolvedToolData } from '@/plugins/tools-render/types'
 import { defaultResolveData } from '@/plugins/tools-render/utils/resolveData'
@@ -131,9 +131,7 @@ function WriteExecution({
         </span>
         <span className="tool-header-meta">
           <span className="tool-name">
-            <svg className="tool-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
+            <FilePlus2 className="tool-icon" strokeWidth={1.75} aria-hidden="true" />
             Write
           </span>
         </span>
