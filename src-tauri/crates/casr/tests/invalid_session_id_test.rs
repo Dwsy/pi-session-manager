@@ -63,11 +63,7 @@ fn assert_session_not_found(session_id: &str, label: &str) {
             eprintln!("{label}: got non-SessionNotFound error (acceptable): {other}");
         }
         Ok(resolved) => {
-            panic!(
-                "{label}: malformed session ID '{session_id}' unexpectedly resolved to {} at {}",
-                resolved.provider.slug(),
-                resolved.path.display()
-            );
+            panic!("{label}: malformed session ID '{session_id}' unexpectedly resolved to {} at {}", resolved.provider.slug(), resolved.path.display());
         }
     }
 }
@@ -154,10 +150,7 @@ fn resolve_zero_width_joiners() {
 
 #[test]
 fn resolve_valid_uuid_nonexistent() {
-    assert_session_not_found(
-        "550e8400-e29b-41d4-a716-446655440000",
-        "valid UUID, non-existent",
-    );
+    assert_session_not_found("550e8400-e29b-41d4-a716-446655440000", "valid UUID, non-existent");
 }
 
 // ===========================================================================
@@ -198,10 +191,7 @@ fn error_message_does_not_leak_traversal_path() {
     if let Err(e) = result {
         let msg = e.to_string();
         // The error message should NOT contain the resolved/expanded path.
-        assert!(
-            !msg.contains("/etc/passwd") || msg.contains("../../etc/passwd"),
-            "error message should not leak resolved traversal path; got: {msg}"
-        );
+        assert!(!msg.contains("/etc/passwd") || msg.contains("../../etc/passwd"), "error message should not leak resolved traversal path; got: {msg}");
     }
 }
 
@@ -217,11 +207,7 @@ fn cc_owns_session_traversal_returns_none() {
 
     // Path traversal should not find a session.
     let result = ClaudeCode.owns_session("../../etc/passwd");
-    assert!(
-        result.is_none(),
-        "CC owns_session should return None for path traversal; got: {:?}",
-        result
-    );
+    assert!(result.is_none(), "CC owns_session should return None for path traversal; got: {:?}", result);
 }
 
 #[test]
@@ -231,11 +217,7 @@ fn codex_owns_session_traversal_returns_none() {
     let _env = EnvGuard::set("CODEX_HOME", tmp.path());
 
     let result = Codex.owns_session("../../etc/passwd");
-    assert!(
-        result.is_none(),
-        "Codex owns_session should return None for path traversal; got: {:?}",
-        result
-    );
+    assert!(result.is_none(), "Codex owns_session should return None for path traversal; got: {:?}", result);
 }
 
 #[test]
@@ -245,9 +227,5 @@ fn cc_owns_session_empty_returns_none() {
     let _env = EnvGuard::set("CLAUDE_HOME", tmp.path());
 
     let result = ClaudeCode.owns_session("");
-    assert!(
-        result.is_none(),
-        "CC owns_session should return None for empty string; got: {:?}",
-        result
-    );
+    assert!(result.is_none(), "CC owns_session should return None for empty string; got: {:?}", result);
 }

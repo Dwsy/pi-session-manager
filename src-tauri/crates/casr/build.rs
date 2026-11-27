@@ -10,12 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cargo = Cargo::builder().target_triple(true).build();
     let gitcl = Gitcl::builder().sha(true).build();
 
-    Emitter::default()
-        .default_on_error()
-        .add_instructions(&build)?
-        .add_instructions(&cargo)?
-        .add_instructions(&gitcl)?
-        .emit()?;
+    Emitter::default().default_on_error().add_instructions(&build)?.add_instructions(&cargo)?.add_instructions(&gitcl)?.emit()?;
 
     Ok(())
 }

@@ -69,9 +69,7 @@ fn full_filesystem_round_trip_preserves_history_and_state() {
 
     let original = Kiro.read_session(&fixture_json()).expect("read original");
 
-    let written = Kiro
-        .write_session(&original, &WriteOptions { force: true })
-        .expect("write session");
+    let written = Kiro.write_session(&original, &WriteOptions { force: true }).expect("write session");
 
     // .json + .jsonl + .history (history was present).
     assert_eq!(written.paths.len(), 3, "json + jsonl + history");
@@ -80,46 +78,23 @@ fn full_filesystem_round_trip_preserves_history_and_state() {
         assert!(p.exists(), "written file missing: {}", p.display());
     }
 
-    let new_json = Kiro
-        .owns_session(&written.session_id)
-        .expect("owns written session");
+    let new_json = Kiro.owns_session(&written.session_id).expect("owns written session");
     let reread = Kiro.read_session(&new_json).expect("re-read written");
 
     assert_eq!(reread.messages.len(), original.messages.len());
     for (a, b) in original.messages.iter().zip(reread.messages.iter()) {
         assert_eq!(a.role, b.role, "role mismatch at idx {}", a.idx);
         assert_eq!(a.content, b.content, "content mismatch at idx {}", a.idx);
-        assert_eq!(
-            a.tool_calls.len(),
-            b.tool_calls.len(),
-            "tool_calls at {}",
-            a.idx
-        );
-        assert_eq!(
-            a.tool_results.len(),
-            b.tool_results.len(),
-            "tool_results at {}",
-            a.idx
-        );
+        assert_eq!(a.tool_calls.len(), b.tool_calls.len(), "tool_calls at {}", a.idx);
+        assert_eq!(a.tool_results.len(), b.tool_results.len(), "tool_results at {}", a.idx);
     }
 
     // Nested session_state survives verbatim — the round-trip risk.
-    assert_eq!(
-        original.metadata.get("session_state"),
-        reread.metadata.get("session_state"),
-        "session_state must round-trip verbatim"
-    );
+    assert_eq!(original.metadata.get("session_state"), reread.metadata.get("session_state"), "session_state must round-trip verbatim");
     // .history plain text survives byte-for-byte.
-    assert_eq!(
-        original.metadata.get("history").and_then(|v| v.as_str()),
-        reread.metadata.get("history").and_then(|v| v.as_str()),
-        "history must round-trip"
-    );
+    assert_eq!(original.metadata.get("history").and_then(|v| v.as_str()), reread.metadata.get("history").and_then(|v| v.as_str()), "history must round-trip");
     assert_eq!(original.workspace, reread.workspace);
-    assert_eq!(
-        original.metadata.get("parent_session_id"),
-        reread.metadata.get("parent_session_id"),
-    );
+    assert_eq!(original.metadata.get("parent_session_id"), reread.metadata.get("parent_session_id"),);
 }
 
 #[test]
@@ -152,33 +127,13 @@ fn cli_list_finds_seeded_kiro_session() {
     // `casr list` defaults to scoping by the current working-directory
     // project; the captured fixture's workspace is a macOS path, so we pass
     // it explicitly via `--workspace` to take it out of cwd scope.
-    let workspace =
-        "/Users/tranquangdang21/Projects/jcode/.worktrees/feat-380-compaction-resistant-notepad";
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_casr"))
-        .args([
-            "list",
-            "--provider",
-            "kiro",
-            "--workspace",
-            workspace,
-            "--limit",
-            "5",
-        ])
-        .env("KIRO_HOME", tmp.path())
-        .output()
-        .expect("run casr list");
+    let workspace = "/Users/tranquangdang21/Projects/jcode/.worktrees/feat-380-compaction-resistant-notepad";
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_casr")).args(["list", "--provider", "kiro", "--workspace", workspace, "--limit", "5"]).env("KIRO_HOME", tmp.path()).output().expect("run casr list");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        output.status.success(),
-        "casr list failed: status={:?}\nstdout={stdout}\nstderr={stderr}",
-        output.status
-    );
-    assert!(
-        stdout.contains(FIXTURE_ID) || stdout.contains("kiro"),
-        "expected the seeded Kiro session in output:\n{stdout}"
-    );
+    assert!(output.status.success(), "casr list failed: status={:?}\nstdout={stdout}\nstderr={stderr}", output.status);
+    assert!(stdout.contains(FIXTURE_ID) || stdout.contains("kiro"), "expected the seeded Kiro session in output:\n{stdout}");
 }
 
 /// CLI smoke test: `casr info <id> --source kr` reports the session details.
@@ -188,23 +143,12 @@ fn cli_info_reports_seeded_kiro_session() {
     let tmp = tempfile::tempdir().unwrap();
     seed_kiro_home(tmp.path());
 
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_casr"))
-        .args(["info", FIXTURE_ID, "--source", "kr"])
-        .env("KIRO_HOME", tmp.path())
-        .output()
-        .expect("run casr info");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_casr")).args(["info", FIXTURE_ID, "--source", "kr"]).env("KIRO_HOME", tmp.path()).output().expect("run casr info");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        output.status.success(),
-        "casr info failed: status={:?}\nstdout={stdout}\nstderr={stderr}",
-        output.status
-    );
-    assert!(
-        stdout.contains(FIXTURE_ID),
-        "expected session id in info output:\n{stdout}"
-    );
+    assert!(output.status.success(), "casr info failed: status={:?}\nstdout={stdout}\nstderr={stderr}", output.status);
+    assert!(stdout.contains(FIXTURE_ID), "expected session id in info output:\n{stdout}");
 }
 
 /// Cross-provider import: a synthetic non-Kiro session writes a valid triplet
@@ -225,27 +169,14 @@ fn foreign_session_writes_and_rereads() {
         started_at: Some(1_700_000_000_000),
         ended_at: Some(1_700_000_100_000),
         messages: vec![
-            CanonicalMessage {
-                idx: 0,
-                role: MessageRole::User,
-                content: "Hi there".into(),
-                timestamp: Some(1_700_000_000_000),
-                author: Some("user".into()),
-                tool_calls: vec![],
-                tool_results: vec![],
-                extra: serde_json::Value::Null,
-            },
+            CanonicalMessage { idx: 0, role: MessageRole::User, content: "Hi there".into(), timestamp: Some(1_700_000_000_000), author: Some("user".into()), tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null },
             CanonicalMessage {
                 idx: 1,
                 role: MessageRole::Assistant,
                 content: "Hello back".into(),
                 timestamp: None,
                 author: None,
-                tool_calls: vec![ToolCall {
-                    id: Some("t1".into()),
-                    name: "shell".into(),
-                    arguments: serde_json::json!({"command": "ls"}),
-                }],
+                tool_calls: vec![ToolCall { id: Some("t1".into()), name: "shell".into(), arguments: serde_json::json!({"command": "ls"}) }],
                 tool_results: vec![],
                 extra: serde_json::Value::Null,
             },
@@ -255,15 +186,11 @@ fn foreign_session_writes_and_rereads() {
         model_name: None,
     };
 
-    let written = Kiro
-        .write_session(&session, &WriteOptions { force: true })
-        .expect("write foreign session");
+    let written = Kiro.write_session(&session, &WriteOptions { force: true }).expect("write foreign session");
     // No history present → only .json + .jsonl.
     assert_eq!(written.paths.len(), 2);
 
-    let reread = Kiro
-        .read_session(&Kiro.owns_session(&written.session_id).unwrap())
-        .expect("re-read");
+    let reread = Kiro.read_session(&Kiro.owns_session(&written.session_id).unwrap()).expect("re-read");
     assert_eq!(reread.messages.len(), 2);
     assert_eq!(reread.messages[0].content, "Hi there");
     assert_eq!(reread.messages[1].content, "Hello back");

@@ -14,10 +14,7 @@ use casr::{
     error::CasrError,
     model::CanonicalSession,
     model::MessageRole,
-    providers::{
-        Provider, WriteOptions, WrittenSession, claude_code::ClaudeCode, codex::Codex,
-        gemini::Gemini,
-    },
+    providers::{Provider, WriteOptions, WrittenSession, claude_code::ClaudeCode, codex::Codex, gemini::Gemini},
 };
 use walkdir::WalkDir;
 
@@ -37,12 +34,7 @@ struct ScanProvider {
 
 impl ScanProvider {
     fn new(name: &str, slug: &str, alias: &str, roots: Vec<PathBuf>) -> Self {
-        Self {
-            name: name.to_string(),
-            slug: slug.to_string(),
-            alias: alias.to_string(),
-            roots,
-        }
+        Self { name: name.to_string(), slug: slug.to_string(), alias: alias.to_string(), roots }
     }
 }
 
@@ -60,15 +52,7 @@ impl Provider for ScanProvider {
     }
 
     fn detect(&self) -> DetectionResult {
-        DetectionResult {
-            installed: true,
-            version: None,
-            evidence: self
-                .roots
-                .iter()
-                .map(|r| format!("scan-root={}", r.display()))
-                .collect(),
-        }
+        DetectionResult { installed: true, version: None, evidence: self.roots.iter().map(|r| format!("scan-root={}", r.display())).collect() }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
@@ -77,21 +61,12 @@ impl Provider for ScanProvider {
 
     fn owns_session(&self, session_id: &str) -> Option<PathBuf> {
         for root in &self.roots {
-            for entry in WalkDir::new(root)
-                .max_depth(6)
-                .into_iter()
-                .filter_map(Result::ok)
-            {
+            for entry in WalkDir::new(root).max_depth(6).into_iter().filter_map(Result::ok) {
                 if !entry.file_type().is_file() {
                     continue;
                 }
                 let path = entry.path();
-                if path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .map(|stem| stem == session_id)
-                    .unwrap_or(false)
-                {
+                if path.file_stem().and_then(|s| s.to_str()).map(|stem| stem == session_id).unwrap_or(false) {
                     return Some(path.to_path_buf());
                 }
             }
@@ -103,11 +78,7 @@ impl Provider for ScanProvider {
         Err(anyhow::anyhow!("scan provider does not parse sessions"))
     }
 
-    fn write_session(
-        &self,
-        _session: &CanonicalSession,
-        _opts: &WriteOptions,
-    ) -> anyhow::Result<WrittenSession> {
+    fn write_session(&self, _session: &CanonicalSession, _opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
         Err(anyhow::anyhow!("scan provider does not write sessions"))
     }
 
@@ -120,11 +91,7 @@ fn seed_claude_corpus(projects_dir: &Path, target_id: &str) {
     for i in 0..FILES_PER_PROVIDER {
         let dir = projects_dir.join(format!("proj-{i:04}"));
         fs::create_dir_all(&dir).expect("create claude project dir");
-        let session_id = if i == FILES_PER_PROVIDER - 1 {
-            target_id.to_string()
-        } else {
-            format!("cc-noise-{i:04}")
-        };
+        let session_id = if i == FILES_PER_PROVIDER - 1 { target_id.to_string() } else { format!("cc-noise-{i:04}") };
         let path = dir.join(format!("{session_id}.jsonl"));
         let entry = serde_json::json!({
             "type": "user",
@@ -145,9 +112,7 @@ fn seed_codex_corpus(sessions_dir: &Path) {
     for i in 0..FILES_PER_PROVIDER {
         let day_dir = sessions_dir.join(format!("2026/02/{:02}", (i % 28) + 1));
         fs::create_dir_all(&day_dir).expect("create codex date dir");
-        let path = day_dir.join(format!(
-            "rollout-2026-02-09T00-00-00-cod-noise-{i:04}.jsonl"
-        ));
+        let path = day_dir.join(format!("rollout-2026-02-09T00-00-00-cod-noise-{i:04}.jsonl"));
         let lines = [
             serde_json::json!({
                 "type": "session_meta",
@@ -166,11 +131,7 @@ fn seed_codex_corpus(sessions_dir: &Path) {
                 }
             }),
         ];
-        let payload = lines
-            .iter()
-            .map(serde_json::Value::to_string)
-            .collect::<Vec<_>>()
-            .join("\n");
+        let payload = lines.iter().map(serde_json::Value::to_string).collect::<Vec<_>>().join("\n");
         fs::write(path, payload).expect("write codex seed file");
     }
 }
@@ -192,11 +153,7 @@ fn seed_gemini_corpus(tmp_dir: &Path) {
                 {"type":"model","content":"seed assistant","timestamp":"2026-02-09T00:00:01Z"}
             ]
         });
-        fs::write(
-            path,
-            serde_json::to_vec(&root).expect("serialize gemini seed"),
-        )
-        .expect("write gemini seed file");
+        fs::write(path, serde_json::to_vec(&root).expect("serialize gemini seed")).expect("write gemini seed file");
     }
 }
 
@@ -218,11 +175,7 @@ fn write_large_claude_file(path: &Path, session_id: &str, message_count: usize) 
             }
         }));
     }
-    let payload = lines
-        .iter()
-        .map(serde_json::Value::to_string)
-        .collect::<Vec<_>>()
-        .join("\n");
+    let payload = lines.iter().map(serde_json::Value::to_string).collect::<Vec<_>>().join("\n");
     fs::write(path, payload).expect("write large claude session");
 }
 
@@ -254,11 +207,7 @@ fn write_large_codex_file(path: &Path, session_id: &str, message_count: usize) {
         }
     }
 
-    let payload = lines
-        .iter()
-        .map(serde_json::Value::to_string)
-        .collect::<Vec<_>>()
-        .join("\n");
+    let payload = lines.iter().map(serde_json::Value::to_string).collect::<Vec<_>>().join("\n");
     fs::write(path, payload).expect("write large codex session");
 }
 
@@ -280,36 +229,18 @@ fn write_large_gemini_file(path: &Path, session_id: &str, message_count: usize) 
         "lastUpdated": "2026-02-09T01:00:00Z",
         "messages": messages
     });
-    fs::write(
-        path,
-        serde_json::to_vec(&root).expect("serialize gemini payload"),
-    )
-    .expect("write large gemini session");
+    fs::write(path, serde_json::to_vec(&root).expect("serialize gemini payload")).expect("write large gemini session");
 }
 
-fn measure_reader_throughput(
-    provider_name: &str,
-    reader: &dyn Provider,
-    session_path: &Path,
-    expected_messages: usize,
-) -> serde_json::Value {
+fn measure_reader_throughput(provider_name: &str, reader: &dyn Provider, session_path: &Path, expected_messages: usize) -> serde_json::Value {
     let start = Instant::now();
-    let parsed = reader
-        .read_session(session_path)
-        .unwrap_or_else(|e| panic!("{provider_name} read failed: {e}"));
+    let parsed = reader.read_session(session_path).unwrap_or_else(|e| panic!("{provider_name} read failed: {e}"));
     let elapsed = start.elapsed();
-    assert_eq!(
-        parsed.messages.len(),
-        expected_messages,
-        "{provider_name} parsed unexpected message count"
-    );
+    assert_eq!(parsed.messages.len(), expected_messages, "{provider_name} parsed unexpected message count");
 
     let elapsed_secs = elapsed.as_secs_f64();
     let throughput = expected_messages as f64 / elapsed_secs.max(1e-9);
-    assert!(
-        throughput >= MIN_READER_THROUGHPUT_MSG_PER_SEC,
-        "{provider_name} throughput too low: {throughput:.2} msg/s (budget {MIN_READER_THROUGHPUT_MSG_PER_SEC:.2})"
-    );
+    assert!(throughput >= MIN_READER_THROUGHPUT_MSG_PER_SEC, "{provider_name} throughput too low: {throughput:.2} msg/s (budget {MIN_READER_THROUGHPUT_MSG_PER_SEC:.2})");
 
     serde_json::json!({
         "provider": provider_name,
@@ -335,48 +266,22 @@ fn discovery_and_reader_scalability_regression() {
     seed_gemini_corpus(&gemini_tmp);
 
     let registry = ProviderRegistry::new(vec![
-        Box::new(ScanProvider::new(
-            "scan-claude",
-            "scan-claude",
-            "scc",
-            vec![claude_projects.clone()],
-        )),
-        Box::new(ScanProvider::new(
-            "scan-codex",
-            "scan-codex",
-            "scod",
-            vec![codex_sessions.clone()],
-        )),
-        Box::new(ScanProvider::new(
-            "scan-gemini",
-            "scan-gemini",
-            "sgmi",
-            vec![gemini_tmp.clone()],
-        )),
+        Box::new(ScanProvider::new("scan-claude", "scan-claude", "scc", vec![claude_projects.clone()])),
+        Box::new(ScanProvider::new("scan-codex", "scan-codex", "scod", vec![codex_sessions.clone()])),
+        Box::new(ScanProvider::new("scan-gemini", "scan-gemini", "sgmi", vec![gemini_tmp.clone()])),
     ]);
 
     let start_found = Instant::now();
-    let resolved = registry
-        .resolve_session(target_session_id, None)
-        .expect("target session should resolve");
+    let resolved = registry.resolve_session(target_session_id, None).expect("target session should resolve");
     let found_ms = start_found.elapsed().as_millis();
     assert_eq!(resolved.provider.slug(), "scan-claude");
-    assert!(
-        found_ms <= DISCOVERY_FOUND_BUDGET_MS,
-        "discovery(found) budget exceeded: {found_ms}ms > {DISCOVERY_FOUND_BUDGET_MS}ms"
-    );
+    assert!(found_ms <= DISCOVERY_FOUND_BUDGET_MS, "discovery(found) budget exceeded: {found_ms}ms > {DISCOVERY_FOUND_BUDGET_MS}ms");
 
     let start_miss = Instant::now();
     let missing = registry.resolve_session("perf-missing-session-id", None);
     let miss_ms = start_miss.elapsed().as_millis();
-    assert!(
-        matches!(missing, Err(CasrError::SessionNotFound { .. })),
-        "missing session should produce SessionNotFound"
-    );
-    assert!(
-        miss_ms <= DISCOVERY_MISS_BUDGET_MS,
-        "discovery(miss) budget exceeded: {miss_ms}ms > {DISCOVERY_MISS_BUDGET_MS}ms"
-    );
+    assert!(matches!(missing, Err(CasrError::SessionNotFound { .. })), "missing session should produce SessionNotFound");
+    assert!(miss_ms <= DISCOVERY_MISS_BUDGET_MS, "discovery(miss) budget exceeded: {miss_ms}ms > {DISCOVERY_MISS_BUDGET_MS}ms");
 
     let perf_dir = tmp.path().join("reader-perf");
     fs::create_dir_all(&perf_dir).expect("create perf dir");
@@ -393,11 +298,7 @@ fn discovery_and_reader_scalability_regression() {
     let codex = Codex;
     let gemini = Gemini;
 
-    let reader_metrics = vec![
-        measure_reader_throughput("claude-code", &claude, &claude_file, LARGE_MESSAGE_COUNT),
-        measure_reader_throughput("codex", &codex, &codex_file, LARGE_MESSAGE_COUNT),
-        measure_reader_throughput("gemini", &gemini, &gemini_file, LARGE_MESSAGE_COUNT),
-    ];
+    let reader_metrics = vec![measure_reader_throughput("claude-code", &claude, &claude_file, LARGE_MESSAGE_COUNT), measure_reader_throughput("codex", &codex, &codex_file, LARGE_MESSAGE_COUNT), measure_reader_throughput("gemini", &gemini, &gemini_file, LARGE_MESSAGE_COUNT)];
 
     let metrics = serde_json::json!({
         "suite": "scalability_regression",
@@ -416,22 +317,13 @@ fn discovery_and_reader_scalability_regression() {
     });
 
     if let Ok(path) = std::env::var("CASR_PERF_METRICS_FILE") {
-        fs::write(
-            PathBuf::from(path),
-            serde_json::to_vec_pretty(&metrics).expect("serialize perf metrics"),
-        )
-        .expect("write perf metrics artifact");
+        fs::write(PathBuf::from(path), serde_json::to_vec_pretty(&metrics).expect("serialize perf metrics")).expect("write perf metrics artifact");
     }
 
-    println!(
-        "SCALABILITY_METRICS:{}",
-        serde_json::to_string(&metrics).expect("serialize metrics line")
-    );
+    println!("SCALABILITY_METRICS:{}", serde_json::to_string(&metrics).expect("serialize metrics line"));
 
     // Sanity-check parsed role normalization is still user/assistant alternating.
-    let parsed_claude = claude
-        .read_session(&claude_file)
-        .expect("re-read claude file for role sanity");
+    let parsed_claude = claude.read_session(&claude_file).expect("re-read claude file for role sanity");
     assert_eq!(parsed_claude.messages[0].role, MessageRole::User);
     assert_eq!(parsed_claude.messages[1].role, MessageRole::Assistant);
 }

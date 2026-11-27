@@ -55,25 +55,12 @@ fn fixtures_dir() -> PathBuf {
 fn seed_grok_home(home: &Path) {
     let dst = home.join("sessions").join(ENCODED_CWD).join(FIXTURE_ID);
     std::fs::create_dir_all(&dst).unwrap();
-    let src = fixtures_dir()
-        .join("sessions")
-        .join(ENCODED_CWD)
-        .join(FIXTURE_ID);
+    let src = fixtures_dir().join("sessions").join(ENCODED_CWD).join(FIXTURE_ID);
     for name in ["updates.jsonl", "summary.json"] {
         std::fs::copy(src.join(name), dst.join(name)).unwrap();
     }
-    std::fs::write(
-        home.join("sessions").join("session_search.sqlite"),
-        b"SQLite format 3\x00fixture",
-    )
-    .unwrap();
-    std::fs::write(
-        home.join("sessions").join(ENCODED_CWD).join("prompt_history.jsonl"),
-        format!(
-            "{{\"timestamp\":\"2026-07-18T15:20:56.242466991Z\",\"session_id\":\"{FIXTURE_ID}\",\"prompt\":\"Run the shell command: echo hi .\",\"is_bash\":false}}\n"
-        ),
-    )
-    .unwrap();
+    std::fs::write(home.join("sessions").join("session_search.sqlite"), b"SQLite format 3\x00fixture").unwrap();
+    std::fs::write(home.join("sessions").join(ENCODED_CWD).join("prompt_history.jsonl"), format!("{{\"timestamp\":\"2026-07-18T15:20:56.242466991Z\",\"session_id\":\"{FIXTURE_ID}\",\"prompt\":\"Run the shell command: echo hi .\",\"is_bash\":false}}\n")).unwrap();
 }
 
 #[test]
@@ -98,9 +85,7 @@ fn discovery_lists_and_owns_seeded_session() {
     let registry = ProviderRegistry::default_registry();
     let provider = registry.find_by_alias("grk").expect("grk alias resolves");
     assert_eq!(provider.slug(), "grok");
-    let provider = registry
-        .find_by_alias("grok-build")
-        .expect("grok-build token resolves");
+    let provider = registry.find_by_alias("grok-build").expect("grok-build token resolves");
     assert_eq!(provider.slug(), "grok");
 }
 
@@ -132,38 +117,11 @@ fn write_session_round_trips_through_reader() {
     let tmp = tempfile::tempdir().unwrap();
     let _env = EnvGuard::set("GROK_HOME", tmp.path());
 
-    let msg = |idx: usize, role: MessageRole, content: &str, ts: i64| CanonicalMessage {
-        idx,
-        role,
-        content: content.into(),
-        timestamp: Some(ts),
-        author: None,
-        tool_calls: vec![],
-        tool_results: vec![],
-        extra: serde_json::Value::Null,
-    };
-    let mut tool_msg = msg(
-        2,
-        MessageRole::Assistant,
-        "Running the command.",
-        1_784_388_020_000,
-    );
-    tool_msg.tool_calls.push(ToolCall {
-        id: Some("call_a".into()),
-        name: "run_terminal_cmd".into(),
-        arguments: serde_json::json!({"command": "echo hi"}),
-    });
-    tool_msg.tool_results.push(ToolResult {
-        call_id: Some("call_a".into()),
-        content: "hi\n".into(),
-        is_error: false,
-    });
-    let mut thought = msg(
-        3,
-        MessageRole::Assistant,
-        "Reflecting on the output.",
-        1_784_388_025_000,
-    );
+    let msg = |idx: usize, role: MessageRole, content: &str, ts: i64| CanonicalMessage { idx, role, content: content.into(), timestamp: Some(ts), author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null };
+    let mut tool_msg = msg(2, MessageRole::Assistant, "Running the command.", 1_784_388_020_000);
+    tool_msg.tool_calls.push(ToolCall { id: Some("call_a".into()), name: "run_terminal_cmd".into(), arguments: serde_json::json!({"command": "echo hi"}) });
+    tool_msg.tool_results.push(ToolResult { call_id: Some("call_a".into()), content: "hi\n".into(), is_error: false });
+    let mut thought = msg(3, MessageRole::Assistant, "Reflecting on the output.", 1_784_388_025_000);
     thought.author = Some("reasoning".into());
 
     let session = CanonicalSession {
@@ -190,22 +148,15 @@ fn write_session_round_trips_through_reader() {
         model_name: Some("claude-opus-4".into()),
     };
 
-    let written = Grok
-        .write_session(&session, &WriteOptions { force: false })
-        .expect("grok write succeeds");
+    let written = Grok.write_session(&session, &WriteOptions { force: false }).expect("grok write succeeds");
     assert_ne!(written.session_id, "foreign", "fresh UUID session id");
     assert!(written.paths[0].ends_with("updates.jsonl"));
     assert!(written.paths[1].ends_with("summary.json"));
-    assert_eq!(
-        written.resume_command,
-        format!("grok --resume {}", written.session_id)
-    );
+    assert_eq!(written.resume_command, format!("grok --resume {}", written.session_id));
     assert!(written.warnings.is_empty(), "{:?}", written.warnings);
 
     // The session must be discoverable exactly like a native one.
-    let owned = Grok
-        .owns_session(&written.session_id)
-        .expect("written session is owned");
+    let owned = Grok.owns_session(&written.session_id).expect("written session is owned");
     assert_eq!(owned, written.paths[0]);
 
     let readback = Grok.read_session(&written.paths[0]).expect("read back");
@@ -218,18 +169,11 @@ fn write_session_round_trips_through_reader() {
     assert_eq!(readback.messages[2].role, MessageRole::Assistant);
     assert_eq!(readback.messages[2].content, "Running the command.");
     assert_eq!(readback.messages[2].tool_calls.len(), 1);
-    assert_eq!(
-        readback.messages[2].tool_calls[0].id.as_deref(),
-        Some("call_a")
-    );
+    assert_eq!(readback.messages[2].tool_calls[0].id.as_deref(), Some("call_a"));
     assert_eq!(readback.messages[2].tool_calls[0].name, "run_terminal_cmd");
     assert_eq!(readback.messages[2].tool_results.len(), 1);
     assert_eq!(readback.messages[2].tool_results[0].content, "hi\n");
-    assert_eq!(
-        readback.messages[3].author.as_deref(),
-        Some("reasoning"),
-        "reasoning author survives via agent_thought_chunk"
-    );
+    assert_eq!(readback.messages[3].author.as_deref(), Some("reasoning"), "reasoning author survives via agent_thought_chunk");
     assert_eq!(readback.messages[3].content, "Reflecting on the output.");
     assert_eq!(readback.messages[4].role, MessageRole::Assistant);
     assert_eq!(readback.messages[4].content, "Done: hi");
@@ -244,10 +188,7 @@ fn write_session_round_trips_through_reader() {
     // is REQUIRED for `grok --resume` to load the session (live-bisected on
     // grok 0.2.118), and a foreign id would confuse model selection.
     assert_eq!(readback.title.as_deref(), Some("Writer round-trip"));
-    assert_eq!(
-        readback.workspace,
-        Some(PathBuf::from("/data/projects/foo"))
-    );
+    assert_eq!(readback.workspace, Some(PathBuf::from("/data/projects/foo")));
     assert_eq!(readback.model_name.as_deref(), Some("grok-4.5"));
 }
 
@@ -261,31 +202,12 @@ fn cli_list_finds_seeded_grok_session() {
     // `casr list` defaults to scoping by the current working-directory
     // project; the fixture's workspace is a synthetic path, so pass it
     // explicitly via `--workspace` to take it out of cwd scope.
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_casr"))
-        .args([
-            "list",
-            "--provider",
-            "grok",
-            "--workspace",
-            FIXTURE_WORKSPACE,
-            "--limit",
-            "5",
-        ])
-        .env("GROK_HOME", tmp.path())
-        .output()
-        .expect("run casr list");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_casr")).args(["list", "--provider", "grok", "--workspace", FIXTURE_WORKSPACE, "--limit", "5"]).env("GROK_HOME", tmp.path()).output().expect("run casr list");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        output.status.success(),
-        "casr list failed: status={:?}\nstdout={stdout}\nstderr={stderr}",
-        output.status
-    );
-    assert!(
-        stdout.contains(FIXTURE_ID) || stdout.contains("grok"),
-        "expected the seeded Grok session in output:\n{stdout}"
-    );
+    assert!(output.status.success(), "casr list failed: status={:?}\nstdout={stdout}\nstderr={stderr}", output.status);
+    assert!(stdout.contains(FIXTURE_ID) || stdout.contains("grok"), "expected the seeded Grok session in output:\n{stdout}");
 }
 
 /// CLI smoke test: `casr info <id> --source grk` reports the session details.
@@ -295,23 +217,12 @@ fn cli_info_reports_seeded_grok_session() {
     let tmp = tempfile::tempdir().unwrap();
     seed_grok_home(tmp.path());
 
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_casr"))
-        .args(["info", FIXTURE_ID, "--source", "grk"])
-        .env("GROK_HOME", tmp.path())
-        .output()
-        .expect("run casr info");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_casr")).args(["info", FIXTURE_ID, "--source", "grk"]).env("GROK_HOME", tmp.path()).output().expect("run casr info");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        output.status.success(),
-        "casr info failed: status={:?}\nstdout={stdout}\nstderr={stderr}",
-        output.status
-    );
-    assert!(
-        stdout.contains(FIXTURE_ID),
-        "expected session id in info output:\n{stdout}"
-    );
+    assert!(output.status.success(), "casr info failed: status={:?}\nstdout={stdout}\nstderr={stderr}", output.status);
+    assert!(stdout.contains(FIXTURE_ID), "expected session id in info output:\n{stdout}");
 }
 
 /// CLI e2e: converting INTO grok succeeds and passes the pipeline's
@@ -325,51 +236,23 @@ fn cli_convert_into_grok_succeeds_with_readback_verification() {
 
     // Seed a Claude Code session as the cross-provider source (same-provider
     // conversions short-circuit without touching the writer).
-    let cc_fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/claude_code/cc_simple.jsonl");
+    let cc_fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/claude_code/cc_simple.jsonl");
     let cc_dir = tmp.path().join("claude/projects/-data-projects-myapp");
     std::fs::create_dir_all(&cc_dir).unwrap();
     std::fs::copy(&cc_fixture, cc_dir.join("cc-simple-001.jsonl")).unwrap();
 
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_casr"))
-        .args(["resume", "grok", "cc-simple-001", "--source", "cc"])
-        .env("GROK_HOME", tmp.path())
-        .env("CLAUDE_HOME", tmp.path().join("claude"))
-        .output()
-        .expect("run casr resume grok");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_casr")).args(["resume", "grok", "cc-simple-001", "--source", "cc"]).env("GROK_HOME", tmp.path()).env("CLAUDE_HOME", tmp.path().join("claude")).output().expect("run casr resume grok");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        output.status.success(),
-        "converting into grok must succeed: status={:?}\nstdout={stdout}\nstderr={stderr}",
-        output.status
-    );
-    assert!(
-        stdout.contains("grok --resume"),
-        "expected a grok resume command in output:\n{stdout}"
-    );
+    assert!(output.status.success(), "converting into grok must succeed: status={:?}\nstdout={stdout}\nstderr={stderr}", output.status);
+    assert!(stdout.contains("grok --resume"), "expected a grok resume command in output:\n{stdout}");
 
     // The written session must exist under GROK_HOME as a native tree.
     let _env = EnvGuard::set("GROK_HOME", tmp.path());
     let written = Grok.list_sessions().expect("list sessions");
-    assert_eq!(
-        written.len(),
-        2,
-        "seeded fixture + newly written session: {written:?}"
-    );
-    let new_session = written
-        .iter()
-        .find(|(id, _)| id != FIXTURE_ID)
-        .expect("newly written session present");
+    assert_eq!(written.len(), 2, "seeded fixture + newly written session: {written:?}");
+    let new_session = written.iter().find(|(id, _)| id != FIXTURE_ID).expect("newly written session present");
     assert!(new_session.1.ends_with("updates.jsonl"));
-    assert!(
-        new_session
-            .1
-            .parent()
-            .unwrap()
-            .join("summary.json")
-            .is_file(),
-        "summary.json written next to updates.jsonl"
-    );
+    assert!(new_session.1.parent().unwrap().join("summary.json").is_file(), "summary.json written next to updates.jsonl");
 }

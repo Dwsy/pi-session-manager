@@ -21,10 +21,7 @@ use anyhow::Context;
 use tracing::{debug, info, trace, warn};
 
 use crate::discovery::DetectionResult;
-use crate::model::{
-    CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, normalize_role,
-    parse_timestamp, reindex_messages, truncate_title,
-};
+use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, normalize_role, parse_timestamp, reindex_messages, truncate_title};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// Claude Code provider implementation.
@@ -40,11 +37,7 @@ pub struct ClaudeCode;
 /// - `/data/projects/cross_agent_session_resumer` -> `-data-projects-cross-agent-session-resumer`
 /// - `/data/projects/jeffreys-skills.md` -> `-data-projects-jeffreys-skills-md`
 pub fn project_dir_key(workspace: &Path) -> String {
-    workspace
-        .to_string_lossy()
-        .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
-        .collect()
+    workspace.to_string_lossy().chars().map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' }).collect()
 }
 
 impl ClaudeCode {
@@ -95,11 +88,7 @@ impl Provider for ClaudeCode {
         }
 
         trace!(provider = "claude-code", ?evidence, installed, "detection");
-        DetectionResult {
-            installed,
-            version: None,
-            evidence,
-        }
+        DetectionResult { installed, version: None, evidence }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
@@ -177,8 +166,7 @@ impl Provider for ClaudeCode {
     fn read_session(&self, path: &Path) -> anyhow::Result<CanonicalSession> {
         debug!(path = %path.display(), "reading Claude Code session");
 
-        let file = std::fs::File::open(path)
-            .with_context(|| format!("failed to open {}", path.display()))?;
+        let file = std::fs::File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
         let reader = BufReader::new(file);
 
         // Session-level metadata extracted from the first relevant entry.
@@ -196,8 +184,7 @@ impl Provider for ClaudeCode {
         let mut away_summary: Option<String> = None;
         let mut started_at: Option<i64> = None;
         let mut ended_at: Option<i64> = None;
-        let mut model_counts: std::collections::HashMap<String, usize> =
-            std::collections::HashMap::new();
+        let mut model_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
 
         let mut messages: Vec<CanonicalMessage> = Vec::new();
         let mut line_num: usize = 0;
@@ -288,19 +275,10 @@ impl Provider for ClaudeCode {
                 _ => {}
             }
 
-            let role_hint = entry
-                .pointer("/message/role")
-                .and_then(|v| v.as_str())
-                .or_else(|| entry.get("role").and_then(|v| v.as_str()));
-            let is_conversational = matches!(entry_type, Some("user") | Some("assistant"))
-                || (entry_type == Some("message")
-                    && matches!(role_hint, Some("user") | Some("assistant")));
+            let role_hint = entry.pointer("/message/role").and_then(|v| v.as_str()).or_else(|| entry.get("role").and_then(|v| v.as_str()));
+            let is_conversational = matches!(entry_type, Some("user") | Some("assistant")) || (entry_type == Some("message") && matches!(role_hint, Some("user") | Some("assistant")));
             if !is_conversational {
-                trace!(
-                    line = line_num,
-                    ?entry_type,
-                    "skipping non-conversational entry"
-                );
+                trace!(line = line_num, ?entry_type, "skipping non-conversational entry");
                 continue;
             }
 
@@ -308,18 +286,11 @@ impl Provider for ClaudeCode {
             let role_str = role_hint.or(entry_type).unwrap_or("user");
 
             // Extract content from message.content → top-level content.
-            let content_value = entry
-                .pointer("/message/content")
-                .or_else(|| entry.get("content"));
+            let content_value = entry.pointer("/message/content").or_else(|| entry.get("content"));
             let content = claude_extract_text_content(content_value);
             let tool_calls = extract_tool_calls(content_value);
             let tool_results = extract_tool_results(content_value);
-            let role =
-                if role_str == "user" && content.trim().is_empty() && !tool_results.is_empty() {
-                    MessageRole::Tool
-                } else {
-                    normalize_role(role_str)
-                };
+            let role = if role_str == "user" && content.trim().is_empty() && !tool_results.is_empty() { MessageRole::Tool } else { normalize_role(role_str) };
 
             // Skip messages that have neither text nor tool payloads.
             if content.trim().is_empty() && tool_calls.is_empty() && tool_results.is_empty() {
@@ -328,9 +299,7 @@ impl Provider for ClaudeCode {
             }
 
             // Extract timestamp.
-            let ts_value = entry
-                .get("timestamp")
-                .or_else(|| entry.pointer("/message/timestamp"));
+            let ts_value = entry.get("timestamp").or_else(|| entry.pointer("/message/timestamp"));
             let timestamp = ts_value.and_then(parse_timestamp);
 
             // Track start/end times.
@@ -340,10 +309,7 @@ impl Provider for ClaudeCode {
             }
 
             // Extract model name (author).
-            let model = entry
-                .pointer("/message/model")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+            let model = entry.pointer("/message/model").and_then(|v| v.as_str()).map(|s| s.to_string());
             if let Some(ref m) = model {
                 *model_counts.entry(m.clone()).or_insert(0) += 1;
             }
@@ -363,42 +329,22 @@ impl Provider for ClaudeCode {
         reindex_messages(&mut messages);
 
         // Derive session ID from filename if not found in content.
-        let session_id = session_id.unwrap_or_else(|| {
-            path.file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("unknown")
-                .to_string()
-        });
+        let session_id = session_id.unwrap_or_else(|| path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string());
 
         // Derive title: prefer the latest away_summary recap — a session that
         // opens with a slash command otherwise gets titled with the
         // `<local-command-caveat>` harness chrome. The user-message fallback
         // skips chrome-only messages for the same reason, keeping the plain
         // first user message as the last resort.
-        let first_user_title = messages
-            .iter()
-            .filter(|m| m.role == MessageRole::User)
-            .find(|m| !is_harness_chrome(&m.content))
-            .or_else(|| messages.iter().find(|m| m.role == MessageRole::User))
-            .map(|m| truncate_title(&m.content, 100));
-        let title = away_summary
-            .as_deref()
-            .map(|s| truncate_title(s, 100))
-            .filter(|s| !s.is_empty())
-            .or(first_user_title);
+        let first_user_title = messages.iter().filter(|m| m.role == MessageRole::User).find(|m| !is_harness_chrome(&m.content)).or_else(|| messages.iter().find(|m| m.role == MessageRole::User)).map(|m| truncate_title(&m.content, 100));
+        let title = away_summary.as_deref().map(|s| truncate_title(s, 100)).filter(|s| !s.is_empty()).or(first_user_title);
 
         // Most common model name.
-        let model_name = model_counts
-            .into_iter()
-            .max_by_key(|(_, count)| *count)
-            .map(|(name, _)| name);
+        let model_name = model_counts.into_iter().max_by_key(|(_, count)| *count).map(|(name, _)| name);
 
         // Build metadata.
         let mut metadata = serde_json::Map::new();
-        metadata.insert(
-            "source".into(),
-            serde_json::Value::String("claude_code".to_string()),
-        );
+        metadata.insert("source".into(), serde_json::Value::String("claude_code".to_string()));
         if let Some(ref gb) = git_branch {
             metadata.insert("gitBranch".into(), serde_json::Value::String(gb.clone()));
         }
@@ -408,45 +354,17 @@ impl Provider for ClaudeCode {
         // Provider-native display name: user `/rename` wins, then the
         // auto-generated title, then a classic summary, then the latest
         // away_summary recap. Blank values are ignored.
-        let native_name = custom_title
-            .or(ai_title)
-            .or(summary_title)
-            .or(away_summary)
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty());
+        let native_name = custom_title.or(ai_title).or(summary_title).or(away_summary).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
         if let Some(name) = native_name {
-            metadata.insert(
-                crate::model::NATIVE_NAME_META_KEY.into(),
-                serde_json::Value::String(name),
-            );
+            metadata.insert(crate::model::NATIVE_NAME_META_KEY.into(), serde_json::Value::String(name));
         }
 
-        debug!(
-            session_id,
-            messages = messages.len(),
-            skipped,
-            "Claude Code session parsed"
-        );
+        debug!(session_id, messages = messages.len(), skipped, "Claude Code session parsed");
 
-        Ok(CanonicalSession {
-            session_id,
-            provider_slug: "claude-code".to_string(),
-            workspace,
-            title,
-            started_at,
-            ended_at,
-            messages,
-            metadata: serde_json::Value::Object(metadata),
-            source_path: path.to_path_buf(),
-            model_name,
-        })
+        Ok(CanonicalSession { session_id, provider_slug: "claude-code".to_string(), workspace, title, started_at, ended_at, messages, metadata: serde_json::Value::Object(metadata), source_path: path.to_path_buf(), model_name })
     }
 
-    fn write_session(
-        &self,
-        session: &CanonicalSession,
-        opts: &WriteOptions,
-    ) -> anyhow::Result<WrittenSession> {
+    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
         let target_session_id = uuid::Uuid::new_v4().to_string();
         let now = jiff::Timestamp::now();
         let now_iso = format!("{now:.3}");
@@ -458,8 +376,7 @@ impl Provider for ClaudeCode {
         let workspace_str = workspace_buf.as_path();
         let dir_key = project_dir_key(workspace_str);
 
-        let projects_dir = Self::projects_dir()
-            .ok_or_else(|| anyhow::anyhow!("cannot determine Claude Code projects directory"))?;
+        let projects_dir = Self::projects_dir().ok_or_else(|| anyhow::anyhow!("cannot determine Claude Code projects directory"))?;
         let target_dir = projects_dir.join(&dir_key);
         let target_path = target_dir.join(format!("{target_session_id}.jsonl"));
 
@@ -475,11 +392,7 @@ impl Provider for ClaudeCode {
 
         for msg in &session.messages {
             let entry_uuid = uuid::Uuid::new_v4().to_string();
-            let msg_ts = msg
-                .timestamp
-                .and_then(|ts| jiff::Timestamp::from_millisecond(ts).ok())
-                .map(|dt| format!("{dt:.3}"))
-                .unwrap_or_else(|| now_iso.clone());
+            let msg_ts = msg.timestamp.and_then(|ts| jiff::Timestamp::from_millisecond(ts).ok()).map(|dt| format!("{dt:.3}")).unwrap_or_else(|| now_iso.clone());
 
             let entry_type = claude_entry_type(&msg.role);
             let inner_msg = build_inner_message(msg, session.model_name.as_deref(), entry_type);
@@ -517,8 +430,7 @@ impl Provider for ClaudeCode {
         let content_bytes = content.into_bytes();
 
         // Use atomic write.
-        let outcome =
-            crate::pipeline::atomic_write(&target_path, &content_bytes, opts.force, self.slug())?;
+        let outcome = crate::pipeline::atomic_write(&target_path, &content_bytes, opts.force, self.slug())?;
 
         info!(
             target_session_id,
@@ -527,13 +439,7 @@ impl Provider for ClaudeCode {
             "Claude Code session written"
         );
 
-        Ok(WrittenSession {
-            paths: vec![outcome.target_path],
-            session_id: target_session_id.clone(),
-            resume_command: self.resume_command(&target_session_id),
-            backup_path: outcome.backup_path,
-            warnings: Vec::new(),
-        })
+        Ok(WrittenSession { paths: vec![outcome.target_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: outcome.backup_path, warnings: Vec::new() })
     }
 
     fn resume_command(&self, session_id: &str) -> String {
@@ -557,15 +463,7 @@ fn extract_tool_calls(content: Option<&serde_json::Value>) -> Vec<ToolCall> {
             if obj.get("type")?.as_str()? != "tool_use" {
                 return None;
             }
-            Some(ToolCall {
-                id: obj.get("id").and_then(|v| v.as_str()).map(String::from),
-                name: obj
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown")
-                    .to_string(),
-                arguments: obj.get("input").cloned().unwrap_or(serde_json::Value::Null),
-            })
+            Some(ToolCall { id: obj.get("id").and_then(|v| v.as_str()).map(String::from), name: obj.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(), arguments: obj.get("input").cloned().unwrap_or(serde_json::Value::Null) })
         })
         .collect()
 }
@@ -582,23 +480,8 @@ fn extract_tool_results(content: Option<&serde_json::Value>) -> Vec<ToolResult> 
             if obj.get("type")?.as_str()? != "tool_result" {
                 return None;
             }
-            let text = obj
-                .get("content")
-                .and_then(|v| v.as_str())
-                .or_else(|| obj.get("output").and_then(|v| v.as_str()))
-                .unwrap_or("")
-                .to_string();
-            Some(ToolResult {
-                call_id: obj
-                    .get("tool_use_id")
-                    .and_then(|v| v.as_str())
-                    .map(String::from),
-                content: text,
-                is_error: obj
-                    .get("is_error")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false),
-            })
+            let text = obj.get("content").and_then(|v| v.as_str()).or_else(|| obj.get("output").and_then(|v| v.as_str())).unwrap_or("").to_string();
+            Some(ToolResult { call_id: obj.get("tool_use_id").and_then(|v| v.as_str()).map(String::from), content: text, is_error: obj.get("is_error").and_then(|v| v.as_bool()).unwrap_or(false) })
         })
         .collect()
 }
@@ -679,11 +562,7 @@ fn build_message_content(msg: &CanonicalMessage) -> serde_json::Value {
     }
 }
 
-fn build_inner_message(
-    msg: &CanonicalMessage,
-    session_model_name: Option<&str>,
-    entry_type: &str,
-) -> serde_json::Value {
+fn build_inner_message(msg: &CanonicalMessage, session_model_name: Option<&str>, entry_type: &str) -> serde_json::Value {
     let mut inner_msg = serde_json::json!({
         "role": entry_type,
         "content": build_message_content(msg),
@@ -702,8 +581,7 @@ fn build_inner_message(
     // session". The source agent doesn't provide real values, so synthesize
     // benign defaults; provenance is preserved in `model` when available.
     if entry_type == "assistant" {
-        inner_msg["id"] =
-            serde_json::Value::String(format!("msg_casr_{}", uuid::Uuid::new_v4().simple()));
+        inner_msg["id"] = serde_json::Value::String(format!("msg_casr_{}", uuid::Uuid::new_v4().simple()));
         inner_msg["type"] = serde_json::Value::String("message".to_string());
         if inner_msg.get("model").is_none() {
             inner_msg["model"] = serde_json::Value::String("unknown".to_string());
@@ -726,10 +604,7 @@ const AWAY_SUMMARY_HINT: &str = "(disable recaps in /config)";
 /// remains once surrounding whitespace and the trailing UI hint are removed.
 fn away_summary_description(content: &str) -> Option<String> {
     let trimmed = content.trim();
-    let body = trimmed
-        .strip_suffix(AWAY_SUMMARY_HINT)
-        .unwrap_or(trimmed)
-        .trim();
+    let body = trimmed.strip_suffix(AWAY_SUMMARY_HINT).unwrap_or(trimmed).trim();
     (!body.is_empty()).then(|| body.to_string())
 }
 
@@ -737,14 +612,7 @@ fn away_summary_description(content: &str) -> Option<String> {
 /// caveats and slash-command echoes) rather than something a person typed.
 fn is_harness_chrome(content: &str) -> bool {
     let t = content.trim_start();
-    [
-        "<local-command-caveat>",
-        "<command-name>",
-        "<command-message>",
-        "<local-command-stdout>",
-    ]
-    .iter()
-    .any(|tag| t.starts_with(tag))
+    ["<local-command-caveat>", "<command-name>", "<command-message>", "<local-command-stdout>"].iter().any(|tag| t.starts_with(tag))
 }
 
 fn claude_session_id_hint(path: &Path) -> Option<String> {
@@ -780,8 +648,7 @@ fn claude_extract_text_content(content: Option<&serde_json::Value>) -> String {
                     serde_json::Value::String(s) => parts.push(s.clone()),
                     serde_json::Value::Object(obj) => {
                         let block_type = obj.get("type").and_then(|v| v.as_str());
-                        if (matches!(block_type, Some("text") | Some("input_text"))
-                            || block_type.is_none())
+                        if (matches!(block_type, Some("text") | Some("input_text")) || block_type.is_none())
                             && let Some(text) = obj.get("text").and_then(|v| v.as_str())
                         {
                             parts.push(text.to_string());
@@ -792,11 +659,7 @@ fn claude_extract_text_content(content: Option<&serde_json::Value>) -> String {
             }
             parts.join("\n")
         }
-        serde_json::Value::Object(obj) => obj
-            .get("text")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
+        serde_json::Value::Object(obj) => obj.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string(),
         _ => String::new(),
     }
 }
@@ -826,31 +689,16 @@ mod tests {
     }
 
     fn sample_message(role: MessageRole, content: &str) -> CanonicalMessage {
-        CanonicalMessage {
-            idx: 0,
-            role,
-            content: content.to_string(),
-            timestamp: None,
-            author: None,
-            tool_calls: Vec::new(),
-            tool_results: Vec::new(),
-            extra: serde_json::Value::Null,
-        }
+        CanonicalMessage { idx: 0, role, content: content.to_string(), timestamp: None, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: serde_json::Value::Null }
     }
 
     #[test]
     fn writer_assistant_content_serializes_text_and_tool_use_blocks() {
         let mut msg = sample_message(MessageRole::Assistant, "Plan generated.");
-        msg.tool_calls.push(ToolCall {
-            id: Some("tool-1".to_string()),
-            name: "Read".to_string(),
-            arguments: serde_json::json!({"file_path": "src/main.rs"}),
-        });
+        msg.tool_calls.push(ToolCall { id: Some("tool-1".to_string()), name: "Read".to_string(), arguments: serde_json::json!({"file_path": "src/main.rs"}) });
 
         let content = build_message_content(&msg);
-        let blocks = content
-            .as_array()
-            .expect("assistant content should be serialized as blocks");
+        let blocks = content.as_array().expect("assistant content should be serialized as blocks");
         assert_eq!(blocks.len(), 2);
         assert_eq!(blocks[0]["type"], "text");
         assert_eq!(blocks[0]["text"], "Plan generated.");
@@ -862,16 +710,10 @@ mod tests {
     #[test]
     fn writer_non_assistant_tool_results_serialize_as_blocks() {
         let mut msg = sample_message(MessageRole::Tool, "");
-        msg.tool_results.push(ToolResult {
-            call_id: Some("call-42".to_string()),
-            content: "Done".to_string(),
-            is_error: false,
-        });
+        msg.tool_results.push(ToolResult { call_id: Some("call-42".to_string()), content: "Done".to_string(), is_error: false });
 
         let content = build_message_content(&msg);
-        let blocks = content
-            .as_array()
-            .expect("tool result content should be serialized as blocks");
+        let blocks = content.as_array().expect("tool result content should be serialized as blocks");
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0]["type"], "tool_result");
         assert_eq!(blocks[0]["tool_use_id"], "call-42");
@@ -893,10 +735,7 @@ mod tests {
         assert_eq!(claude_entry_type(&MessageRole::Assistant), "assistant");
         assert_eq!(claude_entry_type(&MessageRole::Tool), "user");
         assert_eq!(claude_entry_type(&MessageRole::System), "user");
-        assert_eq!(
-            claude_entry_type(&MessageRole::Other("reviewer".to_string())),
-            "user"
-        );
+        assert_eq!(claude_entry_type(&MessageRole::Other("reviewer".to_string())), "user");
     }
 
     // -----------------------------------------------------------------------
@@ -912,9 +751,7 @@ mod tests {
         let mut tmp = tempfile::NamedTempFile::with_suffix(".jsonl").unwrap();
         tmp.write_all(content.as_bytes()).unwrap();
         tmp.flush().unwrap();
-        ClaudeCode
-            .read_session(tmp.path())
-            .unwrap_or_else(|e| panic!("read_session failed: {e}"))
+        ClaudeCode.read_session(tmp.path()).unwrap_or_else(|e| panic!("read_session failed: {e}"))
     }
 
     #[test]
@@ -929,10 +766,7 @@ mod tests {
         assert_eq!(session.messages[0].content, "Hello");
         assert_eq!(session.messages[1].role, MessageRole::Assistant);
         assert_eq!(session.messages[1].content, "Hi there");
-        assert_eq!(
-            session.workspace,
-            Some(std::path::PathBuf::from("/tmp/proj"))
-        );
+        assert_eq!(session.workspace, Some(std::path::PathBuf::from("/tmp/proj")));
         assert_eq!(session.model_name.as_deref(), Some("claude-3"));
     }
 
@@ -988,10 +822,7 @@ mod tests {
         );
         // User message has text + tool_result, so content includes "Here's the result".
         assert_eq!(session.messages[0].tool_results.len(), 1);
-        assert_eq!(
-            session.messages[0].tool_results[0].content,
-            "file contents here"
-        );
+        assert_eq!(session.messages[0].tool_results[0].content, "file contents here");
     }
 
     #[test]
@@ -1042,10 +873,7 @@ not json at all
 {"type":"custom-title","customTitle":"My Renamed Session","sessionId":"s10"}
 {"type":"assistant","sessionId":"s10","message":{"role":"assistant","content":"Hello"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
         );
-        assert_eq!(
-            crate::model::native_name_from_metadata(&session.metadata).as_deref(),
-            Some("My Renamed Session")
-        );
+        assert_eq!(crate::model::native_name_from_metadata(&session.metadata).as_deref(), Some("My Renamed Session"));
     }
 
     #[test]
@@ -1055,10 +883,7 @@ not json at all
 {"type":"user","sessionId":"s11","message":{"role":"user","content":"Hi"},"uuid":"u1","timestamp":"2026-01-01T00:00:00Z"}
 {"type":"assistant","sessionId":"s11","message":{"role":"assistant","content":"Hello"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
         );
-        assert_eq!(
-            crate::model::native_name_from_metadata(&session.metadata).as_deref(),
-            Some("Auto generated title")
-        );
+        assert_eq!(crate::model::native_name_from_metadata(&session.metadata).as_deref(), Some("Auto generated title"));
     }
 
     #[test]
@@ -1067,10 +892,7 @@ not json at all
             r#"{"type":"user","sessionId":"s12","message":{"role":"user","content":"Hi"},"uuid":"u1","timestamp":"2026-01-01T00:00:00Z"}
 {"type":"assistant","sessionId":"s12","message":{"role":"assistant","content":"Hello"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
         );
-        assert!(
-            crate::model::native_name_from_metadata(&session.metadata).is_none(),
-            "sessions without title metadata must have no native name"
-        );
+        assert!(crate::model::native_name_from_metadata(&session.metadata).is_none(), "sessions without title metadata must have no native name");
     }
 
     #[test]
@@ -1080,14 +902,8 @@ not json at all
 {"type":"system","subtype":"away_summary","content":"Wiring the payments webhook retries","sessionId":"as1","timestamp":"2026-01-01T01:00:00Z"}
 {"type":"assistant","sessionId":"as1","message":{"role":"assistant","content":"ok"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
         );
-        assert_eq!(
-            session.title.as_deref(),
-            Some("Wiring the payments webhook retries")
-        );
-        assert_eq!(
-            crate::model::native_name_from_metadata(&session.metadata).as_deref(),
-            Some("Wiring the payments webhook retries")
-        );
+        assert_eq!(session.title.as_deref(), Some("Wiring the payments webhook retries"));
+        assert_eq!(crate::model::native_name_from_metadata(&session.metadata).as_deref(), Some("Wiring the payments webhook retries"));
     }
 
     #[test]
@@ -1098,10 +914,7 @@ not json at all
 {"type":"system","subtype":"away_summary","content":"Final recap of the session. (disable recaps in /config)","sessionId":"as2","timestamp":"2026-01-01T01:00:00Z"}
 {"type":"assistant","sessionId":"as2","message":{"role":"assistant","content":"ok"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
         );
-        assert_eq!(
-            session.title.as_deref(),
-            Some("Final recap of the session.")
-        );
+        assert_eq!(session.title.as_deref(), Some("Final recap of the session."));
     }
 
     #[test]
@@ -1120,10 +933,7 @@ not json at all
 {"type":"system","subtype":"away_summary","content":"A recap","sessionId":"as4","timestamp":"2026-01-01T00:30:00Z"}
 {"type":"custom-title","customTitle":"Renamed By Hand","sessionId":"as4"}"#,
         );
-        assert_eq!(
-            crate::model::native_name_from_metadata(&session.metadata).as_deref(),
-            Some("Renamed By Hand")
-        );
+        assert_eq!(crate::model::native_name_from_metadata(&session.metadata).as_deref(), Some("Renamed By Hand"));
     }
 
     #[test]
@@ -1133,23 +943,13 @@ not json at all
 {"type":"user","sessionId":"as5","message":{"role":"user","content":"<command-name>/effort</command-name>"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}
 {"type":"user","sessionId":"as5","message":{"role":"user","content":"Fix the login redirect loop"},"uuid":"u3","timestamp":"2026-01-01T00:00:02Z"}"#,
         );
-        assert_eq!(
-            session.title.as_deref(),
-            Some("Fix the login redirect loop")
-        );
+        assert_eq!(session.title.as_deref(), Some("Fix the login redirect loop"));
     }
 
     #[test]
     fn reader_all_chrome_user_messages_fall_back_to_first() {
-        let session = read_cc_jsonl(
-            r#"{"type":"user","sessionId":"as6","message":{"role":"user","content":"<local-command-caveat>Caveat: local commands</local-command-caveat>"},"uuid":"u1","timestamp":"2026-01-01T00:00:00Z"}"#,
-        );
-        assert!(
-            session
-                .title
-                .as_deref()
-                .is_some_and(|t| t.starts_with("<local-command-caveat>"))
-        );
+        let session = read_cc_jsonl(r#"{"type":"user","sessionId":"as6","message":{"role":"user","content":"<local-command-caveat>Caveat: local commands</local-command-caveat>"},"uuid":"u1","timestamp":"2026-01-01T00:00:00Z"}"#);
+        assert!(session.title.as_deref().is_some_and(|t| t.starts_with("<local-command-caveat>")));
     }
 
     #[test]
@@ -1158,10 +958,7 @@ not json at all
             r#"{"type":"user","sessionId":"s10","message":{"role":"user","content":"Fix the authentication bug in login.rs"},"uuid":"u1","timestamp":"2026-01-01T00:00:00Z"}
 {"type":"assistant","sessionId":"s10","message":{"role":"assistant","content":"Done"},"uuid":"u2","timestamp":"2026-01-01T00:00:01Z"}"#,
         );
-        assert_eq!(
-            session.title.as_deref(),
-            Some("Fix the authentication bug in login.rs")
-        );
+        assert_eq!(session.title.as_deref(), Some("Fix the authentication bug in login.rs"));
     }
 
     #[test]
@@ -1191,25 +988,16 @@ not json at all
     fn writer_user_content_serializes_as_plain_string() {
         let msg = sample_message(MessageRole::User, "Just text");
         let content = build_message_content(&msg);
-        assert!(
-            content.is_string(),
-            "CC user content should serialize as plain string"
-        );
+        assert!(content.is_string(), "CC user content should serialize as plain string");
         assert_eq!(content.as_str().unwrap(), "Just text");
     }
 
     #[test]
     fn writer_assistant_empty_content_only_tool_calls() {
         let mut msg = sample_message(MessageRole::Assistant, "");
-        msg.tool_calls.push(ToolCall {
-            id: Some("t1".to_string()),
-            name: "Bash".to_string(),
-            arguments: serde_json::json!({"command": "ls"}),
-        });
+        msg.tool_calls.push(ToolCall { id: Some("t1".to_string()), name: "Bash".to_string(), arguments: serde_json::json!({"command": "ls"}) });
         let content = build_message_content(&msg);
-        let blocks = content
-            .as_array()
-            .expect("assistant content should be array");
+        let blocks = content.as_array().expect("assistant content should be array");
         // No text block since content is empty, only tool_use.
         assert_eq!(blocks.len(), 1, "should have only tool_use block");
         assert_eq!(blocks[0]["type"], "tool_use");
@@ -1219,16 +1007,8 @@ not json at all
     #[test]
     fn writer_multiple_tool_calls_all_serialized() {
         let mut msg = sample_message(MessageRole::Assistant, "Running two tools.");
-        msg.tool_calls.push(ToolCall {
-            id: Some("t1".to_string()),
-            name: "Read".to_string(),
-            arguments: serde_json::json!({"file_path": "a.rs"}),
-        });
-        msg.tool_calls.push(ToolCall {
-            id: Some("t2".to_string()),
-            name: "Write".to_string(),
-            arguments: serde_json::json!({"file_path": "b.rs"}),
-        });
+        msg.tool_calls.push(ToolCall { id: Some("t1".to_string()), name: "Read".to_string(), arguments: serde_json::json!({"file_path": "a.rs"}) });
+        msg.tool_calls.push(ToolCall { id: Some("t2".to_string()), name: "Write".to_string(), arguments: serde_json::json!({"file_path": "b.rs"}) });
         let content = build_message_content(&msg);
         let blocks = content.as_array().unwrap();
         assert_eq!(blocks.len(), 3, "text + 2 tool_use blocks");
@@ -1242,11 +1022,7 @@ not json at all
     #[test]
     fn writer_tool_result_error_flag_preserved() {
         let mut msg = sample_message(MessageRole::Tool, "");
-        msg.tool_results.push(ToolResult {
-            call_id: Some("call-err".to_string()),
-            content: "permission denied".to_string(),
-            is_error: true,
-        });
+        msg.tool_results.push(ToolResult { call_id: Some("call-err".to_string()), content: "permission denied".to_string(), is_error: true });
         let content = build_message_content(&msg);
         let blocks = content.as_array().unwrap();
         assert_eq!(blocks[0]["is_error"], true);

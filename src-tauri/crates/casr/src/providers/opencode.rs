@@ -32,10 +32,7 @@ use rusqlite::{Connection, OpenFlags};
 use tracing::{debug, info, trace};
 
 use crate::discovery::DetectionResult;
-use crate::model::{
-    CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, flatten_content,
-    normalize_role, parse_timestamp, reindex_messages, truncate_title,
-};
+use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// OpenCode provider implementation.
@@ -166,10 +163,7 @@ impl OpenCode {
             let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
                 continue;
             };
-            let Some(dir) = json
-                .pointer("/data/directory")
-                .and_then(serde_json::Value::as_str)
-            else {
+            let Some(dir) = json.pointer("/data/directory").and_then(serde_json::Value::as_str) else {
                 continue;
             };
 
@@ -219,11 +213,7 @@ impl OpenCode {
     /// If env override is set, discovery is constrained to that location.
     fn find_db_files() -> Vec<PathBuf> {
         if let Some(env_db) = Self::env_db_path() {
-            return if env_db.is_file() {
-                vec![env_db]
-            } else {
-                Vec::new()
-            };
+            return if env_db.is_file() { vec![env_db] } else { Vec::new() };
         }
 
         let mut candidates = Vec::new();
@@ -231,10 +221,7 @@ impl OpenCode {
         if let Some(home) = dirs::home_dir() {
             candidates.push(home.join(DATA_DIRNAME).join(DB_FILENAME));
         }
-        candidates.extend(Self::xdg_data_db_candidates(
-            std::env::var("XDG_DATA_HOME").ok().as_deref(),
-            dirs::home_dir().as_deref(),
-        ));
+        candidates.extend(Self::xdg_data_db_candidates(std::env::var("XDG_DATA_HOME").ok().as_deref(), dirs::home_dir().as_deref()));
         for data_dir in Self::configured_data_dirs() {
             candidates.push(data_dir.join(DB_FILENAME));
         }
@@ -254,9 +241,7 @@ impl OpenCode {
             // `/private/var/...`). Canonicalize so the DB this write creates
             // is the very path discovery will report; otherwise the same
             // session round-trips under two spellings that compare unequal.
-            let workspace = workspace
-                .canonicalize()
-                .unwrap_or_else(|_| workspace.clone());
+            let workspace = workspace.canonicalize().unwrap_or_else(|_| workspace.clone());
             return Ok(workspace.join(DATA_DIRNAME).join(DB_FILENAME));
         }
 
@@ -291,11 +276,7 @@ impl OpenCode {
 
     /// Open DB in read-only mode.
     fn open_db(path: &Path) -> anyhow::Result<Connection> {
-        let conn = Connection::open_with_flags(
-            path,
-            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )
-        .with_context(|| format!("failed to open OpenCode DB: {}", path.display()))?;
+        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).with_context(|| format!("failed to open OpenCode DB: {}", path.display()))?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         Ok(conn)
     }
@@ -303,32 +284,21 @@ impl OpenCode {
     /// Open DB in read-write/create mode.
     fn open_db_rw(path: &Path) -> anyhow::Result<Connection> {
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create directory: {}", parent.display()))?;
+            std::fs::create_dir_all(parent).with_context(|| format!("failed to create directory: {}", parent.display()))?;
         }
 
-        let conn = Connection::open_with_flags(
-            path,
-            OpenFlags::SQLITE_OPEN_READ_WRITE
-                | OpenFlags::SQLITE_OPEN_CREATE
-                | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )
-        .with_context(|| format!("failed to open OpenCode DB for writing: {}", path.display()))?;
+        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE | OpenFlags::SQLITE_OPEN_NO_MUTEX).with_context(|| format!("failed to open OpenCode DB for writing: {}", path.display()))?;
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         Ok(conn)
     }
 
     fn table_exists(conn: &Connection, table: &str) -> bool {
-        conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1")
-            .and_then(|mut stmt| stmt.exists(rusqlite::params![table]))
-            .unwrap_or(false)
+        conn.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1").and_then(|mut stmt| stmt.exists(rusqlite::params![table])).unwrap_or(false)
     }
 
     /// List every table name in the DB, sorted (from `sqlite_master`).
     fn list_tables(conn: &Connection) -> Vec<String> {
-        let Ok(mut stmt) =
-            conn.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-        else {
+        let Ok(mut stmt) = conn.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name") else {
             return Vec::new();
         };
         let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) else {
@@ -344,14 +314,7 @@ impl OpenCode {
     /// The silent-zero behavior this replaces was indistinguishable from
     /// "no sessions yet" (issue #26).
     fn detect_schema(conn: &Connection, db_path: &Path) -> anyhow::Result<DbSchema> {
-        let missing_tables = |schema: DbSchema| -> Vec<&'static str> {
-            schema
-                .required_tables()
-                .iter()
-                .copied()
-                .filter(|table| !Self::table_exists(conn, table))
-                .collect()
-        };
+        let missing_tables = |schema: DbSchema| -> Vec<&'static str> { schema.required_tables().iter().copied().filter(|table| !Self::table_exists(conn, table)).collect() };
 
         let mut missing_by_schema = Vec::with_capacity(DbSchema::DETECTION_ORDER.len());
         for schema in DbSchema::DETECTION_ORDER {
@@ -366,13 +329,8 @@ impl OpenCode {
         // tables present, so a partial 1.x DB names its own missing tables
         // rather than the legacy ones. Ties fall to the legacy layout, so an
         // empty DB is reported against it.
-        let present =
-            |schema: DbSchema, missing: &[&str]| schema.required_tables().len() - missing.len();
-        let (mut schema, mut missing) = missing_by_schema
-            .iter()
-            .find(|(schema, _)| *schema == DbSchema::Legacy)
-            .cloned()
-            .unwrap_or((DbSchema::Legacy, Vec::new()));
+        let present = |schema: DbSchema, missing: &[&str]| schema.required_tables().len() - missing.len();
+        let (mut schema, mut missing) = missing_by_schema.iter().find(|(schema, _)| *schema == DbSchema::Legacy).cloned().unwrap_or((DbSchema::Legacy, Vec::new()));
         for (candidate, candidate_missing) in missing_by_schema {
             if present(candidate, &candidate_missing) > present(schema, &missing) {
                 schema = candidate;
@@ -381,11 +339,7 @@ impl OpenCode {
         }
 
         let found = Self::list_tables(conn);
-        let found_desc = if found.is_empty() {
-            "no tables at all".to_string()
-        } else {
-            format!("tables present: {}", found.join(", "))
-        };
+        let found_desc = if found.is_empty() { "no tables at all".to_string() } else { format!("tables present: {}", found.join(", ")) };
 
         anyhow::bail!(
             "OpenCode DB {} does not match any schema casr reads \
@@ -425,9 +379,7 @@ impl OpenCode {
     /// The schema diagnostic as a plain message, or `None` when readable.
     #[cfg(test)]
     fn schema_mismatch(conn: &Connection, db_path: &Path) -> Option<String> {
-        Self::detect_schema(conn, db_path)
-            .err()
-            .map(|err| err.to_string())
+        Self::detect_schema(conn, db_path).err().map(|err| err.to_string())
     }
 
     /// Pull a column by name, tolerating columns absent in older or newer
@@ -438,9 +390,7 @@ impl OpenCode {
     }
 
     fn trigger_exists(conn: &Connection, trigger: &str) -> bool {
-        conn.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=?1")
-            .and_then(|mut stmt| stmt.exists(rusqlite::params![trigger]))
-            .unwrap_or(false)
+        conn.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=?1").and_then(|mut stmt| stmt.exists(rusqlite::params![trigger])).unwrap_or(false)
     }
 
     /// Ensure core OpenCode tables exist.
@@ -500,9 +450,7 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
             DbSchema::V1 => "SELECT 1 FROM session WHERE id = ?1 LIMIT 1",
             DbSchema::V2 => "SELECT 1 FROM session_v2 WHERE id = ?1 LIMIT 1",
         };
-        conn.prepare(sql)
-            .and_then(|mut stmt| stmt.exists(rusqlite::params![session_id]))
-            .unwrap_or(false)
+        conn.prepare(sql).and_then(|mut stmt| stmt.exists(rusqlite::params![session_id])).unwrap_or(false)
     }
 
     fn newest_root_session_id(conn: &Connection, schema: DbSchema) -> Option<String> {
@@ -547,11 +495,7 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
         None
     }
 
-    fn read_session_by_id(
-        conn: &Connection,
-        db_path: &Path,
-        session_id: &str,
-    ) -> anyhow::Result<CanonicalSession> {
+    fn read_session_by_id(conn: &Connection, db_path: &Path, session_id: &str) -> anyhow::Result<CanonicalSession> {
         match Self::detect_schema(conn, db_path)? {
             DbSchema::Legacy => Self::read_legacy_session(conn, db_path, session_id),
             DbSchema::V1 => Self::read_v1_session(conn, db_path, session_id),
@@ -580,50 +524,35 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
     /// | `shell`                                                  | Tool: the command and its captured output (background shells skipped) |
     /// | `compaction` (`status: completed`)                       | System: the checkpoint summary + recent context    |
     /// | `model-switched`, `agent-switched`, `location-switched`  | skipped (bookkeeping)                              |
-    fn read_v2_session(
-        conn: &Connection,
-        db_path: &Path,
-        session_id: &str,
-    ) -> anyhow::Result<CanonicalSession> {
+    fn read_v2_session(conn: &Connection, db_path: &Path, session_id: &str) -> anyhow::Result<CanonicalSession> {
         let session_row = conn
-            .query_row(
-                "SELECT * FROM session_v2 WHERE id = ?1 LIMIT 1",
-                rusqlite::params![session_id],
-                |row| {
-                    Ok(V2SessionRow {
-                        title: Self::col(row, "title"),
-                        directory: Self::col(row, "directory"),
-                        parent_id: Self::col(row, "parent_id"),
-                        fork_session_id: Self::col(row, "fork_session_id"),
-                        project_id: Self::col(row, "project_id"),
-                        workspace_id: Self::col(row, "workspace_id"),
-                        slug: Self::col(row, "slug"),
-                        version: Self::col(row, "version"),
-                        agent: Self::col(row, "agent"),
-                        model_json: Self::col(row, "model"),
-                        cost: Self::col(row, "cost"),
-                        tokens_input: Self::col(row, "tokens_input"),
-                        tokens_output: Self::col(row, "tokens_output"),
-                        tokens_reasoning: Self::col(row, "tokens_reasoning"),
-                        tokens_cache_read: Self::col(row, "tokens_cache_read"),
-                        tokens_cache_write: Self::col(row, "tokens_cache_write"),
-                        time_created: Self::col(row, "time_created"),
-                        time_updated: Self::col(row, "time_updated"),
-                        time_archived: Self::col(row, "time_archived"),
-                    })
-                },
-            )
-            .with_context(|| {
-                format!("session '{session_id}' not found in {}", db_path.display())
-            })?;
+            .query_row("SELECT * FROM session_v2 WHERE id = ?1 LIMIT 1", rusqlite::params![session_id], |row| {
+                Ok(V2SessionRow {
+                    title: Self::col(row, "title"),
+                    directory: Self::col(row, "directory"),
+                    parent_id: Self::col(row, "parent_id"),
+                    fork_session_id: Self::col(row, "fork_session_id"),
+                    project_id: Self::col(row, "project_id"),
+                    workspace_id: Self::col(row, "workspace_id"),
+                    slug: Self::col(row, "slug"),
+                    version: Self::col(row, "version"),
+                    agent: Self::col(row, "agent"),
+                    model_json: Self::col(row, "model"),
+                    cost: Self::col(row, "cost"),
+                    tokens_input: Self::col(row, "tokens_input"),
+                    tokens_output: Self::col(row, "tokens_output"),
+                    tokens_reasoning: Self::col(row, "tokens_reasoning"),
+                    tokens_cache_read: Self::col(row, "tokens_cache_read"),
+                    tokens_cache_write: Self::col(row, "tokens_cache_write"),
+                    time_created: Self::col(row, "time_created"),
+                    time_updated: Self::col(row, "time_updated"),
+                    time_archived: Self::col(row, "time_archived"),
+                })
+            })
+            .with_context(|| format!("session '{session_id}' not found in {}", db_path.display()))?;
 
-        let mut started_at = session_row
-            .time_created
-            .and_then(|ts| parse_timestamp(&serde_json::Value::from(ts)));
-        let mut ended_at = session_row
-            .time_updated
-            .and_then(|ts| parse_timestamp(&serde_json::Value::from(ts)))
-            .or(started_at);
+        let mut started_at = session_row.time_created.and_then(|ts| parse_timestamp(&serde_json::Value::from(ts)));
+        let mut ended_at = session_row.time_updated.and_then(|ts| parse_timestamp(&serde_json::Value::from(ts))).or(started_at);
         let mut model_counts: HashMap<String, usize> = HashMap::new();
         let mut messages = Vec::new();
 
@@ -633,45 +562,23 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
                  ORDER BY seq ASC, id ASC",
             )
             .context("failed to prepare OpenCode 2.x message query")?;
-        let rows = stmt.query_map(rusqlite::params![session_id], |row| {
-            Ok((
-                row.get::<_, String>("id")?,
-                row.get::<_, String>("type")?,
-                Self::col::<i64>(row, "seq"),
-                Self::col::<i64>(row, "time_created"),
-                Self::col::<String>(row, "data"),
-            ))
-        })?;
+        let rows = stmt.query_map(rusqlite::params![session_id], |row| Ok((row.get::<_, String>("id")?, row.get::<_, String>("type")?, Self::col::<i64>(row, "seq"), Self::col::<i64>(row, "time_created"), Self::col::<String>(row, "data"))))?;
 
         for row in rows {
             let (message_id, message_type, seq, row_time_created, data_json) = row?;
-            let mut data = data_json
-                .as_deref()
-                .and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok())
-                .unwrap_or_else(|| serde_json::json!({}));
+            let mut data = data_json.as_deref().and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok()).unwrap_or_else(|| serde_json::json!({}));
 
-            let timestamp = data
-                .pointer("/time/created")
-                .and_then(serde_json::Value::as_i64)
-                .or(row_time_created)
-                .and_then(|ts| parse_timestamp(&serde_json::Value::from(ts)));
+            let timestamp = data.pointer("/time/created").and_then(serde_json::Value::as_i64).or(row_time_created).and_then(|ts| parse_timestamp(&serde_json::Value::from(ts)));
             if let Some(ts) = timestamp {
                 started_at = Some(started_at.map_or(ts, |current| current.min(ts)));
                 ended_at = Some(ended_at.map_or(ts, |current| current.max(ts)));
             }
-            if let Some(completed) = data
-                .pointer("/time/completed")
-                .and_then(serde_json::Value::as_i64)
-                .and_then(|ts| parse_timestamp(&serde_json::Value::from(ts)))
-            {
+            if let Some(completed) = data.pointer("/time/completed").and_then(serde_json::Value::as_i64).and_then(|ts| parse_timestamp(&serde_json::Value::from(ts))) {
                 ended_at = Some(ended_at.map_or(completed, |current| current.max(completed)));
             }
 
             let Some(turn) = map_v2_message(&message_type, &data) else {
-                trace!(
-                    message_id,
-                    message_type, "skipping OpenCode 2.x bookkeeping or empty entry"
-                );
+                trace!(message_id, message_type, "skipping OpenCode 2.x bookkeeping or empty entry");
                 continue;
             };
 
@@ -704,45 +611,12 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
 
         reindex_messages(&mut messages);
 
-        let title = session_row
-            .title
-            .as_deref()
-            .map(str::trim)
-            .filter(|t| !t.is_empty())
-            .map(ToString::to_string)
-            .or_else(|| {
-                messages
-                    .iter()
-                    .find(|m| m.role == MessageRole::User)
-                    .map(|m| truncate_title(&m.content, 80))
-                    .filter(|t| !t.is_empty())
-            });
+        let title = session_row.title.as_deref().map(str::trim).filter(|t| !t.is_empty()).map(ToString::to_string).or_else(|| messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 80)).filter(|t| !t.is_empty()));
 
-        let session_model = session_row
-            .model_json
-            .as_deref()
-            .and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok())
-            .filter(serde_json::Value::is_object);
-        let model_name = model_counts
-            .into_iter()
-            .max_by_key(|(_, count)| *count)
-            .map(|(name, _)| name)
-            .or_else(|| {
-                session_model
-                    .as_ref()
-                    .and_then(|model| model.get("id"))
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|id| !id.is_empty())
-                    .map(ToString::to_string)
-            });
+        let session_model = session_row.model_json.as_deref().and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok()).filter(serde_json::Value::is_object);
+        let model_name = model_counts.into_iter().max_by_key(|(_, count)| *count).map(|(name, _)| name).or_else(|| session_model.as_ref().and_then(|model| model.get("id")).and_then(serde_json::Value::as_str).filter(|id| !id.is_empty()).map(ToString::to_string));
 
-        let workspace = session_row
-            .directory
-            .as_deref()
-            .map(str::trim)
-            .filter(|d| !d.is_empty())
-            .map(PathBuf::from)
-            .or_else(|| Self::workspace_from_db_path(db_path));
+        let workspace = session_row.directory.as_deref().map(str::trim).filter(|d| !d.is_empty()).map(PathBuf::from).or_else(|| Self::workspace_from_db_path(db_path));
 
         Ok(CanonicalSession {
             session_id: session_id.to_string(),
@@ -785,36 +659,26 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
     /// lack some of them; `message.data` / `part.data` are the JSON blobs
     /// OpenCode hydrates its `Message`/`Part` values from (ids and
     /// `session_id`/`message_id` live in dedicated columns, not in `data`).
-    fn read_v1_session(
-        conn: &Connection,
-        db_path: &Path,
-        session_id: &str,
-    ) -> anyhow::Result<CanonicalSession> {
+    fn read_v1_session(conn: &Connection, db_path: &Path, session_id: &str) -> anyhow::Result<CanonicalSession> {
         let session_row = conn
-            .query_row(
-                "SELECT * FROM session WHERE id = ?1 LIMIT 1",
-                rusqlite::params![session_id],
-                |row| {
-                    Ok(V1SessionRow {
-                        title: Self::col(row, "title"),
-                        directory: Self::col(row, "directory"),
-                        parent_id: Self::col(row, "parent_id"),
-                        time_created: Self::col(row, "time_created"),
-                        time_updated: Self::col(row, "time_updated"),
-                        cost: Self::col(row, "cost"),
-                        tokens_input: Self::col(row, "tokens_input"),
-                        tokens_output: Self::col(row, "tokens_output"),
-                        tokens_reasoning: Self::col(row, "tokens_reasoning"),
-                        slug: Self::col(row, "slug"),
-                        version: Self::col(row, "version"),
-                        project_id: Self::col(row, "project_id"),
-                        model_json: Self::col(row, "model"),
-                    })
-                },
-            )
-            .with_context(|| {
-                format!("session '{session_id}' not found in {}", db_path.display())
-            })?;
+            .query_row("SELECT * FROM session WHERE id = ?1 LIMIT 1", rusqlite::params![session_id], |row| {
+                Ok(V1SessionRow {
+                    title: Self::col(row, "title"),
+                    directory: Self::col(row, "directory"),
+                    parent_id: Self::col(row, "parent_id"),
+                    time_created: Self::col(row, "time_created"),
+                    time_updated: Self::col(row, "time_updated"),
+                    cost: Self::col(row, "cost"),
+                    tokens_input: Self::col(row, "tokens_input"),
+                    tokens_output: Self::col(row, "tokens_output"),
+                    tokens_reasoning: Self::col(row, "tokens_reasoning"),
+                    slug: Self::col(row, "slug"),
+                    version: Self::col(row, "version"),
+                    project_id: Self::col(row, "project_id"),
+                    model_json: Self::col(row, "model"),
+                })
+            })
+            .with_context(|| format!("session '{session_id}' not found in {}", db_path.display()))?;
 
         // Parts grouped by message id. Join through `message` rather than
         // relying on `part.session_id`, which older 1.x revisions lack.
@@ -828,19 +692,10 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
                      ORDER BY p.message_id ASC, p.id ASC",
                 )
                 .context("failed to prepare OpenCode 1.x part query")?;
-            let rows = stmt.query_map(rusqlite::params![session_id], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, Option<String>>(2)?,
-                ))
-            })?;
+            let rows = stmt.query_map(rusqlite::params![session_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?)))?;
             for row in rows {
                 let (message_id, part_id, data_json) = row?;
-                let mut part = data_json
-                    .as_deref()
-                    .and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok())
-                    .unwrap_or_else(|| serde_json::json!({}));
+                let mut part = data_json.as_deref().and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok()).unwrap_or_else(|| serde_json::json!({}));
                 if let Some(obj) = part.as_object_mut() {
                     obj.insert("id".to_string(), serde_json::Value::from(part_id));
                 }
@@ -848,13 +703,8 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
             }
         }
 
-        let mut started_at = session_row
-            .time_created
-            .and_then(|ts| parse_timestamp(&serde_json::Value::from(ts)));
-        let mut ended_at = session_row
-            .time_updated
-            .and_then(|ts| parse_timestamp(&serde_json::Value::from(ts)))
-            .or(started_at);
+        let mut started_at = session_row.time_created.and_then(|ts| parse_timestamp(&serde_json::Value::from(ts)));
+        let mut ended_at = session_row.time_updated.and_then(|ts| parse_timestamp(&serde_json::Value::from(ts))).or(started_at);
         let mut model_counts: HashMap<String, usize> = HashMap::new();
         let mut messages = Vec::new();
 
@@ -864,60 +714,34 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
                  ORDER BY time_created ASC, id ASC",
             )
             .context("failed to prepare OpenCode 1.x message query")?;
-        let rows = stmt.query_map(rusqlite::params![session_id], |row| {
-            Ok((
-                row.get::<_, String>("id")?,
-                Self::col::<i64>(row, "time_created"),
-                Self::col::<String>(row, "data"),
-            ))
-        })?;
+        let rows = stmt.query_map(rusqlite::params![session_id], |row| Ok((row.get::<_, String>("id")?, Self::col::<i64>(row, "time_created"), Self::col::<String>(row, "data"))))?;
 
         for row in rows {
             let (message_id, row_time_created, data_json) = row?;
-            let info = data_json
-                .as_deref()
-                .and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok())
-                .unwrap_or_else(|| serde_json::json!({}));
+            let info = data_json.as_deref().and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok()).unwrap_or_else(|| serde_json::json!({}));
 
-            let role_raw = info
-                .get("role")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("unknown");
-            let created_raw = info
-                .pointer("/time/created")
-                .and_then(serde_json::Value::as_i64)
-                .or(row_time_created);
-            let timestamp =
-                created_raw.and_then(|ts| parse_timestamp(&serde_json::Value::from(ts)));
+            let role_raw = info.get("role").and_then(serde_json::Value::as_str).unwrap_or("unknown");
+            let created_raw = info.pointer("/time/created").and_then(serde_json::Value::as_i64).or(row_time_created);
+            let timestamp = created_raw.and_then(|ts| parse_timestamp(&serde_json::Value::from(ts)));
             if let Some(ts) = timestamp {
                 started_at = Some(started_at.map_or(ts, |current| current.min(ts)));
                 ended_at = Some(ended_at.map_or(ts, |current| current.max(ts)));
             }
-            if let Some(completed) = info
-                .pointer("/time/completed")
-                .and_then(serde_json::Value::as_i64)
-                .and_then(|ts| parse_timestamp(&serde_json::Value::from(ts)))
-            {
+            if let Some(completed) = info.pointer("/time/completed").and_then(serde_json::Value::as_i64).and_then(|ts| parse_timestamp(&serde_json::Value::from(ts))) {
                 ended_at = Some(ended_at.map_or(completed, |current| current.max(completed)));
             }
 
             // Assistant rows carry a flat `modelID`; user rows nest it under
             // `model.modelID`. Only assistant turns count toward the session
             // model, matching what actually produced the output.
-            let model_id = info
-                .get("modelID")
-                .or_else(|| info.pointer("/model/modelID"))
-                .and_then(serde_json::Value::as_str)
-                .filter(|m| !m.is_empty())
-                .map(ToString::to_string);
+            let model_id = info.get("modelID").or_else(|| info.pointer("/model/modelID")).and_then(serde_json::Value::as_str).filter(|m| !m.is_empty()).map(ToString::to_string);
             if role_raw == "assistant"
                 && let Some(model_name) = &model_id
             {
                 *model_counts.entry(model_name.clone()).or_insert(0) += 1;
             }
 
-            let raw_parts =
-                serde_json::Value::Array(parts_by_message.remove(&message_id).unwrap_or_default());
+            let raw_parts = serde_json::Value::Array(parts_by_message.remove(&message_id).unwrap_or_default());
             let (content, tool_calls, tool_results) = parse_v1_parts(&raw_parts);
 
             messages.push(CanonicalMessage {
@@ -938,41 +762,15 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
 
         reindex_messages(&mut messages);
 
-        let title = session_row
-            .title
-            .filter(|t| !t.trim().is_empty())
-            .or_else(|| {
-                messages
-                    .iter()
-                    .find(|m| m.role == MessageRole::User)
-                    .map(|m| truncate_title(&m.content, 80))
-                    .filter(|t| !t.is_empty())
-            });
+        let title = session_row.title.filter(|t| !t.trim().is_empty()).or_else(|| messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 80)).filter(|t| !t.is_empty()));
 
         let model_name = model_counts
             .into_iter()
             .max_by_key(|(_, count)| *count)
             .map(|(name, _)| name)
-            .or_else(|| {
-                session_row
-                    .model_json
-                    .as_deref()
-                    .and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok())
-                    .and_then(|model| {
-                        model
-                            .get("id")
-                            .and_then(serde_json::Value::as_str)
-                            .map(ToString::to_string)
-                    })
-            });
+            .or_else(|| session_row.model_json.as_deref().and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok()).and_then(|model| model.get("id").and_then(serde_json::Value::as_str).map(ToString::to_string)));
 
-        let workspace = session_row
-            .directory
-            .as_deref()
-            .map(str::trim)
-            .filter(|d| !d.is_empty())
-            .map(PathBuf::from)
-            .or_else(|| Self::workspace_from_db_path(db_path));
+        let workspace = session_row.directory.as_deref().map(str::trim).filter(|d| !d.is_empty()).map(PathBuf::from).or_else(|| Self::workspace_from_db_path(db_path));
 
         Ok(CanonicalSession {
             session_id: session_id.to_string(),
@@ -1001,37 +799,15 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
     }
 
     /// Read a session from the legacy (plural) schema.
-    fn read_legacy_session(
-        conn: &Connection,
-        db_path: &Path,
-        session_id: &str,
-    ) -> anyhow::Result<CanonicalSession> {
-        let (title_raw, created_raw, updated_raw, parent_session_id, prompt_tokens, completion_tokens, cost): (
-            String,
-            i64,
-            i64,
-            Option<String>,
-            i64,
-            i64,
-            f64,
-        ) = conn
+    fn read_legacy_session(conn: &Connection, db_path: &Path, session_id: &str) -> anyhow::Result<CanonicalSession> {
+        let (title_raw, created_raw, updated_raw, parent_session_id, prompt_tokens, completion_tokens, cost): (String, i64, i64, Option<String>, i64, i64, f64) = conn
             .query_row(
                 "SELECT title, created_at, updated_at, parent_session_id, prompt_tokens, completion_tokens, cost
                  FROM sessions
                  WHERE id = ?1
                  LIMIT 1",
                 rusqlite::params![session_id],
-                |row| {
-                    Ok((
-                        row.get(0)?,
-                        row.get(1)?,
-                        row.get(2)?,
-                        row.get(3)?,
-                        row.get(4)?,
-                        row.get(5)?,
-                        row.get(6)?,
-                    ))
-                },
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?)),
             )
             .with_context(|| format!("session '{session_id}' not found in {}", db_path.display()))?;
 
@@ -1049,31 +825,12 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
             )
             .context("failed to prepare message query")?;
 
-        let rows = stmt.query_map(rusqlite::params![session_id], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, Option<String>>(3)?,
-                row.get::<_, i64>(4)?,
-                row.get::<_, i64>(5)?,
-                row.get::<_, Option<i64>>(6)?,
-            ))
-        })?;
+        let rows = stmt.query_map(rusqlite::params![session_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, Option<String>>(3)?, row.get::<_, i64>(4)?, row.get::<_, i64>(5)?, row.get::<_, Option<i64>>(6)?)))?;
 
         for row in rows {
-            let (
-                message_id,
-                role_raw,
-                parts_json,
-                model,
-                created_at_raw,
-                _updated_at_raw,
-                finished_at_raw,
-            ) = row?;
+            let (message_id, role_raw, parts_json, model, created_at_raw, _updated_at_raw, finished_at_raw) = row?;
 
-            let timestamp =
-                parse_timestamp(&serde_json::Value::from(created_at_raw)).or(Some(created_at_raw));
+            let timestamp = parse_timestamp(&serde_json::Value::from(created_at_raw)).or(Some(created_at_raw));
             if let Some(ts) = timestamp {
                 started_at = Some(started_at.map_or(ts, |current| current.min(ts)));
                 ended_at = Some(ended_at.map_or(ts, |current| current.max(ts)));
@@ -1085,8 +842,7 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
                 ended_at = Some(ended_at.map_or(finished_ts, |current| current.max(finished_ts)));
             }
 
-            let raw_parts = serde_json::from_str::<serde_json::Value>(&parts_json)
-                .unwrap_or_else(|_| serde_json::json!([]));
+            let raw_parts = serde_json::from_str::<serde_json::Value>(&parts_json).unwrap_or_else(|_| serde_json::json!([]));
             let (content, tool_calls, tool_results) = parse_parts(&raw_parts);
 
             if let Some(model_name) = model.as_deref().filter(|m| !m.is_empty()) {
@@ -1110,20 +866,9 @@ CREATE INDEX IF NOT EXISTS idx_files_session_id ON files (session_id);
 
         reindex_messages(&mut messages);
 
-        let title = (!title_raw.trim().is_empty())
-            .then_some(title_raw)
-            .or_else(|| {
-                messages
-                    .iter()
-                    .find(|m| m.role == MessageRole::User)
-                    .map(|m| truncate_title(&m.content, 80))
-                    .filter(|t| !t.is_empty())
-            });
+        let title = (!title_raw.trim().is_empty()).then_some(title_raw).or_else(|| messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 80)).filter(|t| !t.is_empty()));
 
-        let model_name = model_counts
-            .into_iter()
-            .max_by_key(|(_, count)| *count)
-            .map(|(name, _)| name);
+        let model_name = model_counts.into_iter().max_by_key(|(_, count)| *count).map(|(name, _)| name);
 
         let source = Self::virtual_session_path(db_path, session_id);
 
@@ -1182,11 +927,7 @@ impl Provider for OpenCode {
         }
 
         trace!(provider = "opencode", installed, ?evidence, "detection");
-        DetectionResult {
-            installed,
-            version: None,
-            evidence,
-        }
+        DetectionResult { installed, version: None, evidence }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
@@ -1240,11 +981,7 @@ impl Provider for OpenCode {
         Self::read_session_by_id(&conn, path, &session_id)
     }
 
-    fn write_session(
-        &self,
-        session: &CanonicalSession,
-        opts: &WriteOptions,
-    ) -> anyhow::Result<WrittenSession> {
+    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
         let db_path = Self::choose_target_db_path(session)?;
 
         // Never graft the legacy plural tables into a live OpenCode 1.x or
@@ -1258,8 +995,7 @@ impl Provider for OpenCode {
         let mut conn = Self::open_db_rw(&db_path)?;
         Self::ensure_schema(&conn)?;
 
-        let has_count_trigger =
-            Self::trigger_exists(&conn, "update_session_message_count_on_insert");
+        let has_count_trigger = Self::trigger_exists(&conn, "update_session_message_count_on_insert");
 
         // Derive a STABLE target id from the source session so re-converting the
         // same session targets the same row (matching the clawdbot/cursor/pi_agent
@@ -1267,11 +1003,7 @@ impl Provider for OpenCode {
         // would silently create an orphaned duplicate row, and with a colliding id
         // the INSERT would otherwise fail on the PRIMARY KEY. Fall back to a random
         // UUID only when the source has no id.
-        let target_session_id = if session.session_id.is_empty() {
-            uuid::Uuid::new_v4().to_string()
-        } else {
-            session.session_id.clone()
-        };
+        let target_session_id = if session.session_id.is_empty() { uuid::Uuid::new_v4().to_string() } else { session.session_id.clone() };
 
         // Honor `--force`: if the target session already exists, either overwrite
         // it (delete-then-insert; `ON DELETE CASCADE` clears messages/files) or
@@ -1282,25 +1014,11 @@ impl Provider for OpenCode {
                 // this connection, so deleting the session cascades to messages
                 // and files. Delete dependents explicitly too, in case the live
                 // DB predates the FK constraint or has the pragma disabled.
-                let _ = conn.execute(
-                    "DELETE FROM files WHERE session_id = ?1",
-                    rusqlite::params![target_session_id],
-                );
-                let _ = conn.execute(
-                    "DELETE FROM messages WHERE session_id = ?1",
-                    rusqlite::params![target_session_id],
-                );
-                conn.execute(
-                    "DELETE FROM sessions WHERE id = ?1",
-                    rusqlite::params![target_session_id],
-                )
-                .context("failed to delete existing OpenCode session for --force overwrite")?;
+                let _ = conn.execute("DELETE FROM files WHERE session_id = ?1", rusqlite::params![target_session_id]);
+                let _ = conn.execute("DELETE FROM messages WHERE session_id = ?1", rusqlite::params![target_session_id]);
+                conn.execute("DELETE FROM sessions WHERE id = ?1", rusqlite::params![target_session_id]).context("failed to delete existing OpenCode session for --force overwrite")?;
             } else {
-                return Err(crate::error::CasrError::SessionConflict {
-                    session_id: target_session_id,
-                    existing_path: db_path,
-                }
-                .into());
+                return Err(crate::error::CasrError::SessionConflict { session_id: target_session_id, existing_path: db_path }.into());
             }
         }
 
@@ -1308,14 +1026,7 @@ impl Provider for OpenCode {
         let created_at = session.started_at.unwrap_or(now);
         let updated_at = session.ended_at.unwrap_or(now);
 
-        let title = session.title.clone().or_else(|| {
-            session
-                .messages
-                .iter()
-                .find(|m| m.role == MessageRole::User)
-                .map(|m| truncate_title(&m.content, 80))
-                .filter(|t| !t.is_empty())
-        });
+        let title = session.title.clone().or_else(|| session.messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 80)).filter(|t| !t.is_empty()));
         let title = title.unwrap_or_else(|| "Converted session".to_string());
 
         let tx = conn.transaction().context("failed to begin transaction")?;
@@ -1325,17 +1036,7 @@ impl Provider for OpenCode {
                 id, parent_session_id, title, message_count, prompt_tokens, completion_tokens, cost,
                 summary_message_id, updated_at, created_at
              ) VALUES (?1, NULL, ?2, ?3, 0, 0, 0.0, NULL, ?4, ?5)",
-            rusqlite::params![
-                target_session_id,
-                title,
-                if has_count_trigger {
-                    0_i64
-                } else {
-                    i64::try_from(session.messages.len()).unwrap_or(i64::MAX)
-                },
-                updated_at,
-                created_at,
-            ],
+            rusqlite::params![target_session_id, title, if has_count_trigger { 0_i64 } else { i64::try_from(session.messages.len()).unwrap_or(i64::MAX) }, updated_at, created_at,],
         )
         .context("failed to insert OpenCode session")?;
 
@@ -1343,8 +1044,7 @@ impl Provider for OpenCode {
         for msg in &session.messages {
             let message_id = uuid::Uuid::new_v4().to_string();
             let parts = build_parts(msg);
-            let parts_json =
-                serde_json::to_string(&parts).context("failed to serialize OpenCode parts")?;
+            let parts_json = serde_json::to_string(&parts).context("failed to serialize OpenCode parts")?;
             let timestamp = msg.timestamp.unwrap_or(created_at);
             let model = msg.author.clone().or_else(|| default_model.clone());
 
@@ -1352,29 +1052,14 @@ impl Provider for OpenCode {
                 "INSERT INTO messages (
                     id, session_id, role, parts, model, created_at, updated_at, finished_at
                  ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)",
-                rusqlite::params![
-                    message_id,
-                    target_session_id,
-                    role_to_opencode(&msg.role),
-                    parts_json,
-                    model,
-                    timestamp,
-                    timestamp,
-                ],
+                rusqlite::params![message_id, target_session_id, role_to_opencode(&msg.role), parts_json, model, timestamp, timestamp,],
             )
             .with_context(|| format!("failed to insert OpenCode message {}", msg.idx))?;
         }
 
         // If the DB has no count trigger, set message_count explicitly.
         if !has_count_trigger {
-            tx.execute(
-                "UPDATE sessions SET message_count = ?1 WHERE id = ?2",
-                rusqlite::params![
-                    i64::try_from(session.messages.len()).unwrap_or(i64::MAX),
-                    target_session_id
-                ],
-            )
-            .context("failed to update OpenCode session message_count")?;
+            tx.execute("UPDATE sessions SET message_count = ?1 WHERE id = ?2", rusqlite::params![i64::try_from(session.messages.len()).unwrap_or(i64::MAX), target_session_id]).context("failed to update OpenCode session message_count")?;
         }
 
         tx.commit().context("failed to commit transaction")?;
@@ -1387,13 +1072,7 @@ impl Provider for OpenCode {
             "OpenCode session written"
         );
 
-        Ok(WrittenSession {
-            paths: vec![virtual_path],
-            session_id: target_session_id.clone(),
-            resume_command: self.resume_command(&target_session_id),
-            backup_path: None,
-            warnings: Vec::new(),
-        })
+        Ok(WrittenSession { paths: vec![virtual_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: None, warnings: Vec::new() })
     }
 
     fn resume_command(&self, _session_id: &str) -> String {
@@ -1462,10 +1141,7 @@ fn parse_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<ToolRes
     };
 
     for item in items {
-        let part_type = item
-            .get("type")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or_default();
+        let part_type = item.get("type").and_then(serde_json::Value::as_str).unwrap_or_default();
         let data = item.get("data").unwrap_or(&serde_json::Value::Null);
 
         match part_type {
@@ -1484,49 +1160,18 @@ fn parse_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<ToolRes
                 }
             }
             "tool_call" => {
-                let name = data
-                    .get("name")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|name| !name.is_empty())
-                    .unwrap_or("tool_call")
-                    .to_string();
-                let id = data
-                    .get("id")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|id| !id.is_empty())
-                    .map(ToString::to_string);
-                let input = data
-                    .get("input")
-                    .and_then(serde_json::Value::as_str)
-                    .unwrap_or_default();
+                let name = data.get("name").and_then(serde_json::Value::as_str).filter(|name| !name.is_empty()).unwrap_or("tool_call").to_string();
+                let id = data.get("id").and_then(serde_json::Value::as_str).filter(|id| !id.is_empty()).map(ToString::to_string);
+                let input = data.get("input").and_then(serde_json::Value::as_str).unwrap_or_default();
 
-                tool_calls.push(ToolCall {
-                    id,
-                    name,
-                    arguments: parse_tool_call_arguments(input),
-                });
+                tool_calls.push(ToolCall { id, name, arguments: parse_tool_call_arguments(input) });
             }
             "tool_result" => {
-                let content = data
-                    .get("content")
-                    .and_then(serde_json::Value::as_str)
-                    .unwrap_or_default()
-                    .to_string();
-                let call_id = data
-                    .get("tool_call_id")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|id| !id.is_empty())
-                    .map(ToString::to_string);
-                let is_error = data
-                    .get("is_error")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false);
+                let content = data.get("content").and_then(serde_json::Value::as_str).unwrap_or_default().to_string();
+                let call_id = data.get("tool_call_id").and_then(serde_json::Value::as_str).filter(|id| !id.is_empty()).map(ToString::to_string);
+                let is_error = data.get("is_error").and_then(serde_json::Value::as_bool).unwrap_or(false);
 
-                tool_results.push(ToolResult {
-                    call_id,
-                    content,
-                    is_error,
-                });
+                tool_results.push(ToolResult { call_id, content, is_error });
             }
             _ => {
                 let fallback = flatten_content(data);
@@ -1542,11 +1187,7 @@ fn parse_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<ToolRes
         content = reasoning_chunks.join("\n");
     }
     if content.trim().is_empty() {
-        let result_texts: Vec<&str> = tool_results
-            .iter()
-            .map(|result| result.content.as_str())
-            .filter(|text| !text.trim().is_empty())
-            .collect();
+        let result_texts: Vec<&str> = tool_results.iter().map(|result| result.content.as_str()).filter(|text| !text.trim().is_empty()).collect();
         content = result_texts.join("\n");
     }
 
@@ -1600,17 +1241,11 @@ fn parse_v1_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<Tool
     };
 
     for item in items {
-        let part_type = item
-            .get("type")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or_default();
+        let part_type = item.get("type").and_then(serde_json::Value::as_str).unwrap_or_default();
 
         match part_type {
             "text" => {
-                let ignored = item
-                    .get("ignored")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false);
+                let ignored = item.get("ignored").and_then(serde_json::Value::as_bool).unwrap_or(false);
                 if ignored {
                     continue;
                 }
@@ -1629,60 +1264,31 @@ fn parse_v1_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<Tool
             }
             "tool" => {
                 let state = item.get("state").unwrap_or(&serde_json::Value::Null);
-                let name = item
-                    .get("tool")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|name| !name.is_empty())
-                    .unwrap_or("tool")
-                    .to_string();
-                let call_id = item
-                    .get("callID")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|id| !id.is_empty())
-                    .map(ToString::to_string);
+                let name = item.get("tool").and_then(serde_json::Value::as_str).filter(|name| !name.is_empty()).unwrap_or("tool").to_string();
+                let call_id = item.get("callID").and_then(serde_json::Value::as_str).filter(|id| !id.is_empty()).map(ToString::to_string);
                 let arguments = match state.get("input") {
                     Some(serde_json::Value::String(raw)) => parse_tool_call_arguments(raw),
                     Some(serde_json::Value::Null) | None => serde_json::json!({}),
                     Some(other) => other.clone(),
                 };
-                tool_calls.push(ToolCall {
-                    id: call_id.clone(),
-                    name,
-                    arguments,
-                });
+                tool_calls.push(ToolCall { id: call_id.clone(), name, arguments });
 
-                let status = state
-                    .get("status")
-                    .and_then(serde_json::Value::as_str)
-                    .unwrap_or_default();
+                let status = state.get("status").and_then(serde_json::Value::as_str).unwrap_or_default();
                 match status {
                     "completed" => {
                         let content = state.get("output").map(flatten_content).unwrap_or_default();
-                        tool_results.push(ToolResult {
-                            call_id,
-                            content,
-                            is_error: false,
-                        });
+                        tool_results.push(ToolResult { call_id, content, is_error: false });
                     }
                     "error" => {
                         let content = state.get("error").map(flatten_content).unwrap_or_default();
-                        tool_results.push(ToolResult {
-                            call_id,
-                            content,
-                            is_error: true,
-                        });
+                        tool_results.push(ToolResult { call_id, content, is_error: true });
                     }
                     // `pending` / `running`: the call exists but has no result yet.
                     _ => {}
                 }
             }
             "file" => {
-                let label = item
-                    .get("filename")
-                    .or_else(|| item.get("url"))
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|s| !s.trim().is_empty())
-                    .unwrap_or("attachment");
+                let label = item.get("filename").or_else(|| item.get("url")).and_then(serde_json::Value::as_str).filter(|s| !s.trim().is_empty()).unwrap_or("attachment");
                 text_chunks.push(format!("[file: {label}]"));
             }
             _ => {}
@@ -1694,11 +1300,7 @@ fn parse_v1_parts(parts: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<Tool
         content = reasoning_chunks.join("\n");
     }
     if content.trim().is_empty() {
-        let result_texts: Vec<&str> = tool_results
-            .iter()
-            .map(|result| result.content.as_str())
-            .filter(|text| !text.trim().is_empty())
-            .collect();
+        let result_texts: Vec<&str> = tool_results.iter().map(|result| result.content.as_str()).filter(|text| !text.trim().is_empty()).collect();
         content = result_texts.join("\n");
     }
 
@@ -1744,13 +1346,7 @@ struct V2Turn {
 
 impl V2Turn {
     fn text(role: MessageRole, content: String) -> Self {
-        Self {
-            role,
-            content,
-            author: None,
-            tool_calls: Vec::new(),
-            tool_results: Vec::new(),
-        }
+        Self { role, content, author: None, tool_calls: Vec::new(), tool_results: Vec::new() }
     }
 
     fn is_empty(&self) -> bool {
@@ -1762,12 +1358,7 @@ impl V2Turn {
 /// blob) onto a canonical turn, or `None` for bookkeeping rows and entries
 /// with nothing to replay (see [`OpenCode::read_v2_session`] for the table).
 fn map_v2_message(message_type: &str, data: &serde_json::Value) -> Option<V2Turn> {
-    let text = |key: &str| {
-        data.get(key)
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or_default()
-            .to_string()
-    };
+    let text = |key: &str| data.get(key).and_then(serde_json::Value::as_str).unwrap_or_default().to_string();
 
     let turn = match message_type {
         "user" => {
@@ -1778,37 +1369,15 @@ fn map_v2_message(message_type: &str, data: &serde_json::Value) -> Option<V2Turn
             }
             // Attachments are inline base64 in `files[]`; keep them visible
             // as short markers the way the 1.x reader does for file parts.
-            for file in data
-                .get("files")
-                .and_then(serde_json::Value::as_array)
-                .into_iter()
-                .flatten()
-            {
-                let label = file
-                    .get("name")
-                    .or_else(|| file.pointer("/source/uri"))
-                    .or_else(|| file.get("mime"))
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|s| !s.trim().is_empty())
-                    .unwrap_or("attachment");
+            for file in data.get("files").and_then(serde_json::Value::as_array).into_iter().flatten() {
+                let label = file.get("name").or_else(|| file.pointer("/source/uri")).or_else(|| file.get("mime")).and_then(serde_json::Value::as_str).filter(|s| !s.trim().is_empty()).unwrap_or("attachment");
                 chunks.push(format!("[file: {label}]"));
             }
             V2Turn::text(MessageRole::User, chunks.join("\n"))
         }
         "assistant" => {
-            let (content, tool_calls, tool_results) =
-                parse_v2_assistant_content(data.get("content").unwrap_or(&serde_json::Value::Null));
-            V2Turn {
-                role: MessageRole::Assistant,
-                content,
-                author: data
-                    .pointer("/model/id")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|id| !id.is_empty())
-                    .map(ToString::to_string),
-                tool_calls,
-                tool_results,
-            }
+            let (content, tool_calls, tool_results) = parse_v2_assistant_content(data.get("content").unwrap_or(&serde_json::Value::Null));
+            V2Turn { role: MessageRole::Assistant, content, author: data.pointer("/model/id").and_then(serde_json::Value::as_str).filter(|id| !id.is_empty()).map(ToString::to_string), tool_calls, tool_results }
         }
         "system" => V2Turn::text(MessageRole::System, text("text")),
         // Injected context (shell-failure notices, background-shell results,
@@ -1818,11 +1387,7 @@ fn map_v2_message(message_type: &str, data: &serde_json::Value) -> Option<V2Turn
             // A background shell reaches the model once, through its
             // completion notice (a `synthetic` entry); OpenCode skips the
             // shell row itself, so keeping it would duplicate the output.
-            if data
-                .pointer("/metadata/background")
-                .and_then(serde_json::Value::as_bool)
-                == Some(true)
-            {
+            if data.pointer("/metadata/background").and_then(serde_json::Value::as_bool) == Some(true) {
                 return None;
             }
             V2Turn::text(MessageRole::Tool, v2_shell_text(data))
@@ -1849,38 +1414,22 @@ fn map_v2_message(message_type: &str, data: &serde_json::Value) -> Option<V2Turn
 /// `output` is `{output, cursor, size, truncated}` on current betas and a
 /// bare string on early ones; both are accepted.
 fn v2_shell_text(data: &serde_json::Value) -> String {
-    let command = data
-        .get("command")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default();
+    let command = data.get("command").and_then(serde_json::Value::as_str).unwrap_or_default();
     let output = match data.get("output") {
         Some(serde_json::Value::String(raw)) => raw.as_str(),
-        Some(serde_json::Value::Object(page)) => page
-            .get("output")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or_default(),
+        Some(serde_json::Value::Object(page)) => page.get("output").and_then(serde_json::Value::as_str).unwrap_or_default(),
         _ => "",
     };
     if command.trim().is_empty() && output.trim().is_empty() {
         return String::new();
     }
-    format!(
-        "The following shell command was executed by the user:\n\nCommand:\n{command}\n\nOutput:\n{output}"
-    )
+    format!("The following shell command was executed by the user:\n\nCommand:\n{command}\n\nOutput:\n{output}")
 }
 
 /// Render a completed 2.x `compaction` checkpoint as system context.
 fn v2_compaction_text(data: &serde_json::Value) -> String {
-    let summary = data
-        .get("summary")
-        .and_then(serde_json::Value::as_str)
-        .map(str::trim)
-        .unwrap_or_default();
-    let recent = data
-        .get("recent")
-        .and_then(serde_json::Value::as_str)
-        .map(str::trim)
-        .unwrap_or_default();
+    let summary = data.get("summary").and_then(serde_json::Value::as_str).map(str::trim).unwrap_or_default();
+    let recent = data.get("recent").and_then(serde_json::Value::as_str).map(str::trim).unwrap_or_default();
     if summary.is_empty() && recent.is_empty() {
         return String::new();
     }
@@ -1913,9 +1462,7 @@ fn v2_compaction_text(data: &serde_json::Value) -> String {
 /// - `text` → content
 /// - `reasoning` → content only when there is no text
 /// - `tool` → a [`ToolCall`] plus a [`ToolResult`] once completed or errored
-fn parse_v2_assistant_content(
-    content: &serde_json::Value,
-) -> (String, Vec<ToolCall>, Vec<ToolResult>) {
+fn parse_v2_assistant_content(content: &serde_json::Value) -> (String, Vec<ToolCall>, Vec<ToolResult>) {
     let mut text_chunks: Vec<String> = Vec::new();
     let mut reasoning_chunks: Vec<String> = Vec::new();
     let mut tool_calls: Vec<ToolCall> = Vec::new();
@@ -1926,10 +1473,7 @@ fn parse_v2_assistant_content(
     };
 
     for item in items {
-        let part_type = item
-            .get("type")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or_default();
+        let part_type = item.get("type").and_then(serde_json::Value::as_str).unwrap_or_default();
         match part_type {
             "text" => {
                 if let Some(text) = item.get("text").and_then(serde_json::Value::as_str)
@@ -1947,17 +1491,8 @@ fn parse_v2_assistant_content(
             }
             "tool" => {
                 let state = item.get("state").unwrap_or(&serde_json::Value::Null);
-                let name = item
-                    .get("name")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|name| !name.is_empty())
-                    .unwrap_or("tool")
-                    .to_string();
-                let call_id = item
-                    .get("id")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|id| !id.is_empty())
-                    .map(ToString::to_string);
+                let name = item.get("name").and_then(serde_json::Value::as_str).filter(|name| !name.is_empty()).unwrap_or("tool").to_string();
+                let call_id = item.get("id").and_then(serde_json::Value::as_str).filter(|id| !id.is_empty()).map(ToString::to_string);
                 // `input` is the raw partial-JSON string while streaming and
                 // the parsed object once the call is admitted.
                 let arguments = match state.get("input") {
@@ -1965,22 +1500,11 @@ fn parse_v2_assistant_content(
                     Some(serde_json::Value::Null) | None => serde_json::json!({}),
                     Some(other) => other.clone(),
                 };
-                tool_calls.push(ToolCall {
-                    id: call_id.clone(),
-                    name,
-                    arguments,
-                });
+                tool_calls.push(ToolCall { id: call_id.clone(), name, arguments });
 
-                let status = state
-                    .get("status")
-                    .and_then(serde_json::Value::as_str)
-                    .unwrap_or_default();
+                let status = state.get("status").and_then(serde_json::Value::as_str).unwrap_or_default();
                 match status {
-                    "completed" => tool_results.push(ToolResult {
-                        call_id,
-                        content: render_v2_tool_output(state),
-                        is_error: false,
-                    }),
+                    "completed" => tool_results.push(ToolResult { call_id, content: render_v2_tool_output(state), is_error: false }),
                     "error" => {
                         let mut content = v2_error_text(state.get("error"));
                         let output = render_v2_tool_output(state);
@@ -1990,11 +1514,7 @@ fn parse_v2_assistant_content(
                             }
                             content.push_str(&output);
                         }
-                        tool_results.push(ToolResult {
-                            call_id,
-                            content,
-                            is_error: true,
-                        });
+                        tool_results.push(ToolResult { call_id, content, is_error: true });
                     }
                     // `streaming` / `pending` / `running`: no outcome yet.
                     _ => {}
@@ -2009,11 +1529,7 @@ fn parse_v2_assistant_content(
         content = reasoning_chunks.join("\n");
     }
     if content.trim().is_empty() {
-        let result_texts: Vec<&str> = tool_results
-            .iter()
-            .map(|result| result.content.as_str())
-            .filter(|text| !text.trim().is_empty())
-            .collect();
+        let result_texts: Vec<&str> = tool_results.iter().map(|result| result.content.as_str()).filter(|text| !text.trim().is_empty()).collect();
         content = result_texts.join("\n");
     }
 
@@ -2029,27 +1545,11 @@ fn render_v2_tool_output(state: &serde_json::Value) -> String {
         .and_then(serde_json::Value::as_array)
         .into_iter()
         .flatten()
-        .filter_map(
-            |item| match item.get("type").and_then(serde_json::Value::as_str) {
-                Some("text") => item
-                    .get("text")
-                    .and_then(serde_json::Value::as_str)
-                    .filter(|text| !text.trim().is_empty())
-                    .map(ToString::to_string),
-                Some("file") => Some(format!(
-                    "[file: {}]",
-                    item.get("name")
-                        .or_else(|| item.get("uri"))
-                        .and_then(serde_json::Value::as_str)
-                        .filter(|s| !s.trim().is_empty())
-                        .unwrap_or("attachment")
-                )),
-                _ => item
-                    .as_str()
-                    .filter(|text| !text.trim().is_empty())
-                    .map(ToString::to_string),
-            },
-        )
+        .filter_map(|item| match item.get("type").and_then(serde_json::Value::as_str) {
+            Some("text") => item.get("text").and_then(serde_json::Value::as_str).filter(|text| !text.trim().is_empty()).map(ToString::to_string),
+            Some("file") => Some(format!("[file: {}]", item.get("name").or_else(|| item.get("uri")).and_then(serde_json::Value::as_str).filter(|s| !s.trim().is_empty()).unwrap_or("attachment"))),
+            _ => item.as_str().filter(|text| !text.trim().is_empty()).map(ToString::to_string),
+        })
         .collect();
     if !from_content.is_empty() {
         return from_content.join("\n");
@@ -2059,11 +1559,7 @@ fn render_v2_tool_output(state: &serde_json::Value) -> String {
     {
         return output.to_string();
     }
-    state
-        .get("result")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default()
-        .to_string()
+    state.get("result").and_then(serde_json::Value::as_str).unwrap_or_default().to_string()
 }
 
 /// Human-readable text of a 2.x structured error (`{type, message, status?}`),
@@ -2072,14 +1568,8 @@ fn v2_error_text(error: Option<&serde_json::Value>) -> String {
     match error {
         Some(serde_json::Value::String(message)) => message.clone(),
         Some(serde_json::Value::Object(fields)) => {
-            let message = fields
-                .get("message")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default();
-            let kind = fields
-                .get("type")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default();
+            let message = fields.get("message").and_then(serde_json::Value::as_str).unwrap_or_default();
+            let kind = fields.get("type").and_then(serde_json::Value::as_str).unwrap_or_default();
             match (kind.is_empty(), message.is_empty()) {
                 (false, false) => format!("{kind}: {message}"),
                 (true, false) => message.to_string(),
@@ -2094,19 +1584,10 @@ fn v2_error_text(error: Option<&serde_json::Value>) -> String {
 /// Drop inline attachment bytes (`files[].data`, base64) from a 2.x user
 /// payload before it is kept in `CanonicalMessage::extra`.
 fn strip_v2_attachment_payloads(data: &mut serde_json::Value) {
-    if let Some(files) = data
-        .get_mut("files")
-        .and_then(serde_json::Value::as_array_mut)
-    {
-        for file in files
-            .iter_mut()
-            .filter_map(serde_json::Value::as_object_mut)
-        {
+    if let Some(files) = data.get_mut("files").and_then(serde_json::Value::as_array_mut) {
+        for file in files.iter_mut().filter_map(serde_json::Value::as_object_mut) {
             if let Some(serde_json::Value::String(bytes)) = file.remove("data") {
-                file.insert(
-                    "data_omitted_bytes".to_string(),
-                    serde_json::Value::from(bytes.len()),
-                );
+                file.insert("data_omitted_bytes".to_string(), serde_json::Value::from(bytes.len()));
             }
         }
     }
@@ -2123,11 +1604,7 @@ fn build_parts(message: &CanonicalMessage) -> serde_json::Value {
     }
 
     for call in &message.tool_calls {
-        let input = if let Some(s) = call.arguments.as_str() {
-            s.to_string()
-        } else {
-            serde_json::to_string(&call.arguments).unwrap_or_else(|_| "{}".to_string())
-        };
+        let input = if let Some(s) = call.arguments.as_str() { s.to_string() } else { serde_json::to_string(&call.arguments).unwrap_or_else(|_| "{}".to_string()) };
 
         parts.push(serde_json::json!({
             "type": "tool_call",
@@ -2202,32 +1679,15 @@ mod tests {
             started_at: Some(1_700_000_000_000),
             ended_at: Some(1_700_000_010_000),
             messages: vec![
-                CanonicalMessage {
-                    idx: 0,
-                    role: MessageRole::User,
-                    content: "Please inspect src/main.rs".to_string(),
-                    timestamp: Some(1_700_000_000_000),
-                    author: None,
-                    tool_calls: vec![],
-                    tool_results: vec![],
-                    extra: serde_json::json!({}),
-                },
+                CanonicalMessage { idx: 0, role: MessageRole::User, content: "Please inspect src/main.rs".to_string(), timestamp: Some(1_700_000_000_000), author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::json!({}) },
                 CanonicalMessage {
                     idx: 1,
                     role: MessageRole::Assistant,
                     content: "Inspecting now.".to_string(),
                     timestamp: Some(1_700_000_005_000),
                     author: Some("gpt-5".to_string()),
-                    tool_calls: vec![ToolCall {
-                        id: Some("call-1".to_string()),
-                        name: "Read".to_string(),
-                        arguments: serde_json::json!({"path":"src/main.rs"}),
-                    }],
-                    tool_results: vec![ToolResult {
-                        call_id: Some("call-1".to_string()),
-                        content: "Read complete".to_string(),
-                        is_error: false,
-                    }],
+                    tool_calls: vec![ToolCall { id: Some("call-1".to_string()), name: "Read".to_string(), arguments: serde_json::json!({"path":"src/main.rs"}) }],
+                    tool_results: vec![ToolResult { call_id: Some("call-1".to_string()), content: "Read complete".to_string(), is_error: false }],
                     extra: serde_json::json!({}),
                 },
             ],
@@ -2243,10 +1703,7 @@ mod tests {
         assert_eq!(provider.name(), "OpenCode");
         assert_eq!(provider.slug(), "opencode");
         assert_eq!(provider.cli_alias(), "opc");
-        assert_eq!(
-            <OpenCode as Provider>::resume_command(&provider, "sid"),
-            "opencode"
-        );
+        assert_eq!(<OpenCode as Provider>::resume_command(&provider, "sid"), "opencode");
     }
 
     #[test]
@@ -2273,22 +1730,14 @@ mod tests {
         let _cwd = CwdGuard::change_to(&workspace);
 
         let source = sample_session(&workspace);
-        let written = OpenCode
-            .write_session(&source, &WriteOptions { force: false })
-            .expect("write should succeed");
+        let written = OpenCode.write_session(&source, &WriteOptions { force: false }).expect("write should succeed");
 
         assert_eq!(written.resume_command, "opencode");
         assert_eq!(written.paths.len(), 1);
-        let db_path = written
-            .paths
-            .first()
-            .and_then(|p| p.parent())
-            .expect("virtual path parent");
+        let db_path = written.paths.first().and_then(|p| p.parent()).expect("virtual path parent");
         assert!(db_path.is_file(), "db file should exist");
 
-        let readback = OpenCode
-            .read_session(&written.paths[0])
-            .expect("readback should succeed");
+        let readback = OpenCode.read_session(&written.paths[0]).expect("readback should succeed");
 
         assert_eq!(readback.provider_slug, "opencode");
         assert_eq!(readback.messages.len(), source.messages.len());
@@ -2299,14 +1748,7 @@ mod tests {
         // The writer canonicalizes the workspace so the DB it creates is the
         // same file discovery reports; the round trip therefore preserves the
         // *directory*, not the byte spelling (macOS: `/var` vs `/private/var`).
-        assert_eq!(
-            readback
-                .workspace
-                .as_deref()
-                .and_then(|w| w.canonicalize().ok()),
-            workspace.canonicalize().ok(),
-            "round trip should preserve the workspace directory"
-        );
+        assert_eq!(readback.workspace.as_deref().and_then(|w| w.canonicalize().ok()), workspace.canonicalize().ok(), "round trip should preserve the workspace directory");
         // The target id is now derived stably from the source session id so that
         // re-conversion is idempotent and `--force` can overwrite in place.
         assert_eq!(readback.session_id, source.session_id);
@@ -2327,16 +1769,12 @@ mod tests {
         let source = sample_session(&workspace);
 
         // First write succeeds.
-        let first = OpenCode
-            .write_session(&source, &WriteOptions { force: false })
-            .expect("first write should succeed");
+        let first = OpenCode.write_session(&source, &WriteOptions { force: false }).expect("first write should succeed");
         let db_path = first.paths[0].parent().expect("db parent").to_path_buf();
 
         // Second write WITHOUT force must be a clean conflict, not a panic or a
         // raw "failed to insert OpenCode session" error.
-        let conflict = OpenCode
-            .write_session(&source, &WriteOptions { force: false })
-            .expect_err("second write without --force should conflict");
+        let conflict = OpenCode.write_session(&source, &WriteOptions { force: false }).expect_err("second write without --force should conflict");
         match conflict.downcast_ref::<crate::error::CasrError>() {
             Some(crate::error::CasrError::SessionConflict { session_id, .. }) => {
                 assert_eq!(session_id, &source.session_id);
@@ -2345,9 +1783,7 @@ mod tests {
         }
 
         // Second write WITH force succeeds and overwrites in place.
-        let second = OpenCode
-            .write_session(&source, &WriteOptions { force: true })
-            .expect("force write should succeed");
+        let second = OpenCode.write_session(&source, &WriteOptions { force: true }).expect("force write should succeed");
 
         // Same stable target id both times.
         assert_eq!(first.session_id, second.session_id);
@@ -2355,24 +1791,14 @@ mod tests {
 
         // Exactly one session row and no orphaned/duplicated message rows.
         let conn = OpenCode::open_db(&db_path).expect("open db");
-        let session_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM sessions", [], |r| r.get(0))
-            .expect("count sessions");
+        let session_count: i64 = conn.query_row("SELECT COUNT(*) FROM sessions", [], |r| r.get(0)).expect("count sessions");
         assert_eq!(session_count, 1, "force must overwrite, not duplicate");
 
-        let message_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM messages", [], |r| r.get(0))
-            .expect("count messages");
-        assert_eq!(
-            message_count,
-            source.messages.len() as i64,
-            "messages from the prior write must be replaced, not accumulated"
-        );
+        let message_count: i64 = conn.query_row("SELECT COUNT(*) FROM messages", [], |r| r.get(0)).expect("count messages");
+        assert_eq!(message_count, source.messages.len() as i64, "messages from the prior write must be replaced, not accumulated");
 
         // The overwritten session still reads back cleanly.
-        let readback = OpenCode
-            .read_session(&second.paths[0])
-            .expect("readback after force overwrite");
+        let readback = OpenCode.read_session(&second.paths[0]).expect("readback after force overwrite");
         assert_eq!(readback.messages.len(), source.messages.len());
     }
 
@@ -2385,9 +1811,7 @@ mod tests {
         let _cwd = CwdGuard::change_to(&workspace);
 
         let source = sample_session(&workspace);
-        let written = OpenCode
-            .write_session(&source, &WriteOptions { force: false })
-            .expect("write should succeed");
+        let written = OpenCode.write_session(&source, &WriteOptions { force: false }).expect("write should succeed");
         let found = OpenCode.owns_session(&written.session_id);
 
         assert_eq!(found.as_deref(), Some(written.paths[0].as_path()));
@@ -2407,28 +1831,17 @@ mod tests {
         first.session_id = "older-source".to_string();
         first.title = Some("Older Session".to_string());
         first.started_at = Some(1_700_000_000_000);
-        let _first_written = OpenCode
-            .write_session(&first, &WriteOptions { force: false })
-            .expect("first write");
+        let _first_written = OpenCode.write_session(&first, &WriteOptions { force: false }).expect("first write");
 
         let mut second = sample_session(&workspace);
         second.session_id = "newer-source".to_string();
         second.title = Some("Newer Session".to_string());
         second.started_at = Some(1_800_000_000_000);
-        let second_written = OpenCode
-            .write_session(&second, &WriteOptions { force: false })
-            .expect("second write");
+        let second_written = OpenCode.write_session(&second, &WriteOptions { force: false }).expect("second write");
 
-        let db_path = second_written
-            .paths
-            .first()
-            .and_then(|p| p.parent())
-            .expect("db path parent")
-            .to_path_buf();
+        let db_path = second_written.paths.first().and_then(|p| p.parent()).expect("db path parent").to_path_buf();
 
-        let read_latest = OpenCode
-            .read_session(&db_path)
-            .expect("read from db should pick latest");
+        let read_latest = OpenCode.read_session(&db_path).expect("read from db should pick latest");
         assert_eq!(read_latest.title.as_deref(), Some("Newer Session"));
     }
 
@@ -2441,22 +1854,11 @@ mod tests {
         let _cwd = CwdGuard::change_to(&workspace);
 
         let source = sample_session(&workspace);
-        OpenCode
-            .write_session(&source, &WriteOptions { force: false })
-            .expect("write should succeed");
+        OpenCode.write_session(&source, &WriteOptions { force: false }).expect("write should succeed");
 
         let detection = OpenCode.detect();
-        assert!(
-            detection.installed,
-            "db presence should mark provider installed"
-        );
-        assert!(
-            detection
-                .evidence
-                .iter()
-                .any(|ev| ev.contains("opencode.db")),
-            "evidence should include db detection"
-        );
+        assert!(detection.installed, "db presence should mark provider installed");
+        assert!(detection.evidence.iter().any(|ev| ev.contains("opencode.db")), "evidence should include db detection");
     }
 
     #[test]
@@ -2614,26 +2016,14 @@ mod tests {
         assert_eq!(role_to_opencode(&MessageRole::Assistant), "assistant");
         assert_eq!(role_to_opencode(&MessageRole::Tool), "tool");
         assert_eq!(role_to_opencode(&MessageRole::System), "system");
-        assert_eq!(
-            role_to_opencode(&MessageRole::Other("custom".to_string())),
-            "custom"
-        );
+        assert_eq!(role_to_opencode(&MessageRole::Other("custom".to_string())), "custom");
     }
 
     // ── build_parts ─────────────────────────────────────────────────────
 
     #[test]
     fn build_parts_text_only() {
-        let msg = CanonicalMessage {
-            idx: 0,
-            role: MessageRole::User,
-            content: "Hello world".to_string(),
-            timestamp: None,
-            author: None,
-            tool_calls: vec![],
-            tool_results: vec![],
-            extra: serde_json::json!({}),
-        };
+        let msg = CanonicalMessage { idx: 0, role: MessageRole::User, content: "Hello world".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::json!({}) };
         let parts = build_parts(&msg);
         let arr = parts.as_array().expect("should be array");
         assert_eq!(arr.len(), 1);
@@ -2649,16 +2039,8 @@ mod tests {
             content: "Let me check.".to_string(),
             timestamp: None,
             author: None,
-            tool_calls: vec![ToolCall {
-                id: Some("tc-1".to_string()),
-                name: "Bash".to_string(),
-                arguments: serde_json::json!({"cmd": "ls"}),
-            }],
-            tool_results: vec![ToolResult {
-                call_id: Some("tc-1".to_string()),
-                content: "file1.rs\nfile2.rs".to_string(),
-                is_error: false,
-            }],
+            tool_calls: vec![ToolCall { id: Some("tc-1".to_string()), name: "Bash".to_string(), arguments: serde_json::json!({"cmd": "ls"}) }],
+            tool_results: vec![ToolResult { call_id: Some("tc-1".to_string()), content: "file1.rs\nfile2.rs".to_string(), is_error: false }],
             extra: serde_json::json!({}),
         };
         let parts = build_parts(&msg);
@@ -2673,20 +2055,7 @@ mod tests {
 
     #[test]
     fn build_parts_empty_content_skips_text() {
-        let msg = CanonicalMessage {
-            idx: 0,
-            role: MessageRole::Tool,
-            content: "  ".to_string(),
-            timestamp: None,
-            author: None,
-            tool_calls: vec![],
-            tool_results: vec![ToolResult {
-                call_id: Some("c1".to_string()),
-                content: "result".to_string(),
-                is_error: false,
-            }],
-            extra: serde_json::json!({}),
-        };
+        let msg = CanonicalMessage { idx: 0, role: MessageRole::Tool, content: "  ".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![ToolResult { call_id: Some("c1".to_string()), content: "result".to_string(), is_error: false }], extra: serde_json::json!({}) };
         let parts = build_parts(&msg);
         let arr = parts.as_array().expect("array");
         assert_eq!(arr.len(), 1);
@@ -2744,9 +2113,7 @@ mod tests {
         let mut session = sample_session(&workspace);
         session.title = None;
 
-        let written = OpenCode
-            .write_session(&session, &WriteOptions { force: false })
-            .expect("write");
+        let written = OpenCode.write_session(&session, &WriteOptions { force: false }).expect("write");
         let readback = OpenCode.read_session(&written.paths[0]).expect("readback");
 
         // Title should be derived from first user message
@@ -2770,9 +2137,7 @@ mod tests {
             msg.timestamp = None;
         }
 
-        let written = OpenCode
-            .write_session(&session, &WriteOptions { force: false })
-            .expect("write");
+        let written = OpenCode.write_session(&session, &WriteOptions { force: false }).expect("write");
         let readback = OpenCode.read_session(&written.paths[0]).expect("readback");
 
         assert!(readback.started_at.is_some());
@@ -2788,9 +2153,7 @@ mod tests {
         let _cwd = CwdGuard::change_to(&workspace);
 
         let session = sample_session(&workspace);
-        let written = OpenCode
-            .write_session(&session, &WriteOptions { force: false })
-            .expect("write");
+        let written = OpenCode.write_session(&session, &WriteOptions { force: false }).expect("write");
         let readback = OpenCode.read_session(&written.paths[0]).expect("readback");
 
         // The model_name should be detected from message authors
@@ -2808,9 +2171,7 @@ mod tests {
         let _cwd = CwdGuard::change_to(&workspace);
 
         let session = sample_session(&workspace);
-        let written = OpenCode
-            .write_session(&session, &WriteOptions { force: false })
-            .expect("write");
+        let written = OpenCode.write_session(&session, &WriteOptions { force: false }).expect("write");
         let readback = OpenCode.read_session(&written.paths[0]).expect("readback");
 
         // Metadata should include OpenCode-specific fields
@@ -2829,20 +2190,12 @@ mod tests {
         let _cwd = CwdGuard::change_to(&workspace);
 
         let session = sample_session(&workspace);
-        let written = OpenCode
-            .write_session(&session, &WriteOptions { force: false })
-            .expect("write");
+        let written = OpenCode.write_session(&session, &WriteOptions { force: false }).expect("write");
         let readback = OpenCode.read_session(&written.paths[0]).expect("readback");
 
         for msg in &readback.messages {
-            assert!(
-                msg.extra.get("opencode_message_id").is_some(),
-                "each message should have opencode_message_id in extra"
-            );
-            assert!(
-                msg.extra.get("opencode_parts").is_some(),
-                "each message should have opencode_parts in extra"
-            );
+            assert!(msg.extra.get("opencode_message_id").is_some(), "each message should have opencode_message_id in extra");
+            assert!(msg.extra.get("opencode_parts").is_some(), "each message should have opencode_parts in extra");
         }
     }
 
@@ -2889,34 +2242,20 @@ mod tests {
         first.session_id = "first-source".to_string();
         first.title = Some("First Session".to_string());
         first.started_at = Some(1_700_000_000_000);
-        let first_written = OpenCode
-            .write_session(&first, &WriteOptions { force: false })
-            .expect("first write");
+        let first_written = OpenCode.write_session(&first, &WriteOptions { force: false }).expect("first write");
 
         let mut second = sample_session(&workspace);
         second.session_id = "second-source".to_string();
         second.title = Some("Second Session".to_string());
         second.started_at = Some(1_800_000_000_000);
-        let second_written = OpenCode
-            .write_session(&second, &WriteOptions { force: false })
-            .expect("second write");
+        let second_written = OpenCode.write_session(&second, &WriteOptions { force: false }).expect("second write");
 
         let listed = OpenCode.list_sessions().expect("should return Some");
-        assert!(
-            listed.len() >= 2,
-            "expected at least 2 sessions, got {}",
-            listed.len()
-        );
+        assert!(listed.len() >= 2, "expected at least 2 sessions, got {}", listed.len());
 
         let ids: Vec<&str> = listed.iter().map(|(id, _)| id.as_str()).collect();
-        assert!(
-            ids.contains(&first_written.session_id.as_str()),
-            "first session should be listed"
-        );
-        assert!(
-            ids.contains(&second_written.session_id.as_str()),
-            "second session should be listed"
-        );
+        assert!(ids.contains(&first_written.session_id.as_str()), "first session should be listed");
+        assert!(ids.contains(&second_written.session_id.as_str()), "second session should be listed");
     }
 
     // ── OpenCode 1.x schema (issue #26) ─────────────────────────────────
@@ -2979,51 +2318,15 @@ CREATE TABLE event (id INTEGER PRIMARY KEY, type TEXT, payload TEXT);
             "cost": 0.01,
             "tokens": {"input": 10, "output": 20, "reasoning": 5, "cache": {"read": 0, "write": 0}}
         });
-        conn.execute(
-            "INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?1, ?2, 1700000001000, 1700000001000, ?3)",
-            rusqlite::params![
-                "msg_user1",
-                V1_SESSION_ID,
-                serde_json::to_string(&user_msg).unwrap()
-            ],
-        )
-        .expect("insert user message");
-        conn.execute(
-            "INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?1, ?2, 1700000005000, 1700000009000, ?3)",
-            rusqlite::params![
-                "msg_asst1",
-                V1_SESSION_ID,
-                serde_json::to_string(&assistant_msg).unwrap()
-            ],
-        )
-        .expect("insert assistant message");
+        conn.execute("INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?1, ?2, 1700000001000, 1700000001000, ?3)", rusqlite::params!["msg_user1", V1_SESSION_ID, serde_json::to_string(&user_msg).unwrap()]).expect("insert user message");
+        conn.execute("INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?1, ?2, 1700000005000, 1700000009000, ?3)", rusqlite::params!["msg_asst1", V1_SESSION_ID, serde_json::to_string(&assistant_msg).unwrap()]).expect("insert assistant message");
         // The older session has one bare user message so it is a real session.
-        conn.execute(
-            "INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?1, ?2, 1600000000000, 1600000000000, ?3)",
-            rusqlite::params![
-                "msg_old1",
-                V1_OLDER_SESSION_ID,
-                serde_json::to_string(&user_msg).unwrap()
-            ],
-        )
-        .expect("insert older message");
+        conn.execute("INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?1, ?2, 1600000000000, 1600000000000, ?3)", rusqlite::params!["msg_old1", V1_OLDER_SESSION_ID, serde_json::to_string(&user_msg).unwrap()]).expect("insert older message");
 
         let parts: Vec<(&str, &str, serde_json::Value)> = vec![
-            (
-                "prt_u1",
-                "msg_user1",
-                serde_json::json!({"type": "text", "text": "Please inspect src/main.rs"}),
-            ),
-            (
-                "prt_a1",
-                "msg_asst1",
-                serde_json::json!({"type": "step-start"}),
-            ),
-            (
-                "prt_a2",
-                "msg_asst1",
-                serde_json::json!({"type": "reasoning", "text": "Need to read the file first.", "time": {"start": 1_700_000_005_000_i64, "end": 1_700_000_006_000_i64}}),
-            ),
+            ("prt_u1", "msg_user1", serde_json::json!({"type": "text", "text": "Please inspect src/main.rs"})),
+            ("prt_a1", "msg_asst1", serde_json::json!({"type": "step-start"})),
+            ("prt_a2", "msg_asst1", serde_json::json!({"type": "reasoning", "text": "Need to read the file first.", "time": {"start": 1_700_000_005_000_i64, "end": 1_700_000_006_000_i64}})),
             (
                 "prt_a3",
                 "msg_asst1",
@@ -3041,33 +2344,13 @@ CREATE TABLE event (id INTEGER PRIMARY KEY, type TEXT, payload TEXT);
                     }
                 }),
             ),
-            (
-                "prt_a4",
-                "msg_asst1",
-                serde_json::json!({"type": "text", "text": "Inspecting now."}),
-            ),
-            (
-                "prt_a5",
-                "msg_asst1",
-                serde_json::json!({"type": "step-finish", "cost": 0.01, "tokens": {"input": 10, "output": 20, "reasoning": 5, "cache": {"read": 0, "write": 0}}}),
-            ),
-            (
-                "prt_o1",
-                "msg_old1",
-                serde_json::json!({"type": "text", "text": "older prompt"}),
-            ),
+            ("prt_a4", "msg_asst1", serde_json::json!({"type": "text", "text": "Inspecting now."})),
+            ("prt_a5", "msg_asst1", serde_json::json!({"type": "step-finish", "cost": 0.01, "tokens": {"input": 10, "output": 20, "reasoning": 5, "cache": {"read": 0, "write": 0}}})),
+            ("prt_o1", "msg_old1", serde_json::json!({"type": "text", "text": "older prompt"})),
         ];
         for (id, message_id, data) in parts {
-            let session_id = if message_id == "msg_old1" {
-                V1_OLDER_SESSION_ID
-            } else {
-                V1_SESSION_ID
-            };
-            conn.execute(
-                "INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?1, ?2, ?3, 1700000001000, 1700000001000, ?4)",
-                rusqlite::params![id, message_id, session_id, serde_json::to_string(&data).unwrap()],
-            )
-            .expect("insert part");
+            let session_id = if message_id == "msg_old1" { V1_OLDER_SESSION_ID } else { V1_SESSION_ID };
+            conn.execute("INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?1, ?2, ?3, 1700000001000, 1700000001000, ?4)", rusqlite::params![id, message_id, session_id, serde_json::to_string(&data).unwrap()]).expect("insert part");
         }
     }
 
@@ -3077,10 +2360,7 @@ CREATE TABLE event (id INTEGER PRIMARY KEY, type TEXT, payload TEXT);
         let db_path = tmp.path().join("opencode.db");
         create_v1_schema_db(&db_path, tmp.path());
         let conn = OpenCode::open_db(&db_path).expect("open db");
-        assert_eq!(
-            OpenCode::detect_schema(&conn, &db_path).expect("1.x schema"),
-            DbSchema::V1
-        );
+        assert_eq!(OpenCode::detect_schema(&conn, &db_path).expect("1.x schema"), DbSchema::V1);
         assert_eq!(OpenCode::schema_mismatch(&conn, &db_path), None);
     }
 
@@ -3095,9 +2375,7 @@ CREATE TABLE event (id INTEGER PRIMARY KEY, type TEXT, payload TEXT);
         create_v1_schema_db(&db_path, &workspace);
 
         let virtual_path = OpenCode::virtual_session_path(&db_path, V1_SESSION_ID);
-        let session = OpenCode
-            .read_session(&virtual_path)
-            .expect("1.x session must read");
+        let session = OpenCode.read_session(&virtual_path).expect("1.x session must read");
 
         assert_eq!(session.session_id, V1_SESSION_ID);
         assert_eq!(session.provider_slug, "opencode");
@@ -3134,11 +2412,7 @@ CREATE TABLE event (id INTEGER PRIMARY KEY, type TEXT, payload TEXT);
         assert_eq!(assistant.tool_results[0].content, "fn main() {}");
         assert!(!assistant.tool_results[0].is_error);
         assert_eq!(assistant.extra["opencode_message_id"], "msg_asst1");
-        assert_eq!(
-            assistant.extra["opencode_parts"].as_array().map(Vec::len),
-            Some(5),
-            "raw 1.x parts are preserved in extra"
-        );
+        assert_eq!(assistant.extra["opencode_parts"].as_array().map(Vec::len), Some(5), "raw 1.x parts are preserved in extra");
     }
 
     #[test]
@@ -3147,9 +2421,7 @@ CREATE TABLE event (id INTEGER PRIMARY KEY, type TEXT, payload TEXT);
         let db_path = tmp.path().join("opencode.db");
         create_v1_schema_db(&db_path, tmp.path());
 
-        let session = OpenCode
-            .read_session(&db_path)
-            .expect("direct db path must resolve to the newest root session");
+        let session = OpenCode.read_session(&db_path).expect("direct db path must resolve to the newest root session");
         assert_eq!(session.session_id, V1_SESSION_ID);
     }
 
@@ -3160,9 +2432,7 @@ CREATE TABLE event (id INTEGER PRIMARY KEY, type TEXT, payload TEXT);
         create_v1_schema_db(&db_path, tmp.path());
 
         let virtual_path = OpenCode::virtual_session_path(&db_path, "ses_missing");
-        let err = OpenCode
-            .read_session(&virtual_path)
-            .expect_err("unknown id must fail");
+        let err = OpenCode.read_session(&virtual_path).expect_err("unknown id must fail");
         let msg = format!("{err:#}");
         assert!(msg.contains("ses_missing"), "got: {msg}");
     }
@@ -3181,11 +2451,7 @@ CREATE TABLE event (id INTEGER PRIMARY KEY, type TEXT, payload TEXT);
         let ids: Vec<&str> = listed.iter().map(|(id, _)| id.as_str()).collect();
         assert_eq!(ids, vec![V1_SESSION_ID, V1_OLDER_SESSION_ID]);
         for (id, path) in &listed {
-            assert!(
-                path.ends_with(urlencoding::encode(id).as_ref()),
-                "virtual path {} must end with the session id",
-                path.display()
-            );
+            assert!(path.ends_with(urlencoding::encode(id).as_ref()), "virtual path {} must end with the session id", path.display());
         }
     }
 
@@ -3199,9 +2465,7 @@ CREATE TABLE event (id INTEGER PRIMARY KEY, type TEXT, payload TEXT);
         create_v1_schema_db(&db_path, &workspace);
         let _cwd = CwdGuard::change_to(&workspace);
 
-        let err = OpenCode
-            .write_session(&sample_session(&workspace), &WriteOptions { force: false })
-            .expect_err("writing into a live 1.x DB must be refused");
+        let err = OpenCode.write_session(&sample_session(&workspace), &WriteOptions { force: false }).expect_err("writing into a live 1.x DB must be refused");
         let msg = format!("{err:#}");
         assert!(msg.contains("1.x"), "got: {msg}");
 
@@ -3229,31 +2493,15 @@ INSERT INTO session (id, title, time_created) VALUES ('ses_partial', 'partial', 
         .expect("populate fixture schema");
         drop(conn);
 
-        let err = OpenCode
-            .read_session(&db_path)
-            .expect_err("partial schema must not read as an empty DB");
+        let err = OpenCode.read_session(&db_path).expect_err("partial schema must not read as an empty DB");
         let msg = format!("{err:#}");
-        assert!(
-            msg.contains("closest is the 1.x schema"),
-            "error must identify the closest schema, got: {msg}"
-        );
-        assert!(
-            msg.contains("missing table(s): message, part"),
-            "error must name the missing 1.x tables, got: {msg}"
-        );
-        assert!(
-            msg.contains("tables present: event, session"),
-            "error must list the tables actually present, got: {msg}"
-        );
-        assert!(
-            !msg.contains("no OpenCode sessions found"),
-            "must not be misreported as an empty DB, got: {msg}"
-        );
+        assert!(msg.contains("closest is the 1.x schema"), "error must identify the closest schema, got: {msg}");
+        assert!(msg.contains("missing table(s): message, part"), "error must name the missing 1.x tables, got: {msg}");
+        assert!(msg.contains("tables present: event, session"), "error must list the tables actually present, got: {msg}");
+        assert!(!msg.contains("no OpenCode sessions found"), "must not be misreported as an empty DB, got: {msg}");
 
         let virtual_path = OpenCode::virtual_session_path(&db_path, "ses_partial");
-        let err = OpenCode
-            .read_session(&virtual_path)
-            .expect_err("partial schema must fail loudly by virtual path too");
+        let err = OpenCode.read_session(&virtual_path).expect_err("partial schema must fail loudly by virtual path too");
         assert!(format!("{err:#}").contains("missing table(s): message, part"));
     }
 
@@ -3262,19 +2510,13 @@ INSERT INTO session (id, title, time_created) VALUES ('ses_partial', 'partial', 
         let tmp = tempfile::tempdir().expect("tmpdir");
         let db_path = tmp.path().join("opencode.db");
         let conn = Connection::open(&db_path).expect("create fixture db");
-        conn.execute_batch("CREATE TABLE unrelated (id INTEGER PRIMARY KEY);")
-            .expect("populate fixture schema");
+        conn.execute_batch("CREATE TABLE unrelated (id INTEGER PRIMARY KEY);").expect("populate fixture schema");
         drop(conn);
 
-        let err = OpenCode
-            .read_session(&db_path)
-            .expect_err("unknown schema must fail loudly");
+        let err = OpenCode.read_session(&db_path).expect_err("unknown schema must fail loudly");
         let msg = format!("{err:#}");
         assert!(msg.contains("closest is the legacy schema"), "got: {msg}");
-        assert!(
-            msg.contains("missing table(s): sessions, messages"),
-            "got: {msg}"
-        );
+        assert!(msg.contains("missing table(s): sessions, messages"), "got: {msg}");
     }
 
     // ── parse_v1_parts ──────────────────────────────────────────────────
@@ -3387,14 +2629,8 @@ INSERT INTO session (id, title, time_created) VALUES ('ses_partial', 'partial', 
         let conn = Connection::open(&db_path).expect("create empty db");
         let msg = OpenCode::schema_mismatch(&conn, &db_path).expect("empty db must mismatch");
         assert!(msg.contains("no tables at all"), "got: {msg}");
-        assert!(
-            msg.contains("closest is the legacy schema"),
-            "empty db must be reported against the legacy schema: {msg}"
-        );
-        assert!(
-            !msg.contains("closest is the 1.x schema"),
-            "empty db is not a 1.x schema: {msg}"
-        );
+        assert!(msg.contains("closest is the legacy schema"), "empty db must be reported against the legacy schema: {msg}");
+        assert!(!msg.contains("closest is the 1.x schema"), "empty db is not a 1.x schema: {msg}");
     }
 
     // ── XDG_DATA_HOME discovery (issue #26) ─────────────────────────────
@@ -3402,27 +2638,15 @@ INSERT INTO session (id, title, time_created) VALUES ('ses_partial', 'partial', 
     #[test]
     fn xdg_data_db_candidates_prefers_env_then_default() {
         let home = PathBuf::from("/home/user");
-        let candidates =
-            OpenCode::xdg_data_db_candidates(Some("/custom/data"), Some(home.as_path()));
-        assert_eq!(
-            candidates,
-            vec![
-                PathBuf::from("/custom/data/opencode/opencode.db"),
-                PathBuf::from("/home/user/.local/share/opencode/opencode.db"),
-            ]
-        );
+        let candidates = OpenCode::xdg_data_db_candidates(Some("/custom/data"), Some(home.as_path()));
+        assert_eq!(candidates, vec![PathBuf::from("/custom/data/opencode/opencode.db"), PathBuf::from("/home/user/.local/share/opencode/opencode.db"),]);
     }
 
     #[test]
     fn xdg_data_db_candidates_ignores_blank_env() {
         let home = PathBuf::from("/home/user");
         let candidates = OpenCode::xdg_data_db_candidates(Some("  "), Some(home.as_path()));
-        assert_eq!(
-            candidates,
-            vec![PathBuf::from(
-                "/home/user/.local/share/opencode/opencode.db"
-            )]
-        );
+        assert_eq!(candidates, vec![PathBuf::from("/home/user/.local/share/opencode/opencode.db")]);
         assert!(OpenCode::xdg_data_db_candidates(None, None).is_empty());
     }
 
@@ -3486,15 +2710,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         .expect("create 2.x fixture schema");
     }
 
-    fn insert_v2_session(
-        conn: &Connection,
-        id: &str,
-        parent_id: Option<&str>,
-        title: Option<&str>,
-        directory: &str,
-        created: i64,
-        updated: i64,
-    ) {
+    fn insert_v2_session(conn: &Connection, id: &str, parent_id: Option<&str>, title: Option<&str>, directory: &str, created: i64, updated: i64) {
         conn.execute(
             "INSERT INTO session_v2 (id, project_id, parent_id, slug, directory, title, version,
                 agent, model, cost, tokens_input, tokens_output, tokens_reasoning,
@@ -3502,39 +2718,16 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
              VALUES (?1, 'prj_2', ?2, ?3, ?4, ?5, '2.0.0-beta.19187', 'build',
                 '{\"providerID\":\"anthropic\",\"id\":\"claude-sonnet-4\",\"variant\":\"max\"}',
                 0.42, 1200, 340, 55, 900, 100, ?6, ?7)",
-            rusqlite::params![
-                id,
-                parent_id,
-                format!("slug-{id}"),
-                directory,
-                title,
-                created,
-                updated
-            ],
+            rusqlite::params![id, parent_id, format!("slug-{id}"), directory, title, created, updated],
         )
         .expect("insert session_v2 row");
     }
 
-    fn insert_v2_message(
-        conn: &Connection,
-        session_id: &str,
-        id: &str,
-        message_type: &str,
-        seq: i64,
-        time_created: i64,
-        data: &serde_json::Value,
-    ) {
+    fn insert_v2_message(conn: &Connection, session_id: &str, id: &str, message_type: &str, seq: i64, time_created: i64, data: &serde_json::Value) {
         conn.execute(
             "INSERT INTO session_message (id, session_id, type, seq, time_created, time_updated, data)
              VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6)",
-            rusqlite::params![
-                id,
-                session_id,
-                message_type,
-                seq,
-                time_created,
-                serde_json::to_string(data).unwrap()
-            ],
+            rusqlite::params![id, session_id, message_type, seq, time_created, serde_json::to_string(data).unwrap()],
         )
         .expect("insert session_message row");
     }
@@ -3544,11 +2737,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
     /// `packages/schema/src/session-message.ts` (`beta` branch).
     fn v2_transcript_rows(directory: &str) -> Vec<(&'static str, &'static str, serde_json::Value)> {
         vec![
-            (
-                "msg_v2_agent",
-                "agent-switched",
-                serde_json::json!({"agent": "build", "time": {"created": 1_700_000_000_500_i64}}),
-            ),
+            ("msg_v2_agent", "agent-switched", serde_json::json!({"agent": "build", "time": {"created": 1_700_000_000_500_i64}})),
             (
                 "msg_v2_model",
                 "model-switched",
@@ -3712,67 +2901,16 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
 
     fn populate_v2_sessions(conn: &Connection, directory: &Path) {
         let dir = directory.display().to_string();
-        insert_v2_session(
-            conn,
-            V2_SESSION_ID,
-            None,
-            Some("live 2.x session"),
-            &dir,
-            1_700_000_000_000,
-            1_700_000_020_000,
-        );
-        insert_v2_session(
-            conn,
-            V2_OLDER_SESSION_ID,
-            None,
-            None,
-            &dir,
-            1_600_000_000_000,
-            1_600_000_001_000,
-        );
-        insert_v2_session(
-            conn,
-            V2_CHILD_SESSION_ID,
-            Some(V2_SESSION_ID),
-            Some("child"),
-            &dir,
-            1_700_000_030_000,
-            1_700_000_031_000,
-        );
+        insert_v2_session(conn, V2_SESSION_ID, None, Some("live 2.x session"), &dir, 1_700_000_000_000, 1_700_000_020_000);
+        insert_v2_session(conn, V2_OLDER_SESSION_ID, None, None, &dir, 1_600_000_000_000, 1_600_000_001_000);
+        insert_v2_session(conn, V2_CHILD_SESSION_ID, Some(V2_SESSION_ID), Some("child"), &dir, 1_700_000_030_000, 1_700_000_031_000);
 
         for (seq, (id, message_type, data)) in v2_transcript_rows(&dir).into_iter().enumerate() {
-            let created = data
-                .pointer("/time/created")
-                .and_then(serde_json::Value::as_i64)
-                .unwrap();
-            insert_v2_message(
-                conn,
-                V2_SESSION_ID,
-                id,
-                message_type,
-                i64::try_from(seq).unwrap() + 1,
-                created,
-                &data,
-            );
+            let created = data.pointer("/time/created").and_then(serde_json::Value::as_i64).unwrap();
+            insert_v2_message(conn, V2_SESSION_ID, id, message_type, i64::try_from(seq).unwrap() + 1, created, &data);
         }
-        insert_v2_message(
-            conn,
-            V2_OLDER_SESSION_ID,
-            "msg_v2_old1",
-            "user",
-            1,
-            1_600_000_000_000,
-            &serde_json::json!({"text": "older 2.x prompt", "time": {"created": 1_600_000_000_000_i64}}),
-        );
-        insert_v2_message(
-            conn,
-            V2_CHILD_SESSION_ID,
-            "msg_v2_child1",
-            "user",
-            1,
-            1_700_000_030_000,
-            &serde_json::json!({"text": "child prompt", "time": {"created": 1_700_000_030_000_i64}}),
-        );
+        insert_v2_message(conn, V2_OLDER_SESSION_ID, "msg_v2_old1", "user", 1, 1_600_000_000_000, &serde_json::json!({"text": "older 2.x prompt", "time": {"created": 1_600_000_000_000_i64}}));
+        insert_v2_message(conn, V2_CHILD_SESSION_ID, "msg_v2_child1", "user", 1, 1_700_000_030_000, &serde_json::json!({"text": "child prompt", "time": {"created": 1_700_000_030_000_i64}}));
     }
 
     /// Build a fixture DB as OpenCode 2 leaves it after migrating a 1.x DB:
@@ -3791,10 +2929,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         let db_path = tmp.path().join("opencode.db");
         create_v2_schema_db(&db_path, tmp.path());
         let conn = OpenCode::open_db(&db_path).expect("open db");
-        assert_eq!(
-            OpenCode::detect_schema(&conn, &db_path).expect("2.x schema must be detected"),
-            DbSchema::V2
-        );
+        assert_eq!(OpenCode::detect_schema(&conn, &db_path).expect("2.x schema must be detected"), DbSchema::V2);
         assert!(!DbSchema::V2.writable());
     }
 
@@ -3807,21 +2942,14 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
 
         assert!(OpenCode::table_exists(&conn, "session"), "fixture premise");
         assert!(OpenCode::table_exists(&conn, "part"), "fixture premise");
-        assert_eq!(
-            OpenCode::detect_schema(&conn, &db_path).expect("migrated DB must read"),
-            DbSchema::V2,
-            "a migrated DB must be read through the live 2.x tables"
-        );
+        assert_eq!(OpenCode::detect_schema(&conn, &db_path).expect("migrated DB must read"), DbSchema::V2, "a migrated DB must be read through the live 2.x tables");
 
         // Listing and the newest-root lookup go through the 2.x tables too,
         // so the dead pre-migration sessions never surface.
         let ids = OpenCode::all_session_ids(&conn, DbSchema::V2);
         assert!(ids.contains(&V2_SESSION_ID.to_string()));
         assert!(!ids.contains(&V1_SESSION_ID.to_string()));
-        assert_eq!(
-            OpenCode::newest_root_session_id(&conn, DbSchema::V2).as_deref(),
-            Some(V2_SESSION_ID)
-        );
+        assert_eq!(OpenCode::newest_root_session_id(&conn, DbSchema::V2).as_deref(), Some(V2_SESSION_ID));
     }
 
     #[test]
@@ -3829,14 +2957,10 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         let tmp = tempfile::tempdir().expect("tmpdir");
         let db_path = tmp.path().join("opencode.db");
         let conn = Connection::open(&db_path).expect("create fixture db");
-        conn.execute_batch("CREATE TABLE session_v2 (id TEXT PRIMARY KEY, title TEXT);")
-            .expect("populate fixture schema");
+        conn.execute_batch("CREATE TABLE session_v2 (id TEXT PRIMARY KEY, title TEXT);").expect("populate fixture schema");
         let msg = OpenCode::schema_mismatch(&conn, &db_path).expect("partial 2.x must mismatch");
         assert!(msg.contains("closest is the 2.x schema"), "got: {msg}");
-        assert!(
-            msg.contains("missing table(s): session_message"),
-            "got: {msg}"
-        );
+        assert!(msg.contains("missing table(s): session_message"), "got: {msg}");
     }
 
     #[test]
@@ -3848,9 +2972,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         create_v2_schema_db(&db_path, &workspace);
 
         let virtual_path = OpenCode::virtual_session_path(&db_path, V2_SESSION_ID);
-        let session = OpenCode
-            .read_session(&virtual_path)
-            .expect("2.x session must read");
+        let session = OpenCode.read_session(&virtual_path).expect("2.x session must read");
 
         assert_eq!(session.session_id, V2_SESSION_ID);
         assert_eq!(session.provider_slug, "opencode");
@@ -3887,50 +3009,23 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
 
         // Bookkeeping rows (agent/model/location-switched) and the running
         // compaction are skipped; everything else maps in `seq` order.
-        let roles: Vec<(&MessageRole, &str)> = session
-            .messages
-            .iter()
-            .map(|m| (&m.role, m.extra["opencode_message_type"].as_str().unwrap()))
-            .collect();
+        let roles: Vec<(&MessageRole, &str)> = session.messages.iter().map(|m| (&m.role, m.extra["opencode_message_type"].as_str().unwrap())).collect();
         assert_eq!(
             roles,
-            vec![
-                (&MessageRole::User, "user"),
-                (&MessageRole::Assistant, "assistant"),
-                (&MessageRole::Tool, "shell"),
-                (&MessageRole::Tool, "synthetic"),
-                (&MessageRole::System, "system"),
-                (&MessageRole::System, "compaction"),
-                (&MessageRole::User, "user"),
-                (&MessageRole::Assistant, "assistant"),
-            ]
+            vec![(&MessageRole::User, "user"), (&MessageRole::Assistant, "assistant"), (&MessageRole::Tool, "shell"), (&MessageRole::Tool, "synthetic"), (&MessageRole::System, "system"), (&MessageRole::System, "compaction"), (&MessageRole::User, "user"), (&MessageRole::Assistant, "assistant"),]
         );
         for (i, m) in session.messages.iter().enumerate() {
             assert_eq!(m.idx, i);
         }
 
         let user = &session.messages[0];
-        assert_eq!(
-            user.content,
-            "Please inspect src/main.rs\n[file: screenshot.png]"
-        );
+        assert_eq!(user.content, "Please inspect src/main.rs\n[file: screenshot.png]");
         assert_eq!(user.timestamp, Some(1_700_000_001_000));
         assert_eq!(user.extra["opencode_message_id"], "msg_v2_user1");
         assert_eq!(user.extra["opencode_seq"], 3);
-        assert!(
-            user.extra["opencode_message"]["files"][0]
-                .get("data")
-                .is_none(),
-            "inline attachment bytes must not be duplicated into extra"
-        );
-        assert_eq!(
-            user.extra["opencode_message"]["files"][0]["data_omitted_bytes"],
-            12
-        );
-        assert_eq!(
-            user.extra["opencode_message"]["files"][0]["name"],
-            "screenshot.png"
-        );
+        assert!(user.extra["opencode_message"]["files"][0].get("data").is_none(), "inline attachment bytes must not be duplicated into extra");
+        assert_eq!(user.extra["opencode_message"]["files"][0]["data_omitted_bytes"], 12);
+        assert_eq!(user.extra["opencode_message"]["files"][0]["name"], "screenshot.png");
 
         let assistant = &session.messages[1];
         assert_eq!(assistant.content, "Inspecting now.");
@@ -3943,71 +3038,35 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         assert_eq!(assistant.tool_calls[1].id.as_deref(), Some("call_v2_2"));
         assert_eq!(assistant.tool_calls[1].name, "bash");
         assert_eq!(assistant.tool_results.len(), 2);
-        assert_eq!(
-            assistant.tool_results[0].call_id.as_deref(),
-            Some("call_v2_1")
-        );
+        assert_eq!(assistant.tool_results[0].call_id.as_deref(), Some("call_v2_1"));
         assert_eq!(assistant.tool_results[0].content, "fn main() {}");
         assert!(!assistant.tool_results[0].is_error);
-        assert_eq!(
-            assistant.tool_results[1].call_id.as_deref(),
-            Some("call_v2_2")
-        );
-        assert_eq!(
-            assistant.tool_results[1].content,
-            "Tool.Error: cat: missing.txt: No such file"
-        );
+        assert_eq!(assistant.tool_results[1].call_id.as_deref(), Some("call_v2_2"));
+        assert_eq!(assistant.tool_results[1].content, "Tool.Error: cat: missing.txt: No such file");
         assert!(assistant.tool_results[1].is_error);
-        assert_eq!(
-            assistant.extra["opencode_message"]["model"]["variant"],
-            "max"
-        );
+        assert_eq!(assistant.extra["opencode_message"]["model"]["variant"], "max");
 
         let shell = &session.messages[2];
-        assert_eq!(
-            shell.content,
-            "The following shell command was executed by the user:\n\nCommand:\nls src\n\nOutput:\nmain.rs\nlib.rs"
-        );
+        assert_eq!(shell.content, "The following shell command was executed by the user:\n\nCommand:\nls src\n\nOutput:\nmain.rs\nlib.rs");
         assert_eq!(shell.extra["opencode_message"]["exit"], 0);
 
         let synthetic = &session.messages[3];
-        assert!(
-            synthetic
-                .content
-                .starts_with("User shell command failed to start:")
-        );
+        assert!(synthetic.content.starts_with("User shell command failed to start:"));
 
         let system = &session.messages[4];
-        assert_eq!(
-            system.content,
-            "AGENTS.md changed: run cargo fmt before committing."
-        );
+        assert_eq!(system.content, "AGENTS.md changed: run cargo fmt before committing.");
 
         let compaction = &session.messages[5];
         assert!(compaction.content.starts_with("Conversation checkpoint:"));
-        assert!(
-            compaction
-                .content
-                .contains("Summary:\nWe inspected src/main.rs and found an empty main.")
-        );
-        assert!(
-            compaction
-                .content
-                .contains("Recent context:\nUser asked to inspect src/main.rs.")
-        );
+        assert!(compaction.content.contains("Summary:\nWe inspected src/main.rs and found an empty main."));
+        assert!(compaction.content.contains("Recent context:\nUser asked to inspect src/main.rs."));
 
         let running_tool = &session.messages[7];
         assert_eq!(running_tool.author.as_deref(), Some("gpt-5"));
         assert_eq!(running_tool.tool_calls.len(), 1);
         assert_eq!(running_tool.tool_calls[0].name, "edit");
-        assert!(
-            running_tool.tool_results.is_empty(),
-            "a running tool has no outcome yet"
-        );
-        assert_eq!(
-            running_tool.content, "",
-            "no text, no reasoning, no settled result"
-        );
+        assert!(running_tool.tool_results.is_empty(), "a running tool has no outcome yet");
+        assert_eq!(running_tool.content, "", "no text, no reasoning, no settled result");
     }
 
     #[test]
@@ -4017,9 +3076,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         create_v2_schema_db(&db_path, tmp.path());
 
         // The child session is newer but has a parent; the live root wins.
-        let session = OpenCode
-            .read_session(&db_path)
-            .expect("direct db path must resolve to the newest root session");
+        let session = OpenCode.read_session(&db_path).expect("direct db path must resolve to the newest root session");
         assert_eq!(session.session_id, V2_SESSION_ID);
     }
 
@@ -4033,15 +3090,8 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         let session = OpenCode.read_session(&virtual_path).expect("older session");
         assert_eq!(session.title.as_deref(), Some("older 2.x prompt"));
         assert_eq!(session.messages.len(), 1);
-        assert_eq!(
-            session.model_name.as_deref(),
-            Some("claude-sonnet-4"),
-            "no assistant turns: fall back to session_v2.model.id"
-        );
-        assert_eq!(
-            session.metadata["parent_session_id"],
-            serde_json::Value::Null
-        );
+        assert_eq!(session.model_name.as_deref(), Some("claude-sonnet-4"), "no assistant turns: fall back to session_v2.model.id");
+        assert_eq!(session.metadata["parent_session_id"], serde_json::Value::Null);
     }
 
     #[test]
@@ -4062,9 +3112,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         create_v2_schema_db(&db_path, tmp.path());
 
         let virtual_path = OpenCode::virtual_session_path(&db_path, "ses_missing_v2");
-        let err = OpenCode
-            .read_session(&virtual_path)
-            .expect_err("unknown id must fail");
+        let err = OpenCode.read_session(&virtual_path).expect_err("unknown id must fail");
         assert!(format!("{err:#}").contains("ses_missing_v2"));
     }
 
@@ -4074,9 +3122,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         let db_path = tmp.path().join("opencode.db");
         create_migrated_v1_v2_db(&db_path, tmp.path());
 
-        let live = OpenCode
-            .read_session(&OpenCode::virtual_session_path(&db_path, V2_SESSION_ID))
-            .expect("2.x session must read from a migrated DB");
+        let live = OpenCode.read_session(&OpenCode::virtual_session_path(&db_path, V2_SESSION_ID)).expect("2.x session must read from a migrated DB");
         assert_eq!(live.metadata["opencode_schema"], "v2");
         assert_eq!(live.messages.len(), 8);
 
@@ -4086,9 +3132,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
 
         // The stale 1.x session id is not reachable: it only exists in the
         // dead tables.
-        let err = OpenCode
-            .read_session(&OpenCode::virtual_session_path(&db_path, V1_SESSION_ID))
-            .expect_err("stale 1.x ids must not resolve");
+        let err = OpenCode.read_session(&OpenCode::virtual_session_path(&db_path, V1_SESSION_ID)).expect_err("stale 1.x ids must not resolve");
         assert!(format!("{err:#}").contains(V1_SESSION_ID));
     }
 
@@ -4104,10 +3148,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
 
         let listed = OpenCode.list_sessions().expect("should return Some");
         let ids: Vec<&str> = listed.iter().map(|(id, _)| id.as_str()).collect();
-        assert_eq!(
-            ids,
-            vec![V2_CHILD_SESSION_ID, V2_SESSION_ID, V2_OLDER_SESSION_ID]
-        );
+        assert_eq!(ids, vec![V2_CHILD_SESSION_ID, V2_SESSION_ID, V2_OLDER_SESSION_ID]);
 
         // `casr list` renders title / directory / time from a full read of
         // each listed path, so every listed path must read.
@@ -4123,10 +3164,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         // (macOS reports `/var/...` tempdirs as `/private/var/...`), so the
         // expectation has to be built from the canonical path too.
         let canonical_db = db_path.canonicalize().expect("db path canonicalizes");
-        assert_eq!(
-            OpenCode.owns_session(V2_SESSION_ID),
-            Some(OpenCode::virtual_session_path(&canonical_db, V2_SESSION_ID))
-        );
+        assert_eq!(OpenCode.owns_session(V2_SESSION_ID), Some(OpenCode::virtual_session_path(&canonical_db, V2_SESSION_ID)));
     }
 
     #[test]
@@ -4141,10 +3179,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
 
         let listed = OpenCode.list_sessions().expect("should return Some");
         let ids: Vec<&str> = listed.iter().map(|(id, _)| id.as_str()).collect();
-        assert_eq!(
-            ids,
-            vec![V2_CHILD_SESSION_ID, V2_SESSION_ID, V2_OLDER_SESSION_ID]
-        );
+        assert_eq!(ids, vec![V2_CHILD_SESSION_ID, V2_SESSION_ID, V2_OLDER_SESSION_ID]);
         assert!(OpenCode.owns_session(V1_SESSION_ID).is_none());
     }
 
@@ -4159,23 +3194,14 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         let before = std::fs::read(&db_path).expect("read db bytes");
         let _cwd = CwdGuard::change_to(&workspace);
 
-        let err = OpenCode
-            .write_session(&sample_session(&workspace), &WriteOptions { force: true })
-            .expect_err("writing into a live 2.x DB must be refused");
+        let err = OpenCode.write_session(&sample_session(&workspace), &WriteOptions { force: true }).expect_err("writing into a live 2.x DB must be refused");
         let msg = format!("{err:#}");
         assert!(msg.contains("2.x"), "got: {msg}");
         assert!(msg.contains("session_v2/session_message"), "got: {msg}");
         assert!(msg.contains("projection"), "must explain why: {msg}");
-        assert!(
-            msg.contains("OPENCODE_DB_PATH"),
-            "must say what to do: {msg}"
-        );
+        assert!(msg.contains("OPENCODE_DB_PATH"), "must say what to do: {msg}");
 
-        assert_eq!(
-            std::fs::read(&db_path).expect("read db bytes"),
-            before,
-            "the refusal must leave the DB byte-identical"
-        );
+        assert_eq!(std::fs::read(&db_path).expect("read db bytes"), before, "the refusal must leave the DB byte-identical");
         let conn = OpenCode::open_db(&db_path).expect("open db");
         assert!(!OpenCode::table_exists(&conn, "sessions"));
         assert!(!OpenCode::table_exists(&conn, "messages"));
@@ -4191,9 +3217,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         create_migrated_v1_v2_db(&db_path, &workspace);
         let _cwd = CwdGuard::change_to(&workspace);
 
-        let err = OpenCode
-            .write_session(&sample_session(&workspace), &WriteOptions { force: false })
-            .expect_err("writing into a migrated DB must be refused");
+        let err = OpenCode.write_session(&sample_session(&workspace), &WriteOptions { force: false }).expect_err("writing into a migrated DB must be refused");
         let msg = format!("{err:#}");
         assert!(msg.contains("2.x schema"), "got: {msg}");
     }
@@ -4209,9 +3233,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         let before = std::fs::read(&db_path).expect("read db bytes");
         let _cwd = CwdGuard::change_to(&workspace);
 
-        let err = OpenCode
-            .write_session(&sample_session(&workspace), &WriteOptions { force: false })
-            .expect_err("writing into a live 1.x DB must be refused");
+        let err = OpenCode.write_session(&sample_session(&workspace), &WriteOptions { force: false }).expect_err("writing into a live 1.x DB must be refused");
         assert!(format!("{err:#}").contains("1.x schema"));
         assert_eq!(std::fs::read(&db_path).expect("read db bytes"), before);
     }
@@ -4244,10 +3266,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
     #[test]
     fn map_v2_message_skips_bookkeeping_kinds() {
         for kind in ["model-switched", "agent-switched", "location-switched"] {
-            assert!(
-                map_v2_message(kind, &serde_json::json!({"text": "ignored"})).is_none(),
-                "{kind} must be skipped"
-            );
+            assert!(map_v2_message(kind, &serde_json::json!({"text": "ignored"})).is_none(), "{kind} must be skipped");
         }
     }
 
@@ -4255,8 +3274,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
     fn map_v2_message_compaction_only_when_completed() {
         let running = serde_json::json!({"status": "running", "summary": "s", "recent": "r"});
         assert!(map_v2_message("compaction", &running).is_none());
-        let failed =
-            serde_json::json!({"status": "failed", "error": {"type": "x", "message": "y"}});
+        let failed = serde_json::json!({"status": "failed", "error": {"type": "x", "message": "y"}});
         assert!(map_v2_message("compaction", &failed).is_none());
 
         let completed = serde_json::json!({"status": "completed", "summary": "s", "recent": ""});
@@ -4281,8 +3299,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
 
     #[test]
     fn map_v2_message_unknown_kind_with_text_keeps_its_own_role() {
-        let turn = map_v2_message("future-kind", &serde_json::json!({"text": "hello"}))
-            .expect("text-bearing unknown kind is kept");
+        let turn = map_v2_message("future-kind", &serde_json::json!({"text": "hello"})).expect("text-bearing unknown kind is kept");
         assert_eq!(turn.role, MessageRole::Other("future-kind".to_string()));
         assert!(map_v2_message("future-kind", &serde_json::json!({"x": 1})).is_none());
     }
@@ -4294,10 +3311,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
             "output": {"output": "done", "cursor": 4, "size": 4, "truncated": false},
             "metadata": {"background": true}
         });
-        assert!(
-            map_v2_message("shell", &background).is_none(),
-            "background shell output arrives via its synthetic completion notice"
-        );
+        assert!(map_v2_message("shell", &background).is_none(), "background shell output arrives via its synthetic completion notice");
         let foreground = serde_json::json!({
             "command": "pwd", "status": "exited", "exit": 0,
             "output": {"output": "/work", "cursor": 5, "size": 5, "truncated": false},
@@ -4344,10 +3358,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         }]);
         let (text, _, results) = parse_v2_assistant_content(&content);
         assert_eq!(results[0].content, "hello\n[file: x.png]");
-        assert_eq!(
-            text, "hello\n[file: x.png]",
-            "result text stands in when there is no assistant text"
-        );
+        assert_eq!(text, "hello\n[file: x.png]", "result text stands in when there is no assistant text");
 
         // Older betas: a bare `output` string.
         let content = serde_json::json!([{
@@ -4391,13 +3402,10 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
         assert_eq!(text, "answer");
         assert!(calls.is_empty() && results.is_empty());
 
-        let (text, _, _) = parse_v2_assistant_content(
-            &serde_json::json!([{"type": "reasoning", "text": "thinking"}]),
-        );
+        let (text, _, _) = parse_v2_assistant_content(&serde_json::json!([{"type": "reasoning", "text": "thinking"}]));
         assert_eq!(text, "thinking");
 
-        let (text, calls, results) =
-            parse_v2_assistant_content(&serde_json::json!({"not": "array"}));
+        let (text, calls, results) = parse_v2_assistant_content(&serde_json::json!({"not": "array"}));
         assert!(text.is_empty() && calls.is_empty() && results.is_empty());
     }
 
@@ -4405,14 +3413,8 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_2', '/work', 'work');
     fn v2_error_text_shapes() {
         assert_eq!(v2_error_text(None), "");
         assert_eq!(v2_error_text(Some(&serde_json::json!("plain"))), "plain");
-        assert_eq!(
-            v2_error_text(Some(&serde_json::json!({"type": "T", "message": "m"}))),
-            "T: m"
-        );
-        assert_eq!(
-            v2_error_text(Some(&serde_json::json!({"message": "m"}))),
-            "m"
-        );
+        assert_eq!(v2_error_text(Some(&serde_json::json!({"type": "T", "message": "m"}))), "T: m");
+        assert_eq!(v2_error_text(Some(&serde_json::json!({"message": "m"}))), "m");
         assert_eq!(v2_error_text(Some(&serde_json::json!({"type": "T"}))), "T");
         assert_eq!(v2_error_text(Some(&serde_json::json!({}))), "");
     }

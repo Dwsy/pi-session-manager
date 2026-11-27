@@ -88,16 +88,8 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_it', '/work', 'work');
     .expect("insert session");
 
     let rows: Vec<(&str, &str, serde_json::Value)> = vec![
-        (
-            "msg_it_model",
-            "model-switched",
-            serde_json::json!({"model": {"providerID": "anthropic", "id": "claude-sonnet-4"}, "time": {"created": 1_700_000_000_500_i64}}),
-        ),
-        (
-            "msg_it_user1",
-            "user",
-            serde_json::json!({"text": "Please inspect src/main.rs", "time": {"created": 1_700_000_001_000_i64}}),
-        ),
+        ("msg_it_model", "model-switched", serde_json::json!({"model": {"providerID": "anthropic", "id": "claude-sonnet-4"}, "time": {"created": 1_700_000_000_500_i64}})),
+        ("msg_it_user1", "user", serde_json::json!({"text": "Please inspect src/main.rs", "time": {"created": 1_700_000_001_000_i64}})),
         (
             "msg_it_asst1",
             "assistant",
@@ -132,16 +124,8 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_it', '/work', 'work');
                 "time": {"created": 1_700_000_010_000_i64, "completed": 1_700_000_010_200_i64}
             }),
         ),
-        (
-            "msg_it_synth",
-            "synthetic",
-            serde_json::json!({"text": "Background shell finished: ls src", "time": {"created": 1_700_000_011_000_i64}}),
-        ),
-        (
-            "msg_it_system",
-            "system",
-            serde_json::json!({"text": "Instructions updated.", "time": {"created": 1_700_000_012_000_i64}}),
-        ),
+        ("msg_it_synth", "synthetic", serde_json::json!({"text": "Background shell finished: ls src", "time": {"created": 1_700_000_011_000_i64}})),
+        ("msg_it_system", "system", serde_json::json!({"text": "Instructions updated.", "time": {"created": 1_700_000_012_000_i64}})),
         (
             "msg_it_compact",
             "compaction",
@@ -151,11 +135,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_it', '/work', 'work');
                 "time": {"created": 1_700_000_013_000_i64}
             }),
         ),
-        (
-            "msg_it_user2",
-            "user",
-            serde_json::json!({"text": "Add a hello world.", "time": {"created": 1_700_000_014_000_i64}}),
-        ),
+        ("msg_it_user2", "user", serde_json::json!({"text": "Add a hello world.", "time": {"created": 1_700_000_014_000_i64}})),
         (
             "msg_it_asst2",
             "assistant",
@@ -172,14 +152,7 @@ INSERT INTO project (id, worktree, name) VALUES ('prj_it', '/work', 'work');
         conn.execute(
             "INSERT INTO session_message (id, session_id, type, seq, time_created, time_updated, data)
              VALUES (?1, ?2, ?3, ?4, ?5, ?5, ?6)",
-            rusqlite::params![
-                id,
-                SESSION_ID,
-                kind,
-                i64::try_from(seq).unwrap() + 1,
-                created,
-                serde_json::to_string(&data).unwrap()
-            ],
+            rusqlite::params![id, SESSION_ID, kind, i64::try_from(seq).unwrap() + 1, created, serde_json::to_string(&data).unwrap()],
         )
         .expect("insert message");
     }
@@ -197,9 +170,7 @@ fn read_v2_fixture(tmp: &Path) -> CanonicalSession {
     let listed = OpenCode.list_sessions().expect("opencode lists");
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].0, SESSION_ID);
-    let session = OpenCode
-        .read_session(&listed[0].1)
-        .expect("2.x session reads");
+    let session = OpenCode.read_session(&listed[0].1).expect("2.x session reads");
     assert_eq!(session.title.as_deref(), Some("integration session"));
     assert_eq!(session.workspace.as_deref(), Some(workspace.as_path()));
     assert_eq!(session.started_at, Some(1_700_000_000_000));
@@ -217,41 +188,16 @@ fn roundtrip_2x_session_into_claude_code_keeps_transcript() {
     let tmp = tempfile::tempdir().unwrap();
     let source = read_v2_fixture(tmp.path());
     assert_eq!(source.messages.len(), 8, "model-switched is skipped");
-    let kinds: Vec<&str> = source
-        .messages
-        .iter()
-        .map(|m| m.extra["opencode_message_type"].as_str().unwrap())
-        .collect();
-    assert_eq!(
-        kinds,
-        [
-            "user",
-            "assistant",
-            "shell",
-            "synthetic",
-            "system",
-            "compaction",
-            "user",
-            "assistant"
-        ]
-    );
+    let kinds: Vec<&str> = source.messages.iter().map(|m| m.extra["opencode_message_type"].as_str().unwrap()).collect();
+    assert_eq!(kinds, ["user", "assistant", "shell", "synthetic", "system", "compaction", "user", "assistant"]);
 
     let cc_home = tmp.path().join("claude-home");
     let _cc_env = EnvGuard::set("CLAUDE_HOME", &cc_home);
-    let written = ClaudeCode
-        .write_session(&source, &WriteOptions { force: false })
-        .expect("Opc 2.x → CC write");
-    let readback = ClaudeCode
-        .read_session(&written.paths[0])
-        .expect("CC read-back");
+    let written = ClaudeCode.write_session(&source, &WriteOptions { force: false }).expect("Opc 2.x → CC write");
+    let readback = ClaudeCode.read_session(&written.paths[0]).expect("CC read-back");
 
     assert_eq!(readback.messages.len(), source.messages.len());
-    for (i, (orig, rb)) in source
-        .messages
-        .iter()
-        .zip(readback.messages.iter())
-        .enumerate()
-    {
+    for (i, (orig, rb)) in source.messages.iter().zip(readback.messages.iter()).enumerate() {
         let expected_role = match orig.role {
             MessageRole::Assistant => MessageRole::Assistant,
             _ => MessageRole::User,
@@ -271,16 +217,9 @@ fn roundtrip_2x_session_into_claude_code_keeps_transcript() {
     assert_eq!(assistant.tool_calls[0].arguments["filePath"], "src/main.rs");
     assert_eq!(assistant.tool_results[0].content, "fn main() {}");
     assert!(assistant.tool_results[1].is_error);
-    assert_eq!(
-        assistant.tool_results[1].content,
-        "Tool.Error: no such file"
-    );
+    assert_eq!(assistant.tool_results[1].content, "Tool.Error: no such file");
     assert!(readback.messages[2].content.contains("Command:\nls src"));
-    assert!(
-        readback.messages[5]
-            .content
-            .contains("We looked at main.rs.")
-    );
+    assert!(readback.messages[5].content.contains("We looked at main.rs."));
 }
 
 /// Writing back into the live 2.x DB through the env override is refused
@@ -294,16 +233,10 @@ fn writing_into_live_2x_db_via_env_override_is_refused() {
     let before = std::fs::read(&db_path).unwrap();
 
     let _env = EnvGuard::set("OPENCODE_DB_PATH", &db_path);
-    let err = OpenCode
-        .write_session(&source, &WriteOptions { force: true })
-        .expect_err("live 2.x DB must refuse writes");
+    let err = OpenCode.write_session(&source, &WriteOptions { force: true }).expect_err("live 2.x DB must refuse writes");
     let msg = format!("{err:#}");
     assert!(msg.contains("2.x schema"), "got: {msg}");
     assert!(msg.contains("session_v2/session_message"), "got: {msg}");
     assert!(msg.contains("projection"), "got: {msg}");
-    assert_eq!(
-        std::fs::read(&db_path).unwrap(),
-        before,
-        "DB must be untouched"
-    );
+    assert_eq!(std::fs::read(&db_path).unwrap(), before, "DB must be untouched");
 }

@@ -56,10 +56,7 @@ use anyhow::Context;
 use tracing::{debug, info, trace};
 
 use crate::discovery::DetectionResult;
-use crate::model::{
-    CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, parse_timestamp,
-    reindex_messages, truncate_title,
-};
+use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, parse_timestamp, reindex_messages, truncate_title};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// Provider slug used in canonical metadata.
@@ -125,11 +122,7 @@ impl Provider for Kiro {
         }
 
         trace!(provider = SLUG, ?evidence, installed, "detection");
-        DetectionResult {
-            installed,
-            version: None,
-            evidence,
-        }
+        DetectionResult { installed, version: None, evidence }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
@@ -163,28 +156,21 @@ impl Provider for Kiro {
         let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
         let mut sessions: Vec<(String, PathBuf)> = Vec::new();
 
-        let mut push =
-            |id: String, path: PathBuf, seen: &mut std::collections::BTreeSet<String>| {
-                if seen.insert(id.clone()) {
-                    sessions.push((id, path));
-                }
-            };
+        let mut push = |id: String, path: PathBuf, seen: &mut std::collections::BTreeSet<String>| {
+            if seen.insert(id.clone()) {
+                sessions.push((id, path));
+            }
+        };
 
         let entries = std::fs::read_dir(&dir).into_iter().flatten().flatten();
         // Two passes so `.json` wins as the anchor path over a bare `.jsonl`.
         let paths: Vec<PathBuf> = entries.map(|e| e.path()).collect();
-        for path in paths
-            .iter()
-            .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("json") && p.is_file())
-        {
+        for path in paths.iter().filter(|p| p.extension().and_then(|e| e.to_str()) == Some("json") && p.is_file()) {
             if let Some(id) = session_id_from_path(path) {
                 push(id, path.clone(), &mut seen);
             }
         }
-        for path in paths
-            .iter()
-            .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl") && p.is_file())
-        {
+        for path in paths.iter().filter(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl") && p.is_file()) {
             if let Some(id) = session_id_from_path(path) {
                 push(id, path.clone(), &mut seen);
             }
@@ -204,26 +190,15 @@ impl Provider for Kiro {
 
         // --- Metadata (.json) ---------------------------------------------
         let meta: serde_json::Value = if json_path.is_file() {
-            let text = std::fs::read_to_string(&json_path)
-                .with_context(|| format!("failed to read {}", json_path.display()))?;
-            serde_json::from_str(&text)
-                .with_context(|| format!("failed to parse JSON {}", json_path.display()))?
+            let text = std::fs::read_to_string(&json_path).with_context(|| format!("failed to read {}", json_path.display()))?;
+            serde_json::from_str(&text).with_context(|| format!("failed to parse JSON {}", json_path.display()))?
         } else {
             serde_json::Value::Null
         };
 
-        let session_id = meta
-            .get("session_id")
-            .and_then(|v| v.as_str())
-            .map(String::from)
-            .or_else(|| session_id_from_path(path))
-            .unwrap_or_else(|| "unknown".to_string());
+        let session_id = meta.get("session_id").and_then(|v| v.as_str()).map(String::from).or_else(|| session_id_from_path(path)).unwrap_or_else(|| "unknown".to_string());
 
-        let workspace = meta
-            .get("cwd")
-            .and_then(|v| v.as_str())
-            .filter(|s| !s.trim().is_empty())
-            .map(PathBuf::from);
+        let workspace = meta.get("cwd").and_then(|v| v.as_str()).filter(|s| !s.trim().is_empty()).map(PathBuf::from);
 
         let started_at = meta.get("created_at").and_then(parse_timestamp);
         let mut ended_at = meta.get("updated_at").and_then(parse_timestamp);
@@ -231,8 +206,7 @@ impl Provider for Kiro {
         // --- Conversation journal (.jsonl) --------------------------------
         let mut messages: Vec<CanonicalMessage> = Vec::new();
         if jsonl_path.is_file() {
-            let text = std::fs::read_to_string(&jsonl_path)
-                .with_context(|| format!("failed to read {}", jsonl_path.display()))?;
+            let text = std::fs::read_to_string(&jsonl_path).with_context(|| format!("failed to read {}", jsonl_path.display()))?;
             for (lineno, line) in text.lines().enumerate() {
                 let line = line.trim();
                 if line.is_empty() {
@@ -255,37 +229,15 @@ impl Provider for Kiro {
         reindex_messages(&mut messages);
 
         // --- Title --------------------------------------------------------
-        let title = meta
-            .get("title")
-            .and_then(|v| v.as_str())
-            .filter(|s| !s.trim().is_empty())
-            .map(|s| truncate_title(s, 100))
-            .or_else(|| {
-                messages
-                    .iter()
-                    .find(|m| m.role == MessageRole::User)
-                    .map(|m| truncate_title(&m.content, 100))
-            });
+        let title = meta.get("title").and_then(|v| v.as_str()).filter(|s| !s.trim().is_empty()).map(|s| truncate_title(s, 100)).or_else(|| messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100)));
 
         // --- Model name ---------------------------------------------------
         // Kiro records the model on each `thinking` part (`modelId`) and may
         // also carry it in `session_state.rts_model_state.model_info`.
-        let model_name = messages
-            .iter()
-            .filter_map(|m| m.author.as_deref())
-            .find(|a| !a.is_empty() && *a != "user" && *a != "reasoning")
-            .map(String::from)
-            .or_else(|| {
-                meta.pointer("/session_state/rts_model_state/model_info")
-                    .and_then(model_name_from_info)
-            });
+        let model_name = messages.iter().filter_map(|m| m.author.as_deref()).find(|a| !a.is_empty() && *a != "user" && *a != "reasoning").map(String::from).or_else(|| meta.pointer("/session_state/rts_model_state/model_info").and_then(model_name_from_info));
 
         // --- History (.history) -------------------------------------------
-        let history = if history_path.is_file() {
-            std::fs::read_to_string(&history_path).ok()
-        } else {
-            None
-        };
+        let history = if history_path.is_file() { std::fs::read_to_string(&history_path).ok() } else { None };
 
         // --- Metadata bag (preserved for round-trip fidelity) -------------
         let mut metadata = serde_json::Map::new();
@@ -306,34 +258,14 @@ impl Provider for Kiro {
 
         debug!(session_id, messages = messages.len(), "Kiro session parsed");
 
-        Ok(CanonicalSession {
-            session_id,
-            provider_slug: SLUG.to_string(),
-            workspace,
-            title,
-            started_at,
-            ended_at,
-            messages,
-            metadata: serde_json::Value::Object(metadata),
-            source_path: if json_path.is_file() {
-                json_path
-            } else {
-                jsonl_path
-            },
-            model_name,
-        })
+        Ok(CanonicalSession { session_id, provider_slug: SLUG.to_string(), workspace, title, started_at, ended_at, messages, metadata: serde_json::Value::Object(metadata), source_path: if json_path.is_file() { json_path } else { jsonl_path }, model_name })
     }
 
-    fn write_session(
-        &self,
-        session: &CanonicalSession,
-        opts: &WriteOptions,
-    ) -> anyhow::Result<WrittenSession> {
+    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
         let target_session_id = uuid::Uuid::new_v4().to_string();
         let now = jiff::Timestamp::now();
 
-        let dir = Self::sessions_dir()
-            .ok_or_else(|| anyhow::anyhow!("cannot determine Kiro sessions directory"))?;
+        let dir = Self::sessions_dir().ok_or_else(|| anyhow::anyhow!("cannot determine Kiro sessions directory"))?;
         let json_path = dir.join(format!("{target_session_id}.json"));
         let jsonl_path = dir.join(format!("{target_session_id}.jsonl"));
         let history_path = dir.join(format!("{target_session_id}.history"));
@@ -345,69 +277,23 @@ impl Provider for Kiro {
         );
 
         // --- Metadata (.json) ---------------------------------------------
-        let created_at = session
-            .started_at
-            .and_then(|ms| jiff::Timestamp::from_millisecond(ms).ok())
-            .unwrap_or(now);
-        let updated_at = session
-            .ended_at
-            .and_then(|ms| jiff::Timestamp::from_millisecond(ms).ok())
-            .unwrap_or(now);
+        let created_at = session.started_at.and_then(|ms| jiff::Timestamp::from_millisecond(ms).ok()).unwrap_or(now);
+        let updated_at = session.ended_at.and_then(|ms| jiff::Timestamp::from_millisecond(ms).ok()).unwrap_or(now);
 
         let mut meta = serde_json::Map::new();
-        meta.insert(
-            "session_id".into(),
-            serde_json::Value::String(target_session_id.clone()),
-        );
-        meta.insert(
-            "cwd".into(),
-            serde_json::Value::String(
-                session
-                    .workspace
-                    .as_ref()
-                    .map(|p| p.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
-            ),
-        );
-        meta.insert(
-            "created_at".into(),
-            serde_json::Value::String(rfc3339_micros(created_at)),
-        );
-        meta.insert(
-            "updated_at".into(),
-            serde_json::Value::String(rfc3339_micros(updated_at)),
-        );
-        meta.insert(
-            "title".into(),
-            serde_json::Value::String(session.title.clone().unwrap_or_default()),
-        );
+        meta.insert("session_id".into(), serde_json::Value::String(target_session_id.clone()));
+        meta.insert("cwd".into(), serde_json::Value::String(session.workspace.as_ref().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default()));
+        meta.insert("created_at".into(), serde_json::Value::String(rfc3339_micros(created_at)));
+        meta.insert("updated_at".into(), serde_json::Value::String(rfc3339_micros(updated_at)));
+        meta.insert("title".into(), serde_json::Value::String(session.title.clone().unwrap_or_default()));
         // Preserve parent/reason/session_state from the canonical metadata bag
         // when present so a Kiro→…→Kiro round-trip keeps the nested state.
-        meta.insert(
-            "parent_session_id".into(),
-            session
-                .metadata
-                .get("parent_session_id")
-                .cloned()
-                .unwrap_or(serde_json::Value::Null),
-        );
-        meta.insert(
-            "session_created_reason".into(),
-            session
-                .metadata
-                .get("session_created_reason")
-                .cloned()
-                .unwrap_or(serde_json::Value::Null),
-        );
-        let session_state = session
-            .metadata
-            .get("session_state")
-            .cloned()
-            .unwrap_or_else(|| default_session_state(&target_session_id, session));
+        meta.insert("parent_session_id".into(), session.metadata.get("parent_session_id").cloned().unwrap_or(serde_json::Value::Null));
+        meta.insert("session_created_reason".into(), session.metadata.get("session_created_reason").cloned().unwrap_or(serde_json::Value::Null));
+        let session_state = session.metadata.get("session_state").cloned().unwrap_or_else(|| default_session_state(&target_session_id, session));
         meta.insert("session_state".into(), session_state);
 
-        let json_bytes =
-            serde_json::to_string_pretty(&serde_json::Value::Object(meta))?.into_bytes();
+        let json_bytes = serde_json::to_string_pretty(&serde_json::Value::Object(meta))?.into_bytes();
 
         // --- Conversation journal (.jsonl) --------------------------------
         let mut jsonl = String::new();
@@ -421,40 +307,22 @@ impl Provider for Kiro {
         // --- Write all files atomically -----------------------------------
         let mut written_paths = Vec::new();
 
-        let json_outcome =
-            crate::pipeline::atomic_write(&json_path, &json_bytes, opts.force, self.slug())?;
+        let json_outcome = crate::pipeline::atomic_write(&json_path, &json_bytes, opts.force, self.slug())?;
         let backup_path = json_outcome.backup_path.clone();
         written_paths.push(json_outcome.target_path);
 
-        let jsonl_outcome =
-            crate::pipeline::atomic_write(&jsonl_path, jsonl.as_bytes(), opts.force, self.slug())?;
+        let jsonl_outcome = crate::pipeline::atomic_write(&jsonl_path, jsonl.as_bytes(), opts.force, self.slug())?;
         written_paths.push(jsonl_outcome.target_path);
 
         // `.history` is optional; only emit when we carried one through.
         if let Some(history) = session.metadata.get("history").and_then(|v| v.as_str()) {
-            let hist_outcome = crate::pipeline::atomic_write(
-                &history_path,
-                history.as_bytes(),
-                opts.force,
-                self.slug(),
-            )?;
+            let hist_outcome = crate::pipeline::atomic_write(&history_path, history.as_bytes(), opts.force, self.slug())?;
             written_paths.push(hist_outcome.target_path);
         }
 
-        info!(
-            target_session_id,
-            files = written_paths.len(),
-            messages = session.messages.len(),
-            "Kiro session written"
-        );
+        info!(target_session_id, files = written_paths.len(), messages = session.messages.len(), "Kiro session written");
 
-        Ok(WrittenSession {
-            paths: written_paths,
-            session_id: target_session_id.clone(),
-            resume_command: self.resume_command(&target_session_id),
-            backup_path,
-            warnings: Vec::new(),
-        })
+        Ok(WrittenSession { paths: written_paths, session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path, warnings: Vec::new() })
     }
 
     fn resume_command(&self, session_id: &str) -> String {
@@ -468,19 +336,13 @@ impl Provider for Kiro {
 
 /// Extract the session id from a `<id>.{json,jsonl,history}` path's file stem.
 fn session_id_from_path(path: &Path) -> Option<String> {
-    path.file_stem()
-        .and_then(|s| s.to_str())
-        .map(ToString::to_string)
-        .filter(|s| !s.is_empty())
+    path.file_stem().and_then(|s| s.to_str()).map(ToString::to_string).filter(|s| !s.is_empty())
 }
 
 /// Parse a single `.jsonl` envelope into a canonical message.
 ///
 /// Returns `None` for unknown `kind`s or envelopes that carry no content.
-fn parse_envelope(
-    envelope: &serde_json::Value,
-    ended_at: &mut Option<i64>,
-) -> Option<CanonicalMessage> {
+fn parse_envelope(envelope: &serde_json::Value, ended_at: &mut Option<i64>) -> Option<CanonicalMessage> {
     let kind = envelope.get("kind").and_then(|v| v.as_str())?;
     let data = envelope.get("data").unwrap_or(&serde_json::Value::Null);
 
@@ -500,11 +362,7 @@ fn parse_envelope(
         *ended_at = Some(ended_at.map_or(t, |e: i64| e.max(t)));
     }
 
-    let content_parts = data
-        .get("content")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let content_parts = data.get("content").and_then(|v| v.as_array()).cloned().unwrap_or_default();
 
     let mut text_chunks: Vec<String> = Vec::new();
     let mut tool_calls: Vec<ToolCall> = Vec::new();
@@ -543,36 +401,11 @@ fn parse_envelope(
             }
             // `toolUse` → `{ toolUseId, name, input }`.
             "toolUse" => {
-                tool_calls.push(ToolCall {
-                    id: pdata
-                        .get("toolUseId")
-                        .and_then(|v| v.as_str())
-                        .map(ToString::to_string),
-                    name: pdata
-                        .get("name")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("unknown")
-                        .to_string(),
-                    arguments: pdata
-                        .get("input")
-                        .cloned()
-                        .unwrap_or(serde_json::Value::Null),
-                });
+                tool_calls.push(ToolCall { id: pdata.get("toolUseId").and_then(|v| v.as_str()).map(ToString::to_string), name: pdata.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(), arguments: pdata.get("input").cloned().unwrap_or(serde_json::Value::Null) });
             }
             // `toolResult` → `{ toolUseId, content: [...], status }`.
             "toolResult" => {
-                tool_results.push(ToolResult {
-                    call_id: pdata
-                        .get("toolUseId")
-                        .and_then(|v| v.as_str())
-                        .map(ToString::to_string),
-                    content: tool_result_text(pdata.get("content")),
-                    is_error: pdata
-                        .get("status")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.eq_ignore_ascii_case("error"))
-                        .unwrap_or(false),
-                });
+                tool_results.push(ToolResult { call_id: pdata.get("toolUseId").and_then(|v| v.as_str()).map(ToString::to_string), content: tool_result_text(pdata.get("content")), is_error: pdata.get("status").and_then(|v| v.as_str()).map(|s| s.eq_ignore_ascii_case("error")).unwrap_or(false) });
             }
             _ => {}
         }
@@ -654,12 +487,7 @@ fn stringify_value(value: &serde_json::Value) -> String {
 fn model_name_from_info(info: &serde_json::Value) -> Option<String> {
     match info {
         serde_json::Value::String(s) if !s.is_empty() => Some(s.clone()),
-        serde_json::Value::Object(obj) => obj
-            .get("model_id")
-            .or_else(|| obj.get("modelId"))
-            .or_else(|| obj.get("name"))
-            .and_then(|v| v.as_str())
-            .map(ToString::to_string),
+        serde_json::Value::Object(obj) => obj.get("model_id").or_else(|| obj.get("modelId")).or_else(|| obj.get("name")).and_then(|v| v.as_str()).map(ToString::to_string),
         _ => None,
     }
 }
@@ -675,14 +503,8 @@ fn rfc3339_micros(dt: jiff::Timestamp) -> String {
 
 /// Build a minimal but well-formed `session_state` when none was carried.
 fn default_session_state(session_id: &str, session: &CanonicalSession) -> serde_json::Value {
-    let cwd = session
-        .workspace
-        .as_ref()
-        .map(|p| p.to_string_lossy().into_owned());
-    let allowed_read = cwd
-        .as_ref()
-        .map(|c| serde_json::json!([c]))
-        .unwrap_or_else(|| serde_json::json!([]));
+    let cwd = session.workspace.as_ref().map(|p| p.to_string_lossy().into_owned());
+    let allowed_read = cwd.as_ref().map(|c| serde_json::json!([c])).unwrap_or_else(|| serde_json::json!([]));
     serde_json::json!({
         "version": "v1",
         "conversation_metadata": {
@@ -809,23 +631,14 @@ mod tests {
 
     #[test]
     fn resume_command_uses_resume_id_flag() {
-        assert_eq!(
-            Kiro.resume_command("abc-123"),
-            "kiro-cli --resume-id abc-123"
-        );
+        assert_eq!(Kiro.resume_command("abc-123"), "kiro-cli --resume-id abc-123");
     }
 
     #[test]
     fn sibling_swaps_extension() {
         let p = Path::new("/x/sessions/cli/abc.json");
-        assert_eq!(
-            Kiro::sibling(p, "jsonl"),
-            Path::new("/x/sessions/cli/abc.jsonl")
-        );
-        assert_eq!(
-            Kiro::sibling(p, "history"),
-            Path::new("/x/sessions/cli/abc.history")
-        );
+        assert_eq!(Kiro::sibling(p, "jsonl"), Path::new("/x/sessions/cli/abc.jsonl"));
+        assert_eq!(Kiro::sibling(p, "history"), Path::new("/x/sessions/cli/abc.history"));
     }
 
     // -----------------------------------------------------------------------
@@ -834,22 +647,11 @@ mod tests {
 
     #[test]
     fn reads_real_fixture_metadata_and_messages() {
-        let session = Kiro
-            .read_session(&fixture_json_path())
-            .expect("read real Kiro fixture");
+        let session = Kiro.read_session(&fixture_json_path()).expect("read real Kiro fixture");
 
         assert_eq!(session.session_id, FIXTURE_ID);
         assert_eq!(session.provider_slug, "kiro");
-        assert_eq!(
-            session
-                .workspace
-                .as_deref()
-                .map(|p| p.to_string_lossy().into_owned()),
-            Some(
-                "/Users/tranquangdang21/Projects/jcode/.worktrees/feat-380-compaction-resistant-notepad"
-                    .to_string()
-            )
-        );
+        assert_eq!(session.workspace.as_deref().map(|p| p.to_string_lossy().into_owned()), Some("/Users/tranquangdang21/Projects/jcode/.worktrees/feat-380-compaction-resistant-notepad".to_string()));
         assert!(session.started_at.is_some());
         assert!(session.ended_at.is_some());
 
@@ -859,11 +661,7 @@ mod tests {
         assert_eq!(session.messages[1].role, MessageRole::Assistant);
         assert_eq!(session.messages[2].role, MessageRole::Tool);
 
-        assert!(
-            session.messages[0]
-                .content
-                .contains("Research ONLY the repo")
-        );
+        assert!(session.messages[0].content.contains("Research ONLY the repo"));
 
         // Assistant turn carries tool calls + a model id from `thinking`.
         assert!(!session.messages[1].tool_calls.is_empty());
@@ -871,29 +669,14 @@ mod tests {
 
         // ToolResults turn surfaces tool output (stdout flattened).
         assert!(!session.messages[2].tool_results.is_empty());
-        assert!(
-            session.messages[2]
-                .tool_results
-                .iter()
-                .any(|r| r.content.contains("origin"))
-        );
+        assert!(session.messages[2].tool_results.iter().any(|r| r.content.contains("origin")));
 
         // Nested session_state + parent linkage preserved.
         assert!(session.metadata.get("session_state").is_some());
-        assert_eq!(
-            session
-                .metadata
-                .get("parent_session_id")
-                .and_then(|v| v.as_str()),
-            Some("98cb06e6-28da-4ba8-8ebe-be6bf16841c1")
-        );
+        assert_eq!(session.metadata.get("parent_session_id").and_then(|v| v.as_str()), Some("98cb06e6-28da-4ba8-8ebe-be6bf16841c1"));
 
         // The `.history` plain-text sidecar is captured.
-        let history = session
-            .metadata
-            .get("history")
-            .and_then(|v| v.as_str())
-            .expect("history captured");
+        let history = session.metadata.get("history").and_then(|v| v.as_str()).expect("history captured");
         assert!(history.contains("/model"));
         assert!(history.contains("/exit"));
     }
@@ -905,9 +688,7 @@ mod tests {
 
     #[test]
     fn envelope_round_trip_preserves_messages() {
-        let original = Kiro
-            .read_session(&fixture_json_path())
-            .expect("read original");
+        let original = Kiro.read_session(&fixture_json_path()).expect("read original");
 
         // Re-emit each message to a Kiro envelope, then re-parse it.
         let mut ended = None;
@@ -935,32 +716,15 @@ mod tests {
 
     #[test]
     fn synthesizes_envelopes_for_foreign_messages() {
-        let user = CanonicalMessage {
-            idx: 0,
-            role: MessageRole::User,
-            content: "Hi there".into(),
-            timestamp: Some(1_700_000_000_000),
-            author: Some("user".into()),
-            tool_calls: vec![],
-            tool_results: vec![],
-            extra: serde_json::Value::Null,
-        };
+        let user = CanonicalMessage { idx: 0, role: MessageRole::User, content: "Hi there".into(), timestamp: Some(1_700_000_000_000), author: Some("user".into()), tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null };
         let assistant = CanonicalMessage {
             idx: 1,
             role: MessageRole::Assistant,
             content: "Hello back".into(),
             timestamp: None,
             author: None,
-            tool_calls: vec![ToolCall {
-                id: Some("t1".into()),
-                name: "shell".into(),
-                arguments: serde_json::json!({"command": "ls"}),
-            }],
-            tool_results: vec![ToolResult {
-                call_id: Some("t1".into()),
-                content: "file.txt".into(),
-                is_error: false,
-            }],
+            tool_calls: vec![ToolCall { id: Some("t1".into()), name: "shell".into(), arguments: serde_json::json!({"command": "ls"}) }],
+            tool_results: vec![ToolResult { call_id: Some("t1".into()), content: "file.txt".into(), is_error: false }],
             extra: serde_json::Value::Null,
         };
 
@@ -990,17 +754,9 @@ mod tests {
     #[test]
     fn tolerates_unknown_kinds_and_malformed_lines() {
         let mut tmp = tempfile::NamedTempFile::with_suffix(".jsonl").unwrap();
-        writeln!(
-            tmp,
-            r#"{{"version":"v1","kind":"Prompt","data":{{"content":[{{"kind":"text","data":"hello"}}]}}}}"#
-        )
-        .unwrap();
+        writeln!(tmp, r#"{{"version":"v1","kind":"Prompt","data":{{"content":[{{"kind":"text","data":"hello"}}]}}}}"#).unwrap();
         writeln!(tmp, "this is not json at all").unwrap();
-        writeln!(
-            tmp,
-            r#"{{"version":"v1","kind":"SomethingNew","data":{{"content":[{{"kind":"text","data":"future"}}]}}}}"#
-        )
-        .unwrap();
+        writeln!(tmp, r#"{{"version":"v1","kind":"SomethingNew","data":{{"content":[{{"kind":"text","data":"future"}}]}}}}"#).unwrap();
         tmp.flush().unwrap();
 
         let session = Kiro.read_session(tmp.path()).expect("tolerant read");
