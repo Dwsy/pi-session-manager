@@ -103,14 +103,22 @@ const SORT_OPTIONS: Array<{ value: SessionSortBy; labelKey: string; fallback: st
   { value: "size", labelKey: "session.sort.short.size", fallback: "Size" },
 ];
 
+export interface SourceFilterOption {
+  slug: string;
+  label: string;
+  enabled?: boolean;
+  count?: number;
+}
+
 interface LabelFilterProps {
   tags: TagType[];
   sessionTags: SessionTag[];
   filterTagIds: string[];
   onFilterChange: (tagIds: string[]) => void;
-  sourceOptions?: Array<{ slug: string; label: string }>;
+  sourceOptions?: SourceFilterOption[];
   selectedSourceSlugs?: string[];
   onSourceFilterChange?: (slugs: string[]) => void;
+  onEnableSourceProvider?: (slug: string) => Promise<void> | void;
   modelOptions?: string[];
   selectedModel?: string;
   onModelFilterChange?: (model: string) => void;
@@ -140,6 +148,7 @@ export default function LabelFilter({
   sourceOptions = [],
   selectedSourceSlugs = [],
   onSourceFilterChange,
+  onEnableSourceProvider,
   modelOptions = [],
   selectedModel,
   onModelFilterChange,
@@ -158,6 +167,8 @@ export default function LabelFilter({
   const [filter, setFilter] = useState("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [pendingEnableSource, setPendingEnableSource] = useState<SourceFilterOption | null>(null);
+  const [enablingSourceSlug, setEnablingSourceSlug] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -191,6 +202,7 @@ export default function LabelFilter({
         setFilter("");
         setCreating(false);
         setNewName("");
+        setPendingEnableSource(null);
         setMenuReady(false);
       }
     };
@@ -580,7 +592,10 @@ export default function LabelFilter({
                 /* Submenu: back button + items */
                 <>
                   <button
-                    onClick={() => setSubmenu(null)}
+                    onClick={() => {
+                      setPendingEnableSource(null);
+                      setSubmenu(null);
+                    }}
                     className="flex w-full items-center gap-2 px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground hover:bg-muted motion-color focus-ring border-b border-border"
                   >
                     <ArrowLeft className="h-3.5 w-3.5" />
@@ -588,34 +603,143 @@ export default function LabelFilter({
                   </button>
                   <div className="py-1">
                     {submenu === "sources" && onSourceFilterChange && (
-                      <>
-                        {sourceOptions.map((source) => {
+                      pendingEnableSource ? (
+                        <div className="px-3 py-2.5 space-y-2.5">
+                          <div className="flex items-center gap-2">
+                            <AgentColorIcon
+                              source={pendingEnableSource.slug}
+                              size={15}
+                              className="shrink-0"
+                              style={{ color: getAgentIconColor(pendingEnableSource.slug) }}
+                            />
+                            <span className="text-[13px] font-medium text-foreground">
+                              {t("tags.filter.enableScanTitle", {
+                                name: pendingEnableSource.label,
+                                defaultValue: "Enable {{name}} scanning?",
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-[12px] leading-relaxed text-muted-foreground">
+                            {t("tags.filter.enableScanDescription", {
+                              name: pendingEnableSource.label,
+                              defaultValue:
+                                "Local session scanning for {{name}} is currently off, so there are no sessions to filter yet. Enable it to scan and apply this filter now.",
+                            })}
+                          </p>
+                          <div className="flex items-center justify-end gap-1.5 pt-1">
+                            <button
+                              type="button"
+                              disabled={enablingSourceSlug !== null}
+                              onClick={() => setPendingEnableSource(null)}
+                              className="rounded-md border border-border px-2.5 py-1 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground motion-color focus-ring disabled:opacity-50"
+                            >
+                              {t("common.cancel", "Cancel")}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={enablingSourceSlug !== null}
+                              onClick={async () => {
+                                const target = pendingEnableSource;
+                                if (!target || !onEnableSourceProvider) return;
+                                setEnablingSourceSlug(target.slug);
+                                try {
+                                  await onEnableSourceProvider(target.slug);
+                                  setPendingEnableSource(null);
+                                } finally {
+                                  setEnablingSourceSlug(null);
+                                }
+                              }}
+                              className="rounded-md bg-primary px-2.5 py-1 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 motion-color focus-ring disabled:opacity-60"
+                            >
+                              {enablingSourceSlug === pendingEnableSource.slug
+                                ? t("tags.filter.enablingScan", "Enabling & scanning...")
+                                : t("tags.filter.enableScanConfirm", "Enable & Scan")}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (() => {
+                        const query = filter.trim().toLowerCase();
+                        const visibleSources = query
+                          ? sourceOptions.filter(
+                              (source) =>
+                                source.label.toLowerCase().includes(query) ||
+                                source.slug.toLowerCase().includes(query),
+                            )
+                          : sourceOptions;
+                        const scannedSources = visibleSources.filter(
+                          (source) => source.enabled !== false,
+                        );
+                        const unscannedSources = visibleSources.filter(
+                          (source) => source.enabled === false,
+                        );
+                        const renderSourceRow = (source: SourceFilterOption) => {
                           const selected = selectedSourceSlugs.includes(source.slug);
+                          const isEnabled = source.enabled !== false;
                           return (
                             <button
                               key={source.slug}
+                              type="button"
                               onClick={() => {
                                 if (selected) {
-                                  onSourceFilterChange(selectedSourceSlugs.filter((slug) => slug !== source.slug));
+                                  onSourceFilterChange(
+                                    selectedSourceSlugs.filter((slug) => slug !== source.slug),
+                                  );
+                                } else if (!isEnabled && onEnableSourceProvider) {
+                                  setPendingEnableSource(source);
                                 } else {
-                                  onSourceFilterChange([...new Set([...selectedSourceSlugs, source.slug])]);
+                                  onSourceFilterChange([
+                                    ...new Set([...selectedSourceSlugs, source.slug]),
+                                  ]);
                                 }
                               }}
-                              className="flex w-full items-center gap-2 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring"
+                              className={`flex w-full items-center gap-2 rounded-md mx-1 px-2 py-1.5 text-[13px] hover:bg-muted motion-color focus-ring ${
+                                isEnabled ? "text-foreground" : "text-muted-foreground/75"
+                              }`}
                               style={{ width: "calc(100% - 8px)" }}
                             >
                               <AgentColorIcon
                                 source={source.slug}
                                 size={13}
-                                className="shrink-0"
+                                className={`shrink-0 ${isEnabled ? "" : "opacity-55"}`}
                                 style={{ color: getAgentIconColor(source.slug) }}
                               />
-                              <span className="flex-1 text-left">{source.label}</span>
-                              {selected && <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />}
+                              <span className="flex-1 truncate text-left">{source.label}</span>
+                              {isEnabled ? (
+                                <>
+                                  {typeof source.count === "number" && source.count > 0 && (
+                                    <span className="text-[11px] tabular-nums text-muted-foreground/60">
+                                      {source.count}
+                                    </span>
+                                  )}
+                                  {selected && (
+                                    <Check className="h-3.5 w-3.5 shrink-0 text-foreground/70" />
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <span className="rounded bg-secondary/70 px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground/80">
+                                    {t("tags.filter.sourceNotScanned", "Not scanned")}
+                                  </span>
+                                  {selected && (
+                                    <Check className="h-3.5 w-3.5 shrink-0 text-foreground/60" />
+                                  )}
+                                </>
+                              )}
                             </button>
                           );
-                        })}
-                      </>
+                        };
+                        return (
+                          <>
+                            {scannedSources.map(renderSourceRow)}
+                            {scannedSources.length > 0 && unscannedSources.length > 0 && (
+                              <div className="my-1 border-t border-border/60 px-3 pt-1.5 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                                {t("tags.filter.sourceNotScanned", "Not scanned")}
+                              </div>
+                            )}
+                            {unscannedSources.map(renderSourceRow)}
+                          </>
+                        );
+                      })()
                     )}
                     {submenu === "models" && onModelFilterChange && (
                       <>

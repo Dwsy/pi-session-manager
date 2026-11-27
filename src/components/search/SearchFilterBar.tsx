@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, X } from 'lucide-react'
-import LabelFilter from '@/components/tags/LabelFilter'
+import LabelFilter, { type SourceFilterOption } from '@/components/tags/LabelFilter'
 import CompositionInput from '@/components/ui/CompositionInput'
 import type { Tag, SessionTag, DateRange } from '@/types'
 import type { SessionSortBy, SessionSortOrder } from '@/types/sessionSort'
@@ -13,9 +13,10 @@ interface SearchFilterBarProps {
   sessionTags: SessionTag[]
   filterTagIds: string[]
   onFilterChange: (tagIds: string[]) => void
-  sourceOptions?: Array<{ slug: string; label: string }>
+  sourceOptions?: SourceFilterOption[]
   selectedSourceSlugs?: string[]
   onSourceFilterChange?: (slugs: string[]) => void
+  onEnableSourceProvider?: (slug: string) => Promise<void> | void
   modelOptions?: string[]
   selectedModel?: string
   onModelFilterChange?: (model: string) => void
@@ -42,6 +43,7 @@ export default function SearchFilterBar({
   sourceOptions,
   selectedSourceSlugs,
   onSourceFilterChange,
+  onEnableSourceProvider,
   modelOptions = [],
   selectedModel,
   onModelFilterChange,
@@ -140,6 +142,7 @@ export default function SearchFilterBar({
           sourceOptions={sourceOptions}
           selectedSourceSlugs={selectedSourceSlugs}
           onSourceFilterChange={onSourceFilterChange}
+          onEnableSourceProvider={onEnableSourceProvider}
           modelOptions={modelOptions}
           selectedModel={selectedModel}
           onModelFilterChange={onModelFilterChange}

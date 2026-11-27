@@ -1,5 +1,6 @@
 import SearchFilterBar from "@/components/search/SearchFilterBar";
 import ActiveFilterChips from "@/components/search/ActiveFilterChips";
+import type { SourceFilterOption } from "@/components/tags/LabelFilter";
 import { CheckSquare2 } from "lucide-react";
 import type { SessionTag, Tag, DateRange } from "@/types";
 import type { SessionSortBy, SessionSortOrder } from "@/types/sessionSort";
@@ -12,9 +13,10 @@ export interface AppMobileFilterBarProps {
   sessionTags: SessionTag[];
   filterTagIds: string[];
   onFilterChange: (tagIds: string[]) => void;
-  sourceOptions?: Array<{ slug: string; label: string }>;
+  sourceOptions?: SourceFilterOption[];
   selectedSourceSlugs?: string[];
   onSourceFilterChange?: (slugs: string[]) => void;
+  onEnableSourceProvider?: (slug: string) => Promise<void> | void;
   modelOptions?: string[];
   selectedModel?: string;
   onModelFilterChange?: (model: string) => void;
@@ -43,6 +45,7 @@ function AppMobileFilterBar({
   sourceOptions,
   selectedSourceSlugs,
   onSourceFilterChange,
+  onEnableSourceProvider,
   modelOptions,
   selectedModel,
   onModelFilterChange,
@@ -74,6 +77,7 @@ function AppMobileFilterBar({
           sourceOptions={sourceOptions}
           selectedSourceSlugs={selectedSourceSlugs}
           onSourceFilterChange={onSourceFilterChange}
+          onEnableSourceProvider={onEnableSourceProvider}
           modelOptions={modelOptions}
           selectedModel={selectedModel}
           onModelFilterChange={onModelFilterChange}

@@ -48,7 +48,7 @@ import ConnectionBanner from "./components/ConnectionBanner";
 import UpdateNoticeToast from "./components/UpdateNoticeToast";
 import StandaloneDatasetOverview from "./components/dataset/StandaloneDatasetOverview";
 import { useTags } from "./hooks/useTags";
-import type { SessionConvertTarget, SessionInfo } from "./types";
+import type { SessionConvertTarget, SessionInfo, SessionProviderInfo } from "./types";
 import type { SearchContext } from "./plugins/types";
 import {
   initializePsmPluginHost,
@@ -58,7 +58,7 @@ import {
 import { emitPsmRuntimeEvent } from "./plugins/runtime-host/eventBus";
 import { registerLocalTerminalOwner } from "./plugins/runtime-host/appTransport";
 import { invoke, isTauri, listen } from "./transport";
-import { getCachedSettings } from "./utils/settingsApi";
+import { getCachedSettings, saveAppSettings } from "./utils/settingsApi";
 import { getSessionSourceSlug } from "./utils/session";
 import { getPathBasename, pathsEqual } from "./utils/path";
 import { buildProjectUrl } from "./router/config";
@@ -228,7 +228,13 @@ function App() {
     getDescendantIds,
     loadTags,
   } = useTags();
-  const { loading: settingsLoading, session: sessionSettings } = useSettings();
+  const {
+    settings: appSettings,
+    loading: settingsLoading,
+    session: sessionSettings,
+    advanced: advancedSettings,
+    reloadSettings,
+  } = useSettings();
   // Multi-tab viewer mode: on by default, can be turned off in Session settings.
   const multiTabEnabled = sessionSettings.multiTabEnabled !== false;
   useAppearance();
@@ -270,9 +276,87 @@ function App() {
   const [modelFilter, setModelFilter] = useState("");
   const [dateRange, setDateRange] = useState<import("./types").DateRange | null>(null);
   const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
-  const [sourceOptions, setSourceOptions] = useState<
-    Array<{ slug: string; label: string }>
+  const [supportedProviders, setSupportedProviders] = useState<
+    SessionProviderInfo[]
   >([]);
+  const sourceOptions = useMemo(() => {
+    if (standaloneDatasetRuntime) return [];
+    const enabledExternal = new Set(
+      sessionSettings.externalSessionProviders ?? [],
+    );
+    const piEnabled = advancedSettings.includeDefaultPiSessionDir !== false;
+    const counts = new Map<string, number>();
+    for (const session of sessions) {
+      const slug = getSessionSourceSlug(session.path) || "pi";
+      counts.set(slug, (counts.get(slug) ?? 0) + 1);
+    }
+    return supportedProviders
+      .filter((item) => item.slug === "pi" || item.capabilities.canScan)
+      .map((item) => ({
+        slug: item.slug,
+        label: item.display_name,
+        enabled: item.slug === "pi" ? piEnabled : enabledExternal.has(item.slug),
+        count: counts.get(item.slug) ?? 0,
+        detected: item.detected,
+      }))
+      .sort((a, b) => {
+        if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+        if (a.enabled) {
+          if (a.slug === "pi") return -1;
+          if (b.slug === "pi") return 1;
+          if (a.count !== b.count) return b.count - a.count;
+        } else if (a.detected !== b.detected) {
+          return a.detected ? -1 : 1;
+        }
+        return a.label.localeCompare(b.label);
+      })
+      .map(({ slug, label, enabled, count }) => ({
+        slug,
+        label,
+        enabled,
+        count,
+      }));
+  }, [
+    standaloneDatasetRuntime,
+    supportedProviders,
+    sessionSettings.externalSessionProviders,
+    advancedSettings.includeDefaultPiSessionDir,
+    sessions,
+  ]);
+  const handleEnableSourceProvider = useCallback(
+    async (slug: string) => {
+      const nextSettings =
+        slug === "pi"
+          ? {
+              ...appSettings,
+              advanced: {
+                ...appSettings.advanced,
+                includeDefaultPiSessionDir: true,
+              },
+            }
+          : (() => {
+              const nextProviders = Array.from(
+                new Set([
+                  ...(appSettings.session.externalSessionProviders ?? []),
+                  slug,
+                ]),
+              ).sort();
+              return {
+                ...appSettings,
+                session: {
+                  ...appSettings.session,
+                  externalSessionProviders: nextProviders,
+                  scanOtherAgentJsonl: nextProviders.length > 0,
+                },
+              };
+            })();
+      await saveAppSettings(nextSettings);
+      await reloadSettings();
+      await loadSessions();
+      setSourceFilterSlugs((prev) => Array.from(new Set([...prev, slug])));
+    },
+    [appSettings, reloadSettings, loadSessions],
+  );
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showConvertDialog, setShowConvertDialog] = useState(false);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
@@ -470,14 +554,12 @@ function App() {
   }, []);
   useEffect(() => {
     if (standaloneDatasetRuntime) {
-      setSourceOptions([]);
+      setSupportedProviders([]);
       return;
     }
 
     void listSupportedSessionProviders().then((items) => {
-      setSourceOptions(
-        items.map((item) => ({ slug: item.slug, label: item.display_name })),
-      );
+      setSupportedProviders(items);
     });
   }, [standaloneDatasetRuntime]);
   useEffect(() => {
@@ -1371,6 +1453,9 @@ function App() {
       sourceOptions={sourceOptions}
       selectedSourceSlugs={sourceFilterSlugs}
       onSourceFilterChange={setSourceFilterSlugs}
+      onEnableSourceProvider={
+        standaloneDatasetRuntime ? undefined : handleEnableSourceProvider
+      }
       modelOptions={modelOptions}
       selectedModel={modelFilter}
       onModelFilterChange={setModelFilter}
@@ -1701,6 +1786,9 @@ function App() {
     sourceOptions,
     selectedSourceSlugs: sourceFilterSlugs,
     onSourceFilterChange: setSourceFilterSlugs,
+    onEnableSourceProvider: standaloneDatasetRuntime
+      ? undefined
+      : handleEnableSourceProvider,
     modelOptions,
     selectedModel: modelFilter,
     onModelFilterChange: setModelFilter,
