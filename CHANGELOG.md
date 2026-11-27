@@ -4,6 +4,21 @@ All notable changes to Pi Session Manager will be documented in this file.
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-11-27
+
+### Added
+
+- **Timeline navigation enabled by default** — enable the right-side dot timeline navigation out of the box (preserving explicit Scroll Markers preferences) and switch default macOS trackpad hover haptics to `single`.
+- **Browser-style session tab menu** — add right-click context menu and tab management actions for session tabs.
+- **External session provider controls** — allow enabling external session providers directly from the source filter menu, streamline provider settings and dialog sorting, and upgrade multi-agent resume with brand icons.
+- **Unified Lucide tool-call icons** — standardize built-in and cross-agent tool-call icons on Lucide components and render PascalCase external tool paths/commands.
+
+### Fixed
+
+- **Relocated local file links** — expand `~/` paths, strip `#L...` fragments, and fall back to locating moved files within the same module/repository when opening local Markdown links; replace blocking `window.alert` dialogs with non-blocking error toasts when a target file is truly missing.
+- **Antigravity subagent prompts & SQLite migrations** — promote Antigravity subagent parent prompts to user messages, purge stale chunk shards, exclude tool-call-only empty rows from `message_entries`, and add migration 22 to re-index unnamed Antigravity sessions.
+- **Session viewer performance** — refine virtual scroll restoration, turn memoization, and scroll markers.
+
 ## [0.9.3] - 2026-11-26
 
 ### Added
