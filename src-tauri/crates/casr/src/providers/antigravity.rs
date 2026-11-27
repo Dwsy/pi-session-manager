@@ -54,7 +54,10 @@ use anyhow::Context;
 use tracing::{debug, trace};
 
 use crate::discovery::DetectionResult;
-use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, parse_timestamp, reindex_messages, truncate_title};
+use crate::model::{
+    CanonicalMessage, CanonicalSession, MessageRole, parse_timestamp, reindex_messages,
+    truncate_title,
+};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// The one model `agy` is allowed to run on. Mirrors the shell-side single
@@ -89,7 +92,12 @@ impl Antigravity {
 
     /// Path to the clean transcript JSONL for a conversation uuid.
     fn transcript_path(cli_dir: &Path, uuid: &str) -> PathBuf {
-        cli_dir.join("brain").join(uuid).join(".system_generated").join("logs").join("transcript.jsonl")
+        cli_dir
+            .join("brain")
+            .join(uuid)
+            .join(".system_generated")
+            .join("logs")
+            .join("transcript.jsonl")
     }
 
     /// Path to the conversation database file for a uuid.
@@ -168,14 +176,22 @@ impl Provider for Antigravity {
         }
 
         trace!(provider = "antigravity", ?evidence, installed, "detection");
-        DetectionResult { installed, version: None, evidence }
+        DetectionResult {
+            installed,
+            version: None,
+            evidence,
+        }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
         let Some(conv_dir) = Self::conversations_dir() else {
             return vec![];
         };
-        if conv_dir.is_dir() { vec![conv_dir] } else { vec![] }
+        if conv_dir.is_dir() {
+            vec![conv_dir]
+        } else {
+            vec![]
+        }
     }
 
     fn list_sessions(&self) -> Option<Vec<(String, PathBuf)>> {
@@ -211,10 +227,19 @@ impl Provider for Antigravity {
         debug!(path = %path.display(), "reading Antigravity conversation");
 
         // `path` is the `<uuid>.db` file. The uuid is the filename stem.
-        let uuid = path.file_stem().and_then(|s| s.to_str()).map(ToString::to_string).unwrap_or_else(|| "unknown".to_string());
+        let uuid = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(ToString::to_string)
+            .unwrap_or_else(|| "unknown".to_string());
 
         // The CLI dir is the grandparent of the db (conversations/<uuid>.db).
-        let cli_dir = path.parent().and_then(Path::parent).map(Path::to_path_buf).or_else(Self::cli_dir).ok_or_else(|| anyhow::anyhow!("cannot determine Antigravity CLI directory"))?;
+        let cli_dir = path
+            .parent()
+            .and_then(Path::parent)
+            .map(Path::to_path_buf)
+            .or_else(Self::cli_dir)
+            .ok_or_else(|| anyhow::anyhow!("cannot determine Antigravity CLI directory"))?;
 
         let transcript = Self::transcript_path(&cli_dir, &uuid);
 
@@ -223,7 +248,8 @@ impl Provider for Antigravity {
         let mut ended_at: Option<i64> = None;
 
         if transcript.is_file() {
-            let content = std::fs::read_to_string(&transcript).with_context(|| format!("failed to read transcript {}", transcript.display()))?;
+            let content = std::fs::read_to_string(&transcript)
+                .with_context(|| format!("failed to read transcript {}", transcript.display()))?;
 
             for (i, line) in content.lines().enumerate() {
                 let line = line.trim();
@@ -256,19 +282,50 @@ impl Provider for Antigravity {
         reindex_messages(&mut messages);
 
         // Title from the first user message (its content is already unwrapped).
-        let title = messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100));
+        let title = messages
+            .iter()
+            .find(|m| m.role == MessageRole::User)
+            .map(|m| truncate_title(&m.content, 100));
 
         let mut metadata = serde_json::Map::new();
-        metadata.insert("source".into(), serde_json::Value::String("antigravity".to_string()));
-        metadata.insert("conversation_uuid".into(), serde_json::Value::String(uuid.clone()));
-        metadata.insert("transcript_path".into(), serde_json::Value::String(transcript.to_string_lossy().into_owned()));
+        metadata.insert(
+            "source".into(),
+            serde_json::Value::String("antigravity".to_string()),
+        );
+        metadata.insert(
+            "conversation_uuid".into(),
+            serde_json::Value::String(uuid.clone()),
+        );
+        metadata.insert(
+            "transcript_path".into(),
+            serde_json::Value::String(transcript.to_string_lossy().into_owned()),
+        );
 
-        debug!(session_id = uuid, messages = messages.len(), "Antigravity conversation parsed");
+        debug!(
+            session_id = uuid,
+            messages = messages.len(),
+            "Antigravity conversation parsed"
+        );
 
-        Ok(CanonicalSession { session_id: uuid, provider_slug: "antigravity".to_string(), workspace: None, title, started_at, ended_at, messages, metadata: serde_json::Value::Object(metadata), source_path: path.to_path_buf(), model_name: Some(AGY_REQUIRED_MODEL.to_string()) })
+        Ok(CanonicalSession {
+            session_id: uuid,
+            provider_slug: "antigravity".to_string(),
+            workspace: None,
+            title,
+            started_at,
+            ended_at,
+            messages,
+            metadata: serde_json::Value::Object(metadata),
+            source_path: path.to_path_buf(),
+            model_name: Some(AGY_REQUIRED_MODEL.to_string()),
+        })
     }
 
-    fn write_session(&self, _session: &CanonicalSession, _opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
+    fn write_session(
+        &self,
+        _session: &CanonicalSession,
+        _opts: &WriteOptions,
+    ) -> anyhow::Result<WrittenSession> {
         // Antigravity conversations are protobuf-backed trajectories created and
         // owned by the `agy` runtime (the `steps`/`trajectory_meta` SQLite blobs
         // plus the sibling `brain/<uuid>/` working tree). There is no supported
@@ -277,7 +334,7 @@ impl Provider for Antigravity {
         Err(anyhow::anyhow!(
             "Antigravity (agy) is read/resume-only: casr cannot create a resumable \
              agy conversation from another provider's history. Use agy as a conversion \
-             SOURCE (e.g. `casr cc resume <agy-uuid> --source agy`), not a target."
+             SOURCE (e.g. `casr resume cc <agy-uuid> --source agy`), not a target."
         ))
     }
 
@@ -335,7 +392,18 @@ fn extract_tool_calls(step: &serde_json::Value) -> Vec<crate::model::ToolCall> {
     arr.iter()
         .filter_map(|call| {
             let obj = call.as_object()?;
-            Some(crate::model::ToolCall { id: obj.get("id").and_then(|v| v.as_str()).map(ToString::to_string), name: obj.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(), arguments: obj.get("args").cloned().unwrap_or(serde_json::Value::Null) })
+            Some(crate::model::ToolCall {
+                id: obj
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .map(ToString::to_string),
+                name: obj
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+                arguments: obj.get("args").cloned().unwrap_or(serde_json::Value::Null),
+            })
         })
         .collect()
 }
@@ -352,16 +420,29 @@ fn step_to_message(step: &serde_json::Value) -> Option<CanonicalMessage> {
     }
 
     let raw_content = step.get("content").and_then(|v| v.as_str()).unwrap_or("");
-    let content = if role == MessageRole::User { unwrap_user_request(raw_content) } else { raw_content.trim().to_string() };
+    let content = if role == MessageRole::User {
+        unwrap_user_request(raw_content)
+    } else {
+        raw_content.trim().to_string()
+    };
 
     // The model's internal reasoning is preserved as a fallback when the
     // visible content is empty (tool-only planner steps), mirroring the Gemini
     // provider's `thoughts` handling.
-    let thinking = step.get("thinking").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let thinking = step
+        .get("thinking")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
 
     let tool_calls = extract_tool_calls(step);
 
-    let effective_content = if content.is_empty() && tool_calls.is_empty() { thinking.clone() } else { content };
+    let effective_content = if content.is_empty() && tool_calls.is_empty() {
+        thinking.clone()
+    } else {
+        content
+    };
 
     // Skip steps that carry no content and no tool activity at all.
     if effective_content.trim().is_empty() && tool_calls.is_empty() {
@@ -370,12 +451,24 @@ fn step_to_message(step: &serde_json::Value) -> Option<CanonicalMessage> {
 
     let timestamp = step.get("created_at").and_then(parse_timestamp);
 
-    Some(CanonicalMessage { idx: 0, role, content: effective_content, timestamp, author: None, tool_calls, tool_results: Vec::new(), extra: step.clone() })
+    Some(CanonicalMessage {
+        idx: 0,
+        role,
+        content: effective_content,
+        timestamp,
+        author: None,
+        tool_calls,
+        tool_results: Vec::new(),
+        extra: step.clone(),
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{AGY_REQUIRED_MODEL, Antigravity, is_housekeeping_type, list_conversations_in, role_for_source, step_to_message, unwrap_user_request};
+    use super::{
+        AGY_REQUIRED_MODEL, Antigravity, is_housekeeping_type, list_conversations_in,
+        role_for_source, step_to_message, unwrap_user_request,
+    };
     use crate::model::MessageRole;
     use crate::providers::Provider;
     use serde_json::json;
@@ -458,7 +551,8 @@ mod tests {
     #[test]
     fn step_to_message_skips_housekeeping() {
         let history = json!({"source": "SYSTEM", "type": "CONVERSATION_HISTORY"});
-        let ephemeral = json!({"source": "SYSTEM", "type": "EPHEMERAL_MESSAGE", "content": "noise"});
+        let ephemeral =
+            json!({"source": "SYSTEM", "type": "EPHEMERAL_MESSAGE", "content": "noise"});
         assert!(step_to_message(&history).is_none());
         assert!(step_to_message(&ephemeral).is_none());
     }
@@ -512,8 +606,12 @@ mod tests {
     #[test]
     fn resume_command_pins_required_model() {
         let p = Antigravity;
-        let cmd = <Antigravity as Provider>::resume_command(&p, "901d1db7-8590-4cb0-a7cb-35fac369d860");
-        assert_eq!(cmd, "agy --conversation 901d1db7-8590-4cb0-a7cb-35fac369d860 --model \"Gemini 3.1 Pro (High)\"");
+        let cmd =
+            <Antigravity as Provider>::resume_command(&p, "901d1db7-8590-4cb0-a7cb-35fac369d860");
+        assert_eq!(
+            cmd,
+            "agy --conversation 901d1db7-8590-4cb0-a7cb-35fac369d860 --model \"Gemini 3.1 Pro (High)\""
+        );
         // The mandated model must appear verbatim.
         assert!(cmd.contains(AGY_REQUIRED_MODEL));
         assert!(cmd.contains("--conversation"));
@@ -535,7 +633,9 @@ mod tests {
             model_name: None,
         };
         let opts = crate::providers::WriteOptions { force: false };
-        let err = p.write_session(&session, &opts).expect_err("agy must refuse writes");
+        let err = p
+            .write_session(&session, &opts)
+            .expect_err("agy must refuse writes");
         assert!(err.to_string().contains("read/resume-only"));
     }
 
@@ -553,7 +653,8 @@ mod tests {
     /// Build a temporary `antigravity-cli` tree with conversations + brain
     /// transcripts, plus a sibling legacy gmi `tmp/.../chats` dir (which must be
     /// invisible to the agy enumerator). Returns `(tempdir guard, cli_dir)`.
-    fn make_agy_tree(conversations: &[(&str, &str)], // (uuid, transcript_jsonl_contents)
+    fn make_agy_tree(
+        conversations: &[(&str, &str)], // (uuid, transcript_jsonl_contents)
     ) -> (tempfile::TempDir, std::path::PathBuf) {
         let tmp = tempfile::tempdir().expect("tmpdir");
         let home = tmp.path();
@@ -567,17 +668,26 @@ mod tests {
             std::fs::write(&db, b"SQLite format 3\x00fixture").expect("write db");
 
             // Brain transcript at the canonical sibling path.
-            let logs = cli_dir.join("brain").join(uuid).join(".system_generated").join("logs");
+            let logs = cli_dir
+                .join("brain")
+                .join(uuid)
+                .join(".system_generated")
+                .join("logs");
             std::fs::create_dir_all(&logs).expect("create logs dir");
             let mut f = std::fs::File::create(logs.join("transcript.jsonl")).expect("transcript");
-            f.write_all(transcript.as_bytes()).expect("write transcript");
+            f.write_all(transcript.as_bytes())
+                .expect("write transcript");
         }
 
         // Legacy gmi layout under the SAME ~/.gemini parent — MUST NOT be
         // picked up by the agy enumerator (it scans only conversations/*.db).
         let gmi_chats = home.join("tmp").join("deadbeefhash").join("chats");
         std::fs::create_dir_all(&gmi_chats).expect("create gmi chats");
-        std::fs::write(gmi_chats.join("session-gmi-legacy-001.json"), br#"{"sessionId":"gmi-legacy-001","messages":[]}"#).expect("write gmi session");
+        std::fs::write(
+            gmi_chats.join("session-gmi-legacy-001.json"),
+            br#"{"sessionId":"gmi-legacy-001","messages":[]}"#,
+        )
+        .expect("write gmi session");
 
         (tmp, cli_dir)
     }
@@ -594,12 +704,21 @@ mod tests {
 
     #[test]
     fn list_conversations_enumerates_db_stems_only() {
-        let (_guard, cli_dir) = make_agy_tree(&[("901d1db7-8590-4cb0-a7cb-35fac369d860", SAMPLE_TRANSCRIPT), ("ad053acc-0ee5-4f9b-b8b6-20506bfd5f56", SAMPLE_TRANSCRIPT)]);
+        let (_guard, cli_dir) = make_agy_tree(&[
+            ("901d1db7-8590-4cb0-a7cb-35fac369d860", SAMPLE_TRANSCRIPT),
+            ("ad053acc-0ee5-4f9b-b8b6-20506bfd5f56", SAMPLE_TRANSCRIPT),
+        ]);
 
         let convs = list_conversations_in(&cli_dir.join("conversations"));
         let mut ids: Vec<String> = convs.iter().map(|(id, _)| id.clone()).collect();
         ids.sort();
-        assert_eq!(ids, vec!["901d1db7-8590-4cb0-a7cb-35fac369d860".to_string(), "ad053acc-0ee5-4f9b-b8b6-20506bfd5f56".to_string(),]);
+        assert_eq!(
+            ids,
+            vec![
+                "901d1db7-8590-4cb0-a7cb-35fac369d860".to_string(),
+                "ad053acc-0ee5-4f9b-b8b6-20506bfd5f56".to_string(),
+            ]
+        );
         // Crucially, the legacy gmi session id is NOT present.
         assert!(!ids.iter().any(|id| id.contains("gmi-legacy")));
         // Every enumerated path is a `.db` under conversations/.
@@ -624,8 +743,11 @@ mod tests {
 
     #[test]
     fn read_session_parses_transcript_and_pins_model() {
-        let (_guard, cli_dir) = make_agy_tree(&[("901d1db7-8590-4cb0-a7cb-35fac369d860", SAMPLE_TRANSCRIPT)]);
-        let db = cli_dir.join("conversations").join("901d1db7-8590-4cb0-a7cb-35fac369d860.db");
+        let (_guard, cli_dir) =
+            make_agy_tree(&[("901d1db7-8590-4cb0-a7cb-35fac369d860", SAMPLE_TRANSCRIPT)]);
+        let db = cli_dir
+            .join("conversations")
+            .join("901d1db7-8590-4cb0-a7cb-35fac369d860.db");
         let session = Antigravity.read_session(&db).expect("should read");
 
         assert_eq!(session.provider_slug, "antigravity");
@@ -646,7 +768,10 @@ mod tests {
             assert_eq!(m.idx, i);
         }
         // Metadata records the conversation uuid + transcript path.
-        assert_eq!(session.metadata["conversation_uuid"].as_str(), Some("901d1db7-8590-4cb0-a7cb-35fac369d860"));
+        assert_eq!(
+            session.metadata["conversation_uuid"].as_str(),
+            Some("901d1db7-8590-4cb0-a7cb-35fac369d860")
+        );
     }
 
     #[test]

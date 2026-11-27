@@ -10,6 +10,28 @@ If I tell you to do something, even if it goes against what follows below, YOU M
 
 ---
 
+## RULE 0.5 - SUITE-WIDE RULES LIVE IN /data/projects/AGENTS.md
+
+The suite-wide rules in **`/data/projects/AGENTS.md`** bind you here too. Read it. Two sections
+are load-bearing for perf work and are NOT duplicated below, so they cannot drift out of sync:
+
+- **`## Named Reward-Hacking Patterns (ALL FORBIDDEN)`** — 12 named patterns, several already
+  observed in this suite: gate self-weakening (and the exact price of a legitimate gate fix),
+  proof-class inflation, golden regeneration reflex, commit-stream pumping, tautological tests,
+  easy-lever cherry-picking, close-pump abuse, scope-splitting, spec-editing as progress,
+  conformance metastasis, dependency smuggling, bench-path hardcoding.
+- **`### Work-Graph Discipline`** — JSONL is truth and `beads.db` is disposable, `br sync
+  --import-only` after every pull, single-writer on graph structure, closure on cited evidence
+  with blocker beads gated on their named probe, `br dep cycles` stays empty.
+
+The three that most often decide whether a number here is real: a **self-speedup is
+MAINTENANCE, not a win** — a win needs the incumbent live in the SAME invocation; **never
+weaken a gate to land a change**, and if a gate is genuinely defective, meet the evidence
+standard and publish the win/lose split of what the fix admits; and **reporting a loss is a
+success** — one line, revert, next lever, no retraction narrative.
+
+---
+
 ## RULE NUMBER 1: NO FILE DELETION
 
 **YOU ARE NEVER ALLOWED TO DELETE A FILE WITHOUT EXPRESS PERMISSION.** Even a new file that you yourself created, such as a test code file. You have a horrible track record of deleting critically important files or otherwise throwing away tons of expensive work. As a result, you have permanently lost any and all rights to determine that a file or folder should be deleted.
@@ -24,7 +46,7 @@ If I tell you to do something, even if it goes against what follows below, YOU M
 
 1. **Absolutely forbidden commands:** `git reset --hard`, `git clean -fd`, `rm -rf`, or any command that can delete or overwrite code/data must never be run unless the user explicitly provides the exact command and states, in the same message, that they understand and want the irreversible consequences.
 2. **No guessing:** If there is any uncertainty about what a command might delete or overwrite, stop immediately and ask the user for specific approval. "I think it's safe" is never acceptable.
-3. **Safer alternatives first:** When cleanup or rollbacks are needed, request permission to use non-destructive options (`git status`, `git diff`, `git stash`, copying to backups) before ever considering a destructive command.
+3. **Inspect freely, mutate carefully:** Read-only commands (`git status`, `git diff`, `git log`, `git show`, reading files) never need permission — run them whenever they help you understand the state of the tree. When cleanup or rollbacks are needed, prefer reversible options (copying to backups, committing) and ask before anything that rewrites the working tree or index. `git stash` is a mutation, not a read: in a shared checkout it sweeps up other agents' in-progress work (see the concurrency note near the end of this file), so it needs the same approval as any other mutation. Only after that should a destructive command even be considered.
 4. **Mandatory explicit plan:** Even after explicit user authorization, restate the command verbatim, list exactly what will be affected, and wait for a confirmation that your understanding is correct. Only then may you execute it—if anything remains ambiguous, refuse and escalate.
 5. **Document the confirmation:** When running any approved destructive command, record (in the session notes / final response) the exact user text that authorized it, the command actually run, and the execution time. If that record is absent, the operation did not happen.
 
@@ -45,6 +67,8 @@ If I tell you to do something, even if it goes against what follows below, YOU M
 1. Update it to `main`
 2. Ensure `master` is synchronized: `git push origin main:master`
 
+Mirroring is part of pushing, not a separate publication step: it only ever fast-forwards `master` to the commit that is already on `main`. If you have not pushed anything to `main`, there is nothing to mirror.
+
 ---
 
 ## Toolchain: Rust & Cargo
@@ -60,10 +84,10 @@ We only use **Cargo** in this project, NEVER any other package manager.
 
 | Crate | Purpose |
 |-------|---------|
-| `clap` + `clap_complete` | CLI argument parsing and shell completions (`casr <target> resume <session-id>`) |
+| `clap` + `clap_complete` | CLI argument parsing and shell completions (`casr resume <target> <session-id>`) |
 | `serde` + `serde_json` | Canonical session model + provider format parsing/writing |
 | `anyhow` + `thiserror` | Internal propagation + actionable user-facing errors |
-| `chrono` | Timestamp normalization (ISO-8601, epoch seconds/millis) |
+| `jiff` | Timestamp normalization and formatting (ISO-8601/RFC 3339, epoch seconds/millis, local time display) |
 | `walkdir` + `dirs` + `which` | Provider detection and session discovery |
 | `glob` | Pattern matching for file paths |
 | `rusqlite` | SQLite session storage (bundled) |
@@ -72,15 +96,15 @@ We only use **Cargo** in this project, NEVER any other package manager.
 | `colored` | Terminal colors with TTY detection |
 | `urlencoding` | URL encoding for provider path handling |
 | `tracing` + `tracing-subscriber` | Structured debug/trace logging |
-| `vergen-gix` | Build metadata embedding (build.rs) |
+| `vergen-gitcl` | Build metadata embedding (build.rs) |
 
 ### Release Profile
 
-The release build optimizes for binary size:
+The release build optimizes for runtime performance:
 
 ```toml
 [profile.release]
-opt-level = "z"     # Optimize for size (lean binary for distribution)
+opt-level = 3       # Optimize for runtime speed
 lto = true          # Link-time optimization
 codegen-units = 1   # Single codegen unit for better optimization
 panic = "abort"     # Smaller binary, no unwinding overhead
@@ -410,7 +434,7 @@ CLI Input
 ```
 cross_agent_session_resumer/
 ├── Cargo.toml                        # Single crate (not a workspace)
-├── build.rs                          # vergen-gix build metadata
+├── build.rs                          # vergen-gitcl build metadata
 ├── src/
 │   ├── main.rs                       # Clap CLI and output rendering
 │   ├── lib.rs                        # Public library entry points
@@ -473,7 +497,7 @@ cross_agent_session_resumer/
 
 ### CLI Surface
 
-- Primary flow: `casr <target-alias> resume <session-id>`
+- Primary flow: `casr resume <target-alias> <session-id>`
 - Inspection flows:
   - `casr list`
   - `casr info <session-id>`
@@ -559,7 +583,7 @@ casr runs in interactive CLI loops, so latency matters:
 casr is a command-line tool (not a hook protocol). Primary command shape:
 
 ```bash
-casr <target> resume <session-id> [--source <alias_or_path>] [--dry-run] [--force] [--json] [--verbose|--trace] [--enrich]
+casr resume <target> <session-id> [--source <alias_or_path>] [--dry-run] [--force] [--json] [--verbose|--trace] [--enrich]
 ```
 
 Additional command shapes:
@@ -752,7 +776,7 @@ A mail-like layer that lets coding agents coordinate asynchronously via MCP tool
 ### Common Pitfalls
 
 - `"from_agent not registered"`: Always `register_agent` in the correct `project_key` first
-- `"FILE_RESERVATION_CONFLICT"`: Adjust patterns, wait for expiry, or use non-exclusive reservation
+- `"FILE_RESERVATION_CONFLICT"`: Message the holder to coordinate, adjust patterns to disjoint paths, wait for expiry, or — only when the work is genuinely compatible with the holder's — use a non-exclusive reservation
 - **Auth errors:** If JWT+JWKS enabled, include bearer token with matching `kid`
 
 ---
@@ -1083,7 +1107,7 @@ br sync --flush-only  # Export to JSONL (NO git operations)
 
 ### Session Protocol
 
-**Before ending any session, run this checklist:**
+**Before ending any session in which you changed something (code, docs, or beads), run this checklist:**
 
 ```bash
 git status              # Check what changed
@@ -1093,6 +1117,8 @@ git add .beads/         # Stage beads changes
 git commit -m "..."     # Commit everything together
 git push                # Push to remote
 ```
+
+A read-only session (review, investigation, answering a question) produces nothing to commit or push — skip the git steps and just hand off.
 
 ### Best Practices
 
@@ -1106,7 +1132,7 @@ git push                # Push to remote
 
 ## Landing the Plane (Session Completion)
 
-**When ending a work session**, you MUST complete ALL steps below.
+**When ending a work session that produced changes**, you MUST complete ALL steps below. A read-only session (review, investigation, answering a question) has nothing to commit or push — file issues for anything you found, then hand off.
 
 **MANDATORY WORKFLOW:**
 
@@ -1166,8 +1192,12 @@ Next steps (pick one)
 
 NEVER EVER DO THAT AGAIN. The answer is literally ALWAYS the same: those are changes created by the potentially dozen of other agents working on the project at the same time. This is not only a common occurence, it happens multiple times PER MINUTE. The way to deal with it is simple: you NEVER, under ANY CIRCUMSTANCE, stash, revert, overwrite, or otherwise disturb in ANY way the work of other agents. Just treat those changes identically to changes that you yourself made. Just fool yourself into thinking YOU made the changes and simply don't recall it for some reason.
 
+To be explicit about how this fits with the rest of this file, because it is deliberate and not an oversight: in this repo many agents share one checkout, so a commit that carries another agent's in-progress hunks alongside your own is normal and expected — `git add -A` before a commit is fine here. "Preserve other agents' work" and "treat it as your own" are the same instruction, not competing ones: both mean the work stays in the tree and goes forward with the next commit. The only things that are ever wrong are stashing, reverting, checking out over, or otherwise removing edits you did not write. And if your session produced no changes of its own, you have nothing to commit — leave the tree exactly as you found it.
+
 ---
 
 ## Note on Built-in TODO Functionality
 
 Also, if I ask you to explicitly use your built-in TODO functionality, don't complain about this and say you need to use beads. You can use built-in TODOs if I tell you specifically to do so. Always comply with such orders.
+
+For any web requests you must make with curl or otherwise, identify yourself honestly: use a User-Agent that names this project, e.g. "cross_agent_session_resumer-agent (+https://github.com/Dicklesworthstone/cross_agent_session_resumer)". Never borrow another product's or company's crawler or client User-Agent, and never spoof a client to get past a block.

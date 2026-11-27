@@ -766,10 +766,7 @@
             "sender_name": "[redacted:sender_name:172]",
             "body_md": "[redacted:body_md:173]",
             "subject": "[redacted:subject:174]",
-            "to": [
-              "[redacted:to:175]",
-              "[redacted:to:176]"
-            ],
+            "to": ["[redacted:to:175]", "[redacted:to:176]"],
             "project_key": "[redacted:project_key:177]"
           },
           "result": [

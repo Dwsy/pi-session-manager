@@ -33,7 +33,10 @@ use std::path::{Path, PathBuf};
 use tracing::{debug, info, trace};
 
 use crate::discovery::DetectionResult;
-use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, ToolCall, normalize_role, parse_timestamp, reindex_messages, truncate_title};
+use crate::model::{
+    CanonicalMessage, CanonicalSession, MessageRole, ToolCall, normalize_role, parse_timestamp,
+    reindex_messages, truncate_title,
+};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// Pi-Agent provider implementation.
@@ -46,13 +49,20 @@ impl PiAgent {
         if let Ok(home) = std::env::var("PI_AGENT_HOME") {
             return PathBuf::from(home);
         }
-        dirs::home_dir().unwrap_or_default().join(".pi").join("agent")
+        dirs::home_dir()
+            .unwrap_or_default()
+            .join(".pi")
+            .join("agent")
     }
 
     /// Sessions directory under the home dir.
     fn sessions_dir(home: &Path) -> PathBuf {
         let sessions = home.join("sessions");
-        if sessions.exists() { sessions } else { home.to_path_buf() }
+        if sessions.exists() {
+            sessions
+        } else {
+            home.to_path_buf()
+        }
     }
 
     /// Flatten Pi-Agent message content to a string.
@@ -69,10 +79,18 @@ impl PiAgent {
                 .filter_map(|block| {
                     let block_type = block.get("type").and_then(|t| t.as_str());
                     match block_type {
-                        Some("text") => block.get("text").and_then(|t| t.as_str()).map(String::from),
-                        Some("thinking") => block.get("thinking").and_then(|t| t.as_str()).map(|t| format!("[Thinking] {t}")),
+                        Some("text") => {
+                            block.get("text").and_then(|t| t.as_str()).map(String::from)
+                        }
+                        Some("thinking") => block
+                            .get("thinking")
+                            .and_then(|t| t.as_str())
+                            .map(|t| format!("[Thinking] {t}")),
                         Some("toolCall") => {
-                            let name = block.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+                            let name = block
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("unknown");
                             Some(format!("[Tool: {name}]"))
                         }
                         Some("image") => None,
@@ -95,7 +113,18 @@ impl PiAgent {
                 if block.get("type").and_then(|t| t.as_str()) != Some("toolCall") {
                     return None;
                 }
-                Some(ToolCall { id: block.get("id").and_then(|v| v.as_str()).map(String::from), name: block.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(), arguments: block.get("arguments").cloned().unwrap_or(serde_json::Value::Null) })
+                Some(ToolCall {
+                    id: block.get("id").and_then(|v| v.as_str()).map(String::from),
+                    name: block
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string(),
+                    arguments: block
+                        .get("arguments")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null),
+                })
             })
             .collect()
     }
@@ -117,15 +146,27 @@ impl Provider for PiAgent {
     fn detect(&self) -> DetectionResult {
         let home = Self::home_dir();
         let installed = home.join("sessions").is_dir();
-        let evidence = if installed { vec![format!("sessions directory found: {}", home.display())] } else { vec![] };
+        let evidence = if installed {
+            vec![format!("sessions directory found: {}", home.display())]
+        } else {
+            vec![]
+        };
         trace!(provider = "pi-agent", ?evidence, installed, "detection");
-        DetectionResult { installed, version: None, evidence }
+        DetectionResult {
+            installed,
+            version: None,
+            evidence,
+        }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
         let home = Self::home_dir();
         let sessions = home.join("sessions");
-        if sessions.is_dir() { vec![sessions] } else { vec![] }
+        if sessions.is_dir() {
+            vec![sessions]
+        } else {
+            vec![]
+        }
     }
 
     fn owns_session(&self, session_id: &str) -> Option<PathBuf> {
@@ -135,7 +176,10 @@ impl Provider for PiAgent {
             return None;
         }
         // Walk to find a JSONL file whose stem matches the session_id.
-        for entry in walkdir::WalkDir::new(&sessions).into_iter().filter_map(Result::ok) {
+        for entry in walkdir::WalkDir::new(&sessions)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -144,7 +188,12 @@ impl Provider for PiAgent {
             if !name.ends_with(".jsonl") || !name.contains('_') {
                 continue;
             }
-            if entry.path().file_stem().and_then(|s| s.to_str()).is_some_and(|s| s == session_id) {
+            if entry
+                .path()
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .is_some_and(|s| s == session_id)
+            {
                 debug!(
                     provider = "pi-agent",
                     path = %entry.path().display(),
@@ -160,7 +209,8 @@ impl Provider for PiAgent {
     fn read_session(&self, path: &Path) -> anyhow::Result<CanonicalSession> {
         debug!(path = %path.display(), "reading Pi-Agent session");
 
-        let file = std::fs::File::open(path).map_err(|e| anyhow::anyhow!("failed to open {}: {e}", path.display()))?;
+        let file = std::fs::File::open(path)
+            .map_err(|e| anyhow::anyhow!("failed to open {}: {e}", path.display()))?;
         let reader = std::io::BufReader::new(file);
 
         let mut messages: Vec<CanonicalMessage> = Vec::new();
@@ -189,10 +239,17 @@ impl Provider for PiAgent {
 
             match entry_type {
                 "session" => {
-                    session_id_from_header = val.get("id").and_then(|v| v.as_str()).map(String::from);
+                    session_id_from_header =
+                        val.get("id").and_then(|v| v.as_str()).map(String::from);
                     session_cwd = val.get("cwd").and_then(|v| v.as_str()).map(String::from);
-                    provider_name = val.get("provider").and_then(|v| v.as_str()).map(String::from);
-                    model_id = val.get("modelId").and_then(|v| v.as_str()).map(String::from);
+                    provider_name = val
+                        .get("provider")
+                        .and_then(|v| v.as_str())
+                        .map(String::from);
+                    model_id = val
+                        .get("modelId")
+                        .and_then(|v| v.as_str())
+                        .map(String::from);
                     if let Some(ts) = val.get("timestamp").and_then(parse_timestamp) {
                         started_at = Some(ts);
                     }
@@ -203,7 +260,10 @@ impl Provider for PiAgent {
                         None => continue,
                     };
 
-                    let role_str = msg.get("role").and_then(|v| v.as_str()).unwrap_or("unknown");
+                    let role_str = msg
+                        .get("role")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown");
                     // Normalize: toolResult → tool.
                     let normalized = match role_str {
                         "toolResult" => "tool",
@@ -218,7 +278,9 @@ impl Provider for PiAgent {
                         continue;
                     }
 
-                    let tool_calls = content_val.map(Self::extract_tool_calls).unwrap_or_default();
+                    let tool_calls = content_val
+                        .map(Self::extract_tool_calls)
+                        .unwrap_or_default();
 
                     let ts = val.get("timestamp").and_then(parse_timestamp);
 
@@ -230,13 +292,35 @@ impl Provider for PiAgent {
                     }
 
                     // Author: message.model first, then tracked model_id for assistants.
-                    let author = if role == MessageRole::Assistant { msg.get("model").and_then(|v| v.as_str()).map(String::from).or_else(|| model_id.clone()) } else { None };
+                    let author = if role == MessageRole::Assistant {
+                        msg.get("model")
+                            .and_then(|v| v.as_str())
+                            .map(String::from)
+                            .or_else(|| model_id.clone())
+                    } else {
+                        None
+                    };
 
-                    messages.push(CanonicalMessage { idx: 0, role, content, timestamp: ts, author, tool_calls, tool_results: vec![], extra: val });
+                    messages.push(CanonicalMessage {
+                        idx: 0,
+                        role,
+                        content,
+                        timestamp: ts,
+                        author,
+                        tool_calls,
+                        tool_results: vec![],
+                        extra: val,
+                    });
                 }
                 "model_change" => {
-                    provider_name = val.get("provider").and_then(|v| v.as_str()).map(String::from);
-                    model_id = val.get("modelId").and_then(|v| v.as_str()).map(String::from);
+                    provider_name = val
+                        .get("provider")
+                        .and_then(|v| v.as_str())
+                        .map(String::from);
+                    model_id = val
+                        .get("modelId")
+                        .and_then(|v| v.as_str())
+                        .map(String::from);
                 }
                 // Skip thinking_level_change and unknown types.
                 _ => continue,
@@ -246,9 +330,17 @@ impl Provider for PiAgent {
         reindex_messages(&mut messages);
 
         // Session ID: prefer header id, then filename stem.
-        let session_id = session_id_from_header.unwrap_or_else(|| path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string());
+        let session_id = session_id_from_header.unwrap_or_else(|| {
+            path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string()
+        });
 
-        let title = messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100));
+        let title = messages
+            .iter()
+            .find(|m| m.role == MessageRole::User)
+            .map(|m| truncate_title(&m.content, 100));
 
         let workspace = session_cwd.as_ref().map(PathBuf::from);
 
@@ -259,23 +351,50 @@ impl Provider for PiAgent {
             "model_id": model_id,
         });
 
-        info!(session_id, messages = messages.len(), "Pi-Agent session parsed");
+        info!(
+            session_id,
+            messages = messages.len(),
+            "Pi-Agent session parsed"
+        );
 
-        Ok(CanonicalSession { session_id, provider_slug: "pi-agent".to_string(), workspace, title, started_at, ended_at, messages, metadata, source_path: path.to_path_buf(), model_name: model_id })
+        Ok(CanonicalSession {
+            session_id,
+            provider_slug: "pi-agent".to_string(),
+            workspace,
+            title,
+            started_at,
+            ended_at,
+            messages,
+            metadata,
+            source_path: path.to_path_buf(),
+            model_name: model_id,
+        })
     }
 
-    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
+    fn write_session(
+        &self,
+        session: &CanonicalSession,
+        opts: &WriteOptions,
+    ) -> anyhow::Result<WrittenSession> {
         // Pi-Agent filenames must contain an underscore to be discoverable
         // by `owns_session`. Convention: `<timestamp>_<uuid>.jsonl`.
         let session_id = if session.session_id.is_empty() {
-            let now = chrono::Utc::now();
-            format!("{}_casr-{}", now.format("%Y-%m-%dT%H-%M-%S"), uuid::Uuid::new_v4())
+            let now = jiff::Timestamp::now();
+            format!(
+                "{}_casr-{}",
+                now.strftime("%Y-%m-%dT%H-%M-%S"),
+                uuid::Uuid::new_v4()
+            )
         } else if session.session_id.contains('_') {
             session.session_id.clone()
         } else {
             // Incoming ID lacks underscore — prefix with timestamp.
-            let now = chrono::Utc::now();
-            format!("{}_{}", now.format("%Y-%m-%dT%H-%M-%S"), session.session_id)
+            let now = jiff::Timestamp::now();
+            format!(
+                "{}_{}",
+                now.strftime("%Y-%m-%dT%H-%M-%S"),
+                session.session_id
+            )
         };
 
         let home = Self::home_dir();
@@ -292,14 +411,18 @@ impl Provider for PiAgent {
         let mut lines: Vec<String> = Vec::new();
 
         // Session header.
-        let workspace = session.workspace.as_ref().and_then(|w| w.to_str()).unwrap_or("/tmp");
+        let workspace = session
+            .workspace
+            .as_ref()
+            .and_then(|w| w.to_str())
+            .unwrap_or("/tmp");
         let header = serde_json::json!({
             "type": "session",
             "id": session_id,
             "timestamp": session.started_at
-                .and_then(chrono::DateTime::from_timestamp_millis)
-                .map(|dt| dt.to_rfc3339())
-                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+                .and_then(|ms| jiff::Timestamp::from_millisecond(ms).ok())
+                .map(|dt| dt.to_string())
+                .unwrap_or_else(|| jiff::Timestamp::now().to_string()),
             "cwd": workspace,
             "provider": session.metadata.get("provider")
                 .and_then(|v| v.as_str())
@@ -331,8 +454,21 @@ impl Provider for PiAgent {
             // For tool-result-only messages (empty content, no tool_calls),
             // synthesize readable content from the tool results so the Pi
             // reader won't skip the message on read-back.
-            let effective_content = if msg.content.trim().is_empty() && msg.tool_calls.is_empty() && !msg.tool_results.is_empty() {
-                msg.tool_results.iter().map(|tr| if tr.is_error { format!("[Tool Error] {}", tr.content) } else { format!("[Tool Output] {}", tr.content) }).collect::<Vec<_>>().join("\n")
+            let effective_content = if msg.content.trim().is_empty()
+                && msg.tool_calls.is_empty()
+                && !msg.tool_results.is_empty()
+            {
+                msg.tool_results
+                    .iter()
+                    .map(|tr| {
+                        if tr.is_error {
+                            format!("[Tool Error] {}", tr.content)
+                        } else {
+                            format!("[Tool Output] {}", tr.content)
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
             } else {
                 msg.content.clone()
             };
@@ -378,7 +514,8 @@ impl Provider for PiAgent {
                     let obj = u.as_object_mut();
                     if let Some(map) = obj {
                         for key in &["input", "output", "cacheRead", "cacheWrite", "totalTokens"] {
-                            map.entry((*key).to_string()).or_insert(serde_json::Value::Number(0.into()));
+                            map.entry((*key).to_string())
+                                .or_insert(serde_json::Value::Number(0.into()));
                         }
                         map.entry("cost".to_string()).or_insert_with(|| {
                             serde_json::json!({
@@ -407,7 +544,11 @@ impl Provider for PiAgent {
                 });
             inner["usage"] = usage;
 
-            let ts_str = msg.timestamp.and_then(chrono::DateTime::from_timestamp_millis).map(|dt| dt.to_rfc3339()).unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
+            let ts_str = msg
+                .timestamp
+                .and_then(|ms| jiff::Timestamp::from_millisecond(ms).ok())
+                .map(|dt| dt.to_string())
+                .unwrap_or_else(|| jiff::Timestamp::now().to_string());
 
             let entry = serde_json::json!({
                 "type": "message",
@@ -418,7 +559,12 @@ impl Provider for PiAgent {
         }
 
         let file_content = lines.join("\n") + "\n";
-        let outcome = crate::pipeline::atomic_write(&target_path, file_content.as_bytes(), opts.force, self.slug())?;
+        let outcome = crate::pipeline::atomic_write(
+            &target_path,
+            file_content.as_bytes(),
+            opts.force,
+            self.slug(),
+        )?;
 
         info!(
             session_id,
@@ -427,7 +573,13 @@ impl Provider for PiAgent {
             "Pi-Agent session written"
         );
 
-        Ok(WrittenSession { paths: vec![outcome.target_path], session_id: session_id.clone(), resume_command: self.resume_command(&session_id), backup_path: outcome.backup_path, warnings: Vec::new() })
+        Ok(WrittenSession {
+            paths: vec![outcome.target_path],
+            session_id: session_id.clone(),
+            resume_command: self.resume_command(&session_id),
+            backup_path: outcome.backup_path,
+            warnings: Vec::new(),
+        })
     }
 
     fn resume_command(&self, session_id: &str) -> String {
@@ -479,14 +631,19 @@ mod tests {
         assert_eq!(session.messages[0].content, "Hello Pi!");
         assert_eq!(session.messages[1].role, MessageRole::Assistant);
         assert_eq!(session.messages[1].content, "Hi there!");
-        assert_eq!(session.messages[1].author, Some("claude-3-opus".to_string()));
+        assert_eq!(
+            session.messages[1].author,
+            Some("claude-3-opus".to_string())
+        );
         assert_eq!(session.workspace, Some(PathBuf::from("/home/user/project")));
         assert!(session.started_at.is_some());
     }
 
     #[test]
     fn reader_tool_result_normalized() {
-        let session = read_piagent(&[r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"toolResult","content":"Tool output here"}}"#]);
+        let session = read_piagent(&[
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"toolResult","content":"Tool output here"}}"#,
+        ]);
         assert_eq!(session.messages[0].role, MessageRole::Tool);
     }
 
@@ -496,7 +653,10 @@ mod tests {
             {"type": "text", "text": "Part 1"},
             {"type": "text", "text": "Part 2"}
         ]);
-        let line = format!(r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{}}}}}"#, content);
+        let line = format!(
+            r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{}}}}}"#,
+            content
+        );
         let session = read_piagent(&[&line]);
 
         assert!(session.messages[0].content.contains("Part 1"));
@@ -509,10 +669,17 @@ mod tests {
             {"type": "thinking", "thinking": "Let me analyze..."},
             {"type": "text", "text": "Here's my answer."}
         ]);
-        let line = format!(r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{}}}}}"#, content);
+        let line = format!(
+            r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{}}}}}"#,
+            content
+        );
         let session = read_piagent(&[&line]);
 
-        assert!(session.messages[0].content.contains("[Thinking] Let me analyze..."));
+        assert!(
+            session.messages[0]
+                .content
+                .contains("[Thinking] Let me analyze...")
+        );
         assert!(session.messages[0].content.contains("Here's my answer."));
     }
 
@@ -522,7 +689,10 @@ mod tests {
             {"type": "text", "text": "Let me check."},
             {"type": "toolCall", "name": "read_file", "arguments": {"path": "/test.rs"}}
         ]);
-        let line = format!(r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{}}}}}"#, content);
+        let line = format!(
+            r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{}}}}}"#,
+            content
+        );
         let session = read_piagent(&[&line]);
 
         assert!(session.messages[0].content.contains("[Tool: read_file]"));
@@ -537,7 +707,10 @@ mod tests {
             {"type": "image", "url": "data:image/png;base64,..."},
             {"type": "text", "text": "After image"}
         ]);
-        let line = format!(r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{}}}}}"#, content);
+        let line = format!(
+            r#"{{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{{"role":"assistant","content":{}}}}}"#,
+            content
+        );
         let session = read_piagent(&[&line]);
 
         assert!(session.messages[0].content.contains("Before image"));
@@ -555,12 +728,18 @@ mod tests {
         ]);
 
         // After model_change, assistant should have new model as author.
-        assert_eq!(session.messages[1].author, Some("claude-3-opus".to_string()));
+        assert_eq!(
+            session.messages[1].author,
+            Some("claude-3-opus".to_string())
+        );
     }
 
     #[test]
     fn reader_skips_thinking_level_change() {
-        let session = read_piagent(&[r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"user","content":"Test"}}"#, r#"{"type":"thinking_level_change","level":"high"}"#]);
+        let session = read_piagent(&[
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"user","content":"Test"}}"#,
+            r#"{"type":"thinking_level_change","level":"high"}"#,
+        ]);
         assert_eq!(session.messages.len(), 1);
     }
 
@@ -576,13 +755,22 @@ mod tests {
 
     #[test]
     fn reader_skips_invalid_json() {
-        let session = read_piagent(&[r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"user","content":"Valid"}}"#, "not valid json", r#"{"type":"message","timestamp":"2025-12-01T10:00:01Z","message":{"role":"user","content":"Also valid"}}"#]);
+        let session = read_piagent(&[
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"user","content":"Valid"}}"#,
+            "not valid json",
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:01Z","message":{"role":"user","content":"Also valid"}}"#,
+        ]);
         assert_eq!(session.messages.len(), 2);
     }
 
     #[test]
     fn reader_skips_empty_lines() {
-        let session = read_piagent(&[r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"user","content":"A"}}"#, "", "   ", r#"{"type":"message","timestamp":"2025-12-01T10:00:01Z","message":{"role":"user","content":"B"}}"#]);
+        let session = read_piagent(&[
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"user","content":"A"}}"#,
+            "",
+            "   ",
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:01Z","message":{"role":"user","content":"B"}}"#,
+        ]);
         assert_eq!(session.messages.len(), 2);
     }
 
@@ -595,19 +783,27 @@ mod tests {
 
     #[test]
     fn reader_title_from_first_user_message() {
-        let session = read_piagent(&[r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"assistant","content":"I'm ready!"}}"#, r#"{"type":"message","timestamp":"2025-12-01T10:00:01Z","message":{"role":"user","content":"This is the title"}}"#]);
+        let session = read_piagent(&[
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"assistant","content":"I'm ready!"}}"#,
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:01Z","message":{"role":"user","content":"This is the title"}}"#,
+        ]);
         assert_eq!(session.title.as_deref(), Some("This is the title"));
     }
 
     #[test]
     fn reader_session_id_from_header() {
-        let session = read_piagent(&[r#"{"type":"session","id":"unique-session-id-123"}"#, r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"user","content":"Test"}}"#]);
+        let session = read_piagent(&[
+            r#"{"type":"session","id":"unique-session-id-123"}"#,
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"user","content":"Test"}}"#,
+        ]);
         assert_eq!(session.session_id, "unique-session-id-123");
     }
 
     #[test]
     fn reader_session_id_fallback_to_filename() {
-        let session = read_piagent(&[r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"user","content":"Test"}}"#]);
+        let session = read_piagent(&[
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"user","content":"Test"}}"#,
+        ]);
         // No session header → falls back to filename stem.
         assert_eq!(session.session_id, "2025-12-01T10-00-00_uuid1");
     }
@@ -626,19 +822,27 @@ mod tests {
 
     #[test]
     fn reader_fallback_model_from_session() {
-        let session = read_piagent(&[r#"{"type":"session","modelId":"gpt-4-turbo"}"#, r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"assistant","content":"Hello!"}}"#]);
+        let session = read_piagent(&[
+            r#"{"type":"session","modelId":"gpt-4-turbo"}"#,
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"assistant","content":"Hello!"}}"#,
+        ]);
         assert_eq!(session.messages[0].author, Some("gpt-4-turbo".to_string()));
     }
 
     #[test]
     fn reader_message_without_inner_skipped() {
-        let session = read_piagent(&[r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z"}"#, r#"{"type":"message","timestamp":"2025-12-01T10:00:01Z","message":{"role":"user","content":"Valid"}}"#]);
+        let session = read_piagent(&[
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z"}"#,
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:01Z","message":{"role":"user","content":"Valid"}}"#,
+        ]);
         assert_eq!(session.messages.len(), 1);
     }
 
     #[test]
     fn reader_metadata_has_source() {
-        let session = read_piagent(&[r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"user","content":"test"}}"#]);
+        let session = read_piagent(&[
+            r#"{"type":"message","timestamp":"2025-12-01T10:00:00Z","message":{"role":"user","content":"test"}}"#,
+        ]);
         assert_eq!(session.metadata["source"], "pi_agent");
     }
 
@@ -649,20 +853,28 @@ mod tests {
     fn write_and_read_back(session: &CanonicalSession) -> CanonicalSession {
         let tmp = tempfile::tempdir().unwrap();
         // Ensure filename has underscore (Pi-Agent convention).
-        let sid = if session.session_id.contains('_') { session.session_id.clone() } else { format!("2025-01-01T00-00-00_{}", session.session_id) };
+        let sid = if session.session_id.contains('_') {
+            session.session_id.clone()
+        } else {
+            format!("2025-01-01T00-00-00_{}", session.session_id)
+        };
         let target = tmp.path().join(format!("{sid}.jsonl"));
         let provider = PiAgent;
 
         let mut lines: Vec<String> = Vec::new();
 
-        let workspace = session.workspace.as_ref().and_then(|w| w.to_str()).unwrap_or("/tmp");
+        let workspace = session
+            .workspace
+            .as_ref()
+            .and_then(|w| w.to_str())
+            .unwrap_or("/tmp");
         let header = json!({
             "type": "session",
             "id": sid,
             "timestamp": session.started_at
-                .and_then(chrono::DateTime::from_timestamp_millis)
-                .map(|dt| dt.to_rfc3339())
-                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+                .and_then(|ms| jiff::Timestamp::from_millisecond(ms).ok())
+                .map(|dt| dt.to_string())
+                .unwrap_or_else(|| jiff::Timestamp::now().to_string()),
             "cwd": workspace,
         });
         lines.push(serde_json::to_string(&header).unwrap());
@@ -675,7 +887,11 @@ mod tests {
                 MessageRole::Tool => "toolResult",
                 MessageRole::Other(r) => r.as_str(),
             };
-            let ts_str = msg.timestamp.and_then(chrono::DateTime::from_timestamp_millis).map(|dt| dt.to_rfc3339()).unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
+            let ts_str = msg
+                .timestamp
+                .and_then(|ms| jiff::Timestamp::from_millisecond(ms).ok())
+                .map(|dt| dt.to_string())
+                .unwrap_or_else(|| jiff::Timestamp::now().to_string());
 
             let mut blocks = vec![json!({"type": "text", "text": msg.content})];
             for tc in &msg.tool_calls {
@@ -714,8 +930,26 @@ mod tests {
             started_at: Some(1_700_000_000_000),
             ended_at: Some(1_700_001_000_000),
             messages: vec![
-                CanonicalMessage { idx: 0, role: MessageRole::User, content: "Fix the bug".to_string(), timestamp: Some(1_700_000_000_000), author: None, tool_calls: vec![], tool_results: vec![], extra: json!({}) },
-                CanonicalMessage { idx: 1, role: MessageRole::Assistant, content: "I'll fix it now.".to_string(), timestamp: Some(1_700_000_500_000), author: Some("claude-3-opus".to_string()), tool_calls: vec![], tool_results: vec![], extra: json!({}) },
+                CanonicalMessage {
+                    idx: 0,
+                    role: MessageRole::User,
+                    content: "Fix the bug".to_string(),
+                    timestamp: Some(1_700_000_000_000),
+                    author: None,
+                    tool_calls: vec![],
+                    tool_results: vec![],
+                    extra: json!({}),
+                },
+                CanonicalMessage {
+                    idx: 1,
+                    role: MessageRole::Assistant,
+                    content: "I'll fix it now.".to_string(),
+                    timestamp: Some(1_700_000_500_000),
+                    author: Some("claude-3-opus".to_string()),
+                    tool_calls: vec![],
+                    tool_results: vec![],
+                    extra: json!({}),
+                },
             ],
             metadata: json!({"source": "claude-code"}),
             source_path: PathBuf::from("/tmp/test.jsonl"),
@@ -728,7 +962,10 @@ mod tests {
         assert_eq!(readback.messages[0].content, "Fix the bug");
         assert_eq!(readback.messages[1].role, MessageRole::Assistant);
         assert_eq!(readback.messages[1].content, "I'll fix it now.");
-        assert_eq!(readback.messages[1].author, Some("claude-3-opus".to_string()));
+        assert_eq!(
+            readback.messages[1].author,
+            Some("claude-3-opus".to_string())
+        );
     }
 
     #[test]
@@ -746,7 +983,11 @@ mod tests {
                 content: "Let me check.".to_string(),
                 timestamp: Some(1_700_000_000_000),
                 author: None,
-                tool_calls: vec![ToolCall { id: None, name: "bash".to_string(), arguments: json!({"command": "ls"}) }],
+                tool_calls: vec![ToolCall {
+                    id: None,
+                    name: "bash".to_string(),
+                    arguments: json!({"command": "ls"}),
+                }],
                 tool_results: vec![],
                 extra: json!({}),
             }],
@@ -783,9 +1024,36 @@ mod tests {
             started_at: None,
             ended_at: None,
             messages: vec![
-                CanonicalMessage { idx: 0, role: MessageRole::User, content: "Hello from Codex".to_string(), timestamp: Some(1_700_000_000_000), author: None, tool_calls: vec![], tool_results: vec![], extra: json!({}) },
-                CanonicalMessage { idx: 1, role: MessageRole::Assistant, content: "Hi there".to_string(), timestamp: Some(1_700_000_001_000), author: None, tool_calls: vec![], tool_results: vec![], extra: json!({}) },
-                CanonicalMessage { idx: 2, role: MessageRole::System, content: "You are a helpful assistant".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: json!({}) },
+                CanonicalMessage {
+                    idx: 0,
+                    role: MessageRole::User,
+                    content: "Hello from Codex".to_string(),
+                    timestamp: Some(1_700_000_000_000),
+                    author: None,
+                    tool_calls: vec![],
+                    tool_results: vec![],
+                    extra: json!({}),
+                },
+                CanonicalMessage {
+                    idx: 1,
+                    role: MessageRole::Assistant,
+                    content: "Hi there".to_string(),
+                    timestamp: Some(1_700_000_001_000),
+                    author: None,
+                    tool_calls: vec![],
+                    tool_results: vec![],
+                    extra: json!({}),
+                },
+                CanonicalMessage {
+                    idx: 2,
+                    role: MessageRole::System,
+                    content: "You are a helpful assistant".to_string(),
+                    timestamp: None,
+                    author: None,
+                    tool_calls: vec![],
+                    tool_results: vec![],
+                    extra: json!({}),
+                },
             ],
             metadata: json!({}),
             source_path: std::path::PathBuf::from("/tmp/codex.jsonl"),
@@ -803,7 +1071,7 @@ mod tests {
         lines.push(
             serde_json::to_string(&json!({
                 "type": "session", "id": "2025-01-01T00-00-00_test",
-                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "timestamp": jiff::Timestamp::now().to_string(),
                 "cwd": "/tmp",
             }))
             .unwrap(),
@@ -830,7 +1098,7 @@ mod tests {
             lines.push(
                 serde_json::to_string(&json!({
                     "type": "message",
-                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                    "timestamp": jiff::Timestamp::now().to_string(),
                     "message": inner,
                 }))
                 .unwrap(),
@@ -844,9 +1112,15 @@ mod tests {
             let val: serde_json::Value = serde_json::from_str(line).unwrap();
             if val.get("type").and_then(|t| t.as_str()) == Some("message") {
                 let content = &val["message"]["content"];
-                assert!(content.is_array(), "expected content to be array, got: {content}");
+                assert!(
+                    content.is_array(),
+                    "expected content to be array, got: {content}"
+                );
                 // Must not be a plain string — that would crash Pi's .some() call.
-                assert!(!content.is_string(), "content must never be a plain string (Pi #9)");
+                assert!(
+                    !content.is_string(),
+                    "content must never be a plain string (Pi #9)"
+                );
             }
         }
 

@@ -28,7 +28,7 @@ That installer is the primary distribution path. It handles platform detection, 
 
 | Feature | What It Does |
 |---|---|
-| Cross-provider resume | `casr cc resume <codex-session-id>` and similar conversions in one command |
+| Cross-provider resume | `casr resume cc <codex-session-id>` and similar conversions in one command |
 | Canonical IR | Normalizes provider formats into a common model, then exports back to native format |
 | Native-format writers | Produces plausible provider-native session files, not intermediate-only exports |
 | Safety-first writes | Atomic temp-then-rename writes, conflict detection, optional `.bak` backup with `--force` |
@@ -50,7 +50,7 @@ casr list --limit 20 --sort date
 casr info 019c3eae-94c3-7d73-9b2a-9edb18f1563b
 
 # 4) Convert that session to Claude Code format
-casr cc resume 019c3eae-94c3-7d73-9b2a-9edb18f1563b
+casr resume cc 019c3eae-94c3-7d73-9b2a-9edb18f1563b
 
 # ergonomic shorthand (auto-detects source provider from the session ID)
 casr -cc 019c3eae-94c3-7d73-9b2a-9edb18f1563b   # open in Claude Code
@@ -92,7 +92,7 @@ claude --resume <new-session-id>
 | Cline | `cln` | Yes | Yes | `code .` |
 | Aider | `aid` | Yes | Yes | `aider --restore-chat-history` |
 | Amp | `amp` | Yes | Yes | `amp threads continue --execute "Continue from @<session-id>"` |
-| OpenCode | `opc` | Yes | Yes | `opencode` |
+| OpenCode | `opc` | Yes | Legacy DBs only | `opencode` |
 | ChatGPT | `gpt` | Yes | Yes | `open "https://chatgpt.com/c/<session-id>"` |
 | ClawdBot | `cwb` | Yes | Yes | `clawdbot --resume <session-id>` |
 | Vibe | `vib` | Yes | Yes | `vibe --resume <session-id>` |
@@ -106,6 +106,7 @@ Notes:
 - Initial core focus is Claude Code, Codex, and Gemini CLI.
 - Additional providers are implemented through the same `Provider` trait model.
 - Grok Build (xAI's official `grok` CLI) is read and write: casr synthesizes the native session tree (`updates.jsonl` + `summary.json`), which was round-trip verified against a live `grok --resume` (the CLI lists, exports, and resumes casr-written sessions with full conversation context).
+- OpenCode's `opencode.db` comes in three layouts, detected from `sqlite_master`: the legacy plural tables (`sessions`/`messages`; read and write), OpenCode 1.x (`session`/`message`/`part`; read only) and OpenCode 2.x (`session_v2` + the `session_message` entry log; read only). A DB migrated from 1.x to 2.x still carries the stale 1.x tables, so 2.x is probed first. For 2.x, `user`/`assistant`/`system` entries map directly (assistant `tool` parts become tool calls plus results carrying the completed output or the error), `shell` and `synthetic` entries become tool-side turns, completed `compaction` checkpoints become system context, and `model-switched`/`agent-switched`/`location-switched` bookkeeping is skipped. The 1.x and 2.x tables are projections of OpenCode's own event log, so casr never writes into them; convert *out* of OpenCode, or point `OPENCODE_DB_PATH` at a separate legacy-layout DB.
 
 ## Installation
 
@@ -120,8 +121,8 @@ What this installer does for you:
 | Capability | Behavior |
 |---|---|
 | Platform targeting | Detects Linux/macOS + x86_64/aarch64 and picks the right artifact |
-| Supply-chain checks | Verifies SHA256 and Sigstore/cosign when available |
-| Download fallback chain | Versioned release -> latest release naming variants -> source build |
+| Supply-chain checks | Enforces SHA256 verification (fail-closed unless `--no-verify`) and Sigstore/cosign when available |
+| Download fallback chain | Versioned release -> same-tag legacy naming (never substitutes `latest` or silently builds from source; use `--from-source`) |
 | Airgap install | `--offline <tarball>` installs from local artifacts |
 | Proxy-aware networking | Uses `HTTPS_PROXY` / `HTTP_PROXY` automatically |
 | Shell UX | Installs completions for bash/zsh/fish |
@@ -159,11 +160,15 @@ cargo build --release
 ./target/release/casr --help
 ```
 
-### Alternative: Cargo Local Install
+### Alternative: Cargo Install (crates.io or Local)
 
 ```bash
-cargo install --path .
+# From crates.io (note the package name is cross_agent_session_resumer; the CLI binary is casr)
+cargo install cross_agent_session_resumer --locked
 casr --help
+
+# Or from a local checkout
+cargo install --path .
 ```
 
 ### Alternative: Development Mode
@@ -191,7 +196,7 @@ casr info <session-id>
 
 4. Convert to your target provider.
 ```bash
-casr <target-alias> resume <session-id>
+casr resume <target-alias> <session-id>
 ```
 
 5. Resume in target provider.
@@ -216,19 +221,19 @@ Global flags:
 --enrich                  # Add optional synthetic context/orientation messages
 ```
 
-### `casr <target> resume <session-id>`
+### `casr resume <target> <session-id>`
 
 Convert a source session into target provider format and print the target resume command.
 
 ```bash
-casr cc resume 019c3eae-94c3-7d73-9b2a-9edb18f1563b
-casr claude resume 019c3eae-94c3-7d73-9b2a-9edb18f1563b   # standard name fallback
-casr cod resume 40f2cb68-fed7-4cee-83de-2b63ba9b7813 --dry-run
-casr codex resume 40f2cb68-fed7-4cee-83de-2b63ba9b7813 --dry-run
-casr gmi resume 40f2cb68-fed7-4cee-83de-2b63ba9b7813 --source cc
-casr gemini resume 40f2cb68-fed7-4cee-83de-2b63ba9b7813 --source claude
-casr cc resume <session-id> --force
-casr cc resume <session-id> --json
+casr resume cc 019c3eae-94c3-7d73-9b2a-9edb18f1563b
+casr resume claude 019c3eae-94c3-7d73-9b2a-9edb18f1563b   # standard name fallback
+casr resume cod 40f2cb68-fed7-4cee-83de-2b63ba9b7813 --dry-run
+casr resume codex 40f2cb68-fed7-4cee-83de-2b63ba9b7813 --dry-run
+casr resume gmi 40f2cb68-fed7-4cee-83de-2b63ba9b7813 --source cc
+casr resume gemini 40f2cb68-fed7-4cee-83de-2b63ba9b7813 --source claude
+casr resume cc <session-id> --force
+casr resume cc <session-id> --json
 ```
 
 ### `casr list`
@@ -286,6 +291,8 @@ export CLINE_HOME="$HOME/.config/Code/User/globalStorage/saoudrizwan.claude-dev"
 export AIDER_HOME="$HOME/.aider"
 export AMP_HOME="$HOME/.local/share/amp"
 export OPENCODE_HOME="$HOME/.opencode"
+# OpenCode 1.x/2.x keep their DB under XDG data (auto-discovered); pin one explicitly with:
+export OPENCODE_DB_PATH="$HOME/.local/share/opencode/opencode.db"
 
 # Logging verbosity (alternative to --verbose / --trace)
 export RUST_LOG="casr=debug"
@@ -331,7 +338,7 @@ Important helpers:
 
 ```text
 Input CLI
-  casr <target> resume <session-id>
+  casr resume <target> <session-id>
           |
           v
 Provider Registry + Detection
@@ -390,7 +397,7 @@ Common examples:
 
 `casr` supports two equivalent resume styles:
 
-- Canonical subcommand form: `casr <target> resume <session-id>`
+- Canonical subcommand form: `casr resume <target> <session-id>`
 - Shorthand form: `casr -cc <session-id>`, `casr -cod <session-id>`, `casr -agy <session-id>`, `casr -gmi <session-id>`
 
 Shorthand flags are rewritten internally before clap parsing, so logging, JSON output, and error handling stay identical across both forms.
@@ -530,7 +537,7 @@ Recommended test set for new providers:
 
 - Reader and writer unit tests for native fixtures.
 - Round-trip tests (`read(write(read(...)))`).
-- CLI integration test path through `casr list`, `casr info`, and `casr <target> resume`.
+- CLI integration test path through `casr list`, `casr info`, and `casr resume <target>`.
 - Error-path tests for malformed input and file I/O failures.
 
 ## Provider Format Notes
@@ -637,7 +644,7 @@ Test suite coverage includes:
 ```bash
 casr list
 casr info <session-id>
-casr cc resume <session-id> --source cod
+casr resume cc <session-id> --source cod
 ```
 
 ### "Target provider not installed"
@@ -655,7 +662,7 @@ Install the missing provider, then retry.
 Use force mode to back up and overwrite:
 
 ```bash
-casr cc resume <session-id> --force
+casr resume cc <session-id> --force
 ```
 
 ### "Write verification failed"
@@ -663,7 +670,7 @@ casr cc resume <session-id> --force
 Run in trace mode and inspect JSON diagnostics:
 
 ```bash
-casr cc resume <session-id> --trace --json
+casr resume cc <session-id> --trace --json
 ```
 
 ### "Wrong source provider was detected"
@@ -671,8 +678,8 @@ casr cc resume <session-id> --trace --json
 Pin source provider or session path explicitly:
 
 ```bash
-casr cc resume <session-id> --source cod
-casr cc resume <session-id> --source ~/.codex/sessions/2026/02/06/rollout-1.jsonl
+casr resume cc <session-id> --source cod
+casr resume cc <session-id> --source ~/.codex/sessions/2026/02/06/rollout-1.jsonl
 ```
 
 ## Limitations

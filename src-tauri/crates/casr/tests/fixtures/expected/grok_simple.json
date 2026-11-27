@@ -5,13 +5,7 @@
   "workspace": "/data/projects/demo",
   "title": "Echo hi probe session",
   "message_count": 5,
-  "roles": [
-    "User",
-    "Assistant",
-    "Assistant",
-    "User",
-    "Assistant"
-  ],
+  "roles": ["User", "Assistant", "Assistant", "User", "Assistant"],
   "started_at_present": true,
   "ended_at_present": true,
   "model_name": "grok-build",

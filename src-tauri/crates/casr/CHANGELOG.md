@@ -6,6 +6,96 @@ Versions correspond to [GitHub Releases](https://github.com/Dicklesworthstone/cr
 
 ---
 
+## [v0.5.0] -- 2026-11-21
+
+Minor release. Tag + GitHub Release (macOS arm64/x86_64, Linux x86_64/aarch64 musl, and Windows x86_64 binaries) + crates.io (`cross_agent_session_resumer` 0.5.0).
+
+### Security & Dependencies
+
+- **Eliminated all `cargo audit` vulnerabilities and advisories (0 vulnerabilities, 0 warnings across 185 locked crates, down from 2 vulnerabilities and 15 warnings across 277 crates)**:
+  - Upgraded `rusqlite` `0.33` -> `0.43` (`libsqlite3-sys` `0.31.0` -> `0.40.0`), resolving `RUSTSEC-2026-0459` / CVE-2026-119375.
+  - Upgraded `rayon` `1.11.0` -> `1.12.0` (`crossbeam-epoch` `0.9.18` -> `0.9.21`), resolving `RUSTSEC-2026-0204`.
+  - Upgraded `anyhow` `1.0.101` -> `1.0.104`, resolving `RUSTSEC-2026-0190`.
+  - Upgraded `rich_rust` `0.2.1` -> `0.2.3` (`lru` `0.16.3` -> `0.18.5`, `rustix` `1.1.3` -> `1.1.6`), resolving `RUSTSEC-2026-0253` and `RUSTSEC-2026-0486`.
+  - Replaced build dependency `vergen-gix` `9.1.0` with `vergen-gitcl` `10.0.4` (using `.default_on_error()` plus explicit `cargo:rerun-if-env-changed=VERGEN_GIT_SHA`), removing ~90 build-only `gix-*` crates along with `faster-hex`, `memmap2`, and `heapless` build-script advisories (`RUSTSEC-2026-0306`, `RUSTSEC-2026-0186`, `RUSTSEC-2026-0574`..`0582`) while preserving `casr --version` build metadata both in git checkouts, staged source builds with `VERGEN_GIT_SHA`, and crates.io installs without `.git`.
+  - Migrated timestamp parsing and formatting from unmaintained `chrono` (`RUSTSEC-2026-0543`) to `jiff` `1.0` across all providers, core model, CLI display, and tests.
+  - Upgraded `which` `7` -> `8`, `dirs` `6` -> `7`, `sha2` `0.10` -> `0.11`, `clap` `4.5` -> `4.6`, `clap_complete` `4.5` -> `4.6`, `uuid` `1.20` -> `1.29`, `serde`/`serde_json`/`thiserror`/`tempfile`/`assert_cmd`/`predicates` to latest stable releases.
+
+### Fixed
+
+- **Hardened `install.sh` checksum verification to fail closed** ([#33](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/33)): missing `sha256sum`/`shasum`, failed `.sha256` sidecar fetches, empty checksum files, and malformed digests now abort before extraction/install while leaving any existing binary byte-identical (preserving `--no-verify` as an explicit escape hatch).
+- **Hardened `install.sh` version pinning and download fallback** ([#32](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/32)): removed mutable `/releases/latest/download/` fallbacks and the silent `v0.1.0` fallback when latest-release resolution fails; explicit `--artifact-url` failures no longer fall back; legacy simple-name fallback stays pinned to the selected `${VERSION}` tag and updates `URL`/`TAR` so verification binds to the exact downloaded artifact.
+- **Codex legacy JSON reader handles pretty-printed multi-line `.json` files**: `Codex::read_session` previously inspected only the first line for `"session"`/`"items"`, causing pretty-printed legacy `.json` sessions to fall through to the JSONL reader and parse zero messages; it now falls back to parsing the full JSON document when the first line is not a complete JSON object, with a regression unit test.
+- **Installer latest-tag parsing handles minified GitHub API JSON** (`fac8916`).
+
+### Performance & Packaging
+
+- **Switched `[profile.release]` from `opt-level = "z"` to `opt-level = 3`** (keeping `lto = true`, `codegen-units = 1`, `panic = "abort"`, `strip = true`), delivering faster session listing and cross-provider conversion for both prebuilt binaries and `cargo install cross_agent_session_resumer` consumers ([#34](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/34)).
+- **Crates.io catch-up & full release provenance**: published `cross_agent_session_resumer` `0.5.0` to crates.io alongside signed multi-platform GitHub Release binaries and `SHA256SUMS` ([#34](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/34)).
+
+---
+
+## [v0.4.1] -- 2026-09-07
+
+Patch release. Tag + GitHub Release (linux x86_64/aarch64 musl and macOS x86_64/arm64 binaries).
+
+### Added
+
+- **OpenCode 1.x sessions are readable**: the singular event-sourced schema (`session`/`message`/`part`) that OpenCode 1.x ships is detected from `sqlite_master` and read alongside the legacy plural layout. Flat `part.data` blobs become canonical content, tool calls and tool results (`text`, `reasoning` as a fallback, `tool` parts once `state.status` is `completed`/`error`, `file` parts as a visible marker); bookkeeping parts (`step-start`, `step-finish`, `snapshot`, `patch`, `agent`) are dropped ([`6125e7e`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/6125e7e), [`4722220`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/4722220), [`779896f`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/779896f)). Closes [#26](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/26).
+- **OpenCode 2.x (beta) sessions are readable**: `session_v2` plus the per-entry `session_message` log (`ORDER BY seq`) is detected *before* the 1.x and legacy layouts, so a DB migrated from 1.x -- which still carries the dead 1.x tables -- lists only its live sessions. `user`/`assistant`/`system` entries map directly (assistant `tool` parts become a tool call plus a result carrying the completed output or the `error {type, message}`; streaming/pending calls carry no result), `synthetic`/`skill`/`shell` entries become tool-side turns, completed `compaction` checkpoints become system context, and `model-switched`/`agent-switched`/`location-switched` bookkeeping is skipped. Session model, timestamps, tokens, cost and parent/fork/project/workspace ids are kept as metadata; untitled sessions take their first user turn as the title ([`2392b39`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/2392b39)). Closes [#30](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/30).
+- **XDG discovery for OpenCode**: `$XDG_DATA_HOME/opencode/opencode.db` is probed (falling back to `~/.local/share/opencode/opencode.db`), so redirected data homes are found; `OPENCODE_DB_PATH` still pins a DB explicitly ([`2079b02`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/2079b02)).
+
+### Fixed
+
+- **OpenCode schema mismatches are loud**: an `opencode.db` whose layout casr does not recognise now errors (`read_session`) or warns (`list_sessions`/`owns_session`) with the missing table(s), the tables actually present, and the closest known schema, instead of silently reporting zero sessions ([`2079b02`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/2079b02)). From [#26](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/26).
+- **Writes into live OpenCode 1.x/2.x databases are refused**: those tables are projections of OpenCode's own event log, so `write_session` bails with the mechanism explained and leaves the file byte-identical; the schema probe uses a read-only connection so the refusal never opens OpenCode's WAL-mode DB read-write. The provider table in the README now says OpenCode write is legacy-DB only ([`779896f`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/779896f), [`2392b39`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/2392b39)).
+- **`install.sh` fails loudly on a missing prebuilt asset**: a mapped target whose release asset 404s now errors with a pointer at the issue tracker instead of silently falling back to a full source build (the v0.4.0-on-macOS failure mode); unmapped platforms report `NO_PREBUILT_REASON` and require an explicit `--from-source` ([`2982ac8`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/2982ac8)). From [#25](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/25).
+- **2.x `owns_session` test canonicalizes its expectation**, so the suite passes on macOS where tempdirs resolve to `/private/var/...`.
+
+### Changed
+
+- **AGENTS.md** separates read-only inspection from mutations (git status/diff never need permission; `git stash` sits with the mutations), scopes the session wrap-up rules to sessions that changed something, and clarifies the main-to-master mirror and shared-checkout ownership ([`e21c74c`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/e21c74c)). Closes [#28](https://github.com/Dicklesworthstone/cross_agent_session_resumer/issues/28).
+
+### Build
+
+- Toolchain pinned to `nightly-2026-08-31` ([`6eecd86`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/6eecd86)).
+
+---
+
+## [v0.4.0] -- 2026-08-23
+
+Minor release. Tag + GitHub Release (linux x86_64 musl binary) + crates.io.
+
+### Added
+
+- **Session titles from Claude Code away-summary recaps**: sessions with no explicit title now derive one from `away_summary` entries (verified against 1,427 real transcripts), with the `"(disable recaps in /config)"` hint stripped; the title fallback also skips harness-chrome user messages ([`54a065a`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/54a065a)). Reimplements the idea from PR [#22](https://github.com/Dicklesworthstone/cross_agent_session_resumer/pull/22).
+- **`casr list --all` and unlimited `--limit 0`**: `--all` lists sessions across every workspace (with a new Workspace column; conflicts with `--workspace`), and `--limit 0` means unlimited, including the scan probe ([`6316ba6`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/6316ba6)). Reimplements ideas from PR [#23](https://github.com/Dicklesworthstone/cross_agent_session_resumer/pull/23).
+
+### Fixed
+
+- **Workspace matching tolerates path spellings**: symlinks, `/private` prefixes, and trailing slashes no longer prevent a session from matching its workspace — reconciliation happens at all three match sites ([`6316ba6`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/6316ba6)).
+- **OpenCode writes agree with discovery**: the writer canonicalizes the target workspace path, so written sessions are found by cwd-based discovery on macOS (fixes 9 real test failures at main; from PR [#24](https://github.com/Dicklesworthstone/cross_agent_session_resumer/pull/24)'s report) ([`ef096c0`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/ef096c0)).
+
+### Build
+
+- Permission-enforcement tests probe the premise first, so suites stop false-failing on root-privileged CI/fleet workers ([`8bf9241`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/8bf9241)).
+
+---
+
+## [v0.3.1] -- 2026-08-15
+
+Patch release. Tag + GitHub Release (linux x86_64 musl binary).
+
+### Fixed
+
+- **Documented `resume` argument order corrected**: every documented target-first form (`casr <target> resume <id>`) was rejected by clap; the CLI has always been `casr resume <TARGET> <SESSION_ID>`. README, AGENTS.md, `install.sh`, in-source doc comments, and the Antigravity error-message hint now show the real form ([`f66f27f`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/f66f27f0b1f4b9fe9396c026627b3814455d2e6c)).
+
+### Build
+
+- Parallel rustc front-end enabled (`-Z threads=4`) and local `target-rel/` ignored.
+
+---
+
 ## [Unreleased] (after v0.1.1)
 
 > Commits on `main` since the v0.1.1 tag (`be1ce19`, 2026-03-03). No GitHub Release yet.
@@ -118,7 +208,7 @@ All 14 providers were implemented via a pluggable `Provider` trait with `detect`
 
 ### CLI and UX
 
-- **Subcommand and shorthand resume**: both `casr <target> resume <id>` and `casr -cc <id>` / `casr -cod <id>` / `casr -gmi <id>` forms supported; shorthand flags rewritten internally before clap parsing ([`ebc7204`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/ebc72044a618ff72a41c11442c27067e9f2c3d8c)).
+- **Subcommand and shorthand resume**: both `casr resume <target> <id>` and `casr -cc <id>` / `casr -cod <id>` / `casr -gmi <id>` forms supported; shorthand flags rewritten internally before clap parsing ([`ebc7204`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/ebc72044a618ff72a41c11442c27067e9f2c3d8c)).
 - **Rich terminal table for `casr list`**: styled columns for provider, session ID, workspace, message count, tool-use count, and relative last-active age ([`ebc7204`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/ebc72044a618ff72a41c11442c27067e9f2c3d8c), [`dc16517`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/dc16517ae34d9877f6c2bfb44a81b58bf59ff0d9)).
 - **Workspace-scoped list**: `casr list` defaults to sessions from the current working directory; `--workspace` overrides explicitly ([`474e765`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/474e765f6cb2d7907e83c9aab631211930ed9442)).
 - **Standard provider name aliases**: `claude` -> `claude-code`, `codex-cli` -> `codex`, `gemini-cli` -> `gemini` for natural command invocation ([`80c5789`](https://github.com/Dicklesworthstone/cross_agent_session_resumer/commit/80c5789d06770aca4d571ffe3e1cc070b58d7440)).

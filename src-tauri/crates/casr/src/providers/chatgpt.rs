@@ -29,7 +29,10 @@ use tracing::{debug, info, trace};
 use walkdir::WalkDir;
 
 use crate::discovery::DetectionResult;
-use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, flatten_content, normalize_role, parse_timestamp, reindex_messages, truncate_title};
+use crate::model::{
+    CanonicalMessage, CanonicalSession, MessageRole, flatten_content, normalize_role,
+    parse_timestamp, reindex_messages, truncate_title,
+};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// ChatGPT desktop app provider implementation.
@@ -119,14 +122,20 @@ impl Provider for ChatGpt {
                     evidence.push(format!("{unencrypted} unencrypted conversation dir(s)"));
                 }
                 if encrypted > 0 {
-                    evidence.push(format!("{encrypted} encrypted conversation dir(s) (not yet supported)"));
+                    evidence.push(format!(
+                        "{encrypted} encrypted conversation dir(s) (not yet supported)"
+                    ));
                 }
                 installed = true;
             }
         }
 
         trace!(provider = "chatgpt", ?evidence, installed, "detection");
-        DetectionResult { installed, version: None, evidence }
+        DetectionResult {
+            installed,
+            version: None,
+            evidence,
+        }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
@@ -137,7 +146,11 @@ impl Provider for ChatGpt {
             return vec![];
         }
         // Each unencrypted conversations-* directory is a session root.
-        Self::find_conversation_dirs(&home).into_iter().filter(|(_, encrypted)| !encrypted).map(|(path, _)| path).collect()
+        Self::find_conversation_dirs(&home)
+            .into_iter()
+            .filter(|(_, encrypted)| !encrypted)
+            .map(|(path, _)| path)
+            .collect()
     }
 
     fn owns_session(&self, session_id: &str) -> Option<PathBuf> {
@@ -198,12 +211,24 @@ impl Provider for ChatGpt {
     fn read_session(&self, path: &Path) -> anyhow::Result<CanonicalSession> {
         debug!(path = %path.display(), "reading ChatGPT session");
 
-        let file = std::fs::File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
+        let file = std::fs::File::open(path)
+            .with_context(|| format!("failed to open {}", path.display()))?;
         let reader = std::io::BufReader::new(file);
-        let root: serde_json::Value = serde_json::from_reader(reader).with_context(|| format!("failed to parse JSON {}", path.display()))?;
+        let root: serde_json::Value = serde_json::from_reader(reader)
+            .with_context(|| format!("failed to parse JSON {}", path.display()))?;
 
         // Session ID: prefer "id", then "conversation_id", then filename stem.
-        let session_id = root.get("id").or_else(|| root.get("conversation_id")).and_then(|v| v.as_str()).map(String::from).unwrap_or_else(|| path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string());
+        let session_id = root
+            .get("id")
+            .or_else(|| root.get("conversation_id"))
+            .and_then(|v| v.as_str())
+            .map(String::from)
+            .unwrap_or_else(|| {
+                path.file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string()
+            });
 
         let title = root.get("title").and_then(|v| v.as_str()).map(String::from);
 
@@ -233,7 +258,10 @@ impl Provider for ChatGpt {
                 let ts_a = a.1.get("create_time").and_then(|v| v.as_f64());
                 let ts_b = b.1.get("create_time").and_then(|v| v.as_f64());
                 match (ts_a, ts_b) {
-                    (Some(a_ts), Some(b_ts)) => a_ts.partial_cmp(&b_ts).unwrap_or(std::cmp::Ordering::Equal).then_with(|| a.0.cmp(b.0)),
+                    (Some(a_ts), Some(b_ts)) => a_ts
+                        .partial_cmp(&b_ts)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.0.cmp(b.0)),
                     (Some(_), None) => std::cmp::Ordering::Less,
                     (None, Some(_)) => std::cmp::Ordering::Greater,
                     (None, None) => a.0.cmp(b.0),
@@ -241,7 +269,11 @@ impl Provider for ChatGpt {
             });
 
             for (_node_id, msg) in msg_nodes {
-                let role_str = msg.get("author").and_then(|a| a.get("role")).and_then(|v| v.as_str()).unwrap_or("assistant");
+                let role_str = msg
+                    .get("author")
+                    .and_then(|a| a.get("role"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("assistant");
 
                 // Skip system messages.
                 if role_str == "system" {
@@ -252,8 +284,15 @@ impl Provider for ChatGpt {
 
                 // Content: prefer "parts" array, then "text" field.
                 let content_val = msg.get("content");
-                let text = if let Some(parts) = content_val.and_then(|c| c.get("parts")).and_then(|p| p.as_array()) {
-                    parts.iter().filter_map(|p| p.as_str()).collect::<Vec<_>>().join("\n")
+                let text = if let Some(parts) = content_val
+                    .and_then(|c| c.get("parts"))
+                    .and_then(|p| p.as_array())
+                {
+                    parts
+                        .iter()
+                        .filter_map(|p| p.as_str())
+                        .collect::<Vec<_>>()
+                        .join("\n")
                 } else if let Some(content) = content_val {
                     flatten_content(content)
                 } else {
@@ -271,9 +310,22 @@ impl Provider for ChatGpt {
                 }
 
                 // Model from message metadata.
-                let msg_model = msg.get("metadata").and_then(|m| m.get("model_slug")).and_then(|v| v.as_str()).map(String::from);
+                let msg_model = msg
+                    .get("metadata")
+                    .and_then(|m| m.get("model_slug"))
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
 
-                messages.push(CanonicalMessage { idx: 0, role, content: text, timestamp: ts, author: msg_model, tool_calls: vec![], tool_results: vec![], extra: msg.clone() });
+                messages.push(CanonicalMessage {
+                    idx: 0,
+                    role,
+                    content: text,
+                    timestamp: ts,
+                    author: msg_model,
+                    tool_calls: vec![],
+                    tool_results: vec![],
+                    extra: msg.clone(),
+                });
             }
         }
 
@@ -282,7 +334,10 @@ impl Provider for ChatGpt {
             && let Some(msgs) = root.get("messages").and_then(|v| v.as_array())
         {
             for msg in msgs {
-                let role_str = msg.get("role").and_then(|v| v.as_str()).unwrap_or("assistant");
+                let role_str = msg
+                    .get("role")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("assistant");
 
                 if role_str == "system" {
                     continue;
@@ -296,29 +351,53 @@ impl Provider for ChatGpt {
                     continue;
                 }
 
-                let ts = msg.get("timestamp").or_else(|| msg.get("create_time")).and_then(parse_timestamp);
+                let ts = msg
+                    .get("timestamp")
+                    .or_else(|| msg.get("create_time"))
+                    .and_then(parse_timestamp);
 
                 if let Some(t) = ts {
                     ended_at = Some(ended_at.map_or(t, |e: i64| e.max(t)));
                 }
 
-                messages.push(CanonicalMessage { idx: 0, role, content: text, timestamp: ts, author: None, tool_calls: vec![], tool_results: vec![], extra: msg.clone() });
+                messages.push(CanonicalMessage {
+                    idx: 0,
+                    role,
+                    content: text,
+                    timestamp: ts,
+                    author: None,
+                    tool_calls: vec![],
+                    tool_results: vec![],
+                    extra: msg.clone(),
+                });
             }
         }
 
         reindex_messages(&mut messages);
 
         // Title: prefer explicit, fall back to first user message.
-        let effective_title = title.or_else(|| messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100)));
+        let effective_title = title.or_else(|| {
+            messages
+                .iter()
+                .find(|m| m.role == MessageRole::User)
+                .map(|m| truncate_title(&m.content, 100))
+        });
 
         // Metadata.
         let mut metadata = serde_json::Map::new();
-        metadata.insert("source".into(), serde_json::Value::String("chatgpt".to_string()));
+        metadata.insert(
+            "source".into(),
+            serde_json::Value::String("chatgpt".to_string()),
+        );
         if let Some(ref m) = model_name {
             metadata.insert("model".into(), serde_json::Value::String(m.clone()));
         }
 
-        debug!(session_id, messages = messages.len(), "ChatGPT session parsed");
+        debug!(
+            session_id,
+            messages = messages.len(),
+            "ChatGPT session parsed"
+        );
 
         Ok(CanonicalSession {
             session_id,
@@ -334,11 +413,16 @@ impl Provider for ChatGpt {
         })
     }
 
-    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
+    fn write_session(
+        &self,
+        session: &CanonicalSession,
+        opts: &WriteOptions,
+    ) -> anyhow::Result<WrittenSession> {
         let target_session_id = uuid::Uuid::new_v4().to_string();
 
         // Determine target directory.
-        let home = Self::home_dir().ok_or_else(|| anyhow::anyhow!("cannot determine ChatGPT home directory"))?;
+        let home = Self::home_dir()
+            .ok_or_else(|| anyhow::anyhow!("cannot determine ChatGPT home directory"))?;
 
         // Write into conversations-<uuid>/ directory.
         let conv_dir = home.join(format!("conversations-{target_session_id}"));
@@ -351,9 +435,15 @@ impl Provider for ChatGpt {
         );
 
         // Build the ChatGPT mapping structure.
-        let now_secs = chrono::Utc::now().timestamp() as f64;
-        let create_time = session.started_at.map(|ms| ms as f64 / 1000.0).unwrap_or(now_secs);
-        let update_time = session.ended_at.map(|ms| ms as f64 / 1000.0).unwrap_or(now_secs);
+        let now_secs = jiff::Timestamp::now().as_second() as f64;
+        let create_time = session
+            .started_at
+            .map(|ms| ms as f64 / 1000.0)
+            .unwrap_or(now_secs);
+        let update_time = session
+            .ended_at
+            .map(|ms| ms as f64 / 1000.0)
+            .unwrap_or(now_secs);
 
         let mut mapping = serde_json::Map::new();
         let mut prev_node_id: Option<String> = None;
@@ -393,7 +483,10 @@ impl Provider for ChatGpt {
                 "message": message_obj,
             });
 
-            node["parent"] = prev_node_id.as_ref().map(|id| serde_json::Value::String(id.clone())).unwrap_or(serde_json::Value::Null);
+            node["parent"] = prev_node_id
+                .as_ref()
+                .map(|id| serde_json::Value::String(id.clone()))
+                .unwrap_or(serde_json::Value::Null);
 
             mapping.insert(node_id.clone(), node);
             prev_node_id = Some(node_id);
@@ -409,7 +502,8 @@ impl Provider for ChatGpt {
 
         let content_bytes = serde_json::to_string_pretty(&root)?.into_bytes();
 
-        let outcome = crate::pipeline::atomic_write(&target_path, &content_bytes, opts.force, self.slug())?;
+        let outcome =
+            crate::pipeline::atomic_write(&target_path, &content_bytes, opts.force, self.slug())?;
 
         info!(
             target_session_id,
@@ -418,7 +512,13 @@ impl Provider for ChatGpt {
             "ChatGPT session written"
         );
 
-        Ok(WrittenSession { paths: vec![outcome.target_path], session_id: target_session_id.clone(), resume_command: self.resume_command(&target_session_id), backup_path: outcome.backup_path, warnings: Vec::new() })
+        Ok(WrittenSession {
+            paths: vec![outcome.target_path],
+            session_id: target_session_id.clone(),
+            resume_command: self.resume_command(&target_session_id),
+            backup_path: outcome.backup_path,
+            warnings: Vec::new(),
+        })
     }
 
     fn resume_command(&self, session_id: &str) -> String {
@@ -444,7 +544,9 @@ mod tests {
         let mut tmp = tempfile::NamedTempFile::with_suffix(".json").unwrap();
         tmp.write_all(content.as_bytes()).unwrap();
         tmp.flush().unwrap();
-        ChatGpt.read_session(tmp.path()).unwrap_or_else(|e| panic!("read_session failed: {e}"))
+        ChatGpt
+            .read_session(tmp.path())
+            .unwrap_or_else(|e| panic!("read_session failed: {e}"))
     }
 
     // -----------------------------------------------------------------------
@@ -462,7 +564,10 @@ mod tests {
     #[test]
     fn resume_command_is_browser_url() {
         let p = ChatGpt;
-        assert_eq!(p.resume_command("abc-123"), "open \"https://chatgpt.com/c/abc-123\"");
+        assert_eq!(
+            p.resume_command("abc-123"),
+            "open \"https://chatgpt.com/c/abc-123\""
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -772,7 +877,13 @@ mod tests {
             .to_string(),
         );
 
-        assert_eq!(session.messages[0].extra.get("custom_field").and_then(|v| v.as_str()), Some("preserved"));
+        assert_eq!(
+            session.messages[0]
+                .extra
+                .get("custom_field")
+                .and_then(|v| v.as_str()),
+            Some("preserved")
+        );
     }
 
     #[test]
@@ -1015,8 +1126,26 @@ mod tests {
             started_at: Some(1_700_000_000_000),
             ended_at: Some(1_700_000_010_000),
             messages: vec![
-                CanonicalMessage { idx: 0, role: MessageRole::User, content: "Hello".to_string(), timestamp: Some(1_700_000_001_000), author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null },
-                CanonicalMessage { idx: 1, role: MessageRole::Assistant, content: "Hi there".to_string(), timestamp: Some(1_700_000_002_000), author: Some("gpt-4".to_string()), tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null },
+                CanonicalMessage {
+                    idx: 0,
+                    role: MessageRole::User,
+                    content: "Hello".to_string(),
+                    timestamp: Some(1_700_000_001_000),
+                    author: None,
+                    tool_calls: vec![],
+                    tool_results: vec![],
+                    extra: serde_json::Value::Null,
+                },
+                CanonicalMessage {
+                    idx: 1,
+                    role: MessageRole::Assistant,
+                    content: "Hi there".to_string(),
+                    timestamp: Some(1_700_000_002_000),
+                    author: Some("gpt-4".to_string()),
+                    tool_calls: vec![],
+                    tool_results: vec![],
+                    extra: serde_json::Value::Null,
+                },
             ],
             metadata: json!({"source": "test"}),
             source_path: std::path::PathBuf::from("/tmp/test.json"),
@@ -1026,7 +1155,7 @@ mod tests {
         // Set CHATGPT_HOME to temp dir so writer has a target.
         // Since we can't use set_var (unsafe), we test the JSON structure
         // by serializing what the writer would produce.
-        let now_secs = chrono::Utc::now().timestamp() as f64;
+        let now_secs = jiff::Timestamp::now().as_second() as f64;
         let mut mapping = serde_json::Map::new();
         let mut prev_node_id: Option<String> = None;
 
@@ -1053,7 +1182,10 @@ mod tests {
             }
 
             let mut node = json!({"message": message_obj});
-            node["parent"] = prev_node_id.as_ref().map(|id| serde_json::Value::String(id.clone())).unwrap_or(serde_json::Value::Null);
+            node["parent"] = prev_node_id
+                .as_ref()
+                .map(|id| serde_json::Value::String(id.clone()))
+                .unwrap_or(serde_json::Value::Null);
 
             mapping.insert(node_id.clone(), node);
             prev_node_id = Some(node_id);
@@ -1094,8 +1226,26 @@ mod tests {
             started_at: Some(1_700_000_000_000),
             ended_at: Some(1_700_000_010_000),
             messages: vec![
-                CanonicalMessage { idx: 0, role: MessageRole::User, content: "User says hello".to_string(), timestamp: Some(1_700_000_001_000), author: None, tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null },
-                CanonicalMessage { idx: 1, role: MessageRole::Assistant, content: "Assistant responds".to_string(), timestamp: Some(1_700_000_002_000), author: Some("gpt-4o".to_string()), tool_calls: vec![], tool_results: vec![], extra: serde_json::Value::Null },
+                CanonicalMessage {
+                    idx: 0,
+                    role: MessageRole::User,
+                    content: "User says hello".to_string(),
+                    timestamp: Some(1_700_000_001_000),
+                    author: None,
+                    tool_calls: vec![],
+                    tool_results: vec![],
+                    extra: serde_json::Value::Null,
+                },
+                CanonicalMessage {
+                    idx: 1,
+                    role: MessageRole::Assistant,
+                    content: "Assistant responds".to_string(),
+                    timestamp: Some(1_700_000_002_000),
+                    author: Some("gpt-4o".to_string()),
+                    tool_calls: vec![],
+                    tool_results: vec![],
+                    extra: serde_json::Value::Null,
+                },
             ],
             metadata: json!({"source": "chatgpt"}),
             source_path: std::path::PathBuf::from("/tmp/test.json"),
@@ -1129,7 +1279,10 @@ mod tests {
             }
 
             let mut node = json!({"message": message_obj});
-            node["parent"] = prev_node_id.as_ref().map(|id| serde_json::Value::String(id.clone())).unwrap_or(serde_json::Value::Null);
+            node["parent"] = prev_node_id
+                .as_ref()
+                .map(|id| serde_json::Value::String(id.clone()))
+                .unwrap_or(serde_json::Value::Null);
 
             mapping.insert(node_id.clone(), node);
             prev_node_id = Some(node_id);
@@ -1145,7 +1298,8 @@ mod tests {
 
         // Write to temp file and read back.
         let mut tmp = tempfile::NamedTempFile::with_suffix(".json").unwrap();
-        tmp.write_all(serde_json::to_string_pretty(&root).unwrap().as_bytes()).unwrap();
+        tmp.write_all(serde_json::to_string_pretty(&root).unwrap().as_bytes())
+            .unwrap();
         tmp.flush().unwrap();
 
         let read_back = ChatGpt.read_session(tmp.path()).unwrap();

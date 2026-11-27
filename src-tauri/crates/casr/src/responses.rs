@@ -27,7 +27,10 @@ pub struct ListEnvelope {
 
 impl ListEnvelope {
     pub fn new(items: Vec<ListItem>) -> Self {
-        Self { schema_version: SCHEMA_VERSION, items }
+        Self {
+            schema_version: SCHEMA_VERSION,
+            items,
+        }
     }
 }
 
@@ -141,7 +144,11 @@ pub struct ErrorEnvelope {
 
 impl ErrorEnvelope {
     pub fn new(error_type: &str, message: String) -> Self {
-        Self { ok: false, error_type: error_type.to_string(), message }
+        Self {
+            ok: false,
+            error_type: error_type.to_string(),
+            message,
+        }
     }
 }
 
@@ -160,8 +167,15 @@ pub const WS_NAME_SOURCE_NONE: &str = "none";
 pub fn workspace_name_from_path(workspace: Option<&PathBuf>) -> (Option<String>, Option<String>) {
     match workspace {
         Some(ws) => {
-            let name = ws.file_name().and_then(|n| n.to_str()).map(|s| s.to_string());
-            if name.is_some() { (name, Some(WS_NAME_SOURCE_SESSION_PATH.to_string())) } else { (None, Some(WS_NAME_SOURCE_NONE.to_string())) }
+            let name = ws
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string());
+            if name.is_some() {
+                (name, Some(WS_NAME_SOURCE_SESSION_PATH.to_string()))
+            } else {
+                (None, Some(WS_NAME_SOURCE_NONE.to_string()))
+            }
         }
         None => (None, Some(WS_NAME_SOURCE_NONE.to_string())),
     }
@@ -259,7 +273,10 @@ mod tests {
         assert_eq!(json["provider"], "codex");
         assert!(json["title"].is_null());
         assert!(json["native_name"].is_null());
-        assert!(!json.as_object().unwrap().contains_key("transcript_tail"), "transcript_tail must be omitted when not peeking");
+        assert!(
+            !json.as_object().unwrap().contains_key("transcript_tail"),
+            "transcript_tail must be omitted when not peeking"
+        );
         assert!(json["workspace"].is_null());
         assert_eq!(json["messages"], 5);
         assert_eq!(json["model_name"], "gpt-4");
@@ -273,7 +290,14 @@ mod tests {
 
     #[test]
     fn provider_info_serializes() {
-        let pi = ProviderInfo { name: "Claude Code".to_string(), slug: "claude-code".to_string(), alias: "cc".to_string(), installed: true, version: Some("1.0".to_string()), evidence: vec!["found binary".to_string()] };
+        let pi = ProviderInfo {
+            name: "Claude Code".to_string(),
+            slug: "claude-code".to_string(),
+            alias: "cc".to_string(),
+            installed: true,
+            version: Some("1.0".to_string()),
+            evidence: vec!["found binary".to_string()],
+        };
         let json = serde_json::to_value(&pi).unwrap();
         assert_eq!(json["name"], "Claude Code");
         assert_eq!(json["slug"], "claude-code");
@@ -289,7 +313,17 @@ mod tests {
 
     #[test]
     fn resume_success_dry_run_serializes() {
-        let rs = ResumeSuccess { ok: true, source_provider: "claude-code".to_string(), target_provider: "codex".to_string(), source_session_id: "sid-src".to_string(), target_session_id: None, written_paths: None, resume_command: None, dry_run: true, warnings: vec![] };
+        let rs = ResumeSuccess {
+            ok: true,
+            source_provider: "claude-code".to_string(),
+            target_provider: "codex".to_string(),
+            source_session_id: "sid-src".to_string(),
+            target_session_id: None,
+            written_paths: None,
+            resume_command: None,
+            dry_run: true,
+            warnings: vec![],
+        };
         let json = serde_json::to_value(&rs).unwrap();
         assert_eq!(json["ok"], true);
         assert_eq!(json["dry_run"], true);
@@ -348,8 +382,14 @@ mod tests {
             repo_name: None,
         };
         let json = serde_json::to_value(&item).unwrap();
-        assert!(!json.as_object().unwrap().contains_key("repo_name"), "repo_name should be omitted from JSON when None");
-        assert!(json.as_object().unwrap().contains_key("native_name"), "native_name is always present (null when absent)");
+        assert!(
+            !json.as_object().unwrap().contains_key("repo_name"),
+            "repo_name should be omitted from JSON when None"
+        );
+        assert!(
+            json.as_object().unwrap().contains_key("native_name"),
+            "native_name is always present (null when absent)"
+        );
     }
 
     #[test]
@@ -400,7 +440,10 @@ mod tests {
             transcript_tail: None,
         };
         let json = serde_json::to_value(&info).unwrap();
-        assert!(!json.as_object().unwrap().contains_key("repo_name"), "repo_name should be omitted from info JSON when None");
+        assert!(
+            !json.as_object().unwrap().contains_key("repo_name"),
+            "repo_name should be omitted from info JSON when None"
+        );
     }
 
     #[test]

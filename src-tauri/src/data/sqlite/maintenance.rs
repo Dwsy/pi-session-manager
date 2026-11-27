@@ -98,7 +98,7 @@ pub fn preload_recent_sessions(conn: &Connection, count: usize) -> Result<Vec<Se
                 name: row.get(3)?,
                 created: parse_timestamp(&row.get::<_, String>(4)?),
                 modified: parse_timestamp(&row.get::<_, String>(5)?),
-                message_count: row.get(6)?,
+                message_count: row.get::<_, i64>(6)?.max(0) as usize,
                 first_message: row.get(7)?,
                 user_messages_text: String::new(),
                 assistant_messages_text: String::new(),

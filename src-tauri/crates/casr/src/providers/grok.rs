@@ -82,7 +82,10 @@ use std::path::{Path, PathBuf};
 use tracing::{debug, info, trace};
 
 use crate::discovery::DetectionResult;
-use crate::model::{CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, flatten_content, parse_timestamp, reindex_messages, truncate_title};
+use crate::model::{
+    CanonicalMessage, CanonicalSession, MessageRole, ToolCall, ToolResult, flatten_content,
+    parse_timestamp, reindex_messages, truncate_title,
+};
 use crate::providers::{Provider, WriteOptions, WrittenSession};
 
 /// Provider slug used in canonical metadata.
@@ -143,7 +146,11 @@ fn list_sessions_in(root: &Path) -> Vec<(String, PathBuf)> {
         if !group_path.is_dir() {
             continue; // e.g. session_search.sqlite
         }
-        for session in std::fs::read_dir(&group_path).into_iter().flatten().flatten() {
+        for session in std::fs::read_dir(&group_path)
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
             let session_dir = session.path();
             if !session_dir.is_dir() {
                 continue; // e.g. prompt_history.jsonl
@@ -199,7 +206,14 @@ enum ChunkKind {
 /// Prefers `_meta.agentTimestampMs` (params-level, then update-level), then
 /// the outer envelope `timestamp` (epoch seconds).
 fn line_timestamp(line: &serde_json::Value, update: &serde_json::Value) -> Option<i64> {
-    line.pointer("/params/_meta/agentTimestampMs").and_then(parse_timestamp).or_else(|| update.pointer("/_meta/agentTimestampMs").and_then(parse_timestamp)).or_else(|| line.get("timestamp").and_then(parse_timestamp))
+    line.pointer("/params/_meta/agentTimestampMs")
+        .and_then(parse_timestamp)
+        .or_else(|| {
+            update
+                .pointer("/_meta/agentTimestampMs")
+                .and_then(parse_timestamp)
+        })
+        .or_else(|| line.get("timestamp").and_then(parse_timestamp))
 }
 
 /// Extract the prompt marker used to detect message boundaries between
@@ -211,7 +225,10 @@ fn line_timestamp(line: &serde_json::Value, update: &serde_json::Value) -> Optio
 /// change between consecutive message-bearing lines means a new message.
 /// Lines without either marker return `None` (no boundary inferred).
 fn boundary_key(line: &serde_json::Value, update: &serde_json::Value) -> Option<String> {
-    if let Some(id) = line.pointer("/params/_meta/promptId").and_then(|v| v.as_str()) {
+    if let Some(id) = line
+        .pointer("/params/_meta/promptId")
+        .and_then(|v| v.as_str())
+    {
         return Some(format!("pid:{id}"));
     }
     if let Some(idx) = update.pointer("/_meta/promptIndex") {
@@ -275,7 +292,11 @@ fn tool_output_text(update: &serde_json::Value) -> Option<String> {
         Some(serde_json::Value::Null) | None => None,
         Some(other) => {
             let text = flatten_content(other);
-            if !text.trim().is_empty() { Some(text) } else { serde_json::to_string(other).ok() }
+            if !text.trim().is_empty() {
+                Some(text)
+            } else {
+                serde_json::to_string(other).ok()
+            }
         }
     }
 }
@@ -321,23 +342,58 @@ impl MessageBuilder {
             _ => author,
         };
         let extra = serde_json::json!({ "sessionUpdate": chunk_kind_label(kind) });
-        self.push_new(kind, CanonicalMessage { idx: 0, role, content: text.to_string(), timestamp: ts, author, tool_calls: Vec::new(), tool_results: Vec::new(), extra });
+        self.push_new(
+            kind,
+            CanonicalMessage {
+                idx: 0,
+                role,
+                content: text.to_string(),
+                timestamp: ts,
+                author,
+                tool_calls: Vec::new(),
+                tool_results: Vec::new(),
+                extra,
+            },
+        );
     }
 
     /// Record a `tool_call` event. Attaches to the in-progress assistant
     /// message when one is open, otherwise starts a new assistant message.
     fn push_tool_call(&mut self, update: &serde_json::Value, ts: Option<i64>) {
         let call = ToolCall {
-            id: update.get("toolCallId").and_then(|v| v.as_str()).map(String::from),
-            name: update.get("title").and_then(|v| v.as_str()).or_else(|| update.get("kind").and_then(|v| v.as_str())).unwrap_or("unknown").to_string(),
-            arguments: update.get("rawInput").cloned().unwrap_or(serde_json::Value::Null),
+            id: update
+                .get("toolCallId")
+                .and_then(|v| v.as_str())
+                .map(String::from),
+            name: update
+                .get("title")
+                .and_then(|v| v.as_str())
+                .or_else(|| update.get("kind").and_then(|v| v.as_str()))
+                .unwrap_or("unknown")
+                .to_string(),
+            arguments: update
+                .get("rawInput")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
         };
         let call_id = call.id.clone();
 
         let target_idx = if self.last_kind == Some(ChunkKind::Agent) && !self.messages.is_empty() {
             self.messages.len() - 1
         } else {
-            self.push_new(ChunkKind::Agent, CanonicalMessage { idx: 0, role: MessageRole::Assistant, content: String::new(), timestamp: ts, author: None, tool_calls: Vec::new(), tool_results: Vec::new(), extra: serde_json::json!({ "sessionUpdate": "tool_call" }) });
+            self.push_new(
+                ChunkKind::Agent,
+                CanonicalMessage {
+                    idx: 0,
+                    role: MessageRole::Assistant,
+                    content: String::new(),
+                    timestamp: ts,
+                    author: None,
+                    tool_calls: Vec::new(),
+                    tool_results: Vec::new(),
+                    extra: serde_json::json!({ "sessionUpdate": "tool_call" }),
+                },
+            );
             self.messages.len() - 1
         };
 
@@ -361,7 +417,10 @@ impl MessageBuilder {
             Some(idx) => {
                 // Merge late-arriving fields into the recorded call.
                 if let Some(id) = call_id
-                    && let Some(call) = self.messages[idx].tool_calls.iter_mut().find(|c| c.id.as_deref() == Some(id))
+                    && let Some(call) = self.messages[idx]
+                        .tool_calls
+                        .iter_mut()
+                        .find(|c| c.id.as_deref() == Some(id))
                 {
                     if let Some(title) = update.get("title").and_then(|v| v.as_str())
                         && !title.is_empty()
@@ -389,17 +448,27 @@ impl MessageBuilder {
         if output.is_none() && !is_error {
             return;
         }
-        let call_id = update.get("toolCallId").and_then(|v| v.as_str()).map(String::from);
+        let call_id = update
+            .get("toolCallId")
+            .and_then(|v| v.as_str())
+            .map(String::from);
         let msg = &mut self.messages[idx];
         // Replace an earlier partial result for the same call (streamed
         // tool_call_update events supersede one another).
-        msg.tool_results.retain(|r| r.call_id.is_none() || r.call_id != call_id);
-        msg.tool_results.push(ToolResult { call_id, content: output.unwrap_or_default(), is_error });
+        msg.tool_results
+            .retain(|r| r.call_id.is_none() || r.call_id != call_id);
+        msg.tool_results.push(ToolResult {
+            call_id,
+            content: output.unwrap_or_default(),
+            is_error,
+        });
     }
 
     /// Finish: drop messages that carry no content and no tool activity.
     fn finish(mut self) -> Vec<CanonicalMessage> {
-        self.messages.retain(|m| !m.content.trim().is_empty() || !m.tool_calls.is_empty() || !m.tool_results.is_empty());
+        self.messages.retain(|m| {
+            !m.content.trim().is_empty() || !m.tool_calls.is_empty() || !m.tool_results.is_empty()
+        });
         reindex_messages(&mut self.messages);
         self.messages
     }
@@ -423,7 +492,10 @@ fn resolve_updates_path(path: &Path) -> PathBuf {
     }
     match path.file_name().and_then(|n| n.to_str()) {
         Some("updates.jsonl") => path.to_path_buf(),
-        Some(_) => path.parent().map(|p| p.join("updates.jsonl")).unwrap_or_else(|| path.to_path_buf()),
+        Some(_) => path
+            .parent()
+            .map(|p| p.join("updates.jsonl"))
+            .unwrap_or_else(|| path.to_path_buf()),
         None => path.to_path_buf(),
     }
 }
@@ -465,7 +537,11 @@ impl Provider for Grok {
         }
 
         trace!(provider = SLUG, ?evidence, installed, "detection");
-        DetectionResult { installed, version: None, evidence }
+        DetectionResult {
+            installed,
+            version: None,
+            evidence,
+        }
     }
 
     fn session_roots(&self) -> Vec<PathBuf> {
@@ -513,18 +589,44 @@ impl Provider for Grok {
         debug!(path = %path.display(), "reading Grok session");
 
         let updates_path = resolve_updates_path(path);
-        let session_dir = updates_path.parent().map(Path::to_path_buf).ok_or_else(|| anyhow::anyhow!("cannot determine Grok session directory"))?;
+        let session_dir = updates_path
+            .parent()
+            .map(Path::to_path_buf)
+            .ok_or_else(|| anyhow::anyhow!("cannot determine Grok session directory"))?;
 
         // ------------------------------------------------------------------
         // summary.json → metadata
         // ------------------------------------------------------------------
-        let summary: Option<serde_json::Value> = std::fs::read_to_string(session_dir.join("summary.json")).ok().and_then(|c| serde_json::from_str(&c).ok());
+        let summary: Option<serde_json::Value> =
+            std::fs::read_to_string(session_dir.join("summary.json"))
+                .ok()
+                .and_then(|c| serde_json::from_str(&c).ok());
 
-        let session_id = summary.as_ref().and_then(|s| s.pointer("/info/id")).and_then(|v| v.as_str()).map(String::from).or_else(|| session_dir.file_name().and_then(|n| n.to_str()).map(String::from)).unwrap_or_else(|| "unknown".to_string());
+        let session_id = summary
+            .as_ref()
+            .and_then(|s| s.pointer("/info/id"))
+            .and_then(|v| v.as_str())
+            .map(String::from)
+            .or_else(|| {
+                session_dir
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(String::from)
+            })
+            .unwrap_or_else(|| "unknown".to_string());
 
-        let workspace = summary.as_ref().and_then(|s| s.pointer("/info/cwd")).and_then(|v| v.as_str()).map(PathBuf::from).or_else(|| session_dir.parent().and_then(decode_group_cwd));
+        let workspace = summary
+            .as_ref()
+            .and_then(|s| s.pointer("/info/cwd"))
+            .and_then(|v| v.as_str())
+            .map(PathBuf::from)
+            .or_else(|| session_dir.parent().and_then(decode_group_cwd));
 
-        let model_name = summary.as_ref().and_then(|s| s.get("current_model_id")).and_then(|v| v.as_str()).map(String::from);
+        let model_name = summary
+            .as_ref()
+            .and_then(|s| s.get("current_model_id"))
+            .and_then(|v| v.as_str())
+            .map(String::from);
 
         // ------------------------------------------------------------------
         // updates.jsonl → messages
@@ -537,7 +639,8 @@ impl Provider for Grok {
         let mut last_boundary: Option<String> = None;
 
         if updates_path.is_file() {
-            let content = std::fs::read_to_string(&updates_path).map_err(|e| anyhow::anyhow!("failed to read {}: {e}", updates_path.display()))?;
+            let content = std::fs::read_to_string(&updates_path)
+                .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", updates_path.display()))?;
 
             for (i, line) in content.lines().enumerate() {
                 let line = line.trim();
@@ -551,7 +654,10 @@ impl Provider for Grok {
 
                 // Envelope: {"params":{"update":{…}}}; tolerate a bare
                 // {"update":{…}} or a naked SessionUpdate object.
-                let update = val.pointer("/params/update").or_else(|| val.get("update")).unwrap_or(&val);
+                let update = val
+                    .pointer("/params/update")
+                    .or_else(|| val.get("update"))
+                    .unwrap_or(&val);
                 let Some(kind) = update.get("sessionUpdate").and_then(|v| v.as_str()) else {
                     continue;
                 };
@@ -565,7 +671,13 @@ impl Provider for Grok {
                 // Message-bearing kinds participate in boundary tracking:
                 // a prompt-marker change starts a new message even when the
                 // chunk kind stays the same (e.g. two consecutive prompts).
-                if matches!(kind, "user_message_chunk" | "agent_message_chunk" | "agent_thought_chunk" | "tool_call") {
+                if matches!(
+                    kind,
+                    "user_message_chunk"
+                        | "agent_message_chunk"
+                        | "agent_thought_chunk"
+                        | "tool_call"
+                ) {
                     let key = boundary_key(&val, update);
                     if key != last_boundary {
                         builder.last_kind = None;
@@ -580,9 +692,20 @@ impl Provider for Grok {
                             "agent_thought_chunk" => ChunkKind::Thought,
                             _ => ChunkKind::Agent,
                         };
-                        let text = update.get("content").map(flatten_content).unwrap_or_default();
+                        let text = update
+                            .get("content")
+                            .map(flatten_content)
+                            .unwrap_or_default();
                         // Model id may ride in update-level _meta.
-                        let author = if chunk_kind == ChunkKind::Agent { update.pointer("/_meta/modelId").and_then(|v| v.as_str()).map(String::from).or_else(|| model_name.clone()) } else { None };
+                        let author = if chunk_kind == ChunkKind::Agent {
+                            update
+                                .pointer("/_meta/modelId")
+                                .and_then(|v| v.as_str())
+                                .map(String::from)
+                                .or_else(|| model_name.clone())
+                        } else {
+                            None
+                        };
                         if text.is_empty() {
                             continue;
                         }
@@ -615,27 +738,49 @@ impl Provider for Grok {
             .and_then(|v| v.as_str())
             .filter(|t| !t.trim().is_empty())
             .map(String::from)
-            .or_else(|| summary.as_ref().and_then(|s| s.get("session_summary")).and_then(|v| v.as_str()).filter(|t| !t.trim().is_empty()).map(String::from))
-            .or_else(|| messages.iter().find(|m| m.role == MessageRole::User).map(|m| truncate_title(&m.content, 100)));
+            .or_else(|| {
+                summary
+                    .as_ref()
+                    .and_then(|s| s.get("session_summary"))
+                    .and_then(|v| v.as_str())
+                    .filter(|t| !t.trim().is_empty())
+                    .map(String::from)
+            })
+            .or_else(|| {
+                messages
+                    .iter()
+                    .find(|m| m.role == MessageRole::User)
+                    .map(|m| truncate_title(&m.content, 100))
+            });
 
         // Summary timestamps take precedence over message-derived bounds.
         if let Some(s) = summary.as_ref() {
             if let Some(t) = s.get("created_at").and_then(parse_timestamp) {
                 started_at = Some(t);
             }
-            if let Some(t) = s.get("last_active_at").and_then(parse_timestamp).or_else(|| s.get("updated_at").and_then(parse_timestamp)) {
+            if let Some(t) = s
+                .get("last_active_at")
+                .and_then(parse_timestamp)
+                .or_else(|| s.get("updated_at").and_then(parse_timestamp))
+            {
                 ended_at = Some(t);
             }
         }
 
         let mut metadata = serde_json::Map::new();
         metadata.insert("source".into(), serde_json::Value::String(SLUG.into()));
-        metadata.insert("sessionId".into(), serde_json::Value::String(session_id.clone()));
+        metadata.insert(
+            "sessionId".into(),
+            serde_json::Value::String(session_id.clone()),
+        );
         if let Some(s) = summary.as_ref() {
             if let Some(t) = s.get("generated_title").and_then(|v| v.as_str())
                 && !t.trim().is_empty()
             {
-                metadata.insert(crate::model::NATIVE_NAME_META_KEY.into(), serde_json::Value::String(t.to_string()));
+                metadata.insert(
+                    crate::model::NATIVE_NAME_META_KEY.into(),
+                    serde_json::Value::String(t.to_string()),
+                );
             }
             for key in ["agent_name", "sandbox_profile", "parent_session_id"] {
                 if let Some(v) = s.get(key)
@@ -653,11 +798,27 @@ impl Provider for Grok {
 
         info!(session_id, messages = messages.len(), "Grok session parsed");
 
-        Ok(CanonicalSession { session_id, provider_slug: SLUG.to_string(), workspace, title, started_at, ended_at, messages, metadata: serde_json::Value::Object(metadata), source_path: path.to_path_buf(), model_name })
+        Ok(CanonicalSession {
+            session_id,
+            provider_slug: SLUG.to_string(),
+            workspace,
+            title,
+            started_at,
+            ended_at,
+            messages,
+            metadata: serde_json::Value::Object(metadata),
+            source_path: path.to_path_buf(),
+            model_name,
+        })
     }
 
-    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession> {
-        let home = Self::home_dir().ok_or_else(|| anyhow::anyhow!("cannot determine Grok home directory"))?;
+    fn write_session(
+        &self,
+        session: &CanonicalSession,
+        opts: &WriteOptions,
+    ) -> anyhow::Result<WrittenSession> {
+        let home = Self::home_dir()
+            .ok_or_else(|| anyhow::anyhow!("cannot determine Grok home directory"))?;
 
         // Grok generates UUIDv7 session ids; a new id avoids clobbering the
         // source session on same-machine conversions.
@@ -705,16 +866,23 @@ impl Provider for Grok {
         // ------------------------------------------------------------------
         // updates.jsonl — one ACP session-update event per line.
         // ------------------------------------------------------------------
-        let now_ms = chrono::Utc::now().timestamp_millis();
+        let now_ms = jiff::Timestamp::now().as_millisecond();
         let fallback_ms = session.started_at.unwrap_or(now_ms);
         let mut lines: Vec<String> = Vec::new();
         let mut event_seq: u64 = 0;
         let mut prompt_index: i64 = 0;
 
-        let mut push_line = |update: serde_json::Value, ts_ms: i64, prompt_id: Option<&str>, lines: &mut Vec<String>| -> anyhow::Result<()> {
+        let mut push_line = |update: serde_json::Value,
+                             ts_ms: i64,
+                             prompt_id: Option<&str>,
+                             lines: &mut Vec<String>|
+         -> anyhow::Result<()> {
             event_seq += 1;
             let mut params_meta = serde_json::Map::new();
-            params_meta.insert("eventId".into(), serde_json::Value::String(format!("{session_id}-{event_seq}")));
+            params_meta.insert(
+                "eventId".into(),
+                serde_json::Value::String(format!("{session_id}-{event_seq}")),
+            );
             params_meta.insert("agentTimestampMs".into(), serde_json::json!(ts_ms));
             if let Some(pid) = prompt_id {
                 params_meta.insert("promptId".into(), serde_json::Value::String(pid.into()));
@@ -739,8 +907,14 @@ impl Provider for Grok {
                 // streamed message share their marker, so distinct markers
                 // keep distinct messages apart on read-back.
                 let prompt_id = uuid::Uuid::new_v4().to_string();
-                let is_thought = msg.author.as_deref() == Some("reasoning") && msg.tool_calls.is_empty() && msg.tool_results.is_empty();
-                let kind = if is_thought { "agent_thought_chunk" } else { "agent_message_chunk" };
+                let is_thought = msg.author.as_deref() == Some("reasoning")
+                    && msg.tool_calls.is_empty()
+                    && msg.tool_results.is_empty();
+                let kind = if is_thought {
+                    "agent_thought_chunk"
+                } else {
+                    "agent_message_chunk"
+                };
                 if !msg.content.is_empty() {
                     push_line(
                         serde_json::json!({
@@ -755,7 +929,10 @@ impl Provider for Grok {
                 // Tool calls, then their results, in canonical order.
                 let mut call_ids: Vec<String> = Vec::with_capacity(msg.tool_calls.len());
                 for (n, call) in msg.tool_calls.iter().enumerate() {
-                    let call_id = call.id.clone().unwrap_or_else(|| format!("call-casr-{i}-{n}"));
+                    let call_id = call
+                        .id
+                        .clone()
+                        .unwrap_or_else(|| format!("call-casr-{i}-{n}"));
                     call_ids.push(call_id.clone());
                     push_line(
                         serde_json::json!({
@@ -771,8 +948,16 @@ impl Provider for Grok {
                     )?;
                 }
                 for (n, result) in msg.tool_results.iter().enumerate() {
-                    let call_id = result.call_id.clone().or_else(|| call_ids.get(n).cloned()).unwrap_or_else(|| format!("call-casr-{i}-r{n}"));
-                    let status = if result.is_error { "failed" } else { "completed" };
+                    let call_id = result
+                        .call_id
+                        .clone()
+                        .or_else(|| call_ids.get(n).cloned())
+                        .unwrap_or_else(|| format!("call-casr-{i}-r{n}"));
+                    let status = if result.is_error {
+                        "failed"
+                    } else {
+                        "completed"
+                    };
                     push_line(
                         serde_json::json!({
                             "sessionUpdate": "tool_call_update",
@@ -809,12 +994,25 @@ impl Provider for Grok {
         // ------------------------------------------------------------------
         // summary.json — the index entry (shape captured from real sessions).
         // ------------------------------------------------------------------
-        let iso = |ms: i64| -> String { chrono::DateTime::from_timestamp_millis(ms).unwrap_or_else(chrono::Utc::now).to_rfc3339_opts(chrono::SecondsFormat::Nanos, true) };
+        let iso = |ms: i64| -> String {
+            let ts =
+                jiff::Timestamp::from_millisecond(ms).unwrap_or_else(|_| jiff::Timestamp::now());
+            format!("{ts:.9}")
+        };
         let created_ms = session.started_at.unwrap_or(now_ms);
         let updated_ms = session.ended_at.unwrap_or(created_ms);
-        let title = session.title.clone().or_else(|| session.messages.iter().find(|m| m.role == crate::model::MessageRole::User).map(|m| crate::model::truncate_title(&m.content, 100)));
+        let title = session.title.clone().or_else(|| {
+            session
+                .messages
+                .iter()
+                .find(|m| m.role == crate::model::MessageRole::User)
+                .map(|m| crate::model::truncate_title(&m.content, 100))
+        });
         let mut summary = serde_json::Map::new();
-        summary.insert("info".into(), serde_json::json!({"id": session_id, "cwd": workspace_str}));
+        summary.insert(
+            "info".into(),
+            serde_json::json!({"id": session_id, "cwd": workspace_str}),
+        );
         if let Some(t) = title.as_ref() {
             summary.insert("session_summary".into(), serde_json::json!(t));
             summary.insert("generated_title".into(), serde_json::json!(t));
@@ -823,7 +1021,10 @@ impl Provider for Grok {
         summary.insert("updated_at".into(), serde_json::json!(iso(updated_ms)));
         summary.insert("last_active_at".into(), serde_json::json!(iso(updated_ms)));
         summary.insert("num_messages".into(), serde_json::json!(lines.len()));
-        summary.insert("num_chat_messages".into(), serde_json::json!(session.messages.len()));
+        summary.insert(
+            "num_chat_messages".into(),
+            serde_json::json!(session.messages.len()),
+        );
         // `current_model_id` is REQUIRED: live bisection against grok 0.2.118
         // showed `grok --resume <id>` fails with "Session does not exist"
         // when summary.json lacks it (all other optional fields — agent_name,
@@ -831,22 +1032,46 @@ impl Provider for Grok {
         // source model only when it is a Grok model; a foreign id (e.g. a
         // Claude model) would confuse resume-time model selection, so fall
         // back to the current default coding model.
-        let model_id = session.model_name.as_deref().filter(|m| m.to_ascii_lowercase().starts_with("grok")).unwrap_or(DEFAULT_MODEL_ID);
+        let model_id = session
+            .model_name
+            .as_deref()
+            .filter(|m| m.to_ascii_lowercase().starts_with("grok"))
+            .unwrap_or(DEFAULT_MODEL_ID);
         summary.insert("current_model_id".into(), serde_json::json!(model_id));
         summary.insert("chat_format_version".into(), serde_json::json!(1));
-        summary.insert("grok_home".into(), serde_json::json!(home.to_string_lossy()));
+        summary.insert(
+            "grok_home".into(),
+            serde_json::json!(home.to_string_lossy()),
+        );
 
         // ------------------------------------------------------------------
         // Write (atomic, honoring --force semantics per file).
         // ------------------------------------------------------------------
-        let updates_content = if lines.is_empty() { String::new() } else { lines.join("\n") + "\n" };
-        let updates_outcome = crate::pipeline::atomic_write(&updates_path, updates_content.as_bytes(), opts.force, self.slug())?;
-        let summary_content = serde_json::to_string_pretty(&serde_json::Value::Object(summary))? + "\n";
-        let summary_outcome = crate::pipeline::atomic_write(&summary_path, summary_content.as_bytes(), opts.force, self.slug())?;
+        let updates_content = if lines.is_empty() {
+            String::new()
+        } else {
+            lines.join("\n") + "\n"
+        };
+        let updates_outcome = crate::pipeline::atomic_write(
+            &updates_path,
+            updates_content.as_bytes(),
+            opts.force,
+            self.slug(),
+        )?;
+        let summary_content =
+            serde_json::to_string_pretty(&serde_json::Value::Object(summary))? + "\n";
+        let summary_outcome = crate::pipeline::atomic_write(
+            &summary_path,
+            summary_content.as_bytes(),
+            opts.force,
+            self.slug(),
+        )?;
         if needs_cwd_marker {
             let cwd_marker = group_dir.join(".cwd");
             if !cwd_marker.exists() {
-                std::fs::write(&cwd_marker, format!("{workspace_str}\n")).map_err(|e| anyhow::anyhow!("failed to write {}: {e}", cwd_marker.display()))?;
+                std::fs::write(&cwd_marker, format!("{workspace_str}\n")).map_err(|e| {
+                    anyhow::anyhow!("failed to write {}: {e}", cwd_marker.display())
+                })?;
             }
         }
 
@@ -857,7 +1082,13 @@ impl Provider for Grok {
             "Grok session written"
         );
 
-        Ok(WrittenSession { paths: vec![updates_outcome.target_path, summary_outcome.target_path], session_id: session_id.clone(), resume_command: self.resume_command(&session_id), backup_path: updates_outcome.backup_path, warnings })
+        Ok(WrittenSession {
+            paths: vec![updates_outcome.target_path, summary_outcome.target_path],
+            session_id: session_id.clone(),
+            resume_command: self.resume_command(&session_id),
+            backup_path: updates_outcome.backup_path,
+            warnings,
+        })
     }
 
     fn resume_command(&self, session_id: &str) -> String {
@@ -892,14 +1123,25 @@ mod tests {
     }
 
     /// Build `<root>/sessions/<encoded-cwd>/<uuid>/` with updates + summary.
-    fn make_grok_tree(lines: &[String], summary: Option<serde_json::Value>) -> (tempfile::TempDir, PathBuf) {
+    fn make_grok_tree(
+        lines: &[String],
+        summary: Option<serde_json::Value>,
+    ) -> (tempfile::TempDir, PathBuf) {
         let tmp = tempfile::tempdir().expect("tmpdir");
-        let session_dir = tmp.path().join("sessions").join(ENCODED_CWD).join(SESSION_ID);
+        let session_dir = tmp
+            .path()
+            .join("sessions")
+            .join(ENCODED_CWD)
+            .join(SESSION_ID);
         std::fs::create_dir_all(&session_dir).expect("mkdirs");
         let updates = session_dir.join("updates.jsonl");
         std::fs::write(&updates, lines.join("\n")).expect("write updates");
         if let Some(s) = summary {
-            std::fs::write(session_dir.join("summary.json"), serde_json::to_string_pretty(&s).unwrap()).expect("write summary");
+            std::fs::write(
+                session_dir.join("summary.json"),
+                serde_json::to_string_pretty(&s).unwrap(),
+            )
+            .expect("write summary");
         }
         (tmp, updates)
     }
@@ -945,17 +1187,32 @@ mod tests {
         assert_eq!(session.session_id, SESSION_ID);
         assert_eq!(session.messages.len(), 1);
         assert_eq!(session.messages[0].role, MessageRole::User);
-        assert_eq!(session.messages[0].content, "Run the shell command: echo hi");
+        assert_eq!(
+            session.messages[0].content,
+            "Run the shell command: echo hi"
+        );
         assert!(session.messages[0].timestamp.is_some());
     }
 
     #[test]
     fn reader_coalesces_consecutive_same_kind_chunks() {
         let lines = vec![
-            envelope(json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "Run echo hi"}}), 100),
-            envelope(json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": " please"}}), 101),
-            envelope(json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "Running"}}), 102),
-            envelope(json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " it now."}}), 103),
+            envelope(
+                json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "Run echo hi"}}),
+                100,
+            ),
+            envelope(
+                json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": " please"}}),
+                101,
+            ),
+            envelope(
+                json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "Running"}}),
+                102,
+            ),
+            envelope(
+                json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " it now."}}),
+                103,
+            ),
         ];
         let (_guard, updates) = make_grok_tree(&lines, None);
         let session = Grok.read_session(&updates).expect("read");
@@ -969,7 +1226,16 @@ mod tests {
 
     #[test]
     fn reader_thought_chunks_become_reasoning_messages() {
-        let lines = vec![envelope(json!({"sessionUpdate": "agent_thought_chunk", "content": {"type": "text", "text": "The user wants echo."}}), 100), envelope(json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "On it."}}), 101)];
+        let lines = vec![
+            envelope(
+                json!({"sessionUpdate": "agent_thought_chunk", "content": {"type": "text", "text": "The user wants echo."}}),
+                100,
+            ),
+            envelope(
+                json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "On it."}}),
+                101,
+            ),
+        ];
         let (_guard, updates) = make_grok_tree(&lines, None);
         let session = Grok.read_session(&updates).expect("read");
 
@@ -984,7 +1250,10 @@ mod tests {
     #[test]
     fn reader_merges_tool_call_and_update_into_one_message() {
         let lines = vec![
-            envelope(json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "Running echo."}}), 100),
+            envelope(
+                json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "Running echo."}}),
+                100,
+            ),
             envelope(
                 json!({
                     "sessionUpdate": "tool_call",
@@ -1008,7 +1277,10 @@ mod tests {
                 }),
                 102,
             ),
-            envelope(json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " Done: hi."}}), 103),
+            envelope(
+                json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": " Done: hi."}}),
+                103,
+            ),
         ];
         let (_guard, updates) = make_grok_tree(&lines, None);
         let session = Grok.read_session(&updates).expect("read");
@@ -1087,9 +1359,15 @@ mod tests {
                 101,
             ),
             envelope(json!({"sessionUpdate": "plan", "entries": []}), 102),
-            envelope(json!({"sessionUpdate": "some_future_kind", "payload": {"x": 1}}), 103),
+            envelope(
+                json!({"sessionUpdate": "some_future_kind", "payload": {"x": 1}}),
+                103,
+            ),
             "not valid json {{{".to_string(),
-            envelope(json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "Real message"}}), 104),
+            envelope(
+                json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "Real message"}}),
+                104,
+            ),
         ];
         let (_guard, updates) = make_grok_tree(&lines, None);
         let session = Grok.read_session(&updates).expect("read");
@@ -1100,16 +1378,25 @@ mod tests {
 
     #[test]
     fn reader_summary_metadata_wins() {
-        let lines = vec![envelope(json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "hello"}}), 1_784_388_059)];
+        let lines = vec![envelope(
+            json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "hello"}}),
+            1_784_388_059,
+        )];
         let (_guard, updates) = make_grok_tree(&lines, Some(default_summary()));
         let session = Grok.read_session(&updates).expect("read");
 
         assert_eq!(session.title.as_deref(), Some("Echo test session"));
         assert_eq!(session.model_name.as_deref(), Some("grok-build"));
-        assert_eq!(session.workspace, Some(PathBuf::from("/data/projects/demo")));
+        assert_eq!(
+            session.workspace,
+            Some(PathBuf::from("/data/projects/demo"))
+        );
         assert_eq!(session.metadata["source"], "grok");
         assert_eq!(session.metadata["agent_name"], "grok-build-plan");
-        assert_eq!(crate::model::native_name_from_metadata(&session.metadata).as_deref(), Some("Echo test session"));
+        assert_eq!(
+            crate::model::native_name_from_metadata(&session.metadata).as_deref(),
+            Some("Echo test session")
+        );
         // created_at 2026-07-18T15:20:54Z / last_active_at 15:20:59Z.
         assert!(session.started_at.is_some());
         assert!(session.ended_at.unwrap() > session.started_at.unwrap());
@@ -1117,7 +1404,10 @@ mod tests {
 
     #[test]
     fn reader_title_falls_back_to_session_summary_then_user_message() {
-        let lines = vec![envelope(json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "first user words"}}), 100)];
+        let lines = vec![envelope(
+            json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "first user words"}}),
+            100,
+        )];
 
         // No generated_title → session_summary.
         let mut summary = default_summary();
@@ -1136,19 +1426,30 @@ mod tests {
 
     #[test]
     fn reader_workspace_falls_back_to_percent_decoded_group_dir() {
-        let lines = vec![envelope(json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "hi"}}), 100)];
+        let lines = vec![envelope(
+            json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "hi"}}),
+            100,
+        )];
         let (_guard, updates) = make_grok_tree(&lines, None);
         let session = Grok.read_session(&updates).expect("read");
-        assert_eq!(session.workspace, Some(PathBuf::from("/data/projects/demo")));
+        assert_eq!(
+            session.workspace,
+            Some(PathBuf::from("/data/projects/demo"))
+        );
     }
 
     #[test]
     fn reader_accepts_summary_json_or_session_dir_path() {
-        let lines = vec![envelope(json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "hi"}}), 100)];
+        let lines = vec![envelope(
+            json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": "hi"}}),
+            100,
+        )];
         let (_guard, updates) = make_grok_tree(&lines, Some(default_summary()));
         let session_dir = updates.parent().unwrap().to_path_buf();
 
-        let via_summary = Grok.read_session(&session_dir.join("summary.json")).expect("read via summary.json");
+        let via_summary = Grok
+            .read_session(&session_dir.join("summary.json"))
+            .expect("read via summary.json");
         assert_eq!(via_summary.messages.len(), 1);
 
         let via_dir = Grok.read_session(&session_dir).expect("read via dir");
@@ -1195,13 +1496,19 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let group = tmp.path().join(ENCODED_CWD);
         std::fs::create_dir_all(&group).unwrap();
-        assert_eq!(decode_group_cwd(&group), Some(PathBuf::from("/data/projects/demo")));
+        assert_eq!(
+            decode_group_cwd(&group),
+            Some(PathBuf::from("/data/projects/demo"))
+        );
 
         // A `.cwd` file (long-path escape hatch) wins over the dir name.
         let hashed = tmp.path().join("some-slug-abc123");
         std::fs::create_dir_all(&hashed).unwrap();
         std::fs::write(hashed.join(".cwd"), "/very/long/original/path\n").unwrap();
-        assert_eq!(decode_group_cwd(&hashed), Some(PathBuf::from("/very/long/original/path")));
+        assert_eq!(
+            decode_group_cwd(&hashed),
+            Some(PathBuf::from("/very/long/original/path"))
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1218,6 +1525,9 @@ mod tests {
 
     #[test]
     fn resume_command_uses_documented_flag() {
-        assert_eq!(Grok.resume_command(SESSION_ID), format!("grok --resume {SESSION_ID}"));
+        assert_eq!(
+            Grok.resume_command(SESSION_ID),
+            format!("grok --resume {SESSION_ID}")
+        );
     }
 }

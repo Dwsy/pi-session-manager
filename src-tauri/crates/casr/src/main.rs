@@ -9,7 +9,6 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use chrono::{Local, Utc};
 use clap::Parser;
 use colored::Colorize;
 use rayon::prelude::*;
@@ -18,7 +17,9 @@ use tracing_subscriber::EnvFilter;
 
 use casr::discovery::ProviderRegistry;
 use casr::pipeline::{ConversionPipeline, ConvertOptions};
-use casr::responses::{self, ErrorEnvelope, InfoResponse, ListEnvelope, ListItem, ProviderInfo, ResumeSuccess};
+use casr::responses::{
+    self, ErrorEnvelope, InfoResponse, ListEnvelope, ListItem, ProviderInfo, ResumeSuccess,
+};
 
 /// Maximum characters per turn snippet in `info --peek` output.
 const PEEK_SNIPPET_MAX_CHARS: usize = 200;
@@ -112,7 +113,13 @@ enum Command {
         #[arg(long)]
         workspace: Option<String>,
 
-        /// Maximum sessions to show per provider.
+        /// List sessions from every workspace instead of scoping to one
+        /// project. Without this (or --workspace), `list` scopes to the
+        /// current working directory's project.
+        #[arg(long, conflicts_with = "workspace")]
+        all: bool,
+
+        /// Maximum sessions to show per provider. Use 0 for no limit.
         #[arg(long, default_value = "10")]
         limit: usize,
 
@@ -161,10 +168,20 @@ enum Command {
 
 /// Build the long version string with embedded build metadata.
 ///
-/// vergen-gix always emits these env vars (uses placeholders when values are
-/// unavailable), so `env!()` is safe here.
+/// vergen-gitcl always emits these env vars (uses placeholders when values are
+/// unavailable, or honors explicit `VERGEN_GIT_SHA` overrides), so `env!()` is
+/// safe here.
 fn long_version() -> &'static str {
-    concat!(env!("CARGO_PKG_VERSION"), " (", env!("VERGEN_GIT_SHA"), " ", env!("VERGEN_BUILD_TIMESTAMP"), " ", env!("VERGEN_CARGO_TARGET_TRIPLE"), ")",)
+    concat!(
+        env!("CARGO_PKG_VERSION"),
+        " (",
+        env!("VERGEN_GIT_SHA"),
+        " ",
+        env!("VERGEN_BUILD_TIMESTAMP"),
+        " ",
+        env!("VERGEN_CARGO_TARGET_TRIPLE"),
+        ")",
+    )
 }
 
 /// Initialize the tracing subscriber based on CLI flags.
@@ -179,7 +196,11 @@ fn init_tracing(cli: &Cli) {
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"))
     };
 
-    tracing_subscriber::fmt().with_env_filter(filter).with_target(true).with_writer(std::io::stderr).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(true)
+        .with_writer(std::io::stderr)
+        .init();
 }
 
 /// Rewrite ergonomic shorthand target flags into canonical resume commands.
@@ -252,9 +273,53 @@ fn main() -> ExitCode {
     init_tracing(&cli);
 
     let result = match cli.command {
-        Command::Resume { target, session_id, dry_run, force, source, enrich, max_context_tokens, max_tool_output, keep_reasoning, workspace } => cmd_resume(&target, &session_id, dry_run, force, source, enrich, max_context_tokens, max_tool_output, keep_reasoning, workspace, cli.json),
-        Command::List { provider, workspace, limit, sort, enrich_fs } => cmd_list(provider.as_deref(), workspace.as_deref(), limit, &sort, cli.json, enrich_fs),
-        Command::Info { session_id, enrich_fs, source, peek, peek_lines } => cmd_info(&session_id, cli.json, enrich_fs, source, peek, peek_lines),
+        Command::Resume {
+            target,
+            session_id,
+            dry_run,
+            force,
+            source,
+            enrich,
+            max_context_tokens,
+            max_tool_output,
+            keep_reasoning,
+            workspace,
+        } => cmd_resume(
+            &target,
+            &session_id,
+            dry_run,
+            force,
+            source,
+            enrich,
+            max_context_tokens,
+            max_tool_output,
+            keep_reasoning,
+            workspace,
+            cli.json,
+        ),
+        Command::List {
+            provider,
+            workspace,
+            all,
+            limit,
+            sort,
+            enrich_fs,
+        } => cmd_list(
+            provider.as_deref(),
+            workspace.as_deref(),
+            all,
+            limit,
+            &sort,
+            cli.json,
+            enrich_fs,
+        ),
+        Command::Info {
+            session_id,
+            enrich_fs,
+            source,
+            peek,
+            peek_lines,
+        } => cmd_info(&session_id, cli.json, enrich_fs, source, peek, peek_lines),
         Command::Providers => cmd_providers(cli.json),
         Command::Completions { shell } => cmd_completions(&shell),
     };
@@ -264,7 +329,10 @@ fn main() -> ExitCode {
         Err(e) => {
             if cli.json {
                 let envelope = ErrorEnvelope::new(error_type_name(&e), format!("{e}"));
-                eprintln!("{}", serde_json::to_string_pretty(&envelope).unwrap_or_default());
+                eprintln!(
+                    "{}",
+                    serde_json::to_string_pretty(&envelope).unwrap_or_default()
+                );
             } else {
                 eprintln!("{} {e}", "Error:".red().bold());
             }
@@ -297,11 +365,33 @@ fn error_type_name(e: &anyhow::Error) -> &'static str {
 // ---------------------------------------------------------------------------
 
 #[allow(clippy::too_many_arguments)]
-fn cmd_resume(target: &str, session_id: &str, dry_run: bool, force: bool, source: Option<String>, enrich: bool, max_context_tokens: usize, max_tool_output: usize, keep_reasoning: bool, workspace: Option<std::path::PathBuf>, json_mode: bool) -> anyhow::Result<()> {
+fn cmd_resume(
+    target: &str,
+    session_id: &str,
+    dry_run: bool,
+    force: bool,
+    source: Option<String>,
+    enrich: bool,
+    max_context_tokens: usize,
+    max_tool_output: usize,
+    keep_reasoning: bool,
+    workspace: Option<std::path::PathBuf>,
+    json_mode: bool,
+) -> anyhow::Result<()> {
     let registry = ProviderRegistry::default_registry();
     let pipeline = ConversionPipeline { registry };
 
-    let opts = ConvertOptions { dry_run, force, verbose: false, enrich, source_hint: source, max_context_tokens, max_tool_output, keep_reasoning, workspace_override: workspace };
+    let opts = ConvertOptions {
+        dry_run,
+        force,
+        verbose: false,
+        enrich,
+        source_hint: source,
+        max_context_tokens,
+        max_tool_output,
+        keep_reasoning,
+        workspace_override: workspace,
+    };
 
     let result = pipeline.convert(target, session_id, opts)?;
 
@@ -312,17 +402,33 @@ fn cmd_resume(target: &str, session_id: &str, dry_run: bool, force: bool, source
             target_provider: result.target_provider.clone(),
             source_session_id: result.canonical_session.session_id.clone(),
             target_session_id: result.written.as_ref().map(|w| w.session_id.clone()),
-            written_paths: result.written.as_ref().map(|w| w.paths.iter().map(|p| p.display().to_string()).collect()),
+            written_paths: result
+                .written
+                .as_ref()
+                .map(|w| w.paths.iter().map(|p| p.display().to_string()).collect()),
             resume_command: result.written.as_ref().map(|w| w.resume_command.clone()),
             dry_run: result.written.is_none(),
             warnings: result.warnings.clone(),
         };
         println!("{}", serde_json::to_string_pretty(&response)?);
     } else if let Some(ref written) = result.written {
-        println!("{} Converted {} session to {}", "✓".green().bold(), result.source_provider.cyan(), result.target_provider.cyan());
-        println!("  {} → {}", "Source".dimmed(), result.canonical_session.session_id);
+        println!(
+            "{} Converted {} session to {}",
+            "✓".green().bold(),
+            result.source_provider.cyan(),
+            result.target_provider.cyan()
+        );
+        println!(
+            "  {} → {}",
+            "Source".dimmed(),
+            result.canonical_session.session_id
+        );
         println!("  {} → {}", "Target".dimmed(), written.session_id);
-        println!("  {} → {}", "Messages".dimmed(), result.canonical_session.messages.len());
+        println!(
+            "  {} → {}",
+            "Messages".dimmed(),
+            result.canonical_session.messages.len()
+        );
         for path in &written.paths {
             println!("  {} → {}", "Written".dimmed(), path.display());
         }
@@ -330,11 +436,24 @@ fn cmd_resume(target: &str, session_id: &str, dry_run: bool, force: bool, source
             println!("  {} {warning}", "⚠".yellow());
         }
         println!();
-        println!("  {} {}", "Resume:".green().bold(), written.resume_command.bold());
+        println!(
+            "  {} {}",
+            "Resume:".green().bold(),
+            written.resume_command.bold()
+        );
     } else {
         // Dry run.
-        println!("{} Would convert {} session to {}", "⊘".cyan().bold(), result.source_provider.cyan(), result.target_provider.cyan());
-        println!("  {} → {} messages", "Messages".dimmed(), result.canonical_session.messages.len());
+        println!(
+            "{} Would convert {} session to {}",
+            "⊘".cyan().bold(),
+            result.source_provider.cyan(),
+            result.target_provider.cyan()
+        );
+        println!(
+            "  {} → {} messages",
+            "Messages".dimmed(),
+            result.canonical_session.messages.len()
+        );
         for warning in &result.warnings {
             println!("  {} {warning}", "⚠".yellow());
         }
@@ -343,10 +462,61 @@ fn cmd_resume(target: &str, session_id: &str, dry_run: bool, force: bool, source
     Ok(())
 }
 
-fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit: usize, sort: &str, json_mode: bool, enrich_fs: bool) -> anyhow::Result<()> {
+/// Every spelling under which a workspace directory may have been recorded.
+///
+/// Providers store whatever `cwd` the shell reported, while `list` compares
+/// against `current_dir()` or `--workspace`. One directory can be spelled
+/// several ways: macOS reaches `/var`, `/tmp` and `/etc` through symlinks
+/// into `/private` (so `current_dir()` reports `/private/var/...` while a
+/// provider recorded `/var/...`), `--workspace` may name a symlink, and a
+/// trailing slash survives into the raw-string keys some providers derive
+/// (`project_dir_key`, `project_hash`). Matching accepts any spelling.
+fn workspace_spellings(ws: &Path) -> Vec<PathBuf> {
+    let mut spellings: Vec<PathBuf> = Vec::new();
+    let mut push = |p: PathBuf| {
+        if !spellings.contains(&p) {
+            spellings.push(p);
+        }
+    };
+    push(ws.to_path_buf());
+    // Trailing separators change raw-string provider keys.
+    let raw = ws.to_string_lossy();
+    let trimmed = raw.trim_end_matches('/');
+    if !trimmed.is_empty() && trimmed.len() != raw.len() {
+        push(PathBuf::from(trimmed));
+    }
+    // `/private`-stripping recovers the spelling shells usually report on
+    // macOS; canonicalization resolves symlinks in the other direction.
+    if let Ok(stripped) = ws.strip_prefix("/private")
+        && !stripped.as_os_str().is_empty()
+    {
+        push(Path::new("/").join(stripped));
+    }
+    if let Ok(canonical) = ws.canonicalize() {
+        if let Ok(stripped) = canonical.strip_prefix("/private")
+            && !stripped.as_os_str().is_empty()
+        {
+            push(Path::new("/").join(stripped));
+        }
+        push(canonical);
+    }
+    spellings
+}
+
+fn cmd_list(
+    provider_filter: Option<&str>,
+    workspace_filter: Option<&str>,
+    all_workspaces: bool,
+    limit: usize,
+    sort: &str,
+    json_mode: bool,
+    enrich_fs: bool,
+) -> anyhow::Result<()> {
     let registry = ProviderRegistry::default_registry();
     let installed = registry.installed_providers();
-    let provider_filter_slug = provider_filter.and_then(|filter| registry.find_by_alias(filter).map(|p| p.slug().to_string())).or_else(|| provider_filter.map(|filter| filter.to_ascii_lowercase()));
+    let provider_filter_slug = provider_filter
+        .and_then(|filter| registry.find_by_alias(filter).map(|p| p.slug().to_string()))
+        .or_else(|| provider_filter.map(|filter| filter.to_ascii_lowercase()));
 
     #[derive(Debug)]
     struct SessionSummary {
@@ -387,16 +557,32 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
         }
 
         fn started_at_display(&self) -> String {
-            self.started_at.and_then(chrono::DateTime::<Utc>::from_timestamp_millis).map(|dt| dt.with_timezone(&Local).format("%Y-%m-%d %H:%M").to_string()).unwrap_or_else(|| "-".to_string())
+            self.started_at
+                .and_then(|ms| jiff::Timestamp::from_millisecond(ms).ok())
+                .map(|ts| {
+                    ts.to_zoned_datetime(jiff::tz::TimeZone::system())
+                        .strftime("%Y-%m-%d %H:%M")
+                        .to_string()
+                })
+                .unwrap_or_else(|| "-".to_string())
         }
 
         fn last_active_display(&self, now_millis: i64) -> String {
-            self.last_active_at.map(|timestamp| format_relative_age(timestamp, now_millis)).unwrap_or_else(|| "-".to_string())
+            self.last_active_at
+                .map(|timestamp| format_relative_age(timestamp, now_millis))
+                .unwrap_or_else(|| "-".to_string())
         }
 
         fn to_list_item(&self, enrich_fs: bool) -> ListItem {
-            let (workspace_name, workspace_name_source) = responses::workspace_name_from_path(self.workspace.as_ref());
-            let repo_name = if enrich_fs { self.workspace.as_ref().and_then(|ws| casr::discovery::repo_name_from_path(ws)) } else { None };
+            let (workspace_name, workspace_name_source) =
+                responses::workspace_name_from_path(self.workspace.as_ref());
+            let repo_name = if enrich_fs {
+                self.workspace
+                    .as_ref()
+                    .and_then(|ws| casr::discovery::repo_name_from_path(ws))
+            } else {
+                None
+            };
             ListItem {
                 schema_version: responses::SCHEMA_VERSION,
                 session_id: self.session_id.clone(),
@@ -432,19 +618,40 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
     }
 
     fn system_time_to_epoch_millis(time: std::time::SystemTime) -> Option<i64> {
-        time.duration_since(std::time::UNIX_EPOCH).ok().and_then(|dur| i64::try_from(dur.as_millis()).ok())
+        time.duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|dur| i64::try_from(dur.as_millis()).ok())
     }
 
     fn file_mtime_millis(path: &Path) -> i64 {
-        path.metadata().ok().and_then(|meta| meta.modified().ok()).and_then(system_time_to_epoch_millis).unwrap_or(0)
+        path.metadata()
+            .ok()
+            .and_then(|meta| meta.modified().ok())
+            .and_then(system_time_to_epoch_millis)
+            .unwrap_or(0)
     }
 
     fn file_last_activity_millis(path: &Path) -> Option<i64> {
-        path.metadata().ok().and_then(|meta| meta.modified().ok()).and_then(system_time_to_epoch_millis)
+        path.metadata()
+            .ok()
+            .and_then(|meta| meta.modified().ok())
+            .and_then(system_time_to_epoch_millis)
     }
 
-    fn session_activity_millis(session: &casr::model::CanonicalSession, path: &Path) -> Option<i64> {
-        let conversation_activity = session.ended_at.or_else(|| session.messages.iter().filter_map(|msg| msg.timestamp).max()).or(session.started_at);
+    fn session_activity_millis(
+        session: &casr::model::CanonicalSession,
+        path: &Path,
+    ) -> Option<i64> {
+        let conversation_activity = session
+            .ended_at
+            .or_else(|| {
+                session
+                    .messages
+                    .iter()
+                    .filter_map(|msg| msg.timestamp)
+                    .max()
+            })
+            .or(session.started_at);
         let file_activity = file_last_activity_millis(path);
         match (conversation_activity, file_activity) {
             (Some(conversation), Some(file)) => Some(conversation.max(file)),
@@ -455,7 +662,11 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
     }
 
     fn format_relative_age(timestamp_millis: i64, now_millis: i64) -> String {
-        let (delta_millis, suffix) = if now_millis >= timestamp_millis { (now_millis.saturating_sub(timestamp_millis), "ago") } else { (timestamp_millis.saturating_sub(now_millis), "from now") };
+        let (delta_millis, suffix) = if now_millis >= timestamp_millis {
+            (now_millis.saturating_sub(timestamp_millis), "ago")
+        } else {
+            (timestamp_millis.saturating_sub(now_millis), "from now")
+        };
         let total_seconds = u64::try_from(delta_millis / 1000).unwrap_or(0);
         let days = total_seconds / 86_400;
         let hours = (total_seconds % 86_400) / 3_600;
@@ -505,12 +716,22 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
             if entry.get("type").and_then(|v| v.as_str()) != Some("response_item") {
                 continue;
             }
-            let payload_type = entry.pointer("/payload/type").and_then(|v| v.as_str()).unwrap_or("");
+            let payload_type = entry
+                .pointer("/payload/type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             if matches!(payload_type, "function_call" | "custom_tool_call") {
                 count = count.saturating_add(1);
             }
             if let Some(content) = entry.pointer("/payload/content").and_then(|v| v.as_array()) {
-                count = count.saturating_add(content.iter().filter(|block| block.get("type").and_then(|v| v.as_str()) == Some("tool_use")).count());
+                count = count.saturating_add(
+                    content
+                        .iter()
+                        .filter(|block| {
+                            block.get("type").and_then(|v| v.as_str()) == Some("tool_use")
+                        })
+                        .count(),
+                );
             }
         }
 
@@ -528,7 +749,14 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
         if let Some(messages) = root.get("messages").and_then(|v| v.as_array()) {
             for msg in messages {
                 if let Some(parts) = msg.get("content").and_then(|v| v.as_array()) {
-                    count = count.saturating_add(parts.iter().filter(|part| part.get("type").and_then(|v| v.as_str()) == Some("tool_use")).count());
+                    count = count.saturating_add(
+                        parts
+                            .iter()
+                            .filter(|part| {
+                                part.get("type").and_then(|v| v.as_str()) == Some("tool_use")
+                            })
+                            .count(),
+                    );
                 }
                 if let Some(tool_calls) = msg.get("toolCalls").and_then(|v| v.as_array()) {
                     count = count.saturating_add(tool_calls.len());
@@ -554,7 +782,14 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
                 continue;
             };
             if let Some(content) = entry.pointer("/message/content").and_then(|v| v.as_array()) {
-                count = count.saturating_add(content.iter().filter(|block| block.get("type").and_then(|v| v.as_str()) == Some("tool_use")).count());
+                count = count.saturating_add(
+                    content
+                        .iter()
+                        .filter(|block| {
+                            block.get("type").and_then(|v| v.as_str()) == Some("tool_use")
+                        })
+                        .count(),
+                );
             }
         }
 
@@ -580,9 +815,25 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
                 continue;
             }
             if let Some(content) = entry.pointer("/message/content").and_then(|v| v.as_array()) {
-                count = count.saturating_add(content.iter().filter(|block| matches!(block.get("type").and_then(|v| v.as_str()), Some("tool_use") | Some("tool_call") | Some("function_call") | Some("custom_tool_call"))).count());
+                count = count.saturating_add(
+                    content
+                        .iter()
+                        .filter(|block| {
+                            matches!(
+                                block.get("type").and_then(|v| v.as_str()),
+                                Some("tool_use")
+                                    | Some("tool_call")
+                                    | Some("function_call")
+                                    | Some("custom_tool_call")
+                            )
+                        })
+                        .count(),
+                );
             }
-            if let Some(tool_calls) = entry.pointer("/message/toolCalls").and_then(|v| v.as_array()) {
+            if let Some(tool_calls) = entry
+                .pointer("/message/toolCalls")
+                .and_then(|v| v.as_array())
+            {
                 count = count.saturating_add(tool_calls.len());
             }
         }
@@ -617,7 +868,8 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
         let Some(last_active_at) = last_active_at else {
             return Style::parse("dim").unwrap_or_default();
         };
-        let age_seconds = u64::try_from(now_millis.saturating_sub(last_active_at).max(0) / 1000).unwrap_or(0);
+        let age_seconds =
+            u64::try_from(now_millis.saturating_sub(last_active_at).max(0) / 1000).unwrap_or(0);
         let style_str = if age_seconds < 3_600 {
             "bold bright_green"
         } else if age_seconds < 86_400 {
@@ -656,13 +908,22 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
 
     fn normalize_user_message_for_uniqueness(content: &str) -> Option<String> {
         let normalized = content.split_whitespace().collect::<Vec<_>>().join(" ");
-        if normalized.is_empty() { None } else { Some(normalized) }
+        if normalized.is_empty() {
+            None
+        } else {
+            Some(normalized)
+        }
     }
 
-    fn session_metrics(provider_slug: &str, session: &casr::model::CanonicalSession, path: &Path) -> (u64, usize, f64, usize) {
+    fn session_metrics(
+        provider_slug: &str,
+        session: &casr::model::CanonicalSession,
+        path: &Path,
+    ) -> (u64, usize, f64, usize) {
         let file_size_bytes = path.metadata().map(|meta| meta.len()).unwrap_or(0);
 
-        let mut unique_user_messages: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut unique_user_messages: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
         let mut assistant_chars_total: usize = 0;
         let mut assistant_responses: usize = 0;
         let mut canonical_tool_uses: usize = 0;
@@ -677,7 +938,12 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
             }
 
             if msg.role == casr::model::MessageRole::Assistant {
-                let char_count = msg.content.chars().count().saturating_add(msg.tool_results.iter().map(|result| result.content.chars().count()).sum::<usize>());
+                let char_count = msg.content.chars().count().saturating_add(
+                    msg.tool_results
+                        .iter()
+                        .map(|result| result.content.chars().count())
+                        .sum::<usize>(),
+                );
                 if char_count > 0 {
                     assistant_chars_total = assistant_chars_total.saturating_add(char_count);
                     assistant_responses = assistant_responses.saturating_add(1);
@@ -685,16 +951,34 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
             }
         }
 
-        let avg_agent_response_chars = if assistant_responses > 0 { assistant_chars_total as f64 / assistant_responses as f64 } else { 0.0 };
+        let avg_agent_response_chars = if assistant_responses > 0 {
+            assistant_chars_total as f64 / assistant_responses as f64
+        } else {
+            0.0
+        };
 
-        let tool_uses = if canonical_tool_uses > 0 { canonical_tool_uses } else { tool_uses_from_source_file(provider_slug, path) };
+        let tool_uses = if canonical_tool_uses > 0 {
+            canonical_tool_uses
+        } else {
+            tool_uses_from_source_file(provider_slug, path)
+        };
 
-        (file_size_bytes, unique_user_messages.len(), avg_agent_response_chars, tool_uses)
+        (
+            file_size_bytes,
+            unique_user_messages.len(),
+            avg_agent_response_chars,
+            tool_uses,
+        )
     }
 
-    fn build_summary(provider_slug: &str, path: PathBuf, session: casr::model::CanonicalSession) -> SessionSummary {
+    fn build_summary(
+        provider_slug: &str,
+        path: PathBuf,
+        session: casr::model::CanonicalSession,
+    ) -> SessionSummary {
         let last_active_at = session_activity_millis(&session, &path);
-        let (file_size_bytes, unique_user_messages, avg_agent_response_chars, tool_uses) = session_metrics(provider_slug, &session, &path);
+        let (file_size_bytes, unique_user_messages, avg_agent_response_chars, tool_uses) =
+            session_metrics(provider_slug, &session, &path);
         let native_name = casr::model::native_name_from_metadata(&session.metadata);
 
         SessionSummary {
@@ -715,6 +999,10 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
     }
 
     fn probe_limit_for_sort(limit: usize, sort: &str, workspace_scoped: bool) -> usize {
+        // limit == 0 lifts the cap entirely, so every candidate is scanned.
+        if limit == 0 {
+            return usize::MAX;
+        }
         if sort == "date" {
             // Cap expensive provider scans while preserving high confidence for
             // "most recent" results. Workspace-scoped lists can use a tighter cap.
@@ -725,22 +1013,48 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
         }
     }
 
-    fn workspace_hint_matches(provider_slug: &str, path: &Path, workspace_filter: Option<&PathBuf>) -> bool {
+    fn workspace_hint_matches(
+        provider_slug: &str,
+        path: &Path,
+        workspace_filter: Option<&PathBuf>,
+    ) -> bool {
         let Some(ws) = workspace_filter else {
             return true;
         };
+        // Any recorded spelling of the workspace is a legitimate match.
+        let spellings = workspace_spellings(ws.as_path());
 
         match provider_slug {
             "claude-code" => {
-                let expected = casr::providers::claude_code::project_dir_key(ws.as_path());
-                path.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()) == Some(expected.as_str())
+                let observed = path
+                    .parent()
+                    .and_then(|p| p.file_name())
+                    .and_then(|n| n.to_str());
+                observed.is_some_and(|dir_name| {
+                    spellings
+                        .iter()
+                        .any(|s| casr::providers::claude_code::project_dir_key(s) == dir_name)
+                })
             }
             "gemini" => {
-                let expected_hash = casr::providers::gemini::project_hash(ws.as_path());
-                let observed_hash = path.parent().and_then(|p| p.parent()).and_then(|p| p.file_name()).and_then(|n| n.to_str());
+                let observed_hash = path
+                    .parent()
+                    .and_then(|p| p.parent())
+                    .and_then(|p| p.file_name())
+                    .and_then(|n| n.to_str());
                 match observed_hash {
-                    Some(hash) if hash == expected_hash => true,
-                    Some(hash) if hash.len() == 64 && hash.chars().all(|c| c.is_ascii_hexdigit()) => false,
+                    Some(hash)
+                        if spellings
+                            .iter()
+                            .any(|s| casr::providers::gemini::project_hash(s) == hash) =>
+                    {
+                        true
+                    }
+                    Some(hash)
+                        if hash.len() == 64 && hash.chars().all(|c| c.is_ascii_hexdigit()) =>
+                    {
+                        false
+                    }
                     // Keep fixture/legacy layouts permissive.
                     _ => true,
                 }
@@ -753,75 +1067,113 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
         matches!(provider_slug, "claude-code" | "gemini")
     }
 
-    fn workspace_scoped_listed_sessions(provider_slug: &str, workspace_filter: Option<&PathBuf>) -> Option<Vec<(String, PathBuf)>> {
+    fn workspace_scoped_listed_sessions(
+        provider_slug: &str,
+        workspace_filter: Option<&PathBuf>,
+    ) -> Option<Vec<(String, PathBuf)>> {
         let ws = workspace_filter?;
         match provider_slug {
             "claude-code" => {
-                let claude_home = std::env::var("CLAUDE_HOME").ok().map(PathBuf::from).or_else(|| dirs::home_dir().map(|h| h.join(".claude")))?;
-                let expected_dir = claude_home.join("projects").join(casr::providers::claude_code::project_dir_key(ws.as_path()));
-                if !expected_dir.is_dir() {
-                    return Some(vec![]);
-                }
+                let claude_home = std::env::var("CLAUDE_HOME")
+                    .ok()
+                    .map(PathBuf::from)
+                    .or_else(|| dirs::home_dir().map(|h| h.join(".claude")))?;
+                let projects_dir = claude_home.join("projects");
 
+                // Each spelling of the workspace derives its own project key;
+                // sessions may sit under any of them, and a missing dir for
+                // one spelling must not short-circuit the others.
+                let mut seen_dirs: Vec<PathBuf> = Vec::new();
                 let mut sessions: Vec<(String, PathBuf)> = Vec::new();
-                let entries = match std::fs::read_dir(&expected_dir) {
-                    Ok(entries) => entries,
-                    Err(_) => return Some(vec![]),
-                };
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                for spelling in workspace_spellings(ws.as_path()) {
+                    let expected_dir =
+                        projects_dir.join(casr::providers::claude_code::project_dir_key(&spelling));
+                    if seen_dirs.contains(&expected_dir) {
                         continue;
                     }
-                    let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                    seen_dirs.push(expected_dir.clone());
+                    let Ok(entries) = std::fs::read_dir(&expected_dir) else {
                         continue;
                     };
-                    sessions.push((stem.to_string(), path));
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if !path.is_file()
+                            || path.extension().and_then(|e| e.to_str()) != Some("jsonl")
+                        {
+                            continue;
+                        }
+                        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                            continue;
+                        };
+                        sessions.push((stem.to_string(), path));
+                    }
                 }
                 Some(sessions)
             }
             "gemini" => {
-                let gemini_home = std::env::var("GEMINI_HOME").ok().map(PathBuf::from).or_else(|| dirs::home_dir().map(|h| h.join(".gemini")))?;
+                let gemini_home = std::env::var("GEMINI_HOME")
+                    .ok()
+                    .map(PathBuf::from)
+                    .or_else(|| dirs::home_dir().map(|h| h.join(".gemini")))?;
                 let tmp_root = gemini_home.join("tmp");
-                let hash = casr::providers::gemini::project_hash(ws.as_path());
-                let chats_dir = tmp_root.join(hash).join("chats");
-                if !chats_dir.is_dir() {
+                // Collect the chats dir of every workspace spelling that has
+                // one; only when none exists do the legacy fallbacks apply.
+                let mut chats_dirs: Vec<PathBuf> = Vec::new();
+                for spelling in workspace_spellings(ws.as_path()) {
+                    let dir = tmp_root
+                        .join(casr::providers::gemini::project_hash(&spelling))
+                        .join("chats");
+                    if dir.is_dir() && !chats_dirs.contains(&dir) {
+                        chats_dirs.push(dir);
+                    }
+                }
+                if chats_dirs.is_empty() {
                     // Fallback to generic provider enumeration when tmp/ has
                     // legacy/non-hash chat roots (fixtures or older layouts).
                     // Otherwise, return empty early to avoid an expensive scan.
-                    let has_legacy_chat_roots = std::fs::read_dir(&tmp_root).ok().is_some_and(|entries| {
-                        entries.flatten().any(|entry| {
-                            let path = entry.path();
-                            if !path.is_dir() || !path.join("chats").is_dir() {
-                                return false;
-                            }
-                            let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
-                                return true;
-                            };
-                            !(name.len() == 64 && name.chars().all(|c| c.is_ascii_hexdigit()))
-                        })
-                    });
-                    return if has_legacy_chat_roots { None } else { Some(vec![]) };
+                    let has_legacy_chat_roots =
+                        std::fs::read_dir(&tmp_root).ok().is_some_and(|entries| {
+                            entries.flatten().any(|entry| {
+                                let path = entry.path();
+                                if !path.is_dir() || !path.join("chats").is_dir() {
+                                    return false;
+                                }
+                                let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                                    return true;
+                                };
+                                !(name.len() == 64 && name.chars().all(|c| c.is_ascii_hexdigit()))
+                            })
+                        });
+                    return if has_legacy_chat_roots {
+                        None
+                    } else {
+                        Some(vec![])
+                    };
                 }
 
                 let mut sessions: Vec<(String, PathBuf)> = Vec::new();
-                let entries = match std::fs::read_dir(&chats_dir) {
-                    Ok(entries) => entries,
-                    Err(_) => return Some(vec![]),
-                };
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if !path.is_file() {
-                        continue;
-                    }
-                    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                for chats_dir in &chats_dirs {
+                    let Ok(entries) = std::fs::read_dir(chats_dir) else {
                         continue;
                     };
-                    if !(name.starts_with("session-") && name.ends_with(".json")) {
-                        continue;
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if !path.is_file() {
+                            continue;
+                        }
+                        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                            continue;
+                        };
+                        if !(name.starts_with("session-") && name.ends_with(".json")) {
+                            continue;
+                        }
+                        let session_id = name
+                            .strip_prefix("session-")
+                            .and_then(|n| n.strip_suffix(".json"))
+                            .unwrap_or(name)
+                            .to_string();
+                        sessions.push((session_id, path));
                     }
-                    let session_id = name.strip_prefix("session-").and_then(|n| n.strip_suffix(".json")).unwrap_or(name).to_string();
-                    sessions.push((session_id, path));
                 }
                 Some(sessions)
             }
@@ -830,9 +1182,26 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
     }
 
     let workspace_filter_explicit = workspace_filter.is_some();
-    let workspace_filter = workspace_filter.map(expand_tilde_path).or_else(|| std::env::current_dir().ok());
-    let workspace_scope = workspace_filter.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "all workspaces".to_string());
-    let workspace_scope_label = if workspace_filter_explicit { "workspace project (--workspace)" } else { "current working-directory project" };
+    // `--all` drops the scope entirely; otherwise the filter falls back to
+    // the cwd, hiding sessions recorded in other repos.
+    let workspace_filter = if all_workspaces {
+        None
+    } else {
+        workspace_filter
+            .map(expand_tilde_path)
+            .or_else(|| std::env::current_dir().ok())
+    };
+    let workspace_scope = workspace_filter
+        .as_ref()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| "all workspaces".to_string());
+    let workspace_scope_label = if all_workspaces {
+        "every workspace (--all)"
+    } else if workspace_filter_explicit {
+        "workspace project (--workspace)"
+    } else {
+        "current working-directory project"
+    };
     tracing::debug!(
         provider_filter = ?provider_filter_slug,
         workspace = %workspace_scope,
@@ -857,7 +1226,8 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
 
         // Prefer list_sessions() for providers that store multiple sessions
         // in a single file/DB (avoids undercounting).
-        let scoped_listed = workspace_scoped_listed_sessions(provider.slug(), workspace_filter.as_ref());
+        let scoped_listed =
+            workspace_scoped_listed_sessions(provider.slug(), workspace_filter.as_ref());
         if let Some(listed) = scoped_listed.or_else(|| provider.list_sessions()) {
             let mut listed = listed;
             let probe_limit = probe_limit_for_sort(limit, sort, workspace_filter.is_some());
@@ -871,7 +1241,8 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
                 listed
                     .into_iter()
                     .filter_map(|(_session_id, path)| {
-                        if !workspace_hint_matches(&provider_slug, &path, workspace_filter.as_ref()) {
+                        if !workspace_hint_matches(&provider_slug, &path, workspace_filter.as_ref())
+                        {
                             return None;
                         }
                         let session = provider.read_session(&path).ok()?;
@@ -882,7 +1253,8 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
                 listed
                     .into_par_iter()
                     .filter_map(|(_session_id, path)| {
-                        if !workspace_hint_matches(&provider_slug, &path, workspace_filter.as_ref()) {
+                        if !workspace_hint_matches(&provider_slug, &path, workspace_filter.as_ref())
+                        {
                             return None;
                         }
                         let session = provider.read_session(&path).ok()?;
@@ -897,7 +1269,10 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
         let mut candidate_paths: Vec<PathBuf> = Vec::new();
 
         for root in provider.session_roots() {
-            let walker = walkdir::WalkDir::new(&root).max_depth(4).into_iter().filter_map(Result::ok);
+            let walker = walkdir::WalkDir::new(&root)
+                .max_depth(4)
+                .into_iter()
+                .filter_map(Result::ok);
 
             for entry in walker {
                 if !entry.file_type().is_file() {
@@ -905,7 +1280,15 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
                 }
                 let path = entry.path();
                 let ext = path.extension().and_then(|e| e.to_str());
-                if !matches!(ext, Some("jsonl") | Some("json") | Some("vscdb") | Some("md") | Some("db") | Some("sqlite")) {
+                if !matches!(
+                    ext,
+                    Some("jsonl")
+                        | Some("json")
+                        | Some("vscdb")
+                        | Some("md")
+                        | Some("db")
+                        | Some("sqlite")
+                ) {
                     continue;
                 }
 
@@ -945,29 +1328,62 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
     }
 
     if let Some(filter) = workspace_filter.as_ref() {
-        sessions.retain(|s| s.workspace.as_ref().is_some_and(|w| w.starts_with(filter)) || (provider_has_workspace_path_hint(&s.provider) && workspace_hint_matches(&s.provider, &s.path, Some(filter))));
+        let filter_spellings = workspace_spellings(filter);
+        sessions.retain(|s| {
+            // Both sides can be recorded under any spelling of the same
+            // directory; compare the cross product.
+            let recorded_matches = s.workspace.as_ref().is_some_and(|w| {
+                workspace_spellings(w)
+                    .iter()
+                    .any(|w| filter_spellings.iter().any(|f| w.starts_with(f)))
+            });
+            recorded_matches
+                || (provider_has_workspace_path_hint(&s.provider)
+                    && workspace_hint_matches(&s.provider, &s.path, Some(filter)))
+        });
     }
 
-    let mut sessions_by_provider: std::collections::BTreeMap<String, Vec<SessionSummary>> = std::collections::BTreeMap::new();
+    let mut sessions_by_provider: std::collections::BTreeMap<String, Vec<SessionSummary>> =
+        std::collections::BTreeMap::new();
     for session in sessions {
-        sessions_by_provider.entry(session.provider.clone()).or_default().push(session);
+        sessions_by_provider
+            .entry(session.provider.clone())
+            .or_default()
+            .push(session);
     }
 
     for provider_sessions in sessions_by_provider.values_mut() {
         match sort {
             "date" => provider_sessions.sort_by_key(|s| std::cmp::Reverse(s.recency_value())),
-            "messages" => provider_sessions.sort_by(|a, b| b.messages.cmp(&a.messages).then_with(|| b.recency_value().cmp(&a.recency_value()))),
+            "messages" => provider_sessions.sort_by(|a, b| {
+                b.messages
+                    .cmp(&a.messages)
+                    .then_with(|| b.recency_value().cmp(&a.recency_value()))
+            }),
             "provider" => provider_sessions.sort_by_key(|s| std::cmp::Reverse(s.recency_value())),
             other => {
-                return Err(anyhow::anyhow!("Unknown sort field '{other}'. Expected one of: date, messages, provider."));
+                return Err(anyhow::anyhow!(
+                    "Unknown sort field '{other}'. Expected one of: date, messages, provider."
+                ));
             }
         }
-        provider_sessions.truncate(limit);
+        if limit > 0 {
+            provider_sessions.truncate(limit);
+        }
     }
 
-    let non_empty_group_count = sessions_by_provider.values().filter(|sessions| !sessions.is_empty()).count();
+    let non_empty_group_count = sessions_by_provider
+        .values()
+        .filter(|sessions| !sessions.is_empty())
+        .count();
     let total_sessions_kept: usize = sessions_by_provider.values().map(Vec::len).sum();
-    tracing::debug!(providers = non_empty_group_count, sessions = total_sessions_kept, sort, limit, "list sessions complete");
+    tracing::debug!(
+        providers = non_empty_group_count,
+        sessions = total_sessions_kept,
+        sort,
+        limit,
+        "list sessions complete"
+    );
 
     if json_mode {
         let mut items: Vec<ListItem> = Vec::new();
@@ -980,16 +1396,38 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
         println!("{}", serde_json::to_string_pretty(&envelope)?);
     } else {
         if non_empty_group_count == 0 {
-            println!("No sessions found for {} {}. Run {} to check provider status.", workspace_scope_label.cyan(), workspace_scope.cyan(), "casr providers".cyan(),);
+            println!(
+                "No sessions found for {} {}. Run {} to check provider status.",
+                workspace_scope_label.cyan(),
+                workspace_scope.cyan(),
+                "casr providers".cyan(),
+            );
             return Ok(());
         }
 
         let console = Console::new();
-        console.print(&format!("[bold cyan]Project-scoped sessions[/] for [bold]{workspace_scope}[/]"));
+        if all_workspaces {
+            console.print("[bold cyan]Sessions[/] across [bold]all workspaces[/]");
+        } else {
+            console.print(&format!(
+                "[bold cyan]Project-scoped sessions[/] for [bold]{workspace_scope}[/]"
+            ));
+        }
         console.print(&format!("[dim]Scope:[/] [bold]{workspace_scope_label}[/]"));
-        console.print(&format!("[dim]Showing up to[/] [bold]{limit}[/] [dim]most recent sessions per provider[/]"));
+        if limit > 0 {
+            console.print(&format!(
+                "[dim]Showing up to[/] [bold]{limit}[/] [dim]most recent sessions per provider[/]"
+            ));
+        } else {
+            console.print("[dim]Showing[/] [bold]all[/] [dim]sessions per provider[/]");
+        }
+        if !all_workspaces {
+            console.print(
+                "[dim]Tip:[/] pass [bold]--all[/] [dim]to list sessions from every workspace[/]",
+            );
+        }
 
-        let now_millis = Utc::now().timestamp_millis();
+        let now_millis = jiff::Timestamp::now().as_millisecond();
 
         for (provider_slug, provider_sessions) in &sessions_by_provider {
             if provider_sessions.is_empty() {
@@ -997,27 +1435,78 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
             }
 
             let provider = provider_display(provider_slug);
-            console.print(&format!("[bold]{}[/]: {} session(s)", provider, provider_sessions.len()));
+            console.print(&format!(
+                "[bold]{}[/]: {} session(s)",
+                provider,
+                provider_sessions.len()
+            ));
 
+            let scope_suffix = if all_workspaces {
+                "Across All Workspaces"
+            } else {
+                "in This Project"
+            };
             let mut table = Table::new()
-                .title(format!("Top {} Most Recently Active {} Sessions in This Project", provider_sessions.len(), provider))
+                .title(format!(
+                    "Top {} Most Recently Active {} Sessions {}",
+                    provider_sessions.len(),
+                    provider,
+                    scope_suffix
+                ))
                 .header_style(Style::parse("bold black on bright_white").unwrap_or_default())
                 .border_style(Style::parse("cyan").unwrap_or_default())
                 .with_column(Column::new("#").justify(JustifyMethod::Right).width(3))
                 .with_column(Column::new("Session ID").min_width(36))
-                .with_column(Column::new("Name").justify(JustifyMethod::Left).width(24))
+                .with_column(Column::new("Name").justify(JustifyMethod::Left).width(24));
+            if all_workspaces {
+                // Rows from different repos are indistinguishable without it.
+                table = table.with_column(
+                    Column::new("Workspace")
+                        .justify(JustifyMethod::Left)
+                        .width(20),
+                );
+            }
+            table = table
                 .with_column(Column::new("Msgs").justify(JustifyMethod::Right).width(6))
-                .with_column(Column::new("Size KB").justify(JustifyMethod::Right).width(8))
-                .with_column(Column::new("Unique Users").justify(JustifyMethod::Right).width(12))
-                .with_column(Column::new("Agent Avg Chars").justify(JustifyMethod::Right).width(15))
-                .with_column(Column::new("Tool Uses").justify(JustifyMethod::Right).width(10))
-                .with_column(Column::new("Started").justify(JustifyMethod::Left).width(16))
-                .with_column(Column::new("Last Active").justify(JustifyMethod::Left).min_width(22));
+                .with_column(
+                    Column::new("Size KB")
+                        .justify(JustifyMethod::Right)
+                        .width(8),
+                )
+                .with_column(
+                    Column::new("Unique Users")
+                        .justify(JustifyMethod::Right)
+                        .width(12),
+                )
+                .with_column(
+                    Column::new("Agent Avg Chars")
+                        .justify(JustifyMethod::Right)
+                        .width(15),
+                )
+                .with_column(
+                    Column::new("Tool Uses")
+                        .justify(JustifyMethod::Right)
+                        .width(10),
+                )
+                .with_column(
+                    Column::new("Started")
+                        .justify(JustifyMethod::Left)
+                        .width(16),
+                )
+                .with_column(
+                    Column::new("Last Active")
+                        .justify(JustifyMethod::Left)
+                        .min_width(22),
+                );
 
             for (idx, s) in provider_sessions.iter().enumerate() {
                 let rank = (idx + 1).to_string();
                 let session_id = s.session_id.as_str();
-                let native_name = s.native_name.as_deref().map(|name| truncate_display_name(name, 22)).unwrap_or_default();
+                let native_name = s
+                    .native_name
+                    .as_deref()
+                    .map(|name| truncate_display_name(name, 22))
+                    .unwrap_or_default();
                 let messages = s.messages.to_string();
                 let messages_cell_style = message_count_style(s.messages);
                 let size_kb = s.file_size_display();
@@ -1027,18 +1516,29 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
                 let started = s.started_at_display();
                 let last_active = s.last_active_display(now_millis);
                 let last_active_cell_style = last_active_style(s.last_active_at, now_millis);
-                table.add_row(Row::new(vec![
+                let workspace_label = s
+                    .workspace
+                    .as_ref()
+                    .and_then(|w| w.file_name())
+                    .and_then(|n| n.to_str())
+                    .map(|n| truncate_display_name(n, 18))
+                    .unwrap_or_default();
+                let mut cells = vec![
                     Cell::new(rank.as_str()),
                     Cell::new(session_id),
                     Cell::new(native_name.as_str()),
-                    Cell::new(messages.as_str()).style(messages_cell_style),
-                    Cell::new(size_kb.as_str()),
-                    Cell::new(unique_users.as_str()),
-                    Cell::new(avg_agent.as_str()),
-                    Cell::new(tool_uses.as_str()),
-                    Cell::new(started.as_str()),
-                    Cell::new(last_active.as_str()).style(last_active_cell_style),
-                ]));
+                ];
+                if all_workspaces {
+                    cells.push(Cell::new(workspace_label.as_str()));
+                }
+                cells.push(Cell::new(messages.as_str()).style(messages_cell_style));
+                cells.push(Cell::new(size_kb.as_str()));
+                cells.push(Cell::new(unique_users.as_str()));
+                cells.push(Cell::new(avg_agent.as_str()));
+                cells.push(Cell::new(tool_uses.as_str()));
+                cells.push(Cell::new(started.as_str()));
+                cells.push(Cell::new(last_active.as_str()).style(last_active_cell_style));
+                table.add_row(Row::new(cells));
             }
 
             console.print_renderable(&table);
@@ -1049,7 +1549,14 @@ fn cmd_list(provider_filter: Option<&str>, workspace_filter: Option<&str>, limit
     Ok(())
 }
 
-fn cmd_info(session_id: &str, json_mode: bool, enrich_fs: bool, source: Option<String>, peek: bool, peek_lines: Option<usize>) -> anyhow::Result<()> {
+fn cmd_info(
+    session_id: &str,
+    json_mode: bool,
+    enrich_fs: bool,
+    source: Option<String>,
+    peek: bool,
+    peek_lines: Option<usize>,
+) -> anyhow::Result<()> {
     let registry = ProviderRegistry::default_registry();
     let source_hint = source.as_deref().map(casr::discovery::SourceHint::parse);
     let resolved = registry.resolve_session(session_id, source_hint.as_ref())?;
@@ -1067,8 +1574,16 @@ fn cmd_info(session_id: &str, json_mode: bool, enrich_fs: bool, source: Option<S
     });
 
     if json_mode {
-        let (workspace_name, workspace_name_source) = responses::workspace_name_from_path(session.workspace.as_ref());
-        let repo_name = if enrich_fs { session.workspace.as_ref().and_then(|ws| casr::discovery::repo_name_from_path(ws)) } else { None };
+        let (workspace_name, workspace_name_source) =
+            responses::workspace_name_from_path(session.workspace.as_ref());
+        let repo_name = if enrich_fs {
+            session
+                .workspace
+                .as_ref()
+                .and_then(|ws| casr::discovery::repo_name_from_path(ws))
+        } else {
+            None
+        };
         let response = InfoResponse {
             schema_version: responses::SCHEMA_VERSION,
             session_id: session.session_id.clone(),
@@ -1108,12 +1623,26 @@ fn cmd_info(session_id: &str, json_mode: bool, enrich_fs: bool, source: Option<S
         println!("  {} {}", "Path:".dimmed(), session.source_path.display());
 
         // Show role breakdown.
-        let user_count = session.messages.iter().filter(|m| m.role == casr::model::MessageRole::User).count();
-        let asst_count = session.messages.iter().filter(|m| m.role == casr::model::MessageRole::Assistant).count();
-        println!("  {} {user_count} user, {asst_count} assistant", "Roles:".dimmed());
+        let user_count = session
+            .messages
+            .iter()
+            .filter(|m| m.role == casr::model::MessageRole::User)
+            .count();
+        let asst_count = session
+            .messages
+            .iter()
+            .filter(|m| m.role == casr::model::MessageRole::Assistant)
+            .count();
+        println!(
+            "  {} {user_count} user, {asst_count} assistant",
+            "Roles:".dimmed()
+        );
 
         if let Some(ref tail) = transcript_tail {
-            println!("\n{}", format!("Transcript Tail (last {} turns)", tail.len()).bold());
+            println!(
+                "\n{}",
+                format!("Transcript Tail (last {} turns)", tail.len()).bold()
+            );
             if tail.is_empty() {
                 println!("  {}", "(no messages)".dimmed());
             }
@@ -1131,13 +1660,32 @@ fn cmd_providers(json_mode: bool) -> anyhow::Result<()> {
     let results = registry.detect_all();
 
     if json_mode {
-        let providers: Vec<ProviderInfo> = results.iter().map(|(p, det)| ProviderInfo { name: p.name().to_string(), slug: p.slug().to_string(), alias: p.cli_alias().to_string(), installed: det.installed, version: det.version.clone(), evidence: det.evidence.clone() }).collect();
+        let providers: Vec<ProviderInfo> = results
+            .iter()
+            .map(|(p, det)| ProviderInfo {
+                name: p.name().to_string(),
+                slug: p.slug().to_string(),
+                alias: p.cli_alias().to_string(),
+                installed: det.installed,
+                version: det.version.clone(),
+                evidence: det.evidence.clone(),
+            })
+            .collect();
         println!("{}", serde_json::to_string_pretty(&providers)?);
     } else {
         println!("{}\n", "Detected Providers".bold());
         for (provider, detection) in &results {
-            let status = if detection.installed { "✓".green().bold().to_string() } else { "✗".red().bold().to_string() };
-            println!("  {status} {} ({}) — alias: {}", provider.name(), provider.slug(), provider.cli_alias().cyan());
+            let status = if detection.installed {
+                "✓".green().bold().to_string()
+            } else {
+                "✗".red().bold().to_string()
+            };
+            println!(
+                "  {status} {} ({}) — alias: {}",
+                provider.name(),
+                provider.slug(),
+                provider.cli_alias().cyan()
+            );
             for ev in &detection.evidence {
                 println!("    {ev}");
             }
@@ -1151,7 +1699,9 @@ fn cmd_completions(shell: &str) -> anyhow::Result<()> {
     use clap::CommandFactory;
     use clap_complete::{Shell, generate};
 
-    let parsed_shell: Shell = shell.parse().map_err(|_| anyhow::anyhow!("Unknown shell '{shell}'. Use: bash, zsh, fish"))?;
+    let parsed_shell: Shell = shell
+        .parse()
+        .map_err(|_| anyhow::anyhow!("Unknown shell '{shell}'. Use: bash, zsh, fish"))?;
 
     let mut cmd = Cli::command();
     generate(parsed_shell, &mut cmd, "casr", &mut std::io::stdout());

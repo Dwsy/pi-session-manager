@@ -60,7 +60,9 @@ pub fn list_session_paths_in_db(db_path: &Path) -> Result<Vec<PathBuf>, String> 
     }
 
     let conn = open_db_ro(db_path)?;
-    let query = if table_exists(&conn, "session") {
+    let query = if table_exists(&conn, "session_v2") {
+        "SELECT id FROM session_v2 ORDER BY time_created DESC"
+    } else if table_exists(&conn, "session") {
         "SELECT id FROM session ORDER BY time_created DESC"
     } else if table_exists(&conn, "sessions") {
         "SELECT id FROM sessions ORDER BY created_at DESC"
@@ -85,17 +87,27 @@ pub fn build_target_path(session: &CanonicalSession, target_session_id: &str) ->
     Ok(virtual_session_path(&db_path, target_session_id))
 }
 
-pub fn resume_command() -> String {
-    "opencode".to_string()
+pub fn resume_command(session_id: &str) -> String {
+    if session_id.trim().is_empty() {
+        "opencode".to_string()
+    } else {
+        format!("opencode --session {session_id}")
+    }
 }
 
 pub fn read_session(path: &Path) -> Result<CanonicalSession, String> {
     if let Some((db_path, session_id)) = parse_virtual_path(path) {
         let conn = open_db_ro(&db_path)?;
+        if table_exists(&conn, "session_v2") {
+            return super::vendored::read_session("opencode", path);
+        }
         return read_session_by_id(&conn, &db_path, &session_id);
     }
 
     let conn = open_db_ro(path)?;
+    if table_exists(&conn, "session_v2") {
+        return super::vendored::read_session("opencode", path);
+    }
     let session_id = newest_root_session_id(&conn).ok_or_else(|| format!("OpenCode: no sessions found in {}", path.display()))?;
     read_session_by_id(&conn, path, &session_id)
 }
@@ -111,6 +123,16 @@ pub fn render_session(_session: &CanonicalSession, _target_session_id: &str) -> 
 pub fn write_session(session: &CanonicalSession, target_session_id: &str) -> Result<PathBuf, String> {
     let target_path = build_target_path(session, target_session_id)?;
     let db_path = backing_store_path(&target_path);
+    if db_path.is_file() {
+        if let Ok(probe) = open_db_ro(&db_path) {
+            if table_exists(&probe, "session_v2") {
+                return Err(format!("OpenCode: refusing direct write into live OpenCode 2.x DB {} (read-only)", db_path.display()));
+            }
+            if table_exists(&probe, "session") {
+                return Err(format!("OpenCode: refusing direct write into live OpenCode 1.x DB {} (read-only)", db_path.display()));
+            }
+        }
+    }
     let mut conn = open_db_rw(&db_path)?;
     ensure_schema(&conn)?;
 

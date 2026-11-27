@@ -57,21 +57,26 @@ pub fn read_canonical_session_from_str(content: &str, path_hint: Option<&Path>) 
 
 pub fn parse_session_info_from_path(path: &Path) -> Result<(SessionInfo, Vec<SessionEntry>), String> {
     let modified = file_modified_time(path)?;
-    if let Some(provider) = detect_provider_from_path_or_content(path)? {
+    if let Some(provider) = detect_provider(Some(path), "") {
         if provider == ProviderKind::Pi || provider == ProviderKind::Omp {
             return pi_session::parse_pi_session_info(path, modified);
         }
+        let canonical = provider.read_session(path)?;
+        let entries = adapters::canonical_to_session_entries(&canonical);
+        let info = adapters::canonical_to_session_info(&canonical, path, modified);
+        return Ok((info, entries));
     }
 
-    // Read file once and reuse content for provider detection + parsing.
-    // Previously detect_provider_from_path_or_content read the full file,
-    // then read_canonical_session_from_path read it again.
+    // Content-based fallback when path alone cannot identify the provider.
     let start = std::time::Instant::now();
     let content = fs::read_to_string(path).map_err(|e| format!("Failed to read session file {}: {e}", path.display()))?;
     let elapsed = start.elapsed();
     crate::core::io_trace::trace_file_read(&path.to_string_lossy(), content.len() as u64, elapsed);
 
     let provider = detect_provider(Some(path), &content).ok_or_else(|| format!("Unsupported session format: {}", path.display()))?;
+    if provider == ProviderKind::Pi || provider == ProviderKind::Omp {
+        return pi_session::parse_pi_session_info(path, modified);
+    }
     let canonical = provider.read_session_from_str(path, &content)?;
     let entries = adapters::canonical_to_session_entries(&canonical);
     let info = adapters::canonical_to_session_info(&canonical, path, modified);

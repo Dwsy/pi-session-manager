@@ -62,7 +62,7 @@ pub trait Provider: Send + Sync {
     /// Short slug used in session metadata (e.g. `"claude-code"`).
     fn slug(&self) -> &str;
 
-    /// CLI alias used in `casr <alias> resume …` (e.g. `"cc"`).
+    /// CLI alias used in `casr resume <alias> …` (e.g. `"cc"`).
     fn cli_alias(&self) -> &str;
 
     /// Probe whether this provider is installed on the machine.
@@ -78,7 +78,11 @@ pub trait Provider: Send + Sync {
     fn read_session(&self, path: &Path) -> anyhow::Result<CanonicalSession>;
 
     /// Write a canonical session into this provider's native format.
-    fn write_session(&self, session: &CanonicalSession, opts: &WriteOptions) -> anyhow::Result<WrittenSession>;
+    fn write_session(
+        &self,
+        session: &CanonicalSession,
+        opts: &WriteOptions,
+    ) -> anyhow::Result<WrittenSession>;
 
     /// Build the shell command to resume a session with this provider.
     fn resume_command(&self, session_id: &str) -> String;

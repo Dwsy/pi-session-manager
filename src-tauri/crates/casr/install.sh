@@ -56,7 +56,7 @@ SIGSTORE_BUNDLE_URL="${SIGSTORE_BUNDLE_URL:-}"
 COSIGN_IDENTITY_RE="${COSIGN_IDENTITY_RE:-^https://github.com/${OWNER}/${REPO}/.github/workflows/dist.yml@refs/tags/.*$}"
 COSIGN_OIDC_ISSUER="${COSIGN_OIDC_ISSUER:-https://token.actions.githubusercontent.com}"
 ARTIFACT_URL="${ARTIFACT_URL:-}"
-LOCK_FILE="/tmp/casr-install.lock"
+LOCK_FILE="${LOCK_FILE:-/tmp/casr-install.lock}"
 NO_GUM=0
 NO_CHECKSUM=0
 NO_CONFIGURE=0
@@ -435,7 +435,7 @@ casr -gmi <session-id>  # open in Gemini
 ```bash
 casr providers
 casr list --workspace "$(pwd)" --sort date --limit 20
-casr cod resume <session-id> --source cc
+casr resume cod <session-id> --source cc
 casr info <session-id> --json
 ```
 
@@ -591,14 +591,17 @@ configure_agents() {
 
 resolve_version() {
   if [ -n "$VERSION" ]; then return 0; fi
+  if [ -n "$OFFLINE_TARBALL" ]; then VERSION="offline"; return 0; fi
+  if [ -n "$ARTIFACT_URL" ]; then VERSION="custom"; return 0; fi
+  if [ "$FROM_SOURCE" -eq 1 ]; then VERSION="source"; return 0; fi
 
   info "Resolving latest version..."
   local latest_url="https://api.github.com/repos/${OWNER}/${REPO}/releases/latest"
   local tag
   if tag=$(curl -fsSL --connect-timeout 5 "${PROXY_ARGS[@]}" \
     -H "Accept: application/vnd.github.v3+json" "$latest_url" 2>/dev/null \
-    | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'); then
-    if [ -n "$tag" ]; then
+    | grep -o '"tag_name": *"[^"]*"' | head -n 1 | sed -E 's/.*"([^"]*)"$/\1/'); then
+    if [ -n "$tag" ] && [[ "$tag" =~ ^v?[0-9] ]]; then
       VERSION="$tag"
       info "Resolved latest version: $VERSION"
       return 0
@@ -616,8 +619,9 @@ resolve_version() {
     fi
   fi
 
-  VERSION="v0.1.0"
-  warn "Could not resolve latest version; defaulting to $VERSION"
+  err "Could not resolve latest release version for ${OWNER}/${REPO}"
+  err "Re-run with --version vX.Y.Z, --offline TARBALL, or check network connectivity"
+  exit 1
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -627,6 +631,7 @@ resolve_version() {
 OS=""
 ARCH=""
 TARGET=""
+NO_PREBUILT_REASON=""
 
 detect_platform() {
   OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -643,17 +648,19 @@ detect_platform() {
   fi
 
   TARGET=""
+  NO_PREBUILT_REASON=""
   case "${OS}-${ARCH}" in
     linux-x86_64)   TARGET="x86_64-unknown-linux-musl" ;;
     linux-aarch64)  TARGET="aarch64-unknown-linux-musl" ;;
     darwin-x86_64)  TARGET="x86_64-apple-darwin" ;;
     darwin-aarch64) TARGET="aarch64-apple-darwin" ;;
-    *) :;;
+    *) NO_PREBUILT_REASON="no prebuilt binaries are published for ${OS}/${ARCH}" ;;
   esac
 
   if [ -z "$TARGET" ] && [ "$FROM_SOURCE" -eq 0 ] && [ -z "$ARTIFACT_URL" ] && [ -z "$OFFLINE_TARBALL" ]; then
-    warn "No prebuilt binary for ${OS}/${ARCH}; falling back to build-from-source"
-    FROM_SOURCE=1
+    err "Cannot install prebuilt binary: ${NO_PREBUILT_REASON:-platform ${OS}/${ARCH} is not supported}"
+    err "To build from source instead (requires git + Rust nightly), re-run with: --from-source"
+    exit 1
   fi
 }
 
@@ -668,8 +675,9 @@ set_artifact_url() {
       TAR="casr-${TARGET}.tar.xz"
       URL="https://github.com/${OWNER}/${REPO}/releases/download/${VERSION}/${TAR}"
     else
-      warn "No prebuilt artifact for ${OS}/${ARCH}; falling back to build-from-source"
-      FROM_SOURCE=1
+      err "Cannot install prebuilt binary: ${NO_PREBUILT_REASON:-no prebuilt artifact for ${OS}/${ARCH}}"
+      err "To build from source instead (requires git + Rust nightly), re-run with: --from-source"
+      exit 1
     fi
   fi
 }
@@ -815,15 +823,23 @@ verify_checksum() {
     return 1
   fi
 
+  expected=$(printf '%s' "$expected" | tr '[:upper:]' '[:lower:]')
+  if ! [[ "$expected" =~ ^[0-9a-f]{64}$ ]]; then
+    err "Invalid expected SHA256 checksum: '${expected}'"
+    return 1
+  fi
+
   if command -v sha256sum &>/dev/null; then
     actual=$(sha256sum "$file" | cut -d' ' -f1)
   elif command -v shasum &>/dev/null; then
     actual=$(shasum -a 256 "$file" | cut -d' ' -f1)
   else
-    warn "No SHA256 tool found (sha256sum or shasum); skipping verification"
-    return 0
+    err "No SHA256 tool found (sha256sum or shasum); cannot verify checksum"
+    err "Install sha256sum or shasum, or re-run with --no-verify to skip verification"
+    return 1
   fi
 
+  actual=$(printf '%s' "$actual" | tr '[:upper:]' '[:lower:]')
   if [ "$actual" != "$expected" ]; then
     err "Checksum verification FAILED!"
     err "Expected: $expected"
@@ -1259,32 +1275,39 @@ fi
 if [ -z "$INSTALL_SOURCE" ] && [ "$FROM_SOURCE" -eq 0 ] && [ -n "$URL" ]; then
   info "Downloading $URL"
   DOWNLOAD_OK=0
+  TRIED_URLS=("$URL")
   if run_with_spinner "Downloading casr..." \
     curl -fsSL "${PROXY_ARGS[@]}" "$URL" -o "$TMP/$TAR"; then
     DOWNLOAD_OK=1
   fi
 
-  if [ "$DOWNLOAD_OK" -eq 0 ]; then
-    # Tier 2: unversioned latest
-    TIER2_URL="https://github.com/${OWNER}/${REPO}/releases/latest/download/casr-${TARGET}.tar.xz"
-    info "Trying unversioned latest: $TIER2_URL"
-    if curl -fsSL "${PROXY_ARGS[@]}" "$TIER2_URL" -o "$TMP/$TAR" 2>/dev/null; then
-      DOWNLOAD_OK=1
+  # Retain legacy simple naming ONLY within the selected release tag, and never
+  # override an explicit ARTIFACT_URL or substitute mutable /releases/latest/.
+  if [ "$DOWNLOAD_OK" -eq 0 ] && [ -z "$ARTIFACT_URL" ] && [ -n "$VERSION" ] && [ -n "$OS" ] && [ -n "$ARCH" ]; then
+    LEGACY_TAR="casr-${OS}-${ARCH}.tar.xz"
+    LEGACY_URL="https://github.com/${OWNER}/${REPO}/releases/download/${VERSION}/${LEGACY_TAR}"
+    if [ "$LEGACY_URL" != "$URL" ]; then
+      TRIED_URLS+=("$LEGACY_URL")
+      info "Trying legacy asset name for ${VERSION}: $LEGACY_URL"
+      if curl -fsSL "${PROXY_ARGS[@]}" "$LEGACY_URL" -o "$TMP/$LEGACY_TAR" 2>/dev/null; then
+        TAR="$LEGACY_TAR"
+        URL="$LEGACY_URL"
+        DOWNLOAD_OK=1
+      fi
     fi
   fi
 
   if [ "$DOWNLOAD_OK" -eq 0 ]; then
-    # Tier 3: simple naming
-    TIER3_URL="https://github.com/${OWNER}/${REPO}/releases/latest/download/casr-${OS}-${ARCH}.tar.xz"
-    info "Trying simple naming: $TIER3_URL"
-    if curl -fsSL "${PROXY_ARGS[@]}" "$TIER3_URL" -o "$TMP/$TAR" 2>/dev/null; then
-      DOWNLOAD_OK=1
-    fi
-  fi
-
-  if [ "$DOWNLOAD_OK" -eq 0 ]; then
-    warn "No prebuilt binary found; falling back to build-from-source"
-    FROM_SOURCE=1
+    # A mapped target triple whose release asset 404s is a release-packaging
+    # bug, not a reason to silently compile the world on the user's machine.
+    err "Download failed: no prebuilt binary could be fetched for ${TARGET:-${OS}/${ARCH}}"
+    for tried in "${TRIED_URLS[@]}"; do
+      err "Tried: $tried"
+    done
+    err "This usually means the requested version or release asset does not exist. Please report it if unexpected:"
+    err "  https://github.com/${OWNER}/${REPO}/issues"
+    err "To build from source instead (requires git + Rust nightly), re-run with: --from-source"
+    exit 1
   fi
 fi
 
@@ -1313,27 +1336,28 @@ if [ -z "$INSTALL_SOURCE" ]; then
   if [ "$NO_CHECKSUM" -eq 1 ]; then
     warn "Verification skipped (--no-verify)"
   else
-    # Fetch checksum
+    # Fetch checksum (fail closed unless --no-verify was explicitly passed)
     if [ -z "$CHECKSUM" ]; then
       [ -z "$CHECKSUM_URL" ] && CHECKSUM_URL="${URL}.sha256"
       info "Fetching checksum from ${CHECKSUM_URL}"
       CHECKSUM_FILE="$TMP/checksum.sha256"
-      if curl -fsSL "${PROXY_ARGS[@]}" "$CHECKSUM_URL" -o "$CHECKSUM_FILE" 2>/dev/null; then
-        CHECKSUM=$(awk '{print $1}' "$CHECKSUM_FILE")
-        if [ -z "$CHECKSUM" ]; then
-          warn "Empty checksum file; skipping verification"
-        fi
-      else
-        warn "Checksum file not found; skipping checksum verification"
+      if ! curl -fsSL "${PROXY_ARGS[@]}" "$CHECKSUM_URL" -o "$CHECKSUM_FILE" 2>/dev/null; then
+        err "Failed to fetch checksum from ${CHECKSUM_URL}"
+        err "Installation aborted (pass --no-verify to skip checksum verification)"
+        exit 1
+      fi
+      CHECKSUM=$(awk 'NF {print $1; exit}' "$CHECKSUM_FILE")
+      if [ -z "$CHECKSUM" ]; then
+        err "Checksum file from ${CHECKSUM_URL} is empty"
+        err "Installation aborted (pass --no-verify to skip checksum verification)"
+        exit 1
       fi
     fi
 
-    # Verify checksum if available
-    if [ -n "$CHECKSUM" ]; then
-      if ! verify_checksum "$TMP/$TAR" "$CHECKSUM"; then
-        err "Installation aborted due to checksum failure"
-        exit 1
-      fi
+    # Verify checksum (mandatory unless --no-verify)
+    if ! verify_checksum "$TMP/$TAR" "$CHECKSUM"; then
+      err "Installation aborted due to checksum failure"
+      exit 1
     fi
 
     # Verify sigstore bundle (best-effort)

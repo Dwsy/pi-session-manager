@@ -112,7 +112,9 @@ pub struct ToolResult {
 /// matches the *current* cwd) would otherwise write the session somewhere the
 /// user will never resume from.
 pub fn effective_workspace(session: &CanonicalSession) -> std::path::PathBuf {
-    session.workspace.clone().unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")))
+    session.workspace.clone().unwrap_or_else(|| {
+        std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+    })
 }
 
 /// Flatten heterogeneous content representations into a single string.
@@ -142,8 +144,18 @@ pub fn flatten_content(value: &serde_json::Value) -> String {
                                 }
                             }
                             Some("tool_use") => {
-                                let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
-                                let desc = obj.get("input").and_then(|v| v.as_object()).and_then(|inp| inp.get("description").or_else(|| inp.get("file_path")).and_then(|v| v.as_str()));
+                                let name = obj
+                                    .get("name")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("unknown");
+                                let desc =
+                                    obj.get("input")
+                                        .and_then(|v| v.as_object())
+                                        .and_then(|inp| {
+                                            inp.get("description")
+                                                .or_else(|| inp.get("file_path"))
+                                                .and_then(|v| v.as_str())
+                                        });
                                 match desc {
                                     Some(d) => parts.push(format!("[Tool: {name} - {d}]")),
                                     None => parts.push(format!("[Tool: {name}]")),
@@ -171,7 +183,10 @@ pub fn flatten_content(value: &serde_json::Value) -> String {
                 }
             }
             // Fallback: single object with "text" field.
-            obj.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string()
+            obj.get("text")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string()
         }
         _ => String::new(),
     }
@@ -196,7 +211,13 @@ pub fn parse_timestamp(value: &serde_json::Value) -> Option<i64> {
             if let Some(i) = n.as_i64() {
                 Some(if i < MILLIS_THRESHOLD { i * 1000 } else { i })
             } else {
-                n.as_f64().map(|f| if f < (MILLIS_THRESHOLD as f64) { (f * 1000.0) as i64 } else { f as i64 })
+                n.as_f64().map(|f| {
+                    if f < (MILLIS_THRESHOLD as f64) {
+                        (f * 1000.0) as i64
+                    } else {
+                        f as i64
+                    }
+                })
             }
         }
         serde_json::Value::String(s) => {
@@ -212,24 +233,22 @@ pub fn parse_timestamp(value: &serde_json::Value) -> Option<i64> {
             if let Ok(f) = s.parse::<f64>()
                 && f.is_finite()
             {
-                return Some(if f < (MILLIS_THRESHOLD as f64) { (f * 1000.0) as i64 } else { f as i64 });
+                return Some(if f < (MILLIS_THRESHOLD as f64) {
+                    (f * 1000.0) as i64
+                } else {
+                    f as i64
+                });
             }
-            // Try RFC 3339 / ISO-8601 with timezone.
-            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
-                return Some(dt.timestamp_millis());
+            // Try RFC 3339 / ISO-8601 with timezone (Z or ±HH:MM).
+            if let Ok(ts) = s.parse::<jiff::Timestamp>() {
+                return Some(ts.as_millisecond());
             }
-            // Try common ISO-8601 variants.
-            if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.fZ") {
-                return Some(dt.and_utc().timestamp_millis());
-            }
-            if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%SZ") {
-                return Some(dt.and_utc().timestamp_millis());
-            }
-            if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f") {
-                return Some(dt.and_utc().timestamp_millis());
-            }
-            if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S") {
-                return Some(dt.and_utc().timestamp_millis());
+            // Try naive ISO-8601 variants without timezone (assume UTC).
+            if (s.contains('T') || s.contains('t'))
+                && let Ok(dt) = s.parse::<jiff::civil::DateTime>()
+                && let Ok(ts) = jiff::tz::Offset::UTC.to_timestamp(dt)
+            {
+                return Some(ts.as_millisecond());
             }
             None
         }
@@ -278,7 +297,12 @@ pub const NATIVE_NAME_META_KEY: &str = "native_name";
 /// render an empty column / `null` field for providers without the concept.
 #[must_use]
 pub fn native_name_from_metadata(metadata: &serde_json::Value) -> Option<String> {
-    metadata.get(NATIVE_NAME_META_KEY).and_then(serde_json::Value::as_str).map(str::trim).filter(|s| !s.is_empty()).map(str::to_string)
+    metadata
+        .get(NATIVE_NAME_META_KEY)
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
 }
 
 /// A compact, human-readable snapshot of one conversation turn.
@@ -321,11 +345,19 @@ pub fn role_label(role: &MessageRole) -> String {
 /// truncated to at most `max_len` characters, appending `…` when clipped.
 #[must_use]
 pub fn message_snippet(message: &CanonicalMessage, max_len: usize) -> String {
-    let mut text: String = message.content.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut text: String = message
+        .content
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
 
     if text.is_empty() {
         if !message.tool_calls.is_empty() {
-            let names: Vec<&str> = message.tool_calls.iter().map(|call| call.name.as_str()).collect();
+            let names: Vec<&str> = message
+                .tool_calls
+                .iter()
+                .map(|call| call.name.as_str())
+                .collect();
             text = format!("[tool call: {}]", names.join(", "));
         } else if !message.tool_results.is_empty() {
             text = "[tool result]".to_string();
@@ -347,12 +379,23 @@ pub fn message_snippet(message: &CanonicalMessage, max_len: usize) -> String {
 /// the session is shorter than `count`. A `count` of `0` yields an empty tail.
 /// `max_len` bounds each snippet's length (see [`message_snippet`]).
 #[must_use]
-pub fn transcript_tail(messages: &[CanonicalMessage], count: usize, max_len: usize) -> Vec<TranscriptTurn> {
+pub fn transcript_tail(
+    messages: &[CanonicalMessage],
+    count: usize,
+    max_len: usize,
+) -> Vec<TranscriptTurn> {
     if count == 0 {
         return Vec::new();
     }
     let start = messages.len().saturating_sub(count);
-    messages[start..].iter().map(|message| TranscriptTurn { idx: message.idx, role: role_label(&message.role), snippet: message_snippet(message, max_len) }).collect()
+    messages[start..]
+        .iter()
+        .map(|message| TranscriptTurn {
+            idx: message.idx,
+            role: role_label(&message.role),
+            snippet: message_snippet(message, max_len),
+        })
+        .collect()
 }
 
 /// Map provider-specific role strings to canonical [`MessageRole`].
@@ -455,7 +498,10 @@ mod tests {
             "second",
             {"type": "tool_use", "name": "Edit", "input": {"description": "fix bug"}},
         ]);
-        assert_eq!(flatten_content(&val), "first\nsecond\n[Tool: Edit - fix bug]");
+        assert_eq!(
+            flatten_content(&val),
+            "first\nsecond\n[Tool: Edit - fix bug]"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -587,7 +633,10 @@ mod tests {
 
     #[test]
     fn normalize_role_unknown_becomes_other() {
-        assert_eq!(normalize_role("reasoning"), MessageRole::Other("reasoning".to_string()));
+        assert_eq!(
+            normalize_role("reasoning"),
+            MessageRole::Other("reasoning".to_string())
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -609,7 +658,10 @@ mod tests {
 
     #[test]
     fn truncate_title_multiline_uses_first() {
-        assert_eq!(truncate_title("first line\nsecond line\nthird", 100), "first line");
+        assert_eq!(
+            truncate_title("first line\nsecond line\nthird", 100),
+            "first line"
+        );
     }
 
     #[test]
@@ -629,8 +681,26 @@ mod tests {
     #[test]
     fn reindex_messages_assigns_sequential_indices() {
         let mut msgs = vec![
-            CanonicalMessage { idx: 99, role: MessageRole::User, content: "a".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: json!({}) },
-            CanonicalMessage { idx: 42, role: MessageRole::Assistant, content: "b".to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: json!({}) },
+            CanonicalMessage {
+                idx: 99,
+                role: MessageRole::User,
+                content: "a".to_string(),
+                timestamp: None,
+                author: None,
+                tool_calls: vec![],
+                tool_results: vec![],
+                extra: json!({}),
+            },
+            CanonicalMessage {
+                idx: 42,
+                role: MessageRole::Assistant,
+                content: "b".to_string(),
+                timestamp: None,
+                author: None,
+                tool_calls: vec![],
+                tool_results: vec![],
+                extra: json!({}),
+            },
         ];
 
         reindex_messages(&mut msgs);
@@ -650,8 +720,16 @@ mod tests {
             content: "Hello".to_string(),
             timestamp: Some(1_700_000_000_000),
             author: Some("claude-3".to_string()),
-            tool_calls: vec![ToolCall { id: Some("tc1".to_string()), name: "Read".to_string(), arguments: json!({"file_path": "/foo.rs"}) }],
-            tool_results: vec![ToolResult { call_id: Some("tc1".to_string()), content: "file contents".to_string(), is_error: false }],
+            tool_calls: vec![ToolCall {
+                id: Some("tc1".to_string()),
+                name: "Read".to_string(),
+                arguments: json!({"file_path": "/foo.rs"}),
+            }],
+            tool_results: vec![ToolResult {
+                call_id: Some("tc1".to_string()),
+                content: "file contents".to_string(),
+                is_error: false,
+            }],
             extra: json!({"custom": "field"}),
         };
 
@@ -695,7 +773,10 @@ mod tests {
     #[test]
     fn native_name_present() {
         let meta = json!({"native_name": "My Renamed Session", "source": "claude_code"});
-        assert_eq!(native_name_from_metadata(&meta).as_deref(), Some("My Renamed Session"));
+        assert_eq!(
+            native_name_from_metadata(&meta).as_deref(),
+            Some("My Renamed Session")
+        );
     }
 
     #[test]
@@ -722,12 +803,27 @@ mod tests {
     // -----------------------------------------------------------------------
 
     fn msg(idx: usize, role: MessageRole, content: &str) -> CanonicalMessage {
-        CanonicalMessage { idx, role, content: content.to_string(), timestamp: None, author: None, tool_calls: vec![], tool_results: vec![], extra: json!(null) }
+        CanonicalMessage {
+            idx,
+            role,
+            content: content.to_string(),
+            timestamp: None,
+            author: None,
+            tool_calls: vec![],
+            tool_results: vec![],
+            extra: json!(null),
+        }
     }
 
     #[test]
     fn transcript_tail_returns_last_turns_in_order() {
-        let messages = vec![msg(0, MessageRole::User, "first"), msg(1, MessageRole::Assistant, "second"), msg(2, MessageRole::User, "third"), msg(3, MessageRole::Assistant, "fourth"), msg(4, MessageRole::User, "fifth")];
+        let messages = vec![
+            msg(0, MessageRole::User, "first"),
+            msg(1, MessageRole::Assistant, "second"),
+            msg(2, MessageRole::User, "third"),
+            msg(3, MessageRole::Assistant, "fourth"),
+            msg(4, MessageRole::User, "fifth"),
+        ];
         let tail = transcript_tail(&messages, 3, 100);
         assert_eq!(tail.len(), 3);
         // Chronological order preserved (tail, not reversed).
@@ -740,7 +836,10 @@ mod tests {
 
     #[test]
     fn transcript_tail_shorter_than_count_returns_all() {
-        let messages = vec![msg(0, MessageRole::User, "only one"), msg(1, MessageRole::Assistant, "and two")];
+        let messages = vec![
+            msg(0, MessageRole::User, "only one"),
+            msg(1, MessageRole::Assistant, "and two"),
+        ];
         let tail = transcript_tail(&messages, 5, 100);
         assert_eq!(tail.len(), 2);
         assert_eq!(tail[0].snippet, "only one");
@@ -775,14 +874,22 @@ mod tests {
     #[test]
     fn message_snippet_falls_back_to_tool_call() {
         let mut m = msg(0, MessageRole::Assistant, "");
-        m.tool_calls = vec![ToolCall { id: None, name: "Bash".to_string(), arguments: json!({}) }];
+        m.tool_calls = vec![ToolCall {
+            id: None,
+            name: "Bash".to_string(),
+            arguments: json!({}),
+        }];
         assert_eq!(message_snippet(&m, 100), "[tool call: Bash]");
     }
 
     #[test]
     fn message_snippet_falls_back_to_tool_result() {
         let mut m = msg(0, MessageRole::Tool, "");
-        m.tool_results = vec![ToolResult { call_id: None, content: "output".to_string(), is_error: false }];
+        m.tool_results = vec![ToolResult {
+            call_id: None,
+            content: "output".to_string(),
+            is_error: false,
+        }];
         assert_eq!(message_snippet(&m, 100), "[tool result]");
     }
 
@@ -792,6 +899,9 @@ mod tests {
         assert_eq!(role_label(&MessageRole::Assistant), "Assistant");
         assert_eq!(role_label(&MessageRole::Tool), "Tool");
         assert_eq!(role_label(&MessageRole::System), "System");
-        assert_eq!(role_label(&MessageRole::Other("planner".to_string())), "planner");
+        assert_eq!(
+            role_label(&MessageRole::Other("planner".to_string())),
+            "planner"
+        );
     }
 }

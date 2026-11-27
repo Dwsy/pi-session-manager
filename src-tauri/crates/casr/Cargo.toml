@@ -1,6 +1,6 @@
 [package]
 name = "cross_agent_session_resumer"
-version = "0.3.0"
+version = "0.5.0"
 edition = "2024"
 description = "Cross Agent Session Resumer — resume AI coding sessions across providers (CLI binary: casr)"
 license-file = "LICENSE"
@@ -25,15 +25,15 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1"
-chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+jiff = "1"
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
 colored = "3"
-dirs = "6"
+dirs = "7"
 glob = "0.3"
-rusqlite = { version = "0.33", features = ["bundled"] }
+rusqlite = { version = "0.43", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
-sha2 = "0.10"
+sha2 = "0.11"
 serde_json = "1"
 thiserror = "2"
 uuid = { version = "1", features = ["v4", "v7"] }
@@ -41,8 +41,8 @@ walkdir = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 urlencoding = "2"
-which = "7"
-rich_rust = "0.2.1"
+which = "8"
+rich_rust = "0.2.3"
 rayon = "1"
 
 [dev-dependencies]
@@ -51,11 +51,4 @@ predicates = "3"
 tempfile = "3"
 
 [build-dependencies]
-vergen-gix = { version = "9", features = ["build", "cargo", "rustc"] }
-
-[profile.release]
-opt-level = "z"
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
+vergen-gitcl = { version = "10", features = ["build", "cargo"] }

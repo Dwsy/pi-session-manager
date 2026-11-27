@@ -190,17 +190,43 @@ pub fn render_session(session: &CanonicalSession, target_session_id: &str) -> Re
             }
         }
 
+        let msg_ts = msg.timestamp.and_then(chrono::DateTime::from_timestamp_millis).unwrap_or_else(chrono::Utc::now).to_rfc3339();
         lines.push(
             serde_json::to_string(&json!({
                 "type": "message",
                 "id": id,
                 "parentId": parent_id,
-                "timestamp": msg.timestamp.and_then(chrono::DateTime::from_timestamp_millis).unwrap_or_else(chrono::Utc::now).to_rfc3339(),
+                "timestamp": msg_ts,
                 "message": inner,
             }))
             .map_err(|e| e.to_string())?,
         );
-        parent_id = Some(id);
+        parent_id = Some(id.clone());
+
+        if !matches!(msg.role, MessageRole::Tool) && !msg.tool_results.is_empty() {
+            for (tr_idx, result) in msg.tool_results.iter().enumerate() {
+                let tr_id = format!("{id}-tr-{tr_idx}");
+                let mut tr_inner = json!({
+                    "role": "toolResult",
+                    "content": [{"type": "text", "text": result.content}],
+                    "isError": result.is_error,
+                });
+                if let Some(call_id) = &result.call_id {
+                    tr_inner["toolCallId"] = Value::String(call_id.clone());
+                }
+                lines.push(
+                    serde_json::to_string(&json!({
+                        "type": "message",
+                        "id": tr_id,
+                        "parentId": parent_id,
+                        "timestamp": msg_ts,
+                        "message": tr_inner,
+                    }))
+                    .map_err(|e| e.to_string())?,
+                );
+                parent_id = Some(tr_id);
+            }
+        }
     }
 
     Ok(lines.join("\n"))
