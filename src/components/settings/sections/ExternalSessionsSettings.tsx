@@ -94,7 +94,7 @@ export default function ExternalSessionsSettings({
         "settings.externalSessions.showAgentIconInSessionBadgeHelp",
         "Display the provider icon next to the source badge in session cards.",
       ),
-      checked: settings.session.showAgentIconInSessionBadge !== false,
+      checked: settings.session.showAgentIconInSessionBadge === true,
       onChange: (checked) =>
         onUpdate("session", "showAgentIconInSessionBadge", checked),
       searchKey: "external-sessions-showAgentIcon",
@@ -182,7 +182,7 @@ export default function ExternalSessionsSettings({
               )}
             </div>
             {mergedProviders.length > 0 ? (
-              <div className="mt-3 rounded-xl border border-border/60 bg-background/35 divide-y divide-border/50 overflow-hidden">
+              <div className="mt-3 grid grid-cols-2 gap-2 max-md:grid-cols-1">
                 {mergedProviders.map((provider) => {
                   const providerEnabled = enabledProviders.has(provider.slug);
                   const resumeChecked = selectedResumeTarget === provider.slug;
@@ -191,77 +191,53 @@ export default function ExternalSessionsSettings({
                       ? t("settings.externalSessions.scanEnabled", "Scanning")
                       : t("settings.externalSessions.scanDisabled", "Off")
                     : t("settings.externalSessions.resumeOnly", "Resume only");
+                  const tooltip = provider.canScan
+                    ? t(
+                        "settings.externalSessions.providerEnabledHelp",
+                        "Show and scan sessions from this external provider.",
+                      )
+                    : t(`session.convert.targetDescriptions.${provider.slug}`);
                   return (
                     <div
                       key={provider.slug}
                       role="group"
                       aria-label={provider.display_name}
-                      className="grid grid-cols-[minmax(0,1fr)_86px_140px] items-center gap-3 px-4 py-3 max-md:grid-cols-[minmax(0,1fr)_auto]"
+                      title={tooltip}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/40 px-3 py-2 min-w-0"
                     >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <AgentIcon source={provider.slug} size={14} />
-                          <span className="text-sm font-medium text-foreground truncate">
-                            {provider.display_name}
-                          </span>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                              provider.canScan && providerEnabled
-                                ? "bg-info/15 text-info"
-                                : "bg-secondary/70 text-muted-foreground"
-                            }`}
-                          >
-                            {statusLabel}
-                          </span>
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground truncate">
-                          {provider.canScan
-                            ? t(
-                                "settings.externalSessions.providerEnabledHelp",
-                                "Show and scan sessions from this external provider.",
-                              )
-                            : t(
-                                `session.convert.targetDescriptions.${provider.slug}`,
-                              )}
-                        </div>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <AgentIcon source={provider.slug} size={14} />
+                        <span className="text-xs font-medium text-foreground truncate">
+                          {provider.display_name}
+                        </span>
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${
+                            provider.canScan && providerEnabled
+                              ? "bg-info/15 text-info"
+                              : "bg-secondary/70 text-muted-foreground"
+                          }`}
+                        >
+                          {statusLabel}
+                        </span>
                       </div>
 
-                      <div className="flex items-center justify-center max-md:justify-end">
-                        {provider.canScan ? (
-                          <Toggle
-                            checked={providerEnabled}
-                            onChange={(checked) =>
-                              handleProviderToggle(provider.slug, checked)
-                            }
-                            size="sm"
-                          />
-                        ) : (
-                          <span className="text-[11px] text-muted-foreground">
-                            {t(
-                              "settings.externalSessions.scanNotApplicable",
-                              "Built-in",
-                            )}
-                          </span>
-                        )}
-                      </div>
-
-                      {provider.capabilities.canConvertTarget && (
-                        <div className="flex items-center justify-center max-md:col-span-2 max-md:justify-start">
+                      <div className="flex items-center gap-2 shrink-0">
+                        {provider.capabilities.canConvertTarget && (
                           <button
                             type="button"
                             onClick={() =>
                               handleResumeTargetToggle(provider.slug, !resumeChecked)
                             }
-                            className={`inline-flex min-w-[124px] items-center justify-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
+                            className={`inline-flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-[11px] whitespace-nowrap transition-colors ${
                               resumeChecked
                                 ? "settings-accent-bg-soft settings-accent-ring settings-accent-fg border-transparent"
                                 : "border-border/60 bg-background/40 text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
                             }`}
                           >
                             {resumeChecked ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 settings-accent-fg" />
+                              <CheckCircle2 className="h-3 w-3 settings-accent-fg" />
                             ) : (
-                              <Circle className="h-3.5 w-3.5" />
+                              <Circle className="h-3 w-3" />
                             )}
                             <span>
                               {resumeChecked
@@ -275,8 +251,24 @@ export default function ExternalSessionsSettings({
                                   )}
                             </span>
                           </button>
-                        </div>
-                      )}
+                        )}
+                        {provider.canScan ? (
+                          <Toggle
+                            checked={providerEnabled}
+                            onChange={(checked) =>
+                              handleProviderToggle(provider.slug, checked)
+                            }
+                            size="sm"
+                          />
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground px-1">
+                            {t(
+                              "settings.externalSessions.scanNotApplicable",
+                              "Built-in",
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

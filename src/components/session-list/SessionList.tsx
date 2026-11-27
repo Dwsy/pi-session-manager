@@ -138,7 +138,7 @@ export default function SessionList({
   const { getSessionSetting, settings } = useSettings();
   const isMobile = useIsMobile();
   const showAgentIconInBadge =
-    getSessionSetting("showAgentIconInSessionBadge") !== false;
+    getSessionSetting("showAgentIconInSessionBadge") === true;
   const showModelIconInBadge =
     getSessionSetting("showModelIconInSessionBadge") === true;
   const showSubagentSessions = settings?.subagents?.showSessions !== false;

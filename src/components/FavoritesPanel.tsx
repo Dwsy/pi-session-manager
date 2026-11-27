@@ -35,7 +35,7 @@ export default function FavoritesPanel({
 }: FavoritesPanelProps) {
   const { t } = useTranslation()
   const { getSessionSetting } = useSettings()
-  const showAgentIconInBadge = getSessionSetting('showAgentIconInSessionBadge') !== false
+  const showAgentIconInBadge = getSessionSetting('showAgentIconInSessionBadge') === true
   const favoriteSessions = favorites.filter((favorite) => favorite.type === 'session')
   const favoriteProjects = favorites.filter((favorite) => favorite.type === 'project')
   const showDelayedLoading = useDelayedLoading(loading)

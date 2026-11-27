@@ -236,7 +236,7 @@ export const defaultSettings: AppSettings = {
     externalSessionProviders: [],
     externalSessionsIncludeInStats: false,
     externalSessionsIncludeInSearch: false,
-    showAgentIconInSessionBadge: true,
+    showAgentIconInSessionBadge: false,
     showModelIconInSessionBadge: false,
     externalResumePromptEnabled: true,
     defaultExternalResumeTarget: "pi",
