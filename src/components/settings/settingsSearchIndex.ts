@@ -383,7 +383,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchItem[] = [
   },
   {
     id: "external-sessions-defaultResumeTarget",
-    section: "resume-targets",
+    section: "external-agent-sessions",
     labelKey: "settings.externalSessions.defaultExternalResumeTarget",
     fallbackLabel: "Default external resume target",
     extraKeys: ["settings.externalSessions.defaultExternalResumeTargetHelp"],

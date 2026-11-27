@@ -828,7 +828,7 @@ export const settings = {
       "Scan supported local coding-agent sessions and choose the default resume target.",
     providerMatrixTitle: "Agent providers",
     providerMatrixHelp:
-      "Turn on providers to show their local sessions. Pick one default CLI for resume commands.",
+      "Turn on providers to show and scan their local sessions. Even when scanning is off, any supported CLI can still be used for Resume or conversion.",
     resumeTargetsTitle: "Resume targets",
     resumeTargetsHelp:
       "Choose the default CLI used when resuming or copying resume commands.",

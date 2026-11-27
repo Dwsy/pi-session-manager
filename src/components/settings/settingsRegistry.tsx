@@ -19,7 +19,6 @@ import {
   Palette,
   MessageCircleQuestion,
   Puzzle,
-  Repeat2,
   Search,
   Server,
   Settings2,
@@ -298,17 +297,6 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
     saveMode: "app-settings",
   },
   {
-    id: "resume-targets",
-    area: "config-center",
-    group: "sources",
-    icon: <Repeat2 className="h-4 w-4" />,
-    labelKey: "settings.sections.resumeTargets",
-    fallbackLabel: "Resume Targets",
-    descriptionKey: "settings.sectionDescriptions.resumeTargets",
-    fallbackDescription: "Default CLI target for resume commands",
-    saveMode: "app-settings",
-  },
-  {
     id: "models",
     area: "config-center",
     group: "agent",
@@ -492,7 +480,6 @@ export const SETTINGS_GROUPS: SettingsGroupMeta[] = [
       "data-sources",
       "local-session-paths",
       "external-agent-sessions",
-      "resume-targets",
     ],
   },
   {
@@ -592,7 +579,6 @@ const STANDALONE_DATASET_SECTION_IDS: SettingsSection[] = [
   "data-sources",
   "local-session-paths",
   "external-agent-sessions",
-  "resume-targets",
 ];
 
 const STANDALONE_DATASET_SECTION_SET = new Set(STANDALONE_DATASET_SECTION_IDS);
@@ -717,15 +703,6 @@ export function renderSettingsSection(
         <ExternalSessionsSettings
           settings={settings}
           onUpdate={onUpdate}
-          mode="agents"
-        />
-      );
-    case "resume-targets":
-      return (
-        <ExternalSessionsSettings
-          settings={settings}
-          onUpdate={onUpdate}
-          mode="resume"
         />
       );
     case "models":

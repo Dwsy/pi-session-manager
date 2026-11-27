@@ -298,7 +298,6 @@ export type SettingsSection =
   | "data-sources"
   | "local-session-paths"
   | "external-agent-sessions"
-  | "resume-targets"
   | "pi-resources"
   | "pi-runtime"
   | "subagents"

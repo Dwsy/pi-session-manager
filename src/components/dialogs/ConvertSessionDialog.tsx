@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { useEscapeToClose } from './useEscapeToClose'
+import { AgentIcon } from '@/components/session-viewer/AgentIcon'
 import type {
   SessionConvertTarget,
   SessionInfo,
@@ -11,6 +12,7 @@ import type {
 } from '@/types'
 import { getSessionSourceTag } from '@/utils/session'
 import { getSessionListDisplayName } from '@/utils/sessionDisplay'
+import { getCachedSettings } from '@/utils/settingsApi'
 import {
   FALLBACK_SESSION_PROVIDERS,
   listSupportedSessionProviders,
@@ -63,7 +65,21 @@ export default function ConvertSessionDialog({
   }, [])
 
   const convertTargets = useMemo(
-    () => providers.filter(provider => provider.capabilities.canConvertTarget),
+    () => {
+      const enabledExternal = new Set(
+        getCachedSettings().session?.externalSessionProviders ?? []
+      )
+      return providers
+        .filter(provider => provider.capabilities.canConvertTarget)
+        .sort((a, b) => {
+          if (a.slug === 'pi') return -1
+          if (b.slug === 'pi') return 1
+          const aEnabled = enabledExternal.has(a.slug)
+          const bEnabled = enabledExternal.has(b.slug)
+          if (aEnabled !== bEnabled) return aEnabled ? -1 : 1
+          return a.display_name.localeCompare(b.display_name)
+        })
+    },
     [providers]
   )
 
@@ -126,9 +142,18 @@ export default function ConvertSessionDialog({
                     : 'border-border bg-muted/30 hover:bg-muted/50'
                 }`}
               >
-                <div className="font-medium">{t(`session.convert.targets.${option.slug}`)}</div>
+                <div className="flex items-center gap-2 font-medium">
+                  <AgentIcon source={option.slug} size={15} />
+                  <span>
+                    {t(`session.convert.targets.${option.slug}`, {
+                      defaultValue: option.display_name,
+                    })}
+                  </span>
+                </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {t(`session.convert.targetDescriptions.${option.slug}`)}
+                  {t(`session.convert.targetDescriptions.${option.slug}`, {
+                    defaultValue: option.display_name,
+                  })}
                 </div>
               </button>
             ))}

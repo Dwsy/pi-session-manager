@@ -14,6 +14,7 @@ import { getSessionSourceSlug, getSessionSourceTag } from "@/utils/session";
 import { getSessionListDisplayName } from "@/utils/sessionDisplay";
 import { listSupportedSessionProviders } from "@/utils/sessionProvidersApi";
 import { getSessionResumeInfo } from "@/utils/sessionResume";
+import { getCachedSettings } from "@/utils/settingsApi";
 
 interface ResumeSessionDialogProps {
   session: SessionInfo;
@@ -51,6 +52,9 @@ export default function ResumeSessionDialog({
       const canNativeSource = Boolean(
         sourceSlug && resumeInfo?.can_native_resume && resumeInfo.source_provider === sourceSlug,
       );
+      const enabledExternal = new Set(
+        getCachedSettings().session?.externalSessionProviders ?? [],
+      );
       const targets = items
         .filter(
           (item) =>
@@ -62,6 +66,9 @@ export default function ResumeSessionDialog({
           if (canNativeSource && b.slug === sourceSlug) return 1;
           if (a.slug === "pi") return -1;
           if (b.slug === "pi") return 1;
+          const aEnabled = enabledExternal.has(a.slug);
+          const bEnabled = enabledExternal.has(b.slug);
+          if (aEnabled !== bEnabled) return aEnabled ? -1 : 1;
           return a.display_name.localeCompare(b.display_name);
         });
       setProviders(targets);

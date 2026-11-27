@@ -15,8 +15,7 @@ import { listSupportedSessionProviders } from "@/utils/sessionProvidersApi";
 export default function ExternalSessionsSettings({
   settings,
   onUpdate,
-  mode = "all",
-}: SessionSettingsProps & { mode?: "all" | "agents" | "resume" }) {
+}: SessionSettingsProps) {
   const { t } = useTranslation();
   const [supportedProviders, setSupportedProviders] = useState<
     SessionProviderInfo[]
@@ -31,8 +30,7 @@ export default function ExternalSessionsSettings({
       supportedProviders
         .filter(
           (provider) =>
-            provider.capabilities.canConvertTarget
-            || (mode !== "resume" && provider.capabilities.canScan),
+            provider.capabilities.canConvertTarget || provider.capabilities.canScan,
         )
         .sort((a, b) => {
           if (a.slug === "pi") return -1;
@@ -43,7 +41,7 @@ export default function ExternalSessionsSettings({
           ...provider,
           canScan: provider.slug !== "pi" && provider.capabilities.canScan,
         })),
-    [supportedProviders, mode],
+    [supportedProviders],
   );
   const promptEnabled = settings.session.externalResumePromptEnabled !== false;
   const selectedResumeTarget = promptEnabled
@@ -161,49 +159,27 @@ export default function ExternalSessionsSettings({
   return (
     <div className="space-y-6">
       <SettingsCard
-        title={
-          mode === "resume"
-            ? t("settings.sections.resumeTargets", "Resume Targets")
-            : t(
-                "settings.externalSessions.title",
-                "External agent sessions",
-              )
-        }
-        description={t(
-          mode === "resume"
-            ? "settings.sectionDescriptions.resumeTargets"
-            : "settings.externalSessions.description",
-          mode === "resume"
-            ? "Default target CLI for resume commands."
-            : "Scan supported local coding-agent sessions and choose the default resume target.",
+        title={t(
+          "settings.externalSessions.title",
+          "External agent sessions",
         )}
-        searchKey={
-          mode === "resume"
-            ? "external-sessions-defaultResumeTarget"
-            : "session-scanOtherAgentJsonl"
-        }
+        description={t(
+          "settings.externalSessions.description",
+          "Scan supported local coding-agent sessions and choose the default resume target.",
+        )}
+        searchKey="session-scanOtherAgentJsonl"
         contentClassName="p-4"
       >
         <div className="space-y-3">
           <div className="space-y-1">
             <div className="text-sm font-medium text-foreground">
-              {mode === "resume"
-                ? t(
-                    "settings.externalSessions.resumeTargetsTitle",
-                    "Resume targets",
-                  )
-                : t("settings.externalSessions.providerMatrixTitle", "Agent providers")}
+              {t("settings.externalSessions.providerMatrixTitle", "Agent providers")}
             </div>
             <div className="text-xs text-muted-foreground">
-              {mode === "resume"
-                ? t(
-                    "settings.externalSessions.resumeTargetsHelp",
-                    "Choose the default CLI used when resuming or copying resume commands.",
-                  )
-                : t(
-                    "settings.externalSessions.providerMatrixHelp",
-                    "Turn on providers to show their local sessions. Pick one default CLI for resume commands.",
-                  )}
+              {t(
+                "settings.externalSessions.providerMatrixHelp",
+                "Turn on providers to show their local sessions. Even when scanning is off, any supported CLI can still be used for Resume or conversion.",
+              )}
             </div>
             {mergedProviders.length > 0 ? (
               <div className="mt-3 rounded-xl border border-border/60 bg-background/35 divide-y divide-border/50 overflow-hidden">
@@ -220,11 +196,7 @@ export default function ExternalSessionsSettings({
                       key={provider.slug}
                       role="group"
                       aria-label={provider.display_name}
-                      className={`grid items-center gap-3 px-4 py-3 max-md:grid-cols-[minmax(0,1fr)_auto] ${
-                        mode === "resume"
-                          ? "grid-cols-[minmax(0,1fr)_140px]"
-                          : "grid-cols-[minmax(0,1fr)_86px_140px]"
-                      }`}
+                      className="grid grid-cols-[minmax(0,1fr)_86px_140px] items-center gap-3 px-4 py-3 max-md:grid-cols-[minmax(0,1fr)_auto]"
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -254,26 +226,24 @@ export default function ExternalSessionsSettings({
                         </div>
                       </div>
 
-                      {mode !== "resume" && (
-                        <div className="flex items-center justify-center max-md:justify-end">
-                          {provider.canScan ? (
-                            <Toggle
-                              checked={providerEnabled}
-                              onChange={(checked) =>
-                                handleProviderToggle(provider.slug, checked)
-                              }
-                              size="sm"
-                            />
-                          ) : (
-                            <span className="text-[11px] text-muted-foreground">
-                              {t(
-                                "settings.externalSessions.scanNotApplicable",
-                                "Built-in",
-                              )}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex items-center justify-center max-md:justify-end">
+                        {provider.canScan ? (
+                          <Toggle
+                            checked={providerEnabled}
+                            onChange={(checked) =>
+                              handleProviderToggle(provider.slug, checked)
+                            }
+                            size="sm"
+                          />
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">
+                            {t(
+                              "settings.externalSessions.scanNotApplicable",
+                              "Built-in",
+                            )}
+                          </span>
+                        )}
+                      </div>
 
                       {provider.capabilities.canConvertTarget && (
                         <div className="flex items-center justify-center max-md:col-span-2 max-md:justify-start">
@@ -321,8 +291,10 @@ export default function ExternalSessionsSettings({
             )}
           </div>
 
-          {mode !== "agents" && (
-            <div className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
+          <div
+            className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted-foreground"
+            data-settings-key="external-sessions-defaultResumeTarget"
+          >
             {promptEnabled
               ? t(
                   "settings.externalSessions.resumePromptFallback",
@@ -332,10 +304,9 @@ export default function ExternalSessionsSettings({
                   "settings.externalSessions.defaultExternalResumeTargetHelp",
                   "When prompt is disabled, sessions will be resumed into this target CLI.",
                 )}
-            </div>
-          )}
+          </div>
 
-          {mode !== "resume" && <SettingsListSection rows={behaviorRows} />}
+          <SettingsListSection rows={behaviorRows} />
         </div>
       </SettingsCard>
     </div>

@@ -37,84 +37,73 @@ describe("ExternalSessionsSettings", () => {
     vi.unstubAllGlobals();
   });
 
-  it.each(["agents", "all"] as const)(
-    "allows scan-only providers to be toggled in %s mode without selecting them as targets",
-    async (mode) => {
-      const onUpdate = vi.fn();
-      const view = render(
+  it("allows scan-only providers to be toggled without selecting them as resume targets", async () => {
+    const onUpdate = vi.fn();
+    const view = render(
+      <ExternalSessionsSettings
+        settings={settings}
+        onUpdate={onUpdate}
+      />,
+    );
+
+    await screen.findByRole("group", { name: "Antigravity" });
+
+    for (const [slug, name] of [
+      ["antigravity", "Antigravity"],
+      ["cursor", "Cursor"],
+    ]) {
+      view.rerender(
         <ExternalSessionsSettings
           settings={settings}
           onUpdate={onUpdate}
-          mode={mode}
         />,
       );
+      const provider = within(screen.getByRole("group", { name }));
+      expect(provider.queryByRole("button")).toBeNull();
+      expect(provider.getByRole<HTMLInputElement>("checkbox").checked).toBe(false);
 
-      await screen.findByRole("group", { name: "Antigravity" });
+      onUpdate.mockClear();
+      fireEvent.click(provider.getByRole("checkbox"));
+      const enabled = ["codex", slug].sort();
+      expect(onUpdate.mock.calls).toEqual([
+        ["session", "externalSessionProviders", enabled],
+        ["session", "scanOtherAgentJsonl", true],
+      ]);
 
-      for (const [slug, name] of [
-        ["antigravity", "Antigravity"],
-        ["cursor", "Cursor"],
-      ]) {
-        view.rerender(
-          <ExternalSessionsSettings
-            settings={settings}
-            onUpdate={onUpdate}
-            mode={mode}
-          />,
-        );
-        const provider = within(screen.getByRole("group", { name }));
-        expect(provider.queryByRole("button")).toBeNull();
-        expect(provider.getByRole<HTMLInputElement>("checkbox").checked).toBe(false);
+      view.rerender(
+        <ExternalSessionsSettings
+          settings={{
+            ...settings,
+            session: { ...settings.session, externalSessionProviders: enabled },
+          }}
+          onUpdate={onUpdate}
+        />,
+      );
+      expect(provider.getByRole<HTMLInputElement>("checkbox").checked).toBe(true);
 
-        onUpdate.mockClear();
-        fireEvent.click(provider.getByRole("checkbox"));
-        const enabled = ["codex", slug].sort();
-        expect(onUpdate.mock.calls).toEqual([
-          ["session", "externalSessionProviders", enabled],
-          ["session", "scanOtherAgentJsonl", true],
-        ]);
+      onUpdate.mockClear();
+      fireEvent.click(provider.getByRole("checkbox"));
+      expect(onUpdate.mock.calls).toEqual([
+        ["session", "externalSessionProviders", ["codex"]],
+        ["session", "scanOtherAgentJsonl", true],
+      ]);
+    }
+  });
 
-        view.rerender(
-          <ExternalSessionsSettings
-            settings={{
-              ...settings,
-              session: { ...settings.session, externalSessionProviders: enabled },
-            }}
-            onUpdate={onUpdate}
-            mode={mode}
-          />,
-        );
-        expect(provider.getByRole<HTMLInputElement>("checkbox").checked).toBe(true);
-
-        onUpdate.mockClear();
-        fireEvent.click(provider.getByRole("checkbox"));
-        expect(onUpdate.mock.calls).toEqual([
-          ["session", "externalSessionProviders", ["codex"]],
-          ["session", "scanOtherAgentJsonl", true],
-        ]);
-      }
-    },
-  );
-
-  it("offers only conversion-capable providers in resume mode", async () => {
+  it("allows setting any conversion-capable provider as default resume target even when scanning is off", async () => {
     const onUpdate = vi.fn();
     render(
       <ExternalSessionsSettings
         settings={settings}
         onUpdate={onUpdate}
-        mode="resume"
       />,
     );
 
-    await screen.findByText("Codex");
-    expect(screen.queryByText("Antigravity")).toBeNull();
-    expect(screen.queryByText("Cursor")).toBeNull();
-    expect(screen.queryByRole("checkbox")).toBeNull();
-
-    const codex = within(screen.getByRole("group", { name: "Codex" }));
-    fireEvent.click(codex.getByRole("button", { name: "Set default" }));
+    const claude = within(await screen.findByRole("group", { name: "Claude Code" }));
+    expect(claude.getByRole<HTMLInputElement>("checkbox").checked).toBe(false);
+    fireEvent.click(claude.getByRole("button", { name: "Set default" }));
     expect(onUpdate.mock.calls).toEqual([
-      ["session", "defaultExternalResumeTarget", "codex"],
+      ["session", "defaultExternalResumeTarget", "claude-code"],
       ["session", "externalResumePromptEnabled", false],
     ]);
   });

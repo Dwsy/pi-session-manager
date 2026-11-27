@@ -786,7 +786,7 @@ export const settings = {
     description: "扫描已支持的本地编码 Agent 会话，并选择默认 Resume 目标。",
     providerMatrixTitle: "Agent Provider",
     providerMatrixHelp:
-      "打开 provider 后会显示并扫描它的本地会话；也可以选择一个默认 CLI 用于 Resume。",
+      "打开开关后会扫描并显示该 provider 的本地会话；即使不开启扫描，也仍可作为 Resume 或转换目标使用。",
     resumeTargetsTitle: "Resume 目标",
     resumeTargetsHelp: "选择恢复或复制 Resume 命令时默认使用的 CLI。",
     providerColumn: "Provider",
