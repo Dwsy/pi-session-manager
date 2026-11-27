@@ -181,6 +181,10 @@ function mergeDefaults(raw: Partial<AppSettings>): AppSettings {
       externalSessionProviders.length > 0
         ? true
         : (rawSession?.scanOtherAgentJsonl === true),
+    timelineNavEnabled:
+      typeof rawSession?.timelineNavEnabled === "boolean"
+        ? rawSession.timelineNavEnabled
+        : rawSession?.scrollMarkersEnabled !== true,
   };
 
   return {

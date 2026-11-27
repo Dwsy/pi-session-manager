@@ -248,7 +248,7 @@ export const defaultSettings: AppSettings = {
     cmdFBehavior: "inSessionSearch",
     scrollMarkersEnabled: false,
     scrollMarkersGuideSeen: false,
-    timelineNavEnabled: false,
+    timelineNavEnabled: true,
   },
   search: {
     defaultSearchMode: "content",

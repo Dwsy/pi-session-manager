@@ -13,7 +13,7 @@ export function useSessionViewerSettingsState({
   const scrollMarkersEnabledSetting =
     getSessionSetting("scrollMarkersEnabled") ?? false;
   const timelineNavEnabledSetting =
-    getSessionSetting("timelineNavEnabled") ?? false;
+    getSessionSetting("timelineNavEnabled") ?? true;
   const timelineNavEnabled = previewMode ? false : timelineNavEnabledSetting;
   const scrollMarkersEnabled = previewMode
     ? false

@@ -11,7 +11,7 @@ export interface TimelineHapticOptions {
 let reportedMissingNativeCommand = false;
 
 /** Native Force Touch trackpad feedback; no-op in web previews and on other OSes. */
-export function triggerTimelineHoverHaptic(options: TimelineHapticOptions = { style: "edc", strength: "strong" }): void {
+export function triggerTimelineHoverHaptic(options: TimelineHapticOptions = { style: "single", strength: "strong" }): void {
   if (typeof navigator === "undefined" || !isTauri()) return;
   if (!/Macintosh|Mac OS X/i.test(navigator.userAgent)) return;
 

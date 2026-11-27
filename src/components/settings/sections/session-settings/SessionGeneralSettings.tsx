@@ -9,10 +9,9 @@ import { formatShortcutText } from "@/utils/platformShortcuts";
 
 export default function SessionGeneralSettings({ settings, onUpdate }: SessionSettingsProps) {
   const { t } = useTranslation();
+  const timelineNavEnabled = settings.session.timelineNavEnabled !== false;
   const scrollMarkersEnabled =
-    settings.session.scrollMarkersEnabled !== false &&
-    settings.session.timelineNavEnabled === false;
-  const timelineNavEnabled = settings.session.timelineNavEnabled === true;
+    settings.session.scrollMarkersEnabled === true && !timelineNavEnabled;
 
   return (
         <SettingsCard title={t("settings.sections.sessionViewer", "Session Viewer")}>

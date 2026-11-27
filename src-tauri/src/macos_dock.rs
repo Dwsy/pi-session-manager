@@ -79,8 +79,8 @@ pub struct TimelineHapticOptions {
 #[serde(rename_all = "lowercase")]
 pub enum HapticStyle {
     /// Double tooth: strong -> 45ms -> medium. Matches Alma's EDC feel.
-    #[default]
     Edc,
+    #[default]
     Single,
     Double,
     Engage,
