@@ -60,6 +60,34 @@ function updateMermaidSize(block: HTMLElement) {
   if (zoomIn) zoomIn.disabled = scale >= MERMAID_ZOOM_MAX
 }
 
+function showLinkErrorToast(message: string): void {
+  if (typeof document === 'undefined') return
+  const el = document.createElement('div')
+  el.textContent = message
+  el.setAttribute('role', 'alert')
+  el.style.cssText = `
+    position: fixed; bottom: 24px; right: 24px; z-index: 10000;
+    max-width: min(520px, calc(100vw - 48px)); word-break: break-all;
+    padding: 10px 16px; border-radius: 10px; color: #fff;
+    font-size: 13px; font-family: system-ui, -apple-system, sans-serif;
+    background: rgba(239,68,68,0.92);
+    backdrop-filter: blur(8px); box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    pointer-events: none; user-select: none;
+    opacity: 0; transform: translateY(8px) scale(0.96);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  `
+  document.body.appendChild(el)
+  requestAnimationFrame(() => {
+    el.style.opacity = '1'
+    el.style.transform = 'translateY(0) scale(1)'
+  })
+  setTimeout(() => {
+    el.style.opacity = '0'
+    el.style.transform = 'translateY(8px) scale(0.96)'
+    setTimeout(() => el.remove(), 250)
+  }, 4200)
+}
+
 /** Renders Markdown and adds interactions to its generated content. */
 function MarkdownContent({ content, className = '', searchQuery = '' }: MarkdownContentProps) {
   const { t } = useTranslation()
@@ -225,7 +253,7 @@ function MarkdownContent({ content, className = '', searchQuery = '' }: Markdown
 
     void openMarkdownLinkTarget(target).catch((error) => {
       console.error('Failed to open markdown link:', error)
-      window.alert(`Failed to open link: ${error instanceof Error ? error.message : String(error)}`)
+      showLinkErrorToast(`Failed to open link: ${error instanceof Error ? error.message : String(error)}`)
     })
   }, [])
 

@@ -131,6 +131,11 @@ pub async fn open_path_with_default_app_impl(path: String) -> Result<(), String>
 }
 
 fn strip_editor_position_suffix(path: &str) -> Option<&str> {
+    let trimmed = path.split('#').next().unwrap_or(path);
+    if trimmed != path && !trimmed.is_empty() {
+        return Some(trimmed);
+    }
+
     let (without_last_suffix, last_suffix) = path.rsplit_once(':')?;
     if last_suffix.is_empty() || !last_suffix.chars().all(|ch| ch.is_ascii_digit()) {
         return None;
@@ -141,20 +146,152 @@ fn strip_editor_position_suffix(path: &str) -> Option<&str> {
     (!candidate.is_empty()).then_some(candidate)
 }
 
-fn resolve_existing_open_target(path: &str) -> Result<PathBuf, String> {
-    let target = Path::new(path);
-    if target.exists() {
-        return Ok(target.to_path_buf());
+fn expand_tilde_path(path: &str) -> PathBuf {
+    if let Some(rest) = path.strip_prefix("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(rest);
+        }
+    } else if path == "~" {
+        if let Some(home) = dirs::home_dir() {
+            return home;
+        }
     }
+    PathBuf::from(path)
+}
 
-    if let Some(candidate) = strip_editor_position_suffix(path) {
-        let target = Path::new(candidate);
-        if target.exists() {
-            return Ok(target.to_path_buf());
+fn is_too_broad_search_root(dir: &Path) -> bool {
+    if dir.parent().is_none() {
+        return true;
+    }
+    if let Some(home) = dirs::home_dir() {
+        if dir == home || home.starts_with(dir) {
+            return true;
+        }
+    }
+    // Avoid scanning top-level OS directories like /Users, /tmp, /var, /etc.
+    dir.components().count() <= 2
+}
+
+fn has_project_root_marker(dir: &Path) -> bool {
+    const MARKERS: [&str; 9] = [".git", "Cargo.toml", "package.json", "pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "go.mod", "pyproject.toml"];
+    MARKERS.iter().any(|marker| dir.join(marker).exists())
+}
+
+fn should_skip_search_dir(name: &str) -> bool {
+    matches!(name, ".git" | "node_modules" | "target" | "dist" | "build" | ".next" | ".nuxt" | ".venv" | "venv" | "__pycache__" | ".idea" | ".gradle" | "vendor" | ".turbo" | ".cache")
+}
+
+fn collect_matching_files(root: &Path, target_file_name: &std::ffi::OsStr, max_depth: usize, max_entries: usize) -> Vec<PathBuf> {
+    let mut matches = Vec::new();
+    let mut stack = vec![(root.to_path_buf(), 0usize)];
+    let mut visited = 0usize;
+
+    while let Some((dir, depth)) = stack.pop() {
+        if depth > max_depth || visited >= max_entries {
+            continue;
+        }
+        let Ok(read_dir) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in read_dir.flatten() {
+            visited += 1;
+            if visited > max_entries {
+                break;
+            }
+            let path = entry.path();
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_dir() {
+                if depth < max_depth && !entry.file_name().to_str().is_some_and(should_skip_search_dir) {
+                    stack.push((path, depth + 1));
+                }
+            } else if file_type.is_file() && entry.file_name() == target_file_name {
+                matches.push(path);
+            }
         }
     }
 
-    Err(format!("Path does not exist: {}", target.display()))
+    matches
+}
+
+fn score_relocated_candidate(missing: &Path, candidate: &Path) -> (usize, usize, usize) {
+    let missing_parts: Vec<String> = missing.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+    let candidate_parts: Vec<String> = candidate.components().map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+
+    let common_prefix = missing_parts.iter().zip(candidate_parts.iter()).take_while(|(a, b)| a == b).count();
+
+    let is_test_path = |parts: &[String]| parts.iter().any(|p| matches!(p.as_str(), "test" | "tests" | "__tests__" | "spec"));
+    let test_bucket_match = usize::from(is_test_path(&missing_parts) == is_test_path(&candidate_parts));
+
+    let missing_set: std::collections::HashSet<&str> = missing_parts.iter().map(String::as_str).collect();
+    let shared_segments = candidate_parts.iter().filter(|p| missing_set.contains(p.as_str())).count();
+
+    (test_bucket_match, common_prefix, shared_segments)
+}
+
+/// Fallback for stale links in historical sessions whose target file was moved
+/// during refactoring within the same module or repository.
+fn find_relocated_file_fallback(missing: &Path) -> Option<PathBuf> {
+    let file_name = missing.file_name()?;
+    let mut nearest_dir = missing.parent()?;
+    while !nearest_dir.is_dir() {
+        nearest_dir = nearest_dir.parent()?;
+    }
+    if is_too_broad_search_root(nearest_dir) {
+        return None;
+    }
+
+    let mut candidates = collect_matching_files(nearest_dir, file_name, 10, 15_000);
+    if candidates.is_empty() {
+        let mut search_root = nearest_dir;
+        for _ in 0..5 {
+            if has_project_root_marker(search_root) {
+                break;
+            }
+            let Some(parent) = search_root.parent() else {
+                break;
+            };
+            if is_too_broad_search_root(parent) {
+                break;
+            }
+            search_root = parent;
+        }
+        if search_root != nearest_dir {
+            candidates = collect_matching_files(search_root, file_name, 12, 20_000);
+        }
+    }
+
+    candidates.into_iter().max_by_key(|candidate| score_relocated_candidate(missing, candidate))
+}
+
+fn resolve_existing_open_target(path: &str) -> Result<PathBuf, String> {
+    let trimmed = path.trim();
+    let expanded = expand_tilde_path(trimmed);
+    if expanded.exists() {
+        return Ok(expanded);
+    }
+
+    let mut base_candidate = expanded;
+    let mut current = trimmed;
+    while let Some(stripped) = strip_editor_position_suffix(current) {
+        let candidate = expand_tilde_path(stripped);
+        if candidate.exists() {
+            return Ok(candidate);
+        }
+        base_candidate = candidate;
+        if stripped == current {
+            break;
+        }
+        current = stripped;
+    }
+
+    if let Some(relocated) = find_relocated_file_fallback(&base_candidate) {
+        log::info!("[Terminal] Resolved relocated file '{}' -> '{}'", base_candidate.display(), relocated.display());
+        return Ok(relocated);
+    }
+
+    Err(format!("Path does not exist: {}", base_candidate.display()))
 }
 
 fn open_system_target(target: &str) -> std::io::Result<std::process::Child> {
@@ -184,6 +321,39 @@ mod tests {
 
         fs::remove_file(&path).expect("remove temp source file");
         assert_eq!(resolved, path);
+    }
+
+    #[test]
+    fn resolves_existing_path_with_hash_line_fragment() {
+        let path = std::env::temp_dir().join(format!("psm-open-path-hash-{}.java", std::process::id()));
+        fs::write(&path, "class Example {}\n").expect("write temp source file");
+
+        let with_hash = format!("{}#L42-L55", path.display());
+        let resolved = resolve_existing_open_target(&with_hash).expect("hash fragment should resolve to existing file");
+
+        fs::remove_file(&path).expect("remove temp source file");
+        assert_eq!(resolved, path);
+    }
+
+    #[test]
+    fn resolves_relocated_file_within_project_tree() {
+        let temp = tempfile::tempdir().expect("create tempdir");
+        let relocated_dir = temp.path().join("src/main/java/com/eilocker/dyncode/runtime/cabinetpay/checkout");
+        fs::create_dir_all(&relocated_dir).expect("create relocated dir");
+        let relocated_file = relocated_dir.join("DyncodeOrderCheckoutQuoteConfig.java");
+        fs::write(&relocated_file, "class DyncodeOrderCheckoutQuoteConfig {}\n").expect("write relocated file");
+
+        let stale_path = temp.path().join("src/main/java/com/eilocker/dyncode/runtime/businessapi/DyncodeOrderCheckoutQuoteConfig.java");
+        let resolved = resolve_existing_open_target(stale_path.to_str().expect("utf8 path")).expect("relocated file should resolve");
+        assert_eq!(resolved, relocated_file);
+    }
+
+    #[test]
+    fn returns_err_when_file_truly_missing() {
+        let temp = tempfile::tempdir().expect("create tempdir");
+        let missing_path = temp.path().join("src/main/java/DoesNotExistAtAll.java");
+        let err = resolve_existing_open_target(missing_path.to_str().expect("utf8 path")).expect_err("truly missing file should fail");
+        assert!(err.contains("Path does not exist"));
     }
 }
 

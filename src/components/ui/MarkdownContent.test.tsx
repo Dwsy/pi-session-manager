@@ -50,6 +50,22 @@ describe('MarkdownContent link handling', () => {
     })
   })
 
+  it('shows a non-blocking toast instead of window.alert when opening a link fails', async () => {
+    invokeMock.mockRejectedValueOnce(new Error('Path does not exist: /tmp/missing.java'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    render(<MarkdownContent content="[Missing](file:///tmp/missing.java)" />)
+    fireEvent.click(screen.getByRole('link', { name: 'Missing' }))
+
+    await waitFor(() => {
+      const alertEl = document.body.querySelector('[role="alert"]')
+      expect(alertEl?.textContent).toContain('Path does not exist: /tmp/missing.java')
+    })
+    expect(window.alert).not.toHaveBeenCalled()
+    document.body.querySelectorAll('[role="alert"]').forEach((el) => el.remove())
+    errorSpy.mockRestore()
+  })
+
   it('blocks unsupported protocols', () => {
     render(<MarkdownContent content="[Bad](javascript:alert(1))" />)
 
