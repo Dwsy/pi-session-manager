@@ -128,4 +128,40 @@ describe('crossAgentToolRenderer', () => {
 
     expect(crossAgentToolRenderer.getPreview!(toolCall, data)).toBe('Wait: 10000 ms')
   })
+
+  it('renders Antigravity PascalCase path and command arguments in previews', () => {
+    const readCall = {
+      type: 'toolCall' as const,
+      id: 'agy-read',
+      name: 'read_file',
+      arguments: { Path: '/repo/src/service/payment.ts' },
+    }
+    const editCall = {
+      type: 'toolCall' as const,
+      id: 'agy-edit',
+      name: 'edit_file',
+      arguments: { Path: '/repo/src/app.ts', Target: 'a', Replacement: 'b' },
+    }
+    const writeCall = {
+      type: 'toolCall' as const,
+      id: 'agy-write',
+      name: 'write_file',
+      arguments: { Path: '/repo/src/new.ts', Content: 'export {}' },
+    }
+    const cmdCall = {
+      type: 'toolCall' as const,
+      id: 'agy-cmd',
+      name: 'run_command',
+      arguments: { CommandLine: 'git status' },
+    }
+
+    expect(crossAgentToolRenderer.getPreview!(readCall, crossAgentToolRenderer.resolveData!(readCall, 0, new Map())))
+      .toBe('Read: /repo/src/service/payment.ts')
+    expect(crossAgentToolRenderer.getPreview!(editCall, crossAgentToolRenderer.resolveData!(editCall, 0, new Map())))
+      .toBe('Edit: /repo/src/app.ts')
+    expect(crossAgentToolRenderer.getPreview!(writeCall, crossAgentToolRenderer.resolveData!(writeCall, 0, new Map())))
+      .toBe('Write: /repo/src/new.ts')
+    expect(crossAgentToolRenderer.getPreview!(cmdCall, crossAgentToolRenderer.resolveData!(cmdCall, 0, new Map())))
+      .toBe('Shell: git status')
+  })
 })

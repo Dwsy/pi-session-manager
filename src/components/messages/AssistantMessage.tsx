@@ -202,7 +202,15 @@ function DirectToolCall({
   const isInterceptEnabled = isCodeReviewActive && (codeReviewPlugin.settings?.interceptExpand ?? true)
 
   const reviewableToolNames = ["write", "write_file", "edit", "edit_file", "multiedit", "apply_patch", "read", "read_file", "bash", "shell", "powershell", "pwsh", "exec", "task"]
-  const isSupportedByReview = toolCall.name && reviewableToolNames.includes(toolCall.name.toLowerCase())
+  const isSupportedByReview = Boolean(
+    (toolCall.name && reviewableToolNames.includes(toolCall.name.toLowerCase())) ||
+      toolRenderRegistry.extractReviewOperation(
+        toolCall,
+        resolvedData.args ?? {},
+        resolvedData,
+        resolvedData.result,
+      ),
+  )
 
   const handleToggleExpanded = () => {
     const expanded = isToolExpanded(entryId)
