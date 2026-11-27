@@ -30,9 +30,11 @@ afterEach(() => {
 
 import type { SessionEntry } from "@/types";
 import ToolCallReviewModal from "./ToolCallReviewModal";
+import { toolRenderRegistry } from "@/plugins/tools-render/registry";
 import {
   DEFAULT_REVIEW_FILTER,
   extractFileOperations,
+  getOperationFileDiff,
 } from "./tool-review/model";
 
 function assistantToolEntry(content: NonNullable<SessionEntry["message"]>["content"]): SessionEntry {
@@ -526,6 +528,144 @@ describe("ToolCallReviewModal data model", () => {
         lines: 1,
       },
     });
+  });
+
+  it("adapts Antigravity and external agent tool calls into reviewable operations", () => {
+    const operations = extractFileOperations(
+      [
+        assistantToolEntry([
+          {
+            type: "toolCall",
+            id: "agy-1",
+            name: "run_command",
+            arguments: { CommandLine: "ls -la work/" },
+          },
+          {
+            type: "toolCall",
+            id: "agy-2",
+            name: "write_to_file",
+            arguments: {
+              TargetFile: "/repo/src/new.ts",
+              CodeContent: "export const ok = true;\n",
+            },
+          },
+          {
+            type: "toolCall",
+            id: "agy-2b",
+            name: "write_file",
+            arguments: {
+              Path: "/repo/src/payment.ts",
+              Content: "export const paid = true;\n",
+            },
+          },
+          {
+            type: "toolCall",
+            id: "agy-3",
+            name: "edit_file",
+            arguments: {
+              Path: "/repo/src/app.ts",
+              Target: "const a = 1;",
+              Replacement: "const a = 2;",
+            },
+          },
+          {
+            type: "toolCall",
+            id: "agy-4",
+            name: "view_file",
+            arguments: { AbsolutePath: "/repo/README.md" },
+          },
+          {
+            type: "toolCall",
+            id: "mcp-5",
+            name: "mcp__nexus__file_edit",
+            arguments: {
+              action: "replace",
+              path: "/repo/src/mcp.ts",
+              old: "before()",
+              new: "after()",
+            },
+          },
+        ]),
+      ],
+      new Map(),
+    );
+
+    expect(operations).toHaveLength(6);
+    expect(operations[0]).toMatchObject({
+      toolName: "bash",
+      filePath: "ls -la work/",
+    });
+    expect(operations[1]).toMatchObject({
+      toolName: "write",
+      filePath: "/repo/src/new.ts",
+      content: "export const ok = true;\n",
+    });
+    expect(operations[2]).toMatchObject({
+      toolName: "write",
+      filePath: "/repo/src/payment.ts",
+      content: "export const paid = true;\n",
+    });
+    expect(operations[3]).toMatchObject({
+      toolName: "edit",
+      filePath: "/repo/src/app.ts",
+    });
+    expect(getOperationFileDiff(operations[3])).toEqual({
+      oldFile: { name: "app.ts", contents: "const a = 1;" },
+      newFile: { name: "app.ts", contents: "const a = 2;" },
+    });
+    expect(operations[4]).toMatchObject({
+      toolName: "read",
+      filePath: "/repo/README.md",
+    });
+    expect(operations[5]).toMatchObject({
+      toolName: "edit",
+      filePath: "/repo/src/mcp.ts",
+    });
+    expect(getOperationFileDiff(operations[5])).toEqual({
+      oldFile: { name: "mcp.ts", contents: "before()" },
+      newFile: { name: "mcp.ts", contents: "after()" },
+    });
+  });
+
+  it("supports custom plugin review adapters registered in toolRenderRegistry", () => {
+    toolRenderRegistry.registerReviewAdapter({
+      id: "test.custom.review.adapter",
+      priority: 100,
+      match: "custom_sql_migrate",
+      extract: (_toolCall, args) => ({
+        toolName: "write",
+        filePath: String(args.migrationFile || ""),
+        content: String(args.sql || ""),
+      }),
+    });
+
+    try {
+      const operations = extractFileOperations(
+        [
+          assistantToolEntry([
+            {
+              type: "toolCall",
+              id: "custom-1",
+              name: "custom_sql_migrate",
+              arguments: {
+                migrationFile: "db/migrations/001.sql",
+                sql: "CREATE TABLE demo(id INT);\n",
+              },
+            },
+          ]),
+        ],
+        new Map(),
+      );
+
+      expect(operations).toHaveLength(1);
+      expect(operations[0]).toMatchObject({
+        toolName: "write",
+        filePath: "db/migrations/001.sql",
+        content: "CREATE TABLE demo(id INT);\n",
+      });
+    } finally {
+      toolRenderRegistry.unregisterReviewAdapter("test.custom.review.adapter");
+    }
   });
 });
 

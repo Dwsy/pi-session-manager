@@ -49,6 +49,33 @@ export interface ReadToolData extends BaseToolData {
   images: Array<{ type: 'image'; mimeType: string; data: string }>
 }
 
+// ========== Tool Review Adapter Types ==========
+
+export type ToolReviewKind = 'read' | 'write' | 'edit' | 'bash' | 'task'
+
+export interface ToolReviewOperationDraft {
+  toolName: ToolReviewKind
+  filePath?: string
+  content?: string
+  oldText?: string
+  newText?: string
+  diff?: string
+  output?: string
+  preview?: string
+}
+
+export interface ToolReviewAdapter {
+  id: string
+  priority?: number
+  match: ToolMatcher
+  extract: (
+    toolCall: Content,
+    args: Record<string, unknown>,
+    resolved: ResolvedToolData,
+    resultEntry?: SessionEntry,
+  ) => ToolReviewOperationDraft | null
+}
+
 /**
  * Context provided to tool renderers
  * Contains UI state and utility functions
@@ -140,6 +167,12 @@ export interface ToolRenderPlugin<TData extends BaseToolData = ResolvedToolData>
    * Generate preview text (for session list, etc.)
    */
   getPreview?: (toolCall: Content, resolvedData: TData) => string
+
+  /**
+   * Optional hook to adapt this tool call into a reviewable file/shell operation
+   * for the Tool Call Review modal.
+   */
+  extractReviewOperation?: ToolReviewAdapter['extract']
 
   /**
    * Priority (default 50, higher = first)

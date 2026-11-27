@@ -2,7 +2,9 @@ import type { FileContents } from "@pierre/diffs/react";
 
 import type { Content, SessionEntry } from "@/types";
 import { defaultResolveData } from "@/plugins/tools-render/utils/resolveData";
+import { toolRenderRegistry } from "@/plugins/tools-render/registry";
 import { getLanguageFromPath } from "@/utils/markdown";
+import { ensureBuiltinReviewAdapters } from "./adapters";
 
 export interface OperationMetrics {
   additions: number;
@@ -25,6 +27,8 @@ export interface FileOperation {
   toolName: string;
   filePath: string;
   content?: string;
+  oldText?: string;
+  newText?: string;
   output?: string;
   diff?: string;
   images?: ReviewImage[];
@@ -368,6 +372,13 @@ function getEditFileContents(operation: FileOperation): {
     }
   }
 
+  if (operation.oldText !== undefined || operation.newText !== undefined) {
+    return {
+      oldFile: { name: fileName, contents: operation.oldText ?? "" },
+      newFile: { name: fileName, contents: operation.newText ?? "" },
+    };
+  }
+
   const textPair = getEditTextPair(operation.args);
   if (textPair) {
     return {
@@ -468,6 +479,7 @@ export function extractFileOperations(
   entries: SessionEntry[],
   toolResultByCallId: Map<string, SessionEntry>,
 ): FileOperation[] {
+  ensureBuiltinReviewAdapters();
   const operations: FileOperation[] = [];
 
   entries.forEach((entry) => {
@@ -485,19 +497,31 @@ export function extractFileOperations(
         arguments?: Record<string, unknown>;
       };
       const toolCallId = toolCall.id || toolCall.toolCallId || "";
-      const toolName = normalizeReviewToolName(toolCall.name || "unknown");
-      if (!["write", "edit", "read", "bash", "task"].includes(toolName)) return;
-
       const resolved = defaultResolveData(
         toolCall,
         itemIndex,
         toolResultByCallId,
       );
       const args = asRecord(resolved.args ?? toolCall.arguments);
-      const output = typeof resolved.output === "string" ? resolved.output : "";
       const resultEntry = toolCallId
         ? toolResultByCallId.get(toolCallId)
         : undefined;
+      const draft = toolRenderRegistry.extractReviewOperation(
+        toolCall,
+        args,
+        resolved,
+        resultEntry,
+      );
+      const toolName =
+        draft?.toolName ?? normalizeReviewToolName(toolCall.name || "unknown");
+      if (!["write", "edit", "read", "bash", "task"].includes(toolName)) return;
+
+      const output =
+        draft?.output !== undefined
+          ? draft.output
+          : typeof resolved.output === "string"
+            ? resolved.output
+            : "";
       const details = asRecord(resultEntry?.message?.details);
       const detailsPatch =
         typeof details.patch === "string" ? details.patch : "";
@@ -507,23 +531,31 @@ export function extractFileOperations(
       const diff =
         (detailsPatch && isUnifiedDiff(detailsPatch) ? detailsPatch : "") ||
         resolvedDiff ||
-        detailsPatch;
+        detailsPatch ||
+        draft?.diff ||
+        "";
       const images = resolved.images ?? [];
       const editTextPair = toolName === "edit" ? getEditTextPair(args) : null;
+      const resolvedOldText = draft?.oldText ?? editTextPair?.oldText;
+      const resolvedNewText = draft?.newText ?? editTextPair?.newText;
       const contentArg =
-        toolName === "edit"
-          ? (editTextPair?.newText || getStringArg(args, "content", "new_string"))
-          : toolName === "read"
-            ? output || getStringArg(args, "content", "new_string")
-            : getStringArg(args, "content", "new_string");
-      const filePath = getOperationPath(toolName, args);
-      const preview = getOperationPreview(
-        toolName,
-        args,
-        output,
-        contentArg,
-        diff,
-      );
+        draft?.content !== undefined
+          ? draft.content
+          : toolName === "edit"
+            ? (resolvedNewText || getStringArg(args, "content", "new_string"))
+            : toolName === "read"
+              ? output || getStringArg(args, "content", "new_string")
+              : getStringArg(args, "content", "new_string");
+      const filePath = draft?.filePath || getOperationPath(toolName, args);
+      const preview =
+        draft?.preview ||
+        getOperationPreview(
+          toolName,
+          args,
+          output,
+          contentArg,
+          diff,
+        );
 
       operations.push({
         id: `${entry.id}-${toolCallId || operations.length}`,
@@ -533,6 +565,8 @@ export function extractFileOperations(
         toolName,
         filePath,
         content: contentArg || undefined,
+        oldText: resolvedOldText,
+        newText: resolvedNewText,
         output: output || undefined,
         diff: diff || undefined,
         images: images.length > 0 ? images : undefined,

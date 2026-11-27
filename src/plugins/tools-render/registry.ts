@@ -1,5 +1,11 @@
-import type { ToolRenderPlugin, BaseToolData } from './types'
-import type { Content } from '@/types'
+import type {
+  ToolRenderPlugin,
+  BaseToolData,
+  ResolvedToolData,
+  ToolReviewAdapter,
+  ToolReviewOperationDraft,
+} from './types'
+import type { Content, SessionEntry } from '@/types'
 import { matchTool } from './types'
 
 /**
@@ -10,6 +16,8 @@ export class ToolRenderRegistry {
   private plugins: Map<string, ToolRenderPlugin> = new Map()
   private sortedCache: ToolRenderPlugin[] | null = null
   private fallbackPlugin: ToolRenderPlugin | null = null
+  private reviewAdapters: Map<string, ToolReviewAdapter> = new Map()
+  private sortedReviewAdaptersCache: ToolReviewAdapter[] | null = null
 
   /**
    * Register a plugin
@@ -108,6 +116,58 @@ export class ToolRenderRegistry {
     this.plugins.forEach(p => p.onUnmount?.())
     this.plugins.clear()
     this.sortedCache = null
+    this.reviewAdapters.clear()
+    this.sortedReviewAdaptersCache = null
+  }
+
+  registerReviewAdapter(adapter: ToolReviewAdapter): void {
+    if (this.reviewAdapters.has(adapter.id)) {
+      return
+    }
+    this.reviewAdapters.set(adapter.id, adapter)
+    this.sortedReviewAdaptersCache = null
+  }
+
+  unregisterReviewAdapter(adapterId: string): void {
+    if (this.reviewAdapters.delete(adapterId)) {
+      this.sortedReviewAdaptersCache = null
+    }
+  }
+
+  getSortedReviewAdapters(): ToolReviewAdapter[] {
+    if (!this.sortedReviewAdaptersCache) {
+      this.sortedReviewAdaptersCache = Array.from(this.reviewAdapters.values())
+        .sort((a, b) => (b.priority ?? 50) - (a.priority ?? 50))
+    }
+    return this.sortedReviewAdaptersCache
+  }
+
+  extractReviewOperation(
+    toolCall: Content,
+    args: Record<string, unknown>,
+    resolved: ResolvedToolData,
+    resultEntry?: SessionEntry,
+  ): ToolReviewOperationDraft | null {
+    const name = toolCall.name || ''
+    for (const adapter of this.getSortedReviewAdapters()) {
+      const matched =
+        typeof adapter.match === 'string'
+          ? adapter.match === name
+          : adapter.match instanceof RegExp
+            ? adapter.match.test(name)
+            : adapter.match(toolCall)
+      if (!matched) continue
+      const draft = adapter.extract(toolCall, args, resolved, resultEntry)
+      if (draft) return draft
+    }
+
+    const plugin = this.findPlugin(toolCall)
+    if (plugin.extractReviewOperation) {
+      const draft = plugin.extractReviewOperation(toolCall, args, resolved, resultEntry)
+      if (draft) return draft
+    }
+
+    return null
   }
 
   /**
